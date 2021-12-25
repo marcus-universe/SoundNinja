@@ -1,14 +1,24 @@
 {
-  "name": "soundninjavue",
+  "name": "soundninja",
   "version": "0.1.0",
   "private": true,
+  "author": "Marcus Harting",
+  "license": "MIT",
+  "description": "Ultimate Soundboard",
+
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "electron:build": "vue-cli-service electron:build",
+    "electron:serve": "vue-cli-service electron:serve",
+    "postinstall": "electron-builder install-app-deps",
+    "postuninstall": "electron-builder install-app-deps"
   },
+  "main": "background.js",
   "dependencies": {
     "core-js": "^3.6.5",
+    "node-sass": "^6.0.1",
     "vue": "^3.0.0"
   },
   "devDependencies": {
@@ -16,9 +26,18 @@
     "@vue/cli-plugin-eslint": "~4.5.0",
     "@vue/cli-service": "~4.5.0",
     "@vue/compiler-sfc": "^3.0.0",
+    "axios": "^0.24.0",
     "babel-eslint": "^10.1.0",
+    "electron": "13.0.0",
+    "electron-devtools-installer": "^3.1.0",
+    "electron-store": "^8.0.1",
     "eslint": "^6.7.2",
-    "eslint-plugin-vue": "^7.0.0"
+    "eslint-plugin-vue": "^7.0.0",
+    "howler": "^2.2.3",
+    "sass-loader": "^10.2.0",
+    "style-loader": "^3.3.1",
+    "vue-cli-plugin-electron-builder": "^2.1.1",
+    "vuetify": "^2.6.1"
   },
   "eslintConfig": {
     "root": true,
@@ -32,8 +51,13 @@
     "parserOptions": {
       "parser": "babel-eslint"
     },
-    "rules": {}
+    "rules": {
+      "vue/no-unused-vars": "warn",
+      "vue/no-undef-properties": "warn"
+    }
   },
+
+
   "browserslist": [
     "> 1%",
     "last 2 versions",

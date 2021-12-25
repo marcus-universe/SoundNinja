@@ -1,0 +1,65 @@
+$color2: #2aff3c
+$color_s_li: #596d80
+$color_s: #394855
+$color-bg: #222831
+$color-li: #DDDDDD
+$color: #2adfff
+$small: 1330px
+$ButtonWidth: 180px
+
+\:root
+  --primary_color: #{$color}
+  --ButtonWidth: #{$ButtonWidth}
+
+
+::-webkit-scrollbar 
+    width:  0.5rem
+    height: 0.2rem
+    
+
+::-webkit-scrollbar-thumb 
+    background: var(--primary_color)
+    border-radius: 20px
+    
+
+::-webkit-scrollbar-track 
+    background: $color-bg
+
+@font-face 
+  font-family: "Nunito-Regular"
+  src: url("../Assets/FONTS/Nunito-Regular.ttf") format("truetype")
+
+@font-face 
+  font-family: "Nunito-Bold"
+  src: url("../Assets/FONTS/Nunito-Bold.ttf") format("truetype")
+
+@font-face 
+  font-family: "Nunito-SemiBold"
+  src: url("../Assets/FONTS/Nunito-SemiBold.ttf") format("truetype")
+
+@font-face 
+  font-family: "Nunito-Black"
+  src: url("../Assets/FONTS/Nunito-Black.ttf") format("truetype")
+
+@font-face 
+  font-family: "Caveat-Regular"
+  src: url("../Assets/FONTS/Caveat-Regular.ttf") format("truetype")
+
+@font-face 
+  font-family: "Caveat-Bold"
+  src: url("../Assets/FONTS/Caveat-Bold.ttf") format("truetype")
+
+$Nunito-R: "Nunito-Regular"
+$Nunito-Bo: "Nunito-Bold"
+$Nunito-SemiBo: "Nunito-SemiBold"
+$Nunito-Bl: "Nunito-Black"
+$Caveat-R: "Caveat-Regular"
+$Caveat-Bo: "Caveat-Bold"
+
+
+body
+    background: $color-bg
+    margin: 0
+    padding: 0
+    height: 100vh
+    overflow: hidden

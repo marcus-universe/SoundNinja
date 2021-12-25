@@ -1,0 +1,521 @@
+@import _settings
+
+
+.LogoSection
+    height: 60px
+    width: 100%
+    justify-content: flex-start !important
+    -webkit-app-region: drag
+    z-index: 1
+    &:hover
+        cursor: grab
+
+    .LogoIconContainer
+        margin-left: 2%
+    img
+        width: 55px
+
+    h1
+        color: $color-li
+        font-family: $Caveat-Bo
+        font-size: 2.3rem
+        margin: 0
+        padding: 0px 0px 0px 10px
+        text-align: left
+        em
+            color: var(--primary_color)
+            // color: $color
+
+.windowoptions
+    position: fixed
+    top: 10px
+    right: 10px
+    -webkit-app-region: no-drag
+     z-index: 3
+    svg
+        width: 25px
+        height: 25px
+        margin: 0px 5px
+        transition: all 0.3s ease
+        .cls-1
+            fill: var(--primary_color)
+            transition: fill 0.3s ease
+        &:hover
+            cursor: pointer
+
+            .cls-1
+                fill: $color-li
+        
+
+.hideLogo
+    display: none
+
+
+$max_height: calc(100% - 60px)  
+
+.max_h
+    height: $max_height
+
+
+.flex-c-w
+    display: flex
+    justify-content: space-around
+    flex-direction: row
+    
+.flex-c-rand
+    display: flex
+    justify-content: space-between
+    flex-direction: row
+
+.flex_c_h
+    display: flex
+    justify-content: center
+    flex-direction: column
+
+.flex-center
+    display: flex
+    justify-content: center
+    align-items: center
+
+.grid_c
+    display: grid
+    place-items: center
+
+.ContentSection
+    justify-content: space-between
+
+//* #####################################
+//* ANCHOR Side Panel
+//* #####################################
+
+.sidepanel_w
+    justify-content: center
+    position: absolute
+    bottom: 5%
+    width: 90px
+    // transform: translateY(-50%)
+.sidepanel
+    // width: 70px
+    // min-width: 200px
+    background: $color-bg
+    padding: 0px 20px 0px 20px
+    
+    height: 80vh
+    display: flex
+    flex-direction: column
+    justify-content: flex-end
+@media (max-width: $small)
+    .sidepanel_w
+        // width: calc(15% + 40px)
+    .sidepanel
+        width: 70px
+        // min-width: 300px
+
+.control_button
+    padding: 10px
+    width: 35px
+    height: 35px
+    font-family: $Nunito-Bo
+    font-size: 1rem
+    color: $color-li
+    border: 3px solid var(--primary_color)
+    background: $color-bg
+    margin: 15px 0px
+    border-radius: 10px
+    transition: all 0.3s ease
+    box-shadow: 3px 3px 20px rgba(0, 0, 0, 0.2)
+    svg 
+        .cls-1
+            fill: var(--primary_color)
+            transition: all 0.3s ease
+        .cls-2
+            fill: var(--primary_color)
+            filter: brightness(0.8)
+            transition: all 0.3s ease
+    
+    a
+        text-decoration: none
+        color: $color-li
+.control_button:hover
+    color: $color-li
+    text-shadow: 0px 0px 10px rgba(0, 0, 0, 1.8)
+    background-color: var(--primary_color)
+    cursor: pointer
+    border-radius: 10px
+    svg 
+        .cls-1
+            fill: $color-bg
+        .cls-2
+            fill: $color-bg
+
+
+//* #####################################
+//* ANCHOR Soundboard
+//* #####################################
+@keyframes ShowButtons
+    0%
+        transform: scale(0)
+        opacity: 0.5
+    100%
+        transform: scale(1)
+        opacity: 1
+
+
+.Soundpad
+    width: calc(100% - 140px)
+    justify-content: start
+    margin-left: 110px
+    // height: 100%
+    // padding-top: 10px   
+
+    .Tabs_Container
+        width: 100%
+        // min-height: 60px
+        background: $color-bg
+        border-bottom: 3px solid var(--primary_color)
+        margin-top: 10px
+        justify-content: start
+        flex-wrap: nowrap
+        overflow-x: auto
+        overflow-y: clip
+        width: 100%
+        height: 10vh
+        min-height: 70px
+        max-height: 80px
+        scroll-behavior: smooth
+        // scroll-x: scroll
+        .TabButtonBox
+            // min-width: 100px
+            max-width: 300px
+            max-height: 100px
+            // width: 30%
+            display: flex
+            flex-direction: row
+            justify-content: center
+            align-items: center
+            margin: 0px 10px 0px 10px
+            &:last-child
+                margin: 0px 50px 0px 10px
+            .Tab
+                font-family: $Nunito-Bo
+                color: $color-li
+                padding: 20px
+                box-shadow: 3px 3px 20px rgba(0, 0, 0, 0.2)
+                transition: all 0.3s ease
+                border-left: 3px solid var(--primary_color)
+                border-right: 3px solid var(--primary_color)
+                border-top: 3px solid var(--primary_color)
+                border-top-left-radius: 10px
+                border-top-right-radius: 10px
+                // width: clamp( 20%, 50%, 100%)
+                min-width: 100px
+                max-width: 300px
+                text-align: center
+                
+                
+            .Tab:hover
+                // background: $color_s
+                filter: brightness(1.2)
+                background: $color_s
+                cursor: pointer
+            .addtab
+                width: 30%
+
+    .SoundButton_Container
+        justify-content: flex-start
+        width: 100%
+        // height: 100%
+        flex-wrap: wrap
+        // margin-top: 20px
+        overflow-y: scroll
+        height: 79vh
+        border-left: 3px solid var(--primary_color)
+        align-items: baseline
+        .ButtonTab
+            width: 100%
+            justify-content: flex-start
+            flex-direction: row
+            flex-wrap: wrap
+            padding: 10px 0px
+            border-bottom: 3px solid var(--primary_color)
+            
+            .SoundButtonContainBox
+                margin: 5px
+                display: flex
+                justify-content: center
+                align-items: stretch
+                max-width: var(--ButtonWidth)
+                width: 100%
+                max-height: 160px
+                
+                .SoundButton
+                    align-items: center
+                    background: $color_s
+                    padding: 20px 20px
+                    max-height: 160px
+                    // min-width: 100px
+                    width: clamp(100px, 10%, 150px)
+                    max-width: var(--ButtonWidth)
+                    word-break: break-word
+                    hyphens: auto
+                    white-space: pre-wrap
+                    // overflow-wrap: break-word
+                    width: 100%
+                    color: $color-li
+                    font-family: $Nunito-R
+                    text-align: center
+                    transition: all 0.3s ease
+                    border-radius: 10px
+                    animation: ShowButtons 0.3s ease
+                .SoundButton:hover
+                    cursor: pointer
+                    
+                    background: $color_s_li
+        
+.SoundButtonActive
+    background: var(--primary_color) !important
+    color: $color-bg !important
+.SoundButtonActive:hover
+    background: var(--primary_color)
+    color: $color-bg
+    font-weight: 800
+    // filter: brightness(1.2)
+
+.SoundButtonHide
+    display: none
+            
+
+
+@media (max-width: $small)
+    // .Soundpad
+    //     width: 80% 
+
+
+//* #####################################
+//* ANCHOR Soundboard
+//* #####################################
+.contextmenuTab
+    background: $color-bg
+    border-radius: 10px
+    box-shadow: 3px 3px 20px rgba(0, 0, 0, 0.2)
+    position: absolute
+    z-index: 999
+    margin: 0px
+    padding: 0px
+    width: 100px
+    top: 0px
+    left: 0px
+    display: none
+    li
+        font-family: $Nunito-Bo
+        color: var(--primary_color)
+        text-decoration: none
+        list-style: none
+        padding: 10px 20px 10px 20px
+        text-align: left
+        font-size: 0.9rem
+        // border-radius: 10px
+        &:first-child
+            border-top-left-radius: 10px
+            border-top-right-radius: 10px
+        &:last-child
+            border-bottom-left-radius: 10px
+            border-bottom-right-radius: 10px
+        &:hover
+            background: var(--primary_color)
+            cursor: pointer
+            color: $color-bg
+            font-weight: 800
+            
+            // filter: brightness(1.2)
+
+
+//* #####################################
+//* ANCHOR Settings/About Panel
+//* #####################################
+.SettingPanel, .AboutContainer
+    height: 100vh
+    width: 100%
+    position: absolute
+    top: 0
+    left: 0
+    z-index: 3
+    backdrop-filter: blur(2px)
+    background: rgba($color-bg, .8)
+    transition: all 0.2s ease
+    transform: scale(0.9)
+    opacity: 0
+    pointer-events: none
+    .SettingBox, .AboutPage
+        min-width: 80%
+        min-height: 80%
+        
+        background: rgba($color-bg, .8)
+        border-radius: 50px
+        border: 4px solid var(--primary_color)
+        backdrop-filter: blur(5px)
+        box-shadow: 0px 0px 30px #00000069
+        transform: scale(0.8)
+        transition: all 0.3s ease
+        .ExitSetting, .ExitAbout
+            width: 2rem
+            height: 2rem
+            left: 2rem
+            top: 2rem
+            position: absolute
+            transition: all 0.1s ease
+        .ExitSetting:hover, .ExitAbout:hover
+            transform: scale(1.2)
+            cursor: pointer
+        h2
+            color: var(--primary_color)
+            text-align: center
+            font-family: $Nunito-Bo
+            font-size: 2rem
+            position: absolute
+            left: 50%
+            transform: translateX(-50%)
+        .SettingList
+            max-width: 60%
+            min-width: 40%
+        ul
+            color: $color-li
+            list-style: none
+            font-size: 1.3rem
+            // margin-top: 10%
+            font-family: $Nunito-SemiBo
+            padding: 0
+            max-height: 500px
+            li
+                margin: 10px 0px
+                text-align: right
+                input
+                    margin-left: 100px
+                .colorpicker
+                    border-radius: 100%
+                    width: 30px
+                    height: 30px
+                    border: none
+                    border-image: initial
+                    // outline: none
+                    padding: 0
+                    -webkit-appearance: none
+                    transition: all 0.3s ease
+                .colorpicker::-webkit-color-swatch-wrapper
+                    padding: 0
+                .colorpicker::-webkit-color-swatch
+                    border: none
+                    border-radius: 100%
+                .colorpicker:hover
+                    cursor: pointer
+                    transform: scale(1.3)
+                
+                .checkbox
+                    width: 30px
+                    height: 30px
+                    -webkit-appearance: none
+                    background: $color-bg
+                    border: 2px solid $color-li
+                    margin: 0px
+                    transition: all 0.3s ease
+                    &:hover
+                        cursor: pointer
+                    &:after
+                            content: '✔'
+                            position: absolute
+                            width: 30px
+                            height: 30px
+                            font-size: 1.5rem
+                            // margin-left: 5px
+                            margin-top: -4px
+                            text-align: center
+                            color: var(--primary_color) 
+                            opacity: 0
+                            transition: all 0.3s ease
+                    &:checked
+                        border: 2px solid var(--primary_color)
+                        &:after
+                            opacity: 1
+                select#audioSource
+                    min-width: 150px
+                    font-family: $Nunito-Bo
+                    background: $color-bg
+                    border: 2px solid var(--primary_color)
+                    color: $color-li
+                    outline: none
+                    &:focus
+                        border: 2px solid var(--primary_color)
+                    &:active
+                        border: 2px solid var(--primary_color)
+
+
+.ActiveSettings
+    transform: scale(1) !important
+    opacity: 1
+    pointer-events: auto
+
+//About
+.AboutPage
+    min-height: 30% !important
+    width: 50% !important
+    max-width: 30vw
+    padding: 70px 10px
+    p
+        position: absolute
+        bottom: 0
+        text-align: center
+        font-family: $Nunito-R
+        opacity: 0.6
+        color: $color-li
+        left: 50%
+        transform: translateX(-50%)
+        width: 100%
+    .LogoAbout
+        width: 100%
+        max-height: 300px
+        img
+           min-width: 200px 
+           max-width: 10%
+           position: absolute
+           left: 50%
+           transform: translateX(-50%)
+           
+        h1
+            color: $color-li
+            font-family: $Caveat-Bo
+            font-size: 4rem
+            margin: 160px 0px 10px 0px
+            padding: 0px 0px 0px 0px
+            text-align: center
+            em
+                color: var(--primary_color)
+
+    .Support
+        font-family: $Nunito-Bo
+        color: $color-li
+        text-align: center
+        font-size: 1.4rem
+        .SupportLinks
+            margin: 30px 0px 0px 0px
+            padding: 0
+            width: 100%
+            li
+                margin: 10px 0px
+                padding: 0
+                font-family: $Nunito-R
+                color: var(--primary_color)
+                justify-content: center
+                div
+                    width: 150px
+                    justify-content: start
+                img
+                    width: 30px
+                    margin-right: 20px
+                a
+                    list-style: none
+                    color: var(--primary_color)
+                    text-align: left
+                    transition: color 0.3s ease
+                a:hover
+                    color: $color-li
+
