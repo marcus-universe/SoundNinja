@@ -22,6 +22,7 @@
 import { inject } from "vue";
 import SoundButton from "./SoundButton.vue";
 import draggable from "vuedraggable";
+import { ipcRenderer } from "electron";
 
 export default {
     name: "Tab",
@@ -36,6 +37,7 @@ export default {
             tabindex: 0,
             drag: false,
             tab: "",
+            edited: false,
         };
     },
     computed: {
@@ -44,6 +46,7 @@ export default {
                 return this.tab.audiofiles;
             },
             set(value) {
+                this.updateList();
                 this.tab.audiofiles = value;
             },
         },
@@ -82,22 +85,23 @@ export default {
                 event,
             });
         },
+        updateList() {
+            this.edited = false;
+
+            ipcRenderer.invoke("getData").then((data) => {
+                if (!data) return;
+
+                let list = JSON.parse(JSON.stringify(this.list));
+                data.folder[this.tabindex].audiofiles = list;
+                ipcRenderer.invoke("setData", data);
+            });
+        },
     },
-    mounted() {
-        const tab = this.tabList[this.tabindex];
+    async mounted() {
+        const data = await ipcRenderer.invoke("getData");
+        const tab = data?.folder[this.tabindex];
         this.tab = tab;
         this.list = tab.audiofiles;
-
-        console.log(
-            JSON.parse(
-                JSON.stringify({
-                    tabList: this.tabList,
-                    selectedTab: this.selectedTab,
-                    tab: this.tab,
-                    list: this.list,
-                })
-            )
-        );
     },
 };
 </script>

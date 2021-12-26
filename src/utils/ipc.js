@@ -1,5 +1,21 @@
 import { ipcMain } from "electron";
 import fs from "fs";
+import DatabaseManager from "./DatabaseManager";
+
+const databaseManager = new DatabaseManager();
+
+// Database IPC
+ipcMain.handle("getData", () => {
+    return databaseManager.get();
+});
+
+ipcMain.handle("setData", (_event, data) => {
+    return databaseManager.set(data);
+});
+
+ipcMain.handle("mergeData", (_event, data) => {
+    return databaseManager.merge(data);
+});
 
 ipcMain.handle("getColor", () => {
     return new Promise((resolve, reject) => {
