@@ -1,5 +1,5 @@
 <template>
-    <Topbar />
+    <TopBar />
 
     <div class="flex-c-w max_h ContentSection">
         <div class="flex_c_h sidepanel_w">
@@ -20,7 +20,7 @@
 <style lang="sass" src="./SASS/style.sass"></style>
 
 <script>
-import Topbar from "./components/Topbar.vue";
+import TopBar from "./components/TopBar.vue";
 import Sidemenu from "./components/Sidemenu.vue";
 import About from "./components/Modals/About.vue";
 import Settings from "./components/Modals/Settings.vue";
@@ -45,7 +45,7 @@ export default {
         };
     },
     components: {
-        Topbar,
+        TopBar,
         Sidemenu,
         About,
         Settings,
