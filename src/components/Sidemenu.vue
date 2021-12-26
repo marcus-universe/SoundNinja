@@ -148,7 +148,6 @@ export default {
                         var foldername = path.basename(element.toString());
                         let folderfiles = fs.readdirSync(element);
                         var index = folderpath.indexOf(element);
-                        console.log(index);
 
                         var JsonStruct = {
                             id: Number,

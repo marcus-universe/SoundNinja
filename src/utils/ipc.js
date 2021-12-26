@@ -1,17 +1,21 @@
 import { ipcMain } from "electron";
-import fs from "fs";
+import ConfigManager from "./ConfigManager";
 
-ipcMain.handle("getColor", () => {
-    return new Promise((resolve, reject) => {
-        fs.readFile("./config.json", "utf8", (err, data) => {
-            if (err) reject(err);
-            const config = JSON.parse(data);
-            const color = config.settings[0].color;
-            try {
-                resolve(color);
-            } catch (e) {
-                reject(e);
-            }
-        });
-    });
+const manager = new ConfigManager();
+
+ipcMain.handle("getColor", async () => {
+    return (await manager.get()).settings[0].color;
+});
+
+ipcMain.handle("getConfig", () => {
+    return manager.get();
+});
+
+ipcMain.handle("setConfig", (_event, config) => {
+    return manager.set(config);
+});
+
+ipcMain.handle("mergeConfig", (_event, config) => {
+    if (typeof config !== "object") return;
+    return manager.merge(config);
 });
