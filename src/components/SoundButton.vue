@@ -1,39 +1,34 @@
 <template>
-<div
-    class="SoundButton grid_c"
-    :data-attribute="sound.audiourl"
-    :class="{'SoundButtonActive': clicked}"
-    @click="playSound(sound.audiourl)"
+    <div
+        class="SoundButton grid_c"
+        :data-attribute="sound.audiourl"
+        :class="{ SoundButtonActive: clicked }"
+        @click="playSound(sound.audiourl)"
     >
-
-    {{sound.audioname.replaceAll('.mp3', '').replaceAll('.wav', '').replaceAll('.ogg', '')}}
-
-</div>
+        {{ sound.audioname.replaceAll(".mp3", "").replaceAll(".wav", "").replaceAll(".ogg", "") }}
+    </div>
 </template>
 
 <script>
-import {Howl} from 'howler';
-
+import { Howl } from "howler";
 
 export default {
-    name: 'SoundButton',
+    name: "SoundButton",
     data() {
         return {
             clicked: false,
             playingsound: null,
-        }
+        };
     },
-    props: [
-        'sound'
-    ],
+    props: ["sound"],
     methods: {
         playSound(url) {
             this.clicked = !this.clicked;
-            
-            const contextmenu = document.querySelector('.contextmenuTab')
-            contextmenu.style.display = 'none';
 
-            console.log('playSound: ' + url);
+            const contextmenu = document.querySelector(".contextmenuTab");
+            contextmenu.style.display = "none";
+
+            console.log("playSound: " + url);
             if (this.clicked == true) {
                 this.playingsound = new Howl({
                     src: [url],
@@ -42,13 +37,10 @@ export default {
                     volume: 0.5,
                     html5: true,
                     preload: true,
-                    onend: function() {
+                    onend: function () {
                         this.clicked = false;
-                        console.log('Finished!');
-                        console.log(this.clicked);
-                        
-
-                    }.bind(this)
+                        console.log("Finished!");
+                    }.bind(this),
                 });
                 this.playingsound.play();
             } else {
@@ -59,7 +51,7 @@ export default {
             //     var audio = new Audio(url);
             //     audio.play();
             // }
-        }
-    }
-}
+        },
+    },
+};
 </script>
