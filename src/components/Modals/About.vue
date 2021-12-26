@@ -2,7 +2,7 @@
     <div class="AboutContainer flex-center">
         <div class="AboutPage flex_c_h">
             <img
-                v-on:click="OpenAbout"
+                v-on:click="closeAbout"
                 src="../../Assets/IMG/Exit.svg"
                 alt="Exit Settings Button"
                 class="ExitAbout"
@@ -27,11 +27,10 @@
 </template>
 
 <script>
-import GitHub from "../Icons/GitHub.vue";
-import YouTube from "../Icons/YouTube.vue";
-import Instagram from "../Icons/Instagram.vue";
-
-const shell = require("electron").shell;
+import GitHub from "../Links/GitHub.vue";
+import YouTube from "../Links/YouTube.vue";
+import Instagram from "../Links/Instagram.vue";
+import { shell } from "electron";
 
 export default {
     name: "About",
@@ -44,7 +43,7 @@ export default {
         return {};
     },
     methods: {
-        OpenAbout() {
+        closeAbout() {
             document.querySelector(".AboutContainer").classList.toggle("ActiveSettings");
         },
         clickLink(e) {
