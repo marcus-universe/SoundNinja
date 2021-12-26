@@ -10,7 +10,6 @@ export default class ConfigManager {
             fs.readFile("./config.json", "utf8", (err, data) => {
                 if (err) reject(err);
                 const config = JSON.parse(data);
-                console.log(config);
                 try {
                     resolve(config);
                 } catch (e) {
