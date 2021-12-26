@@ -40,9 +40,9 @@
 </template>
 
 <script>
+import { ipcRenderer } from "electron";
 let root = document.documentElement;
-const fs = require("fs");
-var colorPick;
+let colorPick;
 
 export default {
     data() {
@@ -51,12 +51,10 @@ export default {
         };
     },
 
-    created() {
-        fs.readFile("../config.json", "utf-8", function (err, data) {
-            if (err) throw err;
-            var SettingData = JSON.parse(data);
-            colorPick = SettingData.settings[0].color;
-        });
+    async created() {
+        const config = await ipcRenderer.invoke("getConfig");
+        colorPick = config.settings[0].color;
+        this.colorpick = colorPick;
     },
 
     methods: {
@@ -70,18 +68,12 @@ export default {
         },
 
         writeColor() {
-            fs.readFile("./config.json", "utf-8", function (err, data) {
-                if (err) throw err;
-                var SettingData = JSON.parse(data);
-                SettingData.settings[0].color = colorPick;
-                fs.writeFile(
-                    "./config.json",
-                    JSON.stringify(SettingData, null, 2),
-                    "utf-8",
-                    function (err) {
-                        if (err) throw err;
-                    }
-                );
+            ipcRenderer.invoke("mergeConfig", {
+                settings: [
+                    {
+                        color: colorPick,
+                    },
+                ],
             });
         },
     },
