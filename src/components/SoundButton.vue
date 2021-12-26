@@ -56,34 +56,3 @@ export default {
     },
 };
 </script>
-<style lang="">
-.SoundButton {
-    /* Make text unselectable */
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    align-items: center;
-    background: $color_s;
-    padding: 20px 20px;
-    max-height: 160px;
-    width: clamp(100px, 10%, 150px);
-    max-width: var(--ButtonWidth);
-    word-break: break-word;
-    hyphens: auto;
-    white-space: pre-wrap;
-    width: 100%;
-    color: $color-li;
-    font-family: $Nunito-R;
-    text-align: center;
-    transition: all 0.3s ease;
-    border-radius: 10px;
-    animation: ShowButtons 0.3s ease;
-}
-.SoundButton:hover {
-    cursor: pointer;
-    background: $color_s_li;
-}
-</style>
