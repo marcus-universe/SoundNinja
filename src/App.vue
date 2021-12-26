@@ -24,10 +24,8 @@ import TopBar from "./components/TopBar.vue";
 import Sidemenu from "./components/Sidemenu.vue";
 import About from "./components/Modals/About.vue";
 import Settings from "./components/Modals/Settings.vue";
+import { ipcRenderer } from "electron";
 
-// import axios from 'axios';
-
-const fs = require("fs");
 let root = document.documentElement;
 
 import db from "../db.json";
@@ -64,14 +62,8 @@ export default {
     },
 };
 
-function setColorTheme(color) {
+ipcRenderer.invoke("getColor").then((color) => {
+    // Set Color Theme
     root.style.setProperty("--primary_color", color);
-}
-
-fs.readFile("./config.json", "utf-8", function (err, data) {
-    if (err) throw err;
-    var config = JSON.parse(data);
-    var color = config.settings[0].color;
-    setColorTheme(color);
 });
 </script>
