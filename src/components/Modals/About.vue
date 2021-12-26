@@ -39,9 +39,6 @@ export default {
         YouTube,
         Instagram,
     },
-    data() {
-        return {};
-    },
     methods: {
         closeAbout() {
             document.querySelector(".AboutContainer").classList.toggle("ActiveSettings");
