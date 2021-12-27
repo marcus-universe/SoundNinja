@@ -38,7 +38,6 @@ export default {
 const saveFile = (file, tab) => {
     tab = tab + "";
     const { name, path } = file;
-    console.log({ file: { name, path }, tab });
     ipcRenderer.send("saveFile", { name, path }, tab);
 };
 </script>

@@ -39,8 +39,6 @@ export default {
                     preload: true,
                     onend: function () {
                         this.clicked = false;
-                        console.log("Finished!");
-                        console.log(this.clicked);
                     }.bind(this),
                 });
                 this.playingsound.play();

@@ -141,7 +141,6 @@ export default {
                     properties: ["openDirectory", "multiSelections"],
                 })
                 .then((result) => {
-                    console.log("Three");
                     //?Get Selected Folders
 
                     var folderpath = result.filePaths;

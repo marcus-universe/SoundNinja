@@ -58,7 +58,6 @@ export default {
     },
     methods: {
         async refreshData(data) {
-            console.log("Hey");
             data = data || (await ipcRenderer.invoke("getData"));
             this.tabList = data.folder;
         },

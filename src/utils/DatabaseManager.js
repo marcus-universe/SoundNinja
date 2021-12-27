@@ -10,7 +10,6 @@ export default class DatabaseManager {
         });
     }
     set(data) {
-        console.log(data);
         return new Promise((resolve, reject) => {
             fs.writeFile("./db.json", JSON.stringify(data), "utf8", (err) => {
                 if (err) reject(err);
@@ -21,12 +20,10 @@ export default class DatabaseManager {
     async merge(data) {
         let db = await this.get();
         db = Object.assign(db, data);
-        console.log(db);
         await this.set(db);
     }
 
     async addFile(tab, file) {
-        console.log("Adding file");
         let db = await this.get();
         const folder = db.folder.find((folder) => folder.name === tab);
         if (!folder) return;
@@ -38,9 +35,7 @@ export default class DatabaseManager {
     }
 
     fileExists(audiofiles, file) {
-        console.log("Checking if file exists");
         const fileExists = audiofiles.find((audio) => audio.audioname === file.audioname);
-        console.log({ fileExists, file });
         if (!fileExists) return;
         return true;
     }
