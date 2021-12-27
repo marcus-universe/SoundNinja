@@ -42,7 +42,6 @@ export default class DatabaseManager {
         const fileExists = audiofiles.find((audio) => audio.audioname === file.audioname);
         console.log({ fileExists, file });
         if (!fileExists) return;
-        console.log("File exists");
         return true;
     }
 }

@@ -49,7 +49,7 @@ export default {
             count--;
             console.log(count);
             if (count === 0) {
-                root.style.setProperty("--dropzone-display", "50%");
+                root.style.setProperty("--dropzone-display", "0%");
                 root.style.setProperty("--dropzone-pointer-events", "none");
             }
         },

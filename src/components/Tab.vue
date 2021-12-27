@@ -2,10 +2,8 @@
     <div id="SoundButton_Container" class="flex-c-w SoundButton_Container">
         <draggable
             style="width: 100%"
-            :title="tab.name"
-            v-show="selectedTab.includes(tab.name)"
             v-model="list"
-            :group="tab.name"
+            :data="list"
             @start="drag = true"
             @end="dragEnd"
             item-key="index"
@@ -19,18 +17,18 @@
 </template>
 
 <script>
-import { inject } from "vue";
 import SoundButton from "./SoundButton.vue";
 import draggable from "vuedraggable";
 import { ipcRenderer } from "electron";
+import { inject } from "vue";
 
 export default {
     name: "Tab",
+
     setup() {
         const selectedTab = inject("selectedTab");
-        return {
-            selectedTab,
-        };
+
+        return { selectedTab };
     },
     data() {
         return {
@@ -38,10 +36,12 @@ export default {
             drag: false,
             tab: "",
             edited: false,
+            data: { folder: [] },
+            list: [],
         };
     },
     computed: {
-        list: {
+        computedList: {
             get() {
                 return this.tab.audiofiles;
             },
@@ -79,11 +79,8 @@ export default {
             this.tabindex += 1;
             console.log(this.tabindex);
         },
-        dragEnd(event) {
+        dragEnd() {
             this.drag = false;
-            console.log({
-                event,
-            });
         },
         updateList() {
             this.edited = false;
@@ -97,10 +94,32 @@ export default {
             });
         },
     },
+    watch: {
+        selectedTab(val) {
+            console.log("tab update");
+            if (!val) return;
+            const tab = Array.from(this.data.folder).find((tab) => {
+                console.log({ val: val.foldername }, { tab: tab.foldername });
+                return tab.foldername === val.foldername;
+            });
+            console.log({ tab });
+            if (tab) {
+                console.log(tab.audiofiles.length);
+                console.log({ files: tab.audiofiles });
+                this.list = Array.from(tab.audiofiles);
+                console.log(this.list.map((file) => file.audioname));
+                this.list.length = 0;
+                this.list.push(...tab.audiofiles);
+            } else {
+                this.list = [];
+                this.list.length = 0;
+            }
+        },
+    },
     async mounted() {
         const data = await ipcRenderer.invoke("getData");
+        this.data = data;
         const tab = data?.folder[this.tabindex];
-        this.tab = tab;
         this.list = tab.audiofiles;
     },
 };
