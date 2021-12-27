@@ -34,7 +34,6 @@ export default {
     data() {
         return {
             drag: false,
-            data: { folder: [] },
             completeList: [],
             list: [],
         };
@@ -50,6 +49,7 @@ export default {
             },
         },
     },
+    props: ["data"],
 
     components: {
         SoundButton,
@@ -82,8 +82,10 @@ export default {
         },
     },
     async mounted() {
-        const data = await ipcRenderer.invoke("getData");
-        this.data = data;
+        const data = this.data?.folder[0] ? this.data : await ipcRenderer.invoke("getData");
+
+        if (!data) return;
+
         const tab = data?.folder[this.selectedTab];
         this.list = tab?.audiofiles || [];
         this.completeList = data?.folder.reduce((acc, cur) => {

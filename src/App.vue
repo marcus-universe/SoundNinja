@@ -12,7 +12,7 @@
 
             <div class="flex_c_h Soundpad">
                 <Tabwrapper :tabList="tabList">
-                    <Tab />
+                    <Tab :data="data" />
                     <DropZone />
                 </Tabwrapper>
             </div>
@@ -42,6 +42,7 @@ export default {
             tabList: [],
             soundList: [],
             dragState: false,
+            data: { folder: [] },
         };
     },
     components: {
@@ -60,6 +61,7 @@ export default {
         async refreshData(data) {
             data = data || (await ipcRenderer.invoke("getData"));
             this.tabList = data.folder;
+            this.data = data;
         },
         dragEnter(e) {
             count++;
