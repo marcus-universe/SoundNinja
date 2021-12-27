@@ -1,18 +1,21 @@
 <template>
-    <TopBar />
+    <div v-on:dragenter="dragEnter" v-on:dragleave="dragLeave">
+        <TopBar />
 
-    <div class="flex-c-w max_h ContentSection">
-        <div class="flex_c_h sidepanel_w">
-            <Sidemenu />
-        </div>
+        <div class="flex-c-w max_h ContentSection">
+            <div class="flex_c_h sidepanel_w">
+                <Sidemenu />
+            </div>
 
-        <About />
-        <Settings />
+            <About />
+            <Settings />
 
-        <div class="flex_c_h Soundpad">
-            <Tabwrapper :tabList="tabList">
-                <Tab :soundList="soundList" :tabList="tabList" />
-            </Tabwrapper>
+            <div class="flex_c_h Soundpad">
+                <Tabwrapper :tabList="tabList">
+                    <Tab :soundList="soundList" :tabList="tabList" />
+                </Tabwrapper>
+            </div>
+            <DropZone />
         </div>
     </div>
 </template>
@@ -24,22 +27,38 @@ import TopBar from "./components/TopBar.vue";
 import Sidemenu from "./components/Sidemenu.vue";
 import About from "./components/Modals/About.vue";
 import Settings from "./components/Modals/Settings.vue";
+import DropZone from "./components/DropZone.vue";
 import { ipcRenderer } from "electron";
-
-let root = document.documentElement;
-
-import db from "../db.json";
-
 import Tabwrapper from "./components/TabwrapperContainer.vue";
 import Tab from "./components/Tab.vue";
 
+let root = document.documentElement;
+let count = 0;
+
+import db from "../db.json";
+
 export default {
     name: "SoundNinja",
-    methods: {},
+    methods: {
+        dragEnter() {
+            count++;
+            root.style.setProperty("--dropzone-display", "100%");
+            root.style.setProperty("--dropzone-pointer-events", "auto");
+        },
+        dragLeave() {
+            count--;
+            console.log(count);
+            if (count === 0) {
+                root.style.setProperty("--dropzone-display", "50%");
+                root.style.setProperty("--dropzone-pointer-events", "none");
+            }
+        },
+    },
     data() {
         return {
             tabList: [],
             soundList: [],
+            dragState: false,
         };
     },
     components: {
@@ -49,6 +68,7 @@ export default {
         Settings,
         Tabwrapper,
         Tab,
+        DropZone,
     },
     //get all names of tabs in db.json
     created() {

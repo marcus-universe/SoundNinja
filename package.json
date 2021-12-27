@@ -17,6 +17,7 @@
   "main": "background.js",
   "dependencies": {
     "core-js": "^3.6.5",
+    "dropzone-vue": "^0.1.11",
     "node-sass": "^6.0.1",
     "vue": "^3.0.0",
     "vuedraggable": "^4.1.0"
