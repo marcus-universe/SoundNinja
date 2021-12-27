@@ -30,7 +30,7 @@ ipcMain.on("saveFile", async (_event, file, tab) => {
             console.error(err);
         });
 
-    databaseManager.addFile(tab, file);
+    databaseManager.addFile(tab, { audiopath: destination, audioname: file.name });
 });
 
 ipcMain.handle("getColor", () => {

@@ -30,15 +30,16 @@ export default class DatabaseManager {
         let db = await this.get();
         const folder = db.folder.find((folder) => folder.name === tab);
         if (!folder) return;
-        if (this.fileExists(folder.audiofiles, file)) return;
-        folder.audiofiles.push(file);
-        file.id = folder.audiofiles.length - 1;
+        const { audiofiles } = folder;
+        if (this.fileExists(audiofiles, file)) return;
+        audiofiles.push(file);
+        file.id = audiofiles.length - 1;
         await this.set(db);
     }
 
     fileExists(audiofiles, file) {
         console.log("Checking if file exists");
-        const fileExists = audiofiles.find((audio) => audio.audioname === file.name);
+        const fileExists = audiofiles.find((audio) => audio.audioname === file.audioname);
         console.log({ fileExists, file });
         if (!fileExists) return;
         console.log("File exists");
