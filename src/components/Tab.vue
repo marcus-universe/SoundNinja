@@ -1,14 +1,15 @@
 <template>
-    <div id="SoundButton_Container" class="flex-c-w SoundButton_Container">
-        <draggable
-            style="width: 100%"
-            v-model="list"
-            :data="list"
-            @start="drag = true"
-            @end="dragEnd"
-            item-key="index"
-            class="SoundButtonContainBox"
-        >
+    <div v-if="selectedTab === 'All'" class="flex-c-w SoundButton_Container">
+        <div class="SoundButtonContainBox">
+            <SoundButton
+                :sound="element"
+                v-for="element in completeList"
+                v-bind:key="element.index"
+            />
+        </div>
+    </div>
+    <div v-else id="SoundButton_Container" class="flex-c-w SoundButton_Container">
+        <draggable v-model="computedList" item-key="index" class="SoundButtonContainBox">
             <template #item="{ element }">
                 <SoundButton :sound="element" />
             </template>
@@ -32,22 +33,20 @@ export default {
     },
     data() {
         return {
-            tabindex: 0,
             drag: false,
-            tab: "",
-            edited: false,
             data: { folder: [] },
+            completeList: [],
             list: [],
         };
     },
     computed: {
         computedList: {
             get() {
-                return this.tab.audiofiles;
+                return this.list;
             },
             set(value) {
-                this.updateList();
-                this.tab.audiofiles = value;
+                this.list = value;
+                this.updateList(value);
             },
         },
     },
@@ -56,71 +55,41 @@ export default {
         SoundButton,
         draggable,
     },
-    props: {
-        tabList: {
-            type: Array,
-            default() {
-                return [];
-            },
-        },
-        soundList: {
-            type: Array,
-            default() {
-                return [];
-            },
-        },
-        ShowAllButtons: {
-            type: Boolean,
-            default: false,
-        },
-    },
     methods: {
-        tabindexchange() {
-            this.tabindex += 1;
-            console.log(this.tabindex);
-        },
-        dragEnd() {
-            this.drag = false;
-        },
-        updateList() {
-            this.edited = false;
-
+        updateList(newList) {
             ipcRenderer.invoke("getData").then((data) => {
                 if (!data) return;
 
-                let list = JSON.parse(JSON.stringify(this.list));
-                data.folder[this.tabindex].audiofiles = list;
+                let list = JSON.parse(JSON.stringify(newList));
+                const tab = data.folder.find((tab) => tab.name === this.selectedTab);
+                if (!tab) return;
+                tab.audiofiles = list;
                 ipcRenderer.invoke("setData", data);
             });
         },
     },
     watch: {
         selectedTab(val) {
-            console.log("tab update");
             if (!val) return;
             const tab = Array.from(this.data.folder).find((tab) => {
-                console.log({ val: val.foldername }, { tab: tab.foldername });
-                return tab.foldername === val.foldername;
+                console.log({ val: val }, { tab: tab.foldername });
+                return tab.foldername === val;
             });
-            console.log({ tab });
             if (tab) {
-                console.log(tab.audiofiles.length);
-                console.log({ files: tab.audiofiles });
                 this.list = Array.from(tab.audiofiles);
-                console.log(this.list.map((file) => file.audioname));
-                this.list.length = 0;
-                this.list.push(...tab.audiofiles);
             } else {
                 this.list = [];
-                this.list.length = 0;
             }
         },
     },
     async mounted() {
         const data = await ipcRenderer.invoke("getData");
         this.data = data;
-        const tab = data?.folder[this.tabindex];
-        this.list = tab.audiofiles;
+        const tab = data?.folder[this.selectedTab];
+        this.list = tab?.audiofiles || [];
+        this.completeList = data?.folder.reduce((acc, cur) => {
+            return acc.concat(cur.audiofiles);
+        }, []);
     },
 };
 </script>

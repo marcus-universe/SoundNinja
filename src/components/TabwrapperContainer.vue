@@ -79,7 +79,7 @@ export default {
             const contextmenu = document.querySelector(".contextmenuTab");
             contextmenu.style.display = "none";
 
-            this.updateSelectedTab(tab);
+            this.updateSelectedTab(tabName);
 
             TabElements.forEach((tab) => {
                 if (this.selectedTab === tab.dataset.attribute) {

@@ -12,7 +12,7 @@
 
             <div class="flex_c_h Soundpad">
                 <Tabwrapper :tabList="tabList">
-                    <Tab :soundList="soundList" :tabList="tabList" />
+                    <Tab />
                     <DropZone />
                 </Tabwrapper>
             </div>
@@ -70,14 +70,11 @@ export default {
         Tab,
         DropZone,
     },
-    //get all names of tabs in db.json
     created() {
         this.tabList = [];
-        for (let i = 0; i < db.folder.length; i++) {
-            this.tabList.push(db.folder[i]);
-            for (let j = 0; j < db.folder[i].audiofiles.length; j++) {
-                this.soundList.push(db.folder[i].audiofiles[j]);
-            }
+
+        for (const tab of db.folder) {
+            this.tabList.push(tab);
         }
     },
 };
