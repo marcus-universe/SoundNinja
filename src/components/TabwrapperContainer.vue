@@ -32,7 +32,7 @@
 </template>
 
 <script>
-import { ref, provide } from "vue";
+import { provide, ref } from "vue";
 import TabButton from "./TabButton.vue";
 
 export default {
@@ -45,19 +45,13 @@ export default {
             },
         },
     },
-    setup(props) {
-        function checkSelectedTab() {
-            try {
-                var selectedTab = ref([props.tabList[0].foldername]);
-                return selectedTab;
-            } catch (error) {
-                selectedTab = [];
-                return selectedTab;
-            }
-        }
+    emits: ["updateTab"],
 
-        const selectedTab = checkSelectedTab();
+    setup() {
+        const selectedTab = ref("All");
+
         provide("selectedTab", selectedTab);
+
         return {
             selectedTab,
         };
@@ -65,7 +59,6 @@ export default {
 
     data() {
         return {
-            // selectedTab: '',
             TabClick: false,
             TabActive: false,
             ShowAllButtons: false,
@@ -79,15 +72,18 @@ export default {
             TabsContainer.scrollLeft += evt.deltaY;
         },
 
-        selectTab(tabName) {
+        selectTab(tab) {
+            const tabName = tab.name;
+
             const TabElements = document.querySelectorAll(".TabButtonBox");
             const contextmenu = document.querySelector(".contextmenuTab");
             contextmenu.style.display = "none";
 
-            this.selectedTab = [tabName.foldername];
+            this.updateSelectedTab(tabName);
 
             TabElements.forEach((tab) => {
-                if (this.selectedTab.includes(tab.dataset.attribute)) {
+
+                if (this.selectedTab === tab.dataset.attribute) {
                     tab.firstChild.classList.add("SoundButtonActive");
                     this.TabActive = true;
                 } else {
@@ -97,7 +93,7 @@ export default {
             });
         },
         AllTabClick() {
-            this.selectedTab = ["All"];
+            this.updateSelectedTab("All");
         },
 
         contextTabs(tab, event) {
@@ -109,10 +105,13 @@ export default {
             contextmenu.style.left = x + "px";
             contextmenu.style.top = y + "px";
         },
+        updateSelectedTab(tab) {
+            if (!tab) return;
+            this.selectedTab = tab;
+        },
     },
     components: {
         TabButton,
     },
-    created() {},
 };
 </script>

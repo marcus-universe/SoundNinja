@@ -39,7 +39,6 @@ export default {
                     preload: true,
                     onend: function () {
                         this.clicked = false;
-                        console.log("Finished!");
                     }.bind(this),
                 });
                 this.playingsound.play();
@@ -47,10 +46,6 @@ export default {
                 this.playingsound.stop();
                 this.clicked = false;
             }
-            // if (url) {
-            //     var audio = new Audio(url);
-            //     audio.play();
-            // }
         },
     },
 };
