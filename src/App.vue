@@ -13,9 +13,9 @@
             <div class="flex_c_h Soundpad">
                 <Tabwrapper :tabList="tabList">
                     <Tab :soundList="soundList" :tabList="tabList" />
+                    <DropZone />
                 </Tabwrapper>
             </div>
-            <DropZone />
         </div>
     </div>
 </template>

@@ -12,37 +12,34 @@ import { inject } from "vue";
 let root = document.documentElement;
 export default {
     setup() {
-        inject("selectedTab");
+        const selectedTab = inject("selectedTab");
+        return {
+            selectedTab,
+        };
     },
     components: {},
     methods: {
         drop(e) {
-            console.log("Drop handler");
-            console.log(e);
             e.preventDefault();
             root.style.setProperty("--dropzone-display", "0%");
+            root.style.setProperty("--dropzone-pointer-events", "none");
 
-            if (e.dataTransfer.files.length > 0) {
-                let files = e.dataTransfer.files;
-                for (let i = 0; i < files.length; i++) {
-                    let file = files[i];
-                    ipcRenderer.send("saveFile", file);
-                }
-            } else {
-                console.log("No files");
-            }
+            // Save files if some are dropped
+            if (e.dataTransfer.files.length < 1) return;
+
+            let files = e.dataTransfer.files;
+            for (const file of files) saveFile(file, this.selectedTab);
         },
         dragOver(e) {
             e.preventDefault();
         },
-        dragLeave(e) {
-            e.preventDefault();
-            console.log("Inner drag leave");
-        },
-        dragEnter(e) {
-            e.preventDefault();
-            console.log("Inner drag enter");
-        },
     },
+};
+
+const saveFile = (file, tab) => {
+    tab = tab + "";
+    const { name, path } = file;
+    console.log({ file: { name, path }, tab });
+    ipcRenderer.send("saveFile", { name, path }, tab);
 };
 </script>

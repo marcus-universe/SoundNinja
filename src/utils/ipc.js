@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import fs from "fs";
 import DatabaseManager from "./DatabaseManager";
+import FileManager from "./FileManager";
 
 const databaseManager = new DatabaseManager();
 
@@ -15,6 +16,21 @@ ipcMain.handle("setData", (_event, data) => {
 
 ipcMain.handle("mergeData", (_event, data) => {
     return databaseManager.merge(data);
+});
+
+// Save files
+ipcMain.on("saveFile", async (_event, file, tab) => {
+    const destination = await FileManager.getDestination(tab, file.name);
+    if (!destination) return;
+    FileManager.copyFile(file.path, destination)
+        .then(() => {
+            console.log(file.name + " saved");
+        })
+        .catch((err) => {
+            console.error(err);
+        });
+
+    databaseManager.addFile(tab, file);
 });
 
 ipcMain.handle("getColor", () => {
