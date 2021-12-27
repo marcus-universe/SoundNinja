@@ -72,7 +72,6 @@ export default {
         selectedTab(val) {
             if (!val) return;
             const tab = Array.from(this.data.folder).find((tab) => {
-                console.log({ val: val }, { tab: tab.foldername });
                 return tab.foldername === val;
             });
             if (tab) {

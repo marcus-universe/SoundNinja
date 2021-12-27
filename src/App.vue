@@ -4,7 +4,7 @@
 
         <div class="flex-c-w max_h ContentSection">
             <div class="flex_c_h sidepanel_w">
-                <Sidemenu />
+                <Sidemenu @refreshData="refreshData" />
             </div>
 
             <About />
@@ -35,25 +35,8 @@ import Tab from "./components/Tab.vue";
 let root = document.documentElement;
 let count = 0;
 
-import db from "../db.json";
-
 export default {
     name: "SoundNinja",
-    methods: {
-        dragEnter() {
-            count++;
-            root.style.setProperty("--dropzone-display", "100%");
-            root.style.setProperty("--dropzone-pointer-events", "auto");
-        },
-        dragLeave() {
-            count--;
-            console.log(count);
-            if (count === 0) {
-                root.style.setProperty("--dropzone-display", "0%");
-                root.style.setProperty("--dropzone-pointer-events", "none");
-            }
-        },
-    },
     data() {
         return {
             tabList: [],
@@ -70,12 +53,28 @@ export default {
         Tab,
         DropZone,
     },
-    created() {
-        this.tabList = [];
-
-        for (const tab of db.folder) {
-            this.tabList.push(tab);
-        }
+    async created() {
+        this.refreshData();
+    },
+    methods: {
+        async refreshData(data) {
+            console.log("Hey");
+            data = data || (await ipcRenderer.invoke("getData"));
+            this.tabList = data.folder;
+        },
+        dragEnter(e) {
+            count++;
+            if (e.dataTransfer.files.length < 1) return;
+            root.style.setProperty("--dropzone-display", "100%");
+            root.style.setProperty("--dropzone-pointer-events", "auto");
+        },
+        dragLeave() {
+            count--;
+            if (count === 0) {
+                root.style.setProperty("--dropzone-display", "0%");
+                root.style.setProperty("--dropzone-pointer-events", "none");
+            }
+        },
     },
 };
 

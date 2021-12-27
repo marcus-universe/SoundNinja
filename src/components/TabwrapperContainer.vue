@@ -73,7 +73,6 @@ export default {
 
         selectTab(tab) {
             const tabName = tab.name;
-            console.log({ tabName });
 
             const TabElements = document.querySelectorAll(".TabButtonBox");
             const contextmenu = document.querySelector(".contextmenuTab");
@@ -96,7 +95,6 @@ export default {
         },
 
         contextTabs(tab, event) {
-            console.log(tab);
             const contextmenu = document.querySelector(".contextmenuTab");
             contextmenu.style.display = "block";
             var x = event.clientX;
@@ -106,6 +104,7 @@ export default {
             contextmenu.style.top = y + "px";
         },
         updateSelectedTab(tab) {
+            if (!tab) return;
             this.selectedTab = tab;
         },
     },

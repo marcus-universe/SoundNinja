@@ -17,7 +17,6 @@ export default {
             selectedTab,
         };
     },
-    components: {},
     methods: {
         drop(e) {
             e.preventDefault();

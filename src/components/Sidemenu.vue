@@ -95,14 +95,14 @@ const fs = require("fs");
 const path = require("path");
 
 export default {
-    name: "controls",
+    name: "SideMenu",
     data() {
         return {
             isOpenAbout: false,
             isOpenSettings: false,
         };
     },
-    components: {},
+    emits: ["refreshData"],
 
     methods: {
         Reset() {
@@ -117,6 +117,7 @@ export default {
 
                 fs.writeFile("./db.json", JSON.stringify(AllFolderData, null, 2), "utf8", (err) => {
                     if (err) throw err;
+                    this.$emit("refreshData", AllFolderData);
                 });
             });
         },
@@ -140,6 +141,7 @@ export default {
                     properties: ["openDirectory", "multiSelections"],
                 })
                 .then((result) => {
+                    console.log("Three");
                     //?Get Selected Folders
 
                     var folderpath = result.filePaths;
@@ -148,7 +150,6 @@ export default {
                         var foldername = path.basename(element.toString());
                         let folderfiles = fs.readdirSync(element);
                         var index = folderpath.indexOf(element);
-                        console.log(index);
 
                         var JsonStruct = {
                             id: Number,
@@ -175,9 +176,9 @@ export default {
 
                         json.folder.push(JsonStruct);
 
-                        fs.writeFileSync("./db.json", JSON.stringify(json, null, 2), (err) => {
+                        fs.writeFile("./db.json", JSON.stringify(json, null, 2), (err) => {
                             if (err) throw err;
-                            console.log("The file has been saved!");
+                            this.$emit("refreshData", json);
                         });
                     });
                 });
