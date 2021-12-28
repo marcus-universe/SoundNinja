@@ -17,6 +17,7 @@ export default {
             selectedTab,
         };
     },
+    emits: ["refreshData"],
     methods: {
         drop(e) {
             e.preventDefault();
@@ -27,17 +28,17 @@ export default {
             if (e.dataTransfer.files.length < 1) return;
 
             let files = e.dataTransfer.files;
-            for (const file of files) saveFile(file, this.selectedTab);
+            for (const file of files) this.saveFile(file, this.selectedTab);
         },
         dragOver(e) {
             e.preventDefault();
         },
+        async saveFile(file, tab) {
+            tab = tab + "";
+            const { name, path } = file;
+            const db = await ipcRenderer.invoke("saveFile", { name, path }, tab);
+            this.$emit("refreshData", db);
+        },
     },
-};
-
-const saveFile = (file, tab) => {
-    tab = tab + "";
-    const { name, path } = file;
-    ipcRenderer.send("saveFile", { name, path }, tab);
 };
 </script>

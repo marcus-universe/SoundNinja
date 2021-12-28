@@ -1,6 +1,5 @@
 import { ipcMain } from "electron";
 import ConfigManager from "./ConfigManager";
-import fs from "fs";
 import DatabaseManager from "./DatabaseManager";
 import FileManager from "./FileManager";
 
@@ -20,7 +19,7 @@ ipcMain.handle("mergeData", (_event, data) => {
 });
 
 // Save files
-ipcMain.on("saveFile", async (_event, file, tab) => {
+ipcMain.handle("saveFile", async (_event, file, tab) => {
     const destination = await FileManager.getDestination(tab, file.name);
     if (!destination) return;
     FileManager.copyFile(file.path, destination)
@@ -31,7 +30,8 @@ ipcMain.on("saveFile", async (_event, file, tab) => {
             console.error(err);
         });
 
-    databaseManager.addFile(tab, { audiopath: destination, audioname: file.name });
+    const db = await databaseManager.addFile(tab, { audiopath: destination, audioname: file.name });
+    return db;
 });
 
 const manager = new ConfigManager();

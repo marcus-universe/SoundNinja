@@ -32,6 +32,7 @@ export default class DatabaseManager {
         audiofiles.push(file);
         file.id = audiofiles.length - 1;
         await this.set(db);
+        return db;
     }
 
     fileExists(audiofiles, file) {

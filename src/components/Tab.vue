@@ -80,6 +80,17 @@ export default {
                 this.list = [];
             }
         },
+        data(val) {
+            if (!val) return;
+            const tab = Array.from(val.folder).find((tab) => {
+                return tab.foldername === this.selectedTab;
+            });
+            if (tab) {
+                this.list = Array.from(tab.audiofiles);
+            } else {
+                this.list = [];
+            }
+        },
     },
     async mounted() {
         const data = this.data?.folder[0] ? this.data : await ipcRenderer.invoke("getData");
