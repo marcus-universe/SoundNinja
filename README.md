@@ -94,6 +94,8 @@ npm run tauri:build
 
 ### Vue Devtools
 
+[How to install Vue Devtools Standalone](https://devtools.vuejs.org/guide/installation.html#standalone)
+
 ```
 npm run vue-devtools
 ```
