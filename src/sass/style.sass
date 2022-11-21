@@ -1,0 +1,161 @@
+@import base
+
+.main
+    width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1)
+    background-color: $color-bg
+    height: 100%
+    margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1)
+    .TabContainer
+        min-height: calc(var(--icon_size) + $padding_2 + $padding_2 - $padding_1)
+        margin-top: var(--topbar_height)
+        transition: margin-top 0.2s ease
+        .tab
+            font-family: $Nunito-Bo
+            font-size: var(--font_size_1)
+            color: var(--primary_color)
+            border-top: 0.2rem solid var(--primary_color)
+            border-left: 0.2rem solid var(--primary_color)
+            border-right: 0.2rem solid var(--primary_color)
+            min-width: var(--tab_width)
+            text-align: center
+            border-top-left-radius: 0.5rem
+            border-top-right-radius: 0.5rem
+            padding: $padding_2
+            transition: background-color 0.1s ease, color 0.1s ease, border 0.1s ease
+            &:hover
+                cursor: pointer
+                color: $white
+                border: 0.2rem solid rgba($white, 0.8)
+
+        .addTab
+            fill: var(--primary_color)
+            width: calc(var(--icon_size) - 1rem)
+            transition: fill 0.2s ease, transform 0.2s ease
+            &:hover
+                cursor: pointer
+                fill: $white
+                transform: scale(1.1)
+    .searchMove
+        margin-top: calc(var(--topbar_height) + var(--icon_size) + $padding_1 + $padding_1 - $padding_1)
+
+    .SoundContainer
+        min-height: calc(100%)
+        .SoundTab
+            .Soundbtn
+                font-family: $Nunito-Bo
+                font-size: var(--font_size_2)
+                color: $white
+
+                background-color: $color-btn
+                padding: $padding_1
+                border-radius: 0.5rem
+                max-width: var(--btn_width)
+                min-width: var(--btn_width)
+                word-wrap: break-all
+                hyphens: auto
+                text-align: center
+                transition: background-color 0.2s ease, color 0.2s ease, font-family 0.2s ease
+                &:hover
+                    cursor: pointer
+                    background-color: $color-btn-hover
+                    color: var(--primary_color)
+                    outline: none
+                &.active
+                    background-color: var(--primary_color)
+                    color: $color-bg
+                    font-family: $Nunito-Bo
+                    outline: none
+
+// ########################################
+// Popups
+// ########################################
+.renameContainer
+    position: fixed
+    top: 50%
+    left: 50%
+    transform: translate(-50%, -50%)
+    background-color: $color-bg
+    padding: calc($padding_1 + $padding_1)
+    border-radius: 0.5rem
+    border: 0.2rem solid var(--primary_color)
+    min-width: 50%
+    max-width: 100px
+    min-height: 20%
+    z-index: 3
+    input
+        min-width: 10rem
+        width: 80%
+        padding: $padding_2 $padding_1
+        border-radius: 0.4rem
+        min-height: var(--icon_size)
+        border: none
+        background: $color-bg
+        border: 0.2rem solid var(--primary_color)
+        color: var(--primary_color)
+        font-family: $Nunito-R
+        font-size: var(--font_size_1)
+        transition: all 0.2s ease
+        &:focus
+            padding: $padding_2 $padding_1
+            background: rgba($white, 0.1)
+            outline: none
+    .ErrorMsg
+        position: absolute
+
+        color: $warn
+        font-family: $Nunito-R
+        font-size: var(--font_size_1)
+        top: 2rem
+
+.ErrorAlert
+    position: fixed
+    .ErrorMessageBox
+        position: fixed
+        left: 50%
+        top: 50%
+        transform: translate(-50%, -50%)
+        border-radius: 0.5rem
+        width: 30%
+        min-width: 500px
+        max-width: 700px
+        padding: $padding_1
+        min-height: 20%
+        background: $color-bg
+        border: 0.2rem solid var(--primary_color)
+        z-index: 3
+        text-align: center
+
+// ########################################
+// Assets
+// ########################################
+.BGBlur
+    position: fixed
+    top: 0
+    left: 0
+    width: 100%
+    height: 100%
+    backdrop-filter: blur(4px)
+    background: rgba($color-bg, 0.5)
+    z-index: 2
+
+.exit
+    fill: var(--primary_color)
+    width: calc(var(--icon_size) - 0.5rem)
+    position: absolute
+    right: 1rem
+    top: 1rem
+    transition: all 0.2s ease
+    &:hover
+        fill: $white
+        transform: scale(1.1)
+        cursor: pointer
+
+.icon
+    fill: var(--primary_color)
+    max-width: var(--icon_size)
+    max-height: var(--icon_size)
+    min-width: var(--icon_min_size)
+    min-height: var(--icon_min_size)
+    &:hover
+        fill: $white
+        cursor: pointer

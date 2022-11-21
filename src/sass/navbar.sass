@@ -1,0 +1,61 @@
+@import base
+
+.navbar
+    height: 100vh
+    padding: 0 $padding_1
+    width: var(--icon_size)
+    position: fixed
+    border-right: 0.2rem solid var(--primary_color)
+
+    .iconContainer
+        padding: $padding_1 $padding_1 $padding_1 0
+        width: var(--icon_size)
+
+        svg
+            width: var(--icon_size)
+            height: var(--icon_size)
+            fill: var(--primary_color)
+            transition: fill 0.2s ease, transform 0.2s ease
+
+            &:hover
+                fill: $white
+                transform: scale(1.1)
+                cursor: pointer
+
+        .searchButton
+            position: absolute
+            top: 0px
+            z-index: 2
+            background: $color-bg
+            padding: 20px $padding_1
+            left: 0
+            &:hover
+                cursor: pointer
+                transform: scale(1)
+        .active
+            fill: $white
+            cursor: pointer
+
+        .searchBar
+            position: absolute
+            top: 20px
+            left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1)
+            height: var(--icon_size)
+            background: $color-bg
+            z-index: 1
+            width: calc(100vw - var(--icon_size) - $padding_1 - $padding_1 - $padding_1 - $padding_1)
+            input
+                width: calc(100% - var(--icon_size) - var(--icon_size) - $padding_1 - $padding_1 - $padding_1)
+                padding: $padding_1 $padding_1
+                border: none
+                background: $color-bg
+                color: var(--primary_color)
+                border: 0.2rem solid var(--primary_color)
+                border-radius: 0.5rem
+                font-family: $Nunito-R
+                font-size: var(--font_size_1)
+                transition: all 0.2s ease
+                &:focus
+                    padding: $padding_1 $padding_1
+                    background: rgba($white, 0.1)
+                    outline: none

@@ -1,30 +1,35 @@
 <template>
-  <nav>
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link>
-  </nav>
-  <router-view/>
+<div class="soundninja flex_c_h flex_space_between">
+  <NavBar />
+  <ErrorAlert />
+  <router-view>
+
+
+  </router-view>
+  </div>
+
+  
 </template>
 
-<style lang="scss">
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
+<script>
+import NavBar from '@/components/Section/NavBar.vue';
+import ErrorAlert from '@/components/Popups/ErrorAlert.vue';
 
-nav {
-  padding: 30px;
-
-  a {
-    font-weight: bold;
-    color: #2c3e50;
-
-    &.router-link-exact-active {
-      color: #42b983;
-    }
+export default {
+  name: 'App',
+  components: {
+    NavBar,
+    ErrorAlert
+  },
+  methods: {
   }
-}
+
+};
+
+</script>
+
+
+<style lang="scss">
+@import '@/sass/_base.sass'; 
+@import '@/sass/style.sass';
 </style>

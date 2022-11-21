@@ -1,0 +1,134 @@
+$color-bg: #222831
+$color-btn: #363f4d
+$color-btn-hover: #434e5f
+$white: #eee
+$warn: #f86d6d
+$padding_1: 1rem
+$padding_2: 0.2rem
+
+\:root
+    --primary_color: #2adfff
+    --icon_size: 2.5rem
+    --icon_min_size: 30px
+    --font_size_1: 1.2rem
+    --font_size_2: 1rem
+    --tab_width: 5rem
+    --btn_width: 12rem
+    --topbar_height: 20px
+
+::-webkit-scrollbar
+    width: 0.5rem
+    height: 0.2rem
+
+::-webkit-scrollbar-thumb
+    background: var(--primary_color)
+    border-radius: 20px
+
+::-webkit-scrollbar-track
+    background: $color-bg
+
+// ########################################
+// Font Styles    
+// ########################################
+@font-face
+    font-family: "Nunito-Regular"
+    src: url("@/assets/FONTS/Nunito-Regular.ttf") format("truetype")
+
+@font-face
+    font-family: "Nunito-Bold"
+    src: url("@/assets/FONTS/Nunito-Bold.ttf") format("truetype")
+
+@font-face
+    font-family: "Nunito-SemiBold"
+    src: url("@/assets/FONTS/Nunito-SemiBold.ttf") format("truetype")
+
+@font-face
+    font-family: "Nunito-Black"
+    src: url("@/assets/FONTS/Nunito-Black.ttf") format("truetype")
+
+@font-face
+    font-family: "Caveat-Regular"
+    src: url("@/assets/FONTS/Caveat-Regular.ttf") format("truetype")
+
+@font-face
+    font-family: "Caveat-Bold"
+    src: url("@/assets/FONTS/Caveat-Bold.ttf") format("truetype")
+
+$Nunito-R: "Nunito-Regular"
+$Nunito-Bo: "Nunito-Bold"
+$Nunito-SemiBo: "Nunito-SemiBold"
+$Nunito-Bl: "Nunito-Black"
+$Caveat-R: "Caveat-Regular"
+$Caveat-Bo: "Caveat-Bold"
+
+// Font Classes
+.NormalMessage
+    font-family: $Nunito-R
+    font-size: var(--font_size_1)
+    color: $white
+
+// ########################################
+// Main Classes
+// ########################################
+
+html, body
+    background-color: $color-bg
+    margin: 0
+    padding: 0
+
+// ########################################
+// Align Classes
+// ########################################
+.flex-c-w
+    display: flex
+    justify-content: space-around
+    flex-direction: row
+
+.flex_c_h
+    display: flex
+    justify-content: center
+    flex-direction: row
+
+.flex_c_v
+    display: flex
+    justify-content: center
+    flex-direction: column
+
+.flex_start
+    justify-content: flex-start
+
+.flex_c
+    display: flex
+    justify-content: center
+    align-items: center
+.flex_wrap
+    flex-wrap: wrap
+
+.grid_c
+    display: grid
+    place-items: center
+
+.align_c
+    align-items: center
+
+.flex_space_between
+    justify-content: space-between
+
+.flex_space_evenly
+    justify-content: space-evenly
+
+.gap1
+    gap: $padding_1
+
+.fade-enter-active, .fade-leave-active
+    transition: all 0.2s ease
+
+.fade-enter-from, .fade-leave-to
+    opacity: 0
+
+.slideIn-enter-active, .slideIn-leave-active
+    transition: all 0.2s ease
+.slideIn-enter-from, .slideIn-leave-to
+    transform: translateX(-10%)
+    opacity: 0
+    z-index: 1
