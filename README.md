@@ -1,6 +1,7 @@
 # Sound Ninja
 
 ![Sound Ninja Logo Animated](./designs/Logo_Animated.gif)
+![License](https://img.shields.io/github/license/marcus-universe/SoundNinja?style=for-the-badge.svg)
 
 **Sound Ninja** is an **Open Source Soundboard App** with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**. 😉👍
 
