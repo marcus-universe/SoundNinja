@@ -2,7 +2,7 @@
 
 ![Sound Ninja Logo Animated](./designs/Logo_Animated.gif)
 
-**Sound Ninja** is an **Open Source Soundboard App** with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**.
+**Sound Ninja** is an **Open Source Soundboard App** with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**. 😉👍
 
 ## How is the progress going?
 
@@ -14,7 +14,7 @@ The progress can be tracked on the [GitHub Project Board](https://github.com/use
 
 ## Why Sound Ninja?
 
-Sound Ninja is a **Open Source Soundboard App** with maximal customizability option and a modern UI. Its build with **Tauri.js and Vue.js** and doesn't take much space on your pc and ram not like other soundboard apps. The main reason was to create a Soundboard-App that lets you organize really efficiently your sounds to find them really fast and easy in the moment you need them. On top, it gives everyone the option to share there soundboards with others to become together the biggest Meme-Loards of our time. 😎
+Sound Ninja is a **Open Source Soundboard App** with the goal to provide the maximal customizability options and a modern UI. Its build with **Tauri.js and Vue.js** and doesn't take much space on your pc and ram not like other soundboard apps. The main reason was to create a Soundboard-App that lets you organize really efficiently your sounds to find them really fast and easy in the moment you need them. On top, it gives everyone the option to share there soundboards with others to become together the biggest Meme-Loards of our time. 😎
 
 ## Features (+upcoming)
 
