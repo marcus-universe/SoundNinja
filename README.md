@@ -66,7 +66,7 @@ Sound Ninja currently supports theoretically the following platforms:
 npm install
 ```
 
-### Available dependencies/liberaries
+### Available dependencies
 
 - [Vue.js (Vue3 CLI)](https://vuejs.org/)
 - [Tauri.js](https://tauri.studio/)
@@ -76,7 +76,7 @@ npm install
 - [Vue Use](https://vueuse.org/)
 - [Howler.js](https://howlerjs.com/)
 
-#### Available dependencies/liberaries in future
+#### Available dependencies in future
 
 - [Socket.io](https://socket.io/)
 
