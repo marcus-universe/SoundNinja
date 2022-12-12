@@ -2,10 +2,11 @@
 <div class="soundninja flex_c_h flex_space_between">
   <NavBar />
   <ErrorAlert />
-  <router-view>
-
-
-  </router-view>
+<router-view v-slot="{ Component }">
+  <transition name="fade" mode="out-in">
+    <component :is="Component" :key="$route.path" :class="{ 'searchMove': store.Searchbar.SearchbarActive }"/>
+  </transition>
+</router-view>
   </div>
 
   
@@ -21,7 +22,10 @@ export default {
     NavBar,
     ErrorAlert
   },
-  methods: {
+  computed: {
+    store() {
+      return this.$store.state;
+    }
   }
 
 };

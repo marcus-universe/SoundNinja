@@ -51,17 +51,6 @@ export default {
         }
     },
     methods: {
-        // writeJsonFile(contents) {
-        //     writeTextFile({
-        //         path: 'config.json',
-        //         contents: JSON.stringify(contents, null, 2)
-        //     }, {
-        //         dir: BaseDirectory.App
-        //     });
-
-        //     this.$store.dispatch('setSoundsContent', contents)
-        // },
-
         async readJsonFile() {
             try {
                 var contents = JSON.parse(await readTextFile('config.json', {
@@ -113,6 +102,7 @@ export default {
                     sound.active = false
                 }
             })
+
             if (self.Sounds.tabs[tabindex].sounds[soundindex].active) {
                 self.Sounds.tabs[tabindex].sounds[soundindex].active = true
                 sound.once('load', function () {
@@ -121,6 +111,7 @@ export default {
             } else {
                 self.Sounds.tabs[tabindex].sounds[soundindex].active = false
                 sound.stop();
+
                 self.soundPlaying = false
                 self.activeSounds = null
             }

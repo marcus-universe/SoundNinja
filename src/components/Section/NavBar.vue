@@ -31,7 +31,6 @@ import {
     open
 } from '@tauri-apps/api/dialog'
 import {
-    // writeTextFile,
     readTextFile,
     BaseDirectory
 } from '@tauri-apps/api/fs'
@@ -155,6 +154,13 @@ export default {
                 console.log('check')
             } else if (icon === 'reset') {
                 this.ResetAll()
+            } else if (icon === 'settings') {
+                if (this.$route.path !== '/settings') {
+                    this.$router.push('/settings');
+                } else {
+                    this.$router.push('/');
+                }
+                
             }
 
         }

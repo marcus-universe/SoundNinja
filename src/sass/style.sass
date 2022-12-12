@@ -5,10 +5,11 @@
     background-color: $color-bg
     height: 100%
     margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1)
+    transition: all 0.2s ease
     .TabContainer
         min-height: calc(var(--icon_size) + $padding_2 + $padding_2 - $padding_1)
         margin-top: var(--topbar_height)
-        transition: margin-top 0.2s ease
+
         .tab
             font-family: $Nunito-Bo
             font-size: var(--font_size_1)
@@ -35,8 +36,6 @@
                 cursor: pointer
                 fill: $white
                 transform: scale(1.1)
-    .searchMove
-        margin-top: calc(var(--topbar_height) + var(--icon_size) + $padding_1 + $padding_1 - $padding_1)
 
     .SoundContainer
         min-height: calc(100%)
@@ -66,6 +65,8 @@
                     font-family: $Nunito-Bo
                     outline: none
 
+.searchMove
+    margin-top: calc(var(--topbar_height) + var(--icon_size) + $padding_1 + $padding_1 - $padding_1)
 // ########################################
 // Popups
 // ########################################
@@ -159,3 +160,83 @@
     &:hover
         fill: $white
         cursor: pointer
+
+// ########################################
+// Settings
+// ########################################
+.settingsContainer
+    width: 80%
+    max-width: 600px
+    .setting
+        padding-bottom: $padding_1
+        border-bottom: 0.1rem solid var(--primary_color)
+    label
+        color: var(--primary_color)
+        font-family: $Nunito-Bo
+        font-size: var(--font_size_1)
+        min-width: 30%
+
+    input[type=range]
+        height: 1rem
+        -webkit-appearance: none
+        width: 70%
+        border-radius: 1rem
+        border: none
+        &::-webkit-slider-thumb
+            height: 2rem
+            width: 2rem
+            border-radius: 50%
+            background: var(--primary_color)
+            border: 0.2rem solid $color-bg
+            cursor: pointer
+            -webkit-appearance: none
+            margin-top: -0.5rem
+            transition: width 0.2s ease, height 0.2s ease, border 0.2s ease, margin-top 0.2s ease
+        &::-webkit-slider-runnable-track
+            width: 70%
+            height: 1rem
+            cursor: pointer
+            animate: 0.2s
+            box-shadow: 0.2rem 0.2rem 1rem rgba(0, 0, 0, 0.7)
+            background: linear-gradient(90deg, hsl(0,100%, 58%) 0%, hsl(36,100%, 58%) 10%,hsl(72,100%, 58%) 20%, hsl(108,100%, 58%) 30%, hsl(144,100%, 58%) 40%, hsl(180,100%, 58%) 50%, hsl(216,100%, 58%) 60%, hsl(252,100%, 58%) 70%, hsl(288,100%, 58%) 80%, hsl(324,100%, 58%) 90%, hsl(360,100%, 58%) 100%)
+            border-radius: 1rem
+        &:hover
+            &::-webkit-slider-thumb
+                outline: none
+                height: 3rem
+                width: 3rem
+                margin-top: -1rem
+                border: 0.4rem solid $color-bg
+
+    input[type=range]:focus
+        outline: none
+    input[type=range]:focus
+
+    select
+        width: 70%
+        padding: $padding_1
+        border-radius: 0.5rem
+        border: none
+        background: $color-bg
+        border: 0.2rem solid var(--primary_color)
+        color: var(--primary_color)
+        font-family: $Nunito-R
+        font-size: var(--font_size_1)
+        transition: background 0.2s ease
+        &:focus
+            outline: none
+        &:hover
+            padding: $padding_1
+            background: rgba($white, 0.1)
+            outline: none
+            cursor: pointer
+        option
+            color: var(--primary_color)
+            font-family: $Nunito-Bo
+            font-size: var(--font_size_1)
+            background: $color-bg
+            border: 0.2rem solid var(--primary_color)
+            &:hover, &:checked, &:active
+                box-shadow: 0 0 10px 100px #000 inset
+                background: var(--primary_color) !important
+                color: $color-bg !important

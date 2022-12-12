@@ -1,5 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import MainView from '../views/Main.vue'
+import { createRouter, createWebHashHistory } from 'vue-router'
+const MainView = () => import(/* webpackChunkName: 'ContactSubmit' */ '@/views/Main.vue')
+const Settings = () => import(/* webpackChunkName: 'ContactSubmit' */ '@/views/Settings.vue')
 
 const routes = [
     {
@@ -7,10 +8,15 @@ const routes = [
     name: 'main',
     component: MainView
   },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: Settings
+  },
 ]
 
 const router = createRouter({
-  history: createWebHistory(process.env.BASE_URL),
+  history: createWebHashHistory(process.env.BASE_URL),
   routes
 })
 

@@ -1,5 +1,5 @@
 <template>
-<div class="TabContainer flex_c_h flex_start gap1" :class="{'searchMove': store.Searchbar.SearchbarActive}">
+<div class="TabContainer flex_c_h flex_start gap1" >
     <div class="tab grid_c" ref="tab" :class="{'active': CheckTabContent() === store.currentTab}">All</div>
 
     <Icons

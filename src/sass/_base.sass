@@ -7,7 +7,8 @@ $padding_1: 1rem
 $padding_2: 0.2rem
 
 \:root
-    --primary_color: #2adfff
+    --primary_color: hsl(189, 100%, 58%)
+    // #2adfff
     --icon_size: 2.5rem
     --icon_min_size: 30px
     --font_size_1: 1.2rem
@@ -67,6 +68,12 @@ $Caveat-Bo: "Caveat-Bold"
     font-size: var(--font_size_1)
     color: $white
 
+h1
+    font-family: $Nunito-Bo
+    font-size: 2rem
+    color: var(--primary_color)
+    text-align: center
+
 // ########################################
 // Main Classes
 // ########################################
@@ -75,6 +82,9 @@ html, body
     background-color: $color-bg
     margin: 0
     padding: 0
+    font-family: $Nunito-R
+    box-sizing: border-box
+    scrollbar-gutter: stable
 
 // ########################################
 // Align Classes
@@ -119,6 +129,9 @@ html, body
 
 .gap1
     gap: $padding_1
+
+.w100
+    width: 100%
 
 .fade-enter-active, .fade-leave-active
     transition: all 0.2s ease
