@@ -1,23 +1,23 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
-const MainView = () => import(/* webpackChunkName: 'ContactSubmit' */ '@/views/Main.vue')
-const Settings = () => import(/* webpackChunkName: 'ContactSubmit' */ '@/views/Settings.vue')
+import { createRouter, createWebHashHistory } from "vue-router";
+import MainView from "@/views/Main.vue";
+import Settings from "@/views/Settings.vue";
 
 const routes = [
-    {
-    path: '/',
-    name: 'main',
-    component: MainView
+  {
+    path: "/",
+    name: "main",
+    component: MainView,
   },
   {
-    path: '/settings',
-    name: 'settings',
-    component: Settings
+    path: "/settings",
+    name: "settings",
+    component: Settings,
   },
-]
+];
 
 const router = createRouter({
   history: createWebHashHistory(process.env.BASE_URL),
-  routes
-})
+  routes,
+});
 
-export default router
+export default router;

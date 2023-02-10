@@ -11,14 +11,14 @@
       "all": true,
       "protocol": {
         "all": true,
-        "assetScope": ["*"]
+        "assetScope": ["*", "**", "$PUBLIC/*", "$DATA", "$AUDIO"]
       },
 
       "fs": {
         "all": true,
         "readFile": true,
         "writeFile": true,
-        "scope": ["*", "$PUBLIC/*", "$DATA", "$AUDIO"]
+        "scope": ["*", "**", "$PUBLIC/*", "$DATA", "$AUDIO"]
 
       }
     },
