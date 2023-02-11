@@ -5,7 +5,7 @@
         <div
           v-for="(sound, soundindex) in JSONFile"
           class="Soundbtn flex_c_v flex_wrap"
-          :class="{ active: soundindex === activeSounds }"
+          :class="{ active: sound.active }"
           :key="sound"
           @click="setActiveSound(soundindex)"
         >
@@ -21,8 +21,7 @@
 </template>
 
 <script>
-import { convertFileSrc, invoke } from "@tauri-apps/api/tauri";
-import { Howl, Howler } from "howler";
+// import { convertFileSrc, invoke } from "@tauri-apps/api/tauri";
 
 export default {
   computed: {
@@ -54,60 +53,15 @@ export default {
     };
   },
   methods: {
-    activeSound(soundindex) {
-      if (this.soundPlaying) {
-        this.activeSounds = soundindex;
-      } else {
-        this.activeSounds = null;
-      }
-    },
     setActiveSound(soundindex) {
       var self = this;
-      this.soundPlaying = true;
+      // var filepath = convertFileSrc(self.JSONFile[soundindex].path);
 
-      this.activeSound(soundindex);
-      var filepath = convertFileSrc(self.JSONFile[soundindex].path);
-      var volume = this.JSONFile[soundindex]?.volume;
-      var sound = new Howl({
-        src: [filepath],
-        volume: volume,
-        html5: true,
-        onend: function () {
-          self.soundPlaying = false;
-          self.activeSounds = null;
-          console.log("Finished!");
-        },
-        onplayerror: function () {
-          self.soundPlaying = false;
-          self.activeSounds = null;
-          self.ErrorMessage =
-            "Error: " +
-            self.JSONFile?.files.tabs[soundindex].sounds[soundindex].name +
-            " can't be played!";
-        },
-      });
-
-      Howler.stop();
-
-      this.JSONFile[soundindex].active = !self.JSONFile[soundindex].active;
-      this.JSONFile[soundindex].forEach((sound, index) => {
-        if (index !== soundindex) {
-          sound.active = false;
-        }
-      });
-
-      if (self.JSONFile[soundindex].active) {
-        self.JSONFile[soundindex].active = true;
-        sound.once("load", function () {
-          //   sound.play();
-          invoke("play_sound", filepath);
-        });
+      if (!self.JSONFile[soundindex].active) {
+        // invoke("play_sound", { filepath, });
+        self.$store.dispatch("setActiveSound", { soundindex, status: true });
       } else {
-        self.JSONFile[soundindex].active = false;
-        sound.stop();
-
-        self.soundPlaying = false;
-        self.activeSounds = null;
+        self.$store.dispatch("setActiveSound", { soundindex, status: false });
       }
     },
   },

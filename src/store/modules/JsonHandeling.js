@@ -14,6 +14,7 @@ export default {
     configFile: {
       settings: {
         hue: 0,
+        outputSource: "default",
       },
       files: [],
     },
@@ -46,8 +47,16 @@ export default {
       state.configFile.settings.hue = payload;
     },
 
+    setOutSource(state, payload) {
+      state.configFile.settings.outputSource = payload;
+    },
+
     addFiles(state, payload) {
       state.configFile.files = [...state.configFile.files, ...payload];
+    },
+
+    setActiveSound(state, { soundindex, status }) {
+      state.configFile.files[soundindex].active = status;
     },
 
     SoundsContent(state, payload) {
@@ -96,6 +105,11 @@ export default {
       commit("HueSet", val);
       commit("writeConfig");
     },
+
+    setOutSource({ commit }, val) {
+      commit("setOutSource", val);
+      commit("writeConfig");
+    },
     resetAll({ commit }) {
       commit("Reset");
       commit("writeConfig");
@@ -107,6 +121,14 @@ export default {
         console.log(contents);
       } catch (e) {
         console.log(e);
+        dispatch("setErrorActive", e);
+      }
+    },
+    setActiveSound({ commit, dispatch }, { soundindex, status }) {
+      try {
+        commit("setActiveSound", { soundindex, status });
+        commit("writeConfig");
+      } catch (e) {
         dispatch("setErrorActive", e);
       }
     },

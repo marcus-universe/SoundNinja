@@ -49,10 +49,19 @@ export default {
     const hueState = computed(() => {
       return store.state.JsonHandeling.configFile?.settings.hue;
     });
+
+    const OutputState = computed(() => {
+      return store.state.JsonHandeling.configFile?.settings?.outputSource;
+    });
     const hue = ref();
 
     onUpdated(() => {
       hue.value = hueState.value;
+      if (typeof OutputState.value !== "undefined") {
+        outputSelected.value = OutputState.value;
+      } else {
+        outputSelected.value = OutputDevices.value[0];
+      }
     });
 
     watch(hue, (hueval) => {
@@ -62,11 +71,14 @@ export default {
     async function getOutputDevices() {
       const devices = [await invoke("get_out_devices")];
       OutputDevices.value.push(devices[0]);
-      outputSelected.value = OutputDevices.value[0][0];
-
       return devices;
     }
     getOutputDevices();
+
+    const selectOutputDevice = (event) => {
+      const selectedDevice = event.target.value;
+      store.dispatch("setOutSource", selectedDevice);
+    };
 
     // async function selectOutputDevice() {
     //   // await invoke('set_out_device', {device: outputSelected.value})
@@ -77,6 +89,7 @@ export default {
       getOutputDevices,
       OutputDevices,
       outputSelected,
+      selectOutputDevice,
     };
   },
 };
