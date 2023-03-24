@@ -1,4 +1,22 @@
 <template>
+  <div data-tauri-drag-region class="titlebar">
+    <div class="titlebar-button" id="titlebar-minimize" @click="minimize()">
+      <img
+        src="https://api.iconify.design/mdi:window-minimize.svg"
+        alt="minimize"
+      />
+    </div>
+    <div class="titlebar-button" id="titlebar-maximize" @click="maximize()">
+      <img
+        src="https://api.iconify.design/mdi:window-maximize.svg"
+        alt="maximize"
+      />
+    </div>
+    <div class="titlebar-button" id="titlebar-close" @click="close()">
+      <img src="https://api.iconify.design/mdi:close.svg" alt="close" />
+    </div>
+  </div>
+
   <div class="soundninja flex_c_h flex_space_between">
     <div>{{ getConfig }}</div>
 
@@ -9,7 +27,6 @@
         <component
           :is="Component"
           :key="$route.path"
-          :class="{ searchMove: store.Searchbar.SearchbarActive }"
         />
       </transition>
     </router-view>
@@ -22,6 +39,8 @@ import ErrorAlert from "@/components/Popups/ErrorAlert.vue";
 import { onMounted, watch, computed } from "vue";
 import { readTextFile, BaseDirectory } from "@tauri-apps/api/fs";
 import { useStore } from "vuex";
+import { appWindow } from "@tauri-apps/api/window";
+
 export default {
   name: "App",
 
@@ -49,9 +68,27 @@ export default {
       return contents;
     }
 
+    const minimize = () => {
+      appWindow.minimize();
+    };
+
+    const maximize = () => {
+      appWindow.maximize();
+    };
+
+    const close = () => {
+      appWindow.close();
+    };
+
     onMounted(() => {
       readConfigFile();
     });
+
+    return {
+      minimize,
+      maximize,
+      close,
+    };
   },
   components: {
     NavBar,

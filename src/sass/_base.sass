@@ -14,8 +14,8 @@ $padding_2: 0.2rem
     --font_size_1: 1.2rem
     --font_size_2: 1rem
     --tab_width: 5rem
-    --btn_width: 12rem
-    --topbar_height: 20px
+    --btn_width: 11.5rem
+    --topbar_height: 30px
 
 ::-webkit-scrollbar
     width: 0.5rem
@@ -23,7 +23,7 @@ $padding_2: 0.2rem
 
 ::-webkit-scrollbar-thumb
     background: var(--primary_color)
-    border-radius: 20px
+    // border-radius: 20px
 
 ::-webkit-scrollbar-track
     background: $color-bg
@@ -84,7 +84,10 @@ html, body
     padding: 0
     font-family: $Nunito-R
     box-sizing: border-box
-    scrollbar-gutter: stable
+    overflow-y: hidden
+    // scrollbar-gutter: stable
+
+
 
 // ########################################
 // Align Classes
@@ -120,6 +123,13 @@ html, body
 
 .align_c
     align-items: center
+
+
+.align_start
+    align-items: flex-start
+
+.align_end
+    align-items: flex-end
 
 .flex_space_between
     justify-content: space-between

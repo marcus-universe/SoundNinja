@@ -43,7 +43,7 @@ export default {
   },
   computed: {
     JSONFile() {
-      return this.$store.state.JsonHandeling.JSONFile;
+      return this.$store.state.JsonHandeling.configFile?.files;
     },
     navbarList() {
       return this.$store.state.navbar;
@@ -76,13 +76,34 @@ export default {
       if (Array.isArray(selected)) {
         // const contents = this.JSONFile;
 
-        const soundlist = [];
-        selected.forEach((file) => {
+        // const soundlist = [];
+        // selected.forEach((file) => {
+        //   const tabs = ["All"];
+        //   if (self.currentTab !== "All") {
+        //     tabs.push(self.currentTab);
+        //   }
+        //   soundlist.push({
+        //     name: file
+        //       .replace(/^.*[\\]/, "")
+        //       .replace(".wav", "")
+        //       .replace(".mp3", "")
+        //       .replace(".ogg", "")
+        //       .replaceAll("_", " ")
+        //       .replace(/([A-Z])/g, " $1")
+        //       .trim(),
+        //     path: file,
+        //     volume: 0.4,
+        //     tabs: tabs,
+        //     active: false,
+        //   });
+        // });
+        const indexLength = this.JSONFile.length;
+        const soundlist = selected.map((file, index) => {
           const tabs = ["All"];
           if (self.currentTab !== "All") {
             tabs.push(self.currentTab);
           }
-          soundlist.push({
+          return {
             name: file
               .replace(/^.*[\\]/, "")
               .replace(".wav", "")
@@ -95,7 +116,8 @@ export default {
             volume: 0.4,
             tabs: tabs,
             active: false,
-          });
+            index: index + indexLength,
+          };
         });
 
         try {

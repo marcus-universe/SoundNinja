@@ -69,7 +69,8 @@
       "title": "Sound Ninja",
       "width": 800,
       "minHeight": 600,
-      "minWidth": 650
+      "minWidth": 650,
+      "decorations": false
     }]
   }
 }
