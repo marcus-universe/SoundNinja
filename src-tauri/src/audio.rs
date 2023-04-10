@@ -1,6 +1,6 @@
 use anyhow::Result;
-use cpal::traits::{DeviceTrait, HostTrait};
-use rodio::{self, cpal};
+use cpal::traits::{ DeviceTrait, HostTrait };
+use rodio::{ self, cpal };
 use std::fs::File;
 use std::io::BufReader;
 
@@ -10,10 +10,7 @@ pub fn get_output_devices() -> Result<Vec<cpal::Device>> {
     for host_id in cpal::available_hosts() {
         let host = cpal::host_from_id(host_id)?;
 
-        devices.extend(
-            host.devices()?
-                .filter(|device| device.default_output_config().is_ok()),
-        );
+        devices.extend(host.devices()?.filter(|device| device.default_output_config().is_ok()));
     }
 
     Ok(devices)
@@ -38,12 +35,19 @@ pub fn get_out_devices() -> Vec<String> {
     output
 }
 
+pub static mut SINK: Option<rodio::Sink> = None;
 
 #[tauri::command]
-pub fn play_sound(sound_path: &str, device_name: &str) -> Result<String, String> {
-    let devices = match get_output_devices() {
+pub async fn play_sound(
+    sound_path: &str,
+    device_name: &str,
+    active: bool
+) -> Result<String, String> {
+    let devices: Vec<rodio::Device> = match get_output_devices() {
         Ok(devices) => devices,
-        Err(err) => return Err(err.to_string()),
+        Err(err) => {
+            return Err(err.to_string());
+        }
     };
     let device = devices
         .iter()
@@ -54,19 +58,37 @@ pub fn play_sound(sound_path: &str, device_name: &str) -> Result<String, String>
                 .unwrap_or(false)
         })
         .unwrap();
-    let name = device.name().unwrap_or("Unknown".to_string());
-    println!("{}", name);
-    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-    let sink = rodio::Sink::try_new(&stream_handle).unwrap();
+
+    println!("{} {} {} {}", sound_path, device_name, device.name().unwrap(), active);
+    let _name = device.name().unwrap_or("Unknown".to_string());
+
+    let (_stream, stream_handle) = rodio::OutputStream::try_from_device(&device).unwrap();
+    unsafe {
+        // unsichere Operationen ausführen
+        SINK = Some(rodio::Sink::try_new(&stream_handle).unwrap());
+    }
+
     let file = File::open(sound_path).map_err(|err| err.to_string())?;
     let reader = BufReader::new(file);
-
     let source = rodio::Decoder::new(reader).map_err(|err| err.to_string())?;
-    sink.append(source);
-    sink.sleep_until_end();
+
+    if active == false {
+        unsafe {
+            if let Some(sink) = &mut SINK {
+                // die SINK-Variable enthält einen Wert
+                sink.append(source);
+                sink.sleep_until_end();
+            } else {
+                // die SINK-Variable enthält keinen Wert
+                return Err("SINK not initialized".to_string());
+            }
+        }
+    } else {
+        // for sink in SINKS.iter() {
+        //     sink.stop();
+        // }
+        // sinks.clear();
+        // sinks.push(rodio::Sink::try_new(&stream_handle).unwrap());
+    }
     Ok("".to_string())
 }
-
-
-
-

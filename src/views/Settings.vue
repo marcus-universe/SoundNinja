@@ -36,7 +36,7 @@
   </div>
 </template>
 <script>
-import { ref, watch, computed, onUpdated } from "vue";
+import { ref, watch, computed, onUpdated, onMounted } from "vue";
 import { useStore } from "vuex";
 import { invoke } from "@tauri-apps/api/tauri";
 export default {
@@ -57,10 +57,16 @@ export default {
 
     onUpdated(() => {
       hue.value = hueState.value;
-      if (typeof OutputState.value !== "undefined") {
+    });
+    onMounted(() => {
+      if (
+        (OutputState.value !== undefined,
+        OutputState.value !== null,
+        OutputState.value !== "")
+      ) {
         outputSelected.value = OutputState.value;
       } else {
-        outputSelected.value = OutputDevices.value[0];
+        outputSelected.value = outputSelected.value[0];
       }
     });
 
@@ -78,6 +84,7 @@ export default {
     const selectOutputDevice = (event) => {
       const selectedDevice = event.target.value;
       store.dispatch("setOutSource", selectedDevice);
+      console.log(selectedDevice);
     };
 
     // async function selectOutputDevice() {

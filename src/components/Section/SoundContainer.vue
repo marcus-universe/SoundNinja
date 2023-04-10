@@ -123,14 +123,19 @@ export default {
       // var filepath = convertFileSrc(self.JSONFile[soundindex].path);
 
       if (!self.JSONFile[soundindex].active) {
-        console.log(self.JSONFile[soundindex].path, self.Settings.outputSource);
+        self.$store.dispatch("setActiveSound", { soundindex, status: true });
         invoke("play_sound", {
           soundPath: self.JSONFile[soundindex].path,
           deviceName: self.Settings.outputSource,
+          active: false,
         });
-        self.$store.dispatch("setActiveSound", { soundindex, status: true });
       } else {
         self.$store.dispatch("setActiveSound", { soundindex, status: false });
+        invoke("play_sound", {
+          soundPath: self.JSONFile[soundindex].path,
+          deviceName: self.Settings.outputSource,
+          active: true,
+        });
       }
     },
   },

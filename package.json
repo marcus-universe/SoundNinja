@@ -1,6 +1,7 @@
 {
   "name": "soundninja",
   "version": "0.2.0",
+
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -9,6 +10,7 @@
     "tauri:build": "vue-cli-service tauri:build",
     "tauri:serve": "vue-cli-service tauri:serve",
     "tauri": "tauri",
+    "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\"",
     "vueDevtools": "vue-devtools"
   },
   "dependencies": {
@@ -31,6 +33,8 @@
     "@vue/devtools": "^6.4.4",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
+    "prettier": "2.8.7",
+    "prettier-plugin-rust": "^0.1.8",
     "sass": "^1.32.7",
     "sass-loader": "^12.0.0",
     "vue-cli-plugin-tauri": "~1.0.0",
