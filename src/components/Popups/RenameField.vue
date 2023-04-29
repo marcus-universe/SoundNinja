@@ -1,57 +1,53 @@
 <template>
-
     <div class="renameBox">
-    <div class="renameContainer flex_c_h flex_c gap1">
-
-        <div class="ErrorMsg">{{store.ErrorMessage}}</div>
-        <Icons :icon="'exit'" :customClass="'exit'" @triggered="Exit"/>
-        <input v-model="typedName" type="text" placeholder="Type here a name">
-        <Icons :icon="'check'" :customClass="'icon'" @triggered="setName" />
-    </div>
-    <BlurBG />
+        <div class="renameContainer flex_c_h flex_c gap1">
+            <div class="ErrorMsg">{{ store.ErrorMessage }}</div>
+            <Icons :icon="'exit'" :customClass="'exit'" @triggered="Exit" />
+            <input v-model="typedName" type="text" placeholder="Type here a name" />
+            <Icons :icon="'check'" :customClass="'icon'" @triggered="setName" />
+        </div>
+        <BlurBG />
     </div>
 </template>
 <script>
-import BlurBG from '@/components/Assets/BlurBG.vue'
-import Icons from '@/components/Assets/Icons.vue'
-import { onKeyStroke } from '@vueuse/core'
-
-
+import BlurBG from "@/components/Assets/BlurBG.vue";
+import Icons from "@/components/Assets/Icons.vue";
+import { onKeyStroke } from "@vueuse/core";
 
 export default {
     data() {
         return {
-            typedName: ''
-        }
+            typedName: "",
+        };
     },
     components: {
         BlurBG,
-        Icons
+        Icons,
     },
     computed: {
         store() {
-            return this.$store.state
-        }
+            return this.$store.state;
+        },
     },
     methods: {
         Exit() {
-            this.$store.state.PopupActive = false
+            this.$store.dispatch("setPopupActive", { active: false, type: "addTab" });
         },
         setName() {
-            this.$store.dispatch('setRenameContent', {name: this.typedName, popup: false})
-        }
+            if (this.store.PopupActive.type === "addTab") {
+                this.$store.dispatch("setPopupActive", { active: false, type: "addTab" });
+            }
+            this.$store.dispatch("setRenameContent", { name: this.typedName });
+        },
     },
     mounted() {
-        onKeyStroke('Enter', () => {
-            this.setName()
-        })
-        onKeyStroke('Escape', () => {
-            this.Exit()
-        })
-    }
-    
-}
+        onKeyStroke("Enter", () => {
+            this.setName();
+        });
+        onKeyStroke("Escape", () => {
+            this.Exit();
+        });
+    },
+};
 </script>
-<style lang="">
-    
-</style>
+<style lang=""></style>

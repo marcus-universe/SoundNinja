@@ -58,8 +58,6 @@ pub async fn play_sound(
                 .unwrap_or(false)
         })
         .unwrap();
-
-    println!("{} {} {} {}", sound_path, device_name, device.name().unwrap(), active);
     let _name = device.name().unwrap_or("Unknown".to_string());
 
     let (_stream, stream_handle) = rodio::OutputStream::try_from_device(&device).unwrap();
@@ -78,16 +76,22 @@ pub async fn play_sound(
                 // die SINK-Variable enthält einen Wert
                 sink.append(source);
                 sink.sleep_until_end();
+                // sink.clear();
             } else {
                 // die SINK-Variable enthält keinen Wert
                 return Err("SINK not initialized".to_string());
             }
         }
     } else {
-        // for sink in SINKS.iter() {
-        //     sink.stop();
-        // }
-        // sinks.clear();
+        unsafe {
+            if let Some(sink) = &mut SINK {
+                // die SINK-Variable enthält einen Wert
+                sink.stop();
+            } else {
+                // die SINK-Variable enthält keinen Wert
+                return Err("SINK not initialized".to_string());
+            }
+        }
         // sinks.push(rodio::Sink::try_new(&stream_handle).unwrap());
     }
     Ok("".to_string())
