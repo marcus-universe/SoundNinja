@@ -5,6 +5,7 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     navbar: ['upload', 'folder', 'reset', 'settings', 'about'] as string[],
     currentTab: 'All',
+    activeOverlay: null as 'settings' | 'about' | null,
     PopupActive: { active: false, type: 'addTab' } as { active: boolean; type: string },
     RenameContent: '',
     ErrorMessage: '',
@@ -52,6 +53,10 @@ export const useAppStore = defineStore('app', {
 
     setCurrentTab(val: string) {
       this.currentTab = val
+    },
+
+    setActiveOverlay(val: 'settings' | 'about' | null) {
+      this.activeOverlay = val
     },
   },
 })

@@ -14,6 +14,8 @@
   <div class="soundninja flex_c_h flex_space_between">
     <NavBar />
     <ErrorAlert />
+    <SettingsOverlay />
+    <AboutOverlay />
     <NuxtPage v-slot="{ Component }">
       <transition name="fade" mode="out-in">
         <component :is="Component" />

@@ -38,7 +38,6 @@ import { open } from '@tauri-apps/api/dialog'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
-const route = useRoute()
 
 async function uploadFiles() {
   const selected = await open({
@@ -121,17 +120,9 @@ function IconClicked(icon) {
   } else if (icon === 'reset') {
     ResetAll()
   } else if (icon === 'settings') {
-    if (route.path !== '/settings') {
-      navigateTo('/settings')
-    } else {
-      navigateTo('/')
-    }
+    appStore.setActiveOverlay(appStore.activeOverlay === 'settings' ? null : 'settings')
   } else if (icon === 'about') {
-    if (route.path !== '/about') {
-      navigateTo('/about')
-    } else {
-      navigateTo('/')
-    }
+    appStore.setActiveOverlay(appStore.activeOverlay === 'about' ? null : 'about')
   }
 }
 </script>

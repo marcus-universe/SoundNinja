@@ -235,6 +235,85 @@
 }
 
 // ########################################
+// Overlay (Settings / About)
+// ########################################
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay-panel {
+  position: relative;
+  z-index: 11;
+  background-color: $color-bg;
+  border: 0.2rem solid var(--primary_color);
+  border-radius: 0.75rem;
+  padding: calc($padding_1 * 1.5);
+  min-width: 420px;
+  max-width: 600px;
+  width: 50%;
+
+  .overlay-header {
+    align-items: center;
+    margin-bottom: $padding_1;
+
+    h1 {
+      margin: 0;
+    }
+  }
+
+  .overlay-close {
+    position: static;
+    flex-shrink: 0;
+  }
+
+  .aboutContainer {
+    margin-top: $padding_1;
+
+    p {
+      font-size: 1.1rem;
+      color: $white;
+      font-family: $Nunito-R;
+    }
+
+    .github-link {
+      color: var(--primary_color);
+      text-decoration: none;
+      font-size: 1rem;
+      font-family: $Nunito-R;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+// Overlay transition
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity 0.25s ease;
+
+  .overlay-panel {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+}
+
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
+
+  .overlay-panel {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+  }
+}
+
+// ########################################
 // Settings
 // ########################################
 .settingsContainer {

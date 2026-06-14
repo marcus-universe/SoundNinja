@@ -3,6 +3,7 @@ use cpal::traits::{ DeviceTrait, HostTrait };
 use rodio::{ self, cpal };
 use std::fs::File;
 use std::io::BufReader;
+use std::ptr::addr_of_mut;
 
 pub fn get_output_devices() -> Result<Vec<cpal::Device>> {
     let mut devices = Vec::new();
@@ -72,23 +73,18 @@ pub async fn play_sound(
 
     if active == false {
         unsafe {
-            if let Some(sink) = &mut SINK {
-                // die SINK-Variable enthält einen Wert
+            if let Some(sink) = (*addr_of_mut!(SINK)).as_mut() {
                 sink.append(source);
                 sink.sleep_until_end();
-                // sink.clear();
             } else {
-                // die SINK-Variable enthält keinen Wert
                 return Err("SINK not initialized".to_string());
             }
         }
     } else {
         unsafe {
-            if let Some(sink) = &mut SINK {
-                // die SINK-Variable enthält einen Wert
+            if let Some(sink) = (*addr_of_mut!(SINK)).as_mut() {
                 sink.stop();
             } else {
-                // die SINK-Variable enthält keinen Wert
                 return Err("SINK not initialized".to_string());
             }
         }
