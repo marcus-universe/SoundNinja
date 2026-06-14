@@ -1,14 +1,10 @@
 <template>
-    <div class="renameBox">
-        <div class="renameContainer flex_c_h flex_c gap1">
-            <div class="ErrorMsg">{{ appStore.ErrorMessage }}</div>
-            <Icons :icon="'exit'" :customClass="'exit'" @triggered="Exit" />
-            <input v-model="typedName" type="text" placeholder="Type here a name" />
-            <Icons :icon="'check'" :customClass="'icon'" @triggered="setName" />
-        </div>
-        <BlurBG />
-    </div>
+  <DialogField title="Add Tab" :error-message="appStore.ErrorMessage" @close="Exit">
+    <UIInput v-model="typedName" placeholder="Type here a name" />
+    <UIButton :full-width="true" @click="setName">Confirm</UIButton>
+  </DialogField>
 </template>
+
 <script setup>
 const appStore = useAppStore()
 const typedName = ref('')

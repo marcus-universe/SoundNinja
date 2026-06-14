@@ -1,6 +1,6 @@
 <template>
     <div
-        class="TabContainer flex_c_h flex_start gap1"
+        class="TabContainer flex_c_h flex_start"
         :class="{ searchMove: appStore.Searchbar.SearchbarActive }"
     >
         <div

@@ -14,6 +14,7 @@ export const useAppStore = defineStore('app', {
       SearchbarActive: false,
       SearchbarContent: '',
     },
+    importFoldersActive: false,
   }),
 
   actions: {
@@ -57,6 +58,10 @@ export const useAppStore = defineStore('app', {
 
     setActiveOverlay(val: 'settings' | 'about' | null) {
       this.activeOverlay = val
+    },
+
+    setImportFoldersActive(val: boolean) {
+      this.importFoldersActive = val
     },
   },
 })

@@ -1,10 +1,9 @@
 @use 'variables' as *;
 
 .navbar {
-  height: calc(100vh - 30px);
+  height: calc(100vh);
   padding: 0 $padding_1;
   width: var(--icon_size);
-  top: 30px;
   position: fixed;
   border-right: 0.2rem solid var(--primary_color);
 

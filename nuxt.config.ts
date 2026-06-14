@@ -4,6 +4,16 @@ export default defineNuxtConfig({
   srcDir: 'src/',
   ssr: false,
 
+  typescript: {
+    tsConfig: {
+      compilerOptions: {
+        target: 'ESNext',
+        moduleResolution: 'bundler',
+        ignoreDeprecations: '6.0',
+      },
+    },
+  },
+
   nitro: {
     preset: 'static',
     output: {

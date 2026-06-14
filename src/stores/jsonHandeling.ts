@@ -29,6 +29,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
     JSONFile: null as unknown,
     path: null as string | null,
+    currentProjectPath: null as string | null,
     configFile: {
       tabList: [],
       settings: {
@@ -54,6 +55,14 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         { path: 'config.json', contents: JSON.stringify(this.configFile, null, 2) },
         { dir: BaseDirectory.App }
       )
+    },
+
+    saveToPath(filePath: string): Promise<void> {
+      return writeTextFile(filePath, JSON.stringify(this.configFile, null, 2))
+    },
+
+    setCurrentProjectPath(p: string | null) {
+      this.currentProjectPath = p
     },
 
     setHue(val: number) {
