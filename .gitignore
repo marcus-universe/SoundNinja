@@ -2,6 +2,10 @@
 node_modules
 /dist
 
+# Nuxt generated files
+.nuxt
+.output
+.cache
 
 # local env files
 .env.local
