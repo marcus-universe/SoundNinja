@@ -13,6 +13,15 @@ export default defineNuxtConfig({
 
   modules: ['@pinia/nuxt', '@vueuse/nuxt'],
 
+  components: {
+    dirs: [
+      {
+        path: '~/components',
+        pathPrefix: false,
+      },
+    ],
+  },
+
   css: [
     '~/assets/scss/_base.scss',
     '~/assets/scss/style.scss',
