@@ -1,4 +1,4 @@
-<template lang="en">
+<template>
 <!-- Upload Button -->
 <svg v-if="icon === 'upload'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" :class="[customClass]" @click="$emit('triggered', icon)">
     <g id="Upload">

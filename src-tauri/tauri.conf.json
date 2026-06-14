@@ -1,6 +1,11 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
-  "build": {},
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run generate",
+    "devPath": "http://localhost:3000",
+    "distDir": "../dist"
+  },
   "package": {
     "productName": "soundninja",
     "version": "0.2.0"

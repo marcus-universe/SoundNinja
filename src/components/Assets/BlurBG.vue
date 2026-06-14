@@ -3,17 +3,12 @@
         
     </div>
 </template>
-<script>
-export default {
-    props: {
-        customClass: {
-            type: String,
-            default: ""
-        }
-    }
-    
-}
+<script setup>
+defineProps({
+  customClass: {
+    type: String,
+    default: ''
+  }
+})
 </script>
-<style lang="">
-    
-</style>
+<style lang=""></style>

@@ -31,117 +31,59 @@
     </div>
 </template>
 
-<script>
-import { ref, computed } from "vue";
-import { useStore } from "vuex";
-import { invoke } from "@tauri-apps/api/tauri";
+<script setup>
+import { invoke } from '@tauri-apps/api/tauri'
 
-export default {
-    setup() {
-        const dragButton = ref(null);
-        const dropZoneRef = ref < HTMLDivElement > null;
-        const store = useStore();
-        const currentTab = computed(() => {
-            return store.state.currentTab;
-        });
-        const JSONFile = computed(() => {
-            const sortByIndex = (a, b) => {
-                return a.index - b.index;
-            };
+const appStore = useAppStore()
+const jsonStore = useJsonHandelingStore()
 
-            return store.state.JsonHandeling.configFile?.files
-                ?.filter((sound) => {
-                    return sound.tabs.includes(currentTab.value);
-                })
-                .sort(sortByIndex);
-        });
+const dragButton = ref(null)
+const dropZoneRef = ref(null)
 
-        const Settings = computed(() => {
-            return store.state.JsonHandeling.configFile?.settings;
-        });
+const currentTab = computed(() => appStore.currentTab)
 
-        function onDragStart(event, sound) {
-            event.dataTransfer.setData("SoundID", sound.index);
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.dropEffect = "move";
-            console.log(event.target, sound, sound.index);
-            event.target.style.opacity = "0.5";
-        }
+const JSONFile = computed(() => {
+  const sortByIndex = (a, b) => a.index - b.index
+  return jsonStore.configFile?.files
+    ?.filter((sound) => sound.tabs.includes(currentTab.value))
+    .sort(sortByIndex)
+})
 
-        function onDragEnd(event) {
-            event.target.style.opacity = "1";
-        }
+const Settings = computed(() => jsonStore.configFile?.settings)
 
-        function onDrop(event) {
-            const itemID = event.dataTransfer.getData("SoundID");
-            console.log(itemID);
-        }
+function onDragStart(event, sound) {
+  event.dataTransfer.setData('SoundID', sound.index)
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.dropEffect = 'move'
+  event.target.style.opacity = '0.5'
+}
 
-        return {
-            dragButton,
-            dropZoneRef,
-            onDragStart,
-            onDragEnd,
-            onDrop,
-            JSONFile,
-            currentTab,
-            Settings,
-        };
-    },
+function onDragEnd(event) {
+  event.target.style.opacity = '1'
+}
 
-    computed: {
-        FileStruct() {
-            return this.$store.state.JsonHandeling.FileStruct;
-        },
+function onDrop(event) {
+  const itemID = event.dataTransfer.getData('SoundID')
+  console.log(itemID)
+}
 
-        // JSONFile() {
-        //   return this.$store.state.JsonHandeling.configFile?.files?.filter(
-        //     (sound) => {
-        //       return sound.tabs.includes(this.currentTab);
-        //     }
-        //   );
-        // },
-        ErrorMessage() {
-            return this.$store.state.ErrorMessage;
-        },
-        TabList() {
-            return this.$store.state.JsonHandeling.TabList;
-        },
-        // currentTab() {
-        //   return this.$store.state.currentTab;
-        // },
-    },
-    data() {
-        return {
-            activeSounds: null,
-            soundPlaying: false,
-        };
-    },
-    methods: {
-        setActiveSound(soundindex) {
-            var self = this;
-            // var filepath = convertFileSrc(self.JSONFile[soundindex].path);
-
-            if (!self.JSONFile[soundindex].active) {
-                self.$store.dispatch("ReturnStatusAll");
-                self.$store.dispatch("setActiveSound", { soundindex, status: true });
-                invoke("play_sound", {
-                    soundPath: self.JSONFile[soundindex].path,
-                    deviceName: self.Settings.outputSource,
-                    active: false,
-                });
-            } else {
-                self.$store.dispatch("ReturnStatusAll");
-                self.$store.dispatch("setActiveSound", { soundindex, status: false });
-                invoke("play_sound", {
-                    soundPath: self.JSONFile[soundindex].path,
-                    deviceName: self.Settings.outputSource,
-                    active: true,
-                });
-            }
-        },
-    },
-};
+function setActiveSound(soundindex) {
+  if (!JSONFile.value[soundindex].active) {
+    jsonStore.ReturnStatusAll()
+    jsonStore.setActiveSound({ soundindex, status: true })
+    invoke('play_sound', {
+      soundPath: JSONFile.value[soundindex].path,
+      deviceName: Settings.value.outputSource,
+      active: false,
+    })
+  } else {
+    jsonStore.ReturnStatusAll()
+    jsonStore.setActiveSound({ soundindex, status: false })
+    invoke('play_sound', {
+      soundPath: JSONFile.value[soundindex].path,
+      deviceName: Settings.value.outputSource,
+      active: true,
+    })
+  }
+}
 </script>
-
-<style lang=""></style>

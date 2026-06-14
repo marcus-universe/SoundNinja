@@ -5,13 +5,13 @@
         :icon="'search'"
         :customClass="[
           'icon searchButton',
-          { active: Searchbar.SearchbarActive },
+          { active: appStore.Searchbar.SearchbarActive },
         ]"
         @triggered="IconClicked"
       />
       <transition name="slideIn">
         <div
-          v-if="Searchbar.SearchbarActive"
+          v-if="appStore.Searchbar.SearchbarActive"
           class="searchBar flex_c_h align_c flex_start gap1"
         >
           <input type="text" placeholder="Search" />
@@ -24,60 +24,35 @@
       </transition>
 
       <Icons
-        v-for="(navelm, index) in navbarList"
+        v-for="(navelm, index) in appStore.navbar"
         :key="navelm"
-        :icon="navbarList[index]"
+        :icon="appStore.navbar[index]"
         @triggered="IconClicked"
       />
     </div>
   </div>
 </template>
 
-<script>
-import { open } from "@tauri-apps/api/dialog";
-import Icons from "@/components/Assets/Icons.vue";
-export default {
-  name: "NavBar",
-  components: {
-    Icons,
-  },
-  computed: {
-    JSONFile() {
-      return this.$store.state.JsonHandeling.configFile?.files;
-    },
-    navbarList() {
-      return this.$store.state.navbar;
-    },
-    currentTab() {
-      return this.$store.state.currentTab;
-    },
-    Searchbar() {
-      return this.$store.state.Searchbar;
-    },
-    FileStruct() {
-      return this.$store.state.JsonHandeling.FileStruct;
-    },
-  },
-  methods: {
-    async uploadFiles() {
-      // this.$store.dispatch("readJsonFile");
-      var self = this;
-      const selected = await open({
-        multiple: true,
-        title: "Select files to upload",
-        filters: [
-          {
-            name: "Add Sounds",
-            extensions: ["mp3", "wav", "ogg"],
-          },
-        ],
-      });
+<script setup>
+import { open } from '@tauri-apps/api/dialog'
 
-      if (Array.isArray(selected)) {
-        // const contents = this.JSONFile;
+const appStore = useAppStore()
+const jsonStore = useJsonHandelingStore()
+const route = useRoute()
 
-        // const soundlist = [];
-        // selected.forEach((file) => {
+async function uploadFiles() {
+  const selected = await open({
+    multiple: true,
+    title: 'Select files to upload',
+    filters: [
+      {
+        name: 'Add Sounds',
+        extensions: ['mp3', 'wav', 'ogg'],
+      },
+    ],
+  })
+
+  if (Array.isArray(selected)) {
         //   const tabs = ["All"];
         //   if (self.currentTab !== "All") {
         //     tabs.push(self.currentTab);
@@ -97,72 +72,66 @@ export default {
         //     active: false,
         //   });
         // });
-        const indexLength = this.JSONFile.length;
-        const soundlist = selected.map((file, index) => {
-          const tabs = ["All"];
-          if (self.currentTab !== "All") {
-            tabs.push(self.currentTab);
-          }
-          return {
-            name: file
-              .replace(/^.*[\\]/, "")
-              .replace(".wav", "")
-              .replace(".mp3", "")
-              .replace(".ogg", "")
-              .replaceAll("_", " ")
-              .replace(/([A-Z])/g, " $1")
-              .trim(),
-            path: file,
-            volume: 0.4,
-            tabs: tabs,
-            active: false,
-            index: index + indexLength,
-          };
-        });
-
-        try {
-          self.$store.dispatch("addFiles", soundlist);
-        } catch (err) {
-          console.log(err);
-        }
+    const indexLength = jsonStore.configFile.files.length
+    const soundlist = selected.map((file, index) => {
+      const tabs = ['All']
+      if (appStore.currentTab !== 'All') {
+        tabs.push(appStore.currentTab)
       }
-    },
-
-    async ResetAll() {
-      this.$store.dispatch("resetAll");
-    },
-
-    OpenSearch() {
-      this.$store.dispatch("setSearchOpen", !this.Searchbar.SearchbarActive);
-    },
-
-    IconClicked(icon) {
-      if (icon === "upload") {
-        this.uploadFiles();
-      } else if (icon === "search") {
-        this.OpenSearch();
-      } else if (icon === "check") {
-        console.log("check");
-      } else if (icon === "reset") {
-        this.ResetAll();
-      } else if (icon === "settings") {
-        if (this.$route.path !== "/settings") {
-          this.$router.push("/settings");
-        } else {
-          this.$router.push("/");
-        }
-      } else if (icon === "about") {
-        if (this.$route.path !== "/about") {
-          this.$router.push("/about");
-        } else {
-          this.$router.push("/");
-        }
+      return {
+        name: file
+          .replace(/^.*[\\]/, '')
+          .replace('.wav', '')
+          .replace('.mp3', '')
+          .replace('.ogg', '')
+          .replaceAll('_', ' ')
+          .replace(/([A-Z])/g, ' $1')
+          .trim(),
+        path: file,
+        volume: 0.4,
+        tabs: tabs,
+        active: false,
+        index: index + indexLength,
       }
-    },
-  },
-};
+    })
+
+    try {
+      jsonStore.addFiles(soundlist)
+    } catch (err) {
+      console.log(err)
+    }
+  }
+}
+
+async function ResetAll() {
+  jsonStore.resetAll()
+}
+
+function OpenSearch() {
+  appStore.setSearchOpen(!appStore.Searchbar.SearchbarActive)
+}
+
+function IconClicked(icon) {
+  if (icon === 'upload') {
+    uploadFiles()
+  } else if (icon === 'search') {
+    OpenSearch()
+  } else if (icon === 'check') {
+    console.log('check')
+  } else if (icon === 'reset') {
+    ResetAll()
+  } else if (icon === 'settings') {
+    if (route.path !== '/settings') {
+      navigateTo('/settings')
+    } else {
+      navigateTo('/')
+    }
+  } else if (icon === 'about') {
+    if (route.path !== '/about') {
+      navigateTo('/about')
+    } else {
+      navigateTo('/')
+    }
+  }
+}
 </script>
-
-<style lang="scss">
-@import "@/sass/navbar.sass";
-</style>

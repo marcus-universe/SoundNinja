@@ -1,23 +1,23 @@
 <template>
     <div
         class="TabContainer flex_c_h flex_start gap1"
-        :class="{ searchMove: store.Searchbar.SearchbarActive }"
+        :class="{ searchMove: appStore.Searchbar.SearchbarActive }"
     >
         <div
             class="tab grid_c"
             ref="tab"
-            :class="{ active: 'All' === store.currentTab }"
+            :class="{ active: 'All' === appStore.currentTab }"
             @click="CheckTabContent('All')"
         >
             All
         </div>
 
         <div
-            v-for="tab in store.JsonHandeling.configFile.tabList"
+            v-for="tab in jsonStore.configFile.tabList"
             :key="tab"
             class="tab grid_c"
             ref="tab"
-            :class="{ active: tab === store.currentTab }"
+            :class="{ active: tab === appStore.currentTab }"
             @click="CheckTabContent(tab)"
         >
             {{ tab }}
@@ -26,31 +26,20 @@
         <Icons :customClass="'addTab'" :icon="'plus'" @triggered="AddTab" />
 
         <Transition name="fade">
-            <RenameField v-if="store.PopupActive.active" />
+            <RenameField v-if="appStore.PopupActive.active" />
         </Transition>
     </div>
 </template>
 
-<script>
-import Icons from "@/components/Assets/Icons.vue";
-import RenameField from "@/components/Popups/RenameField.vue";
-export default {
-    components: {
-        Icons,
-        RenameField,
-    },
-    computed: {
-        store() {
-            return this.$store.state;
-        },
-    },
-    methods: {
-        AddTab() {
-            this.$store.dispatch("setPopupActive", { active: true, type: "addTab" });
-        },
-        CheckTabContent(tab) {
-            this.$store.dispatch("setCurrentTab", tab);
-        },
-    },
-};
+<script setup>
+const appStore = useAppStore()
+const jsonStore = useJsonHandelingStore()
+
+function AddTab() {
+  appStore.setPopupActive({ active: true, type: 'addTab' })
+}
+
+function CheckTabContent(tab) {
+  appStore.setCurrentTab(tab)
+}
 </script>
