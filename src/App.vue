@@ -37,7 +37,7 @@
 import NavBar from "@/components/Section/NavBar.vue";
 import ErrorAlert from "@/components/Popups/ErrorAlert.vue";
 import { onMounted, watch, computed } from "vue";
-import { readTextFile, BaseDirectory } from "@tauri-apps/api/fs";
+import { readTextFile, writeTextFile, createDir, BaseDirectory } from "@tauri-apps/api/fs";
 import { useStore } from "vuex";
 import { appWindow } from "@tauri-apps/api/window";
 
@@ -58,14 +58,33 @@ export default {
       );
     });
 
+    const defaultConfig = {
+      tabList: [],
+      settings: {
+        hue: 189,
+        outputSource: "default",
+      },
+      files: [],
+    };
+
     async function readConfigFile() {
-      const contents = JSON.parse(
-        await readTextFile("config.json", {
-          dir: BaseDirectory.App,
-        })
-      );
-      store.dispatch("updateConfigFile", contents);
-      return contents;
+      try {
+        const contents = JSON.parse(
+          await readTextFile("config.json", {
+            dir: BaseDirectory.App,
+          })
+        );
+        store.dispatch("updateConfigFile", contents);
+        return contents;
+      } catch (e) {
+        await createDir("", { dir: BaseDirectory.App, recursive: true });
+        await writeTextFile(
+          { path: "config.json", contents: JSON.stringify(defaultConfig, null, 2) },
+          { dir: BaseDirectory.App }
+        );
+        store.dispatch("updateConfigFile", defaultConfig);
+        return defaultConfig;
+      }
     }
 
     const minimize = () => {

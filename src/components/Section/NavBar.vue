@@ -151,6 +151,12 @@ export default {
         } else {
           this.$router.push("/");
         }
+      } else if (icon === "about") {
+        if (this.$route.path !== "/about") {
+          this.$router.push("/about");
+        } else {
+          this.$router.push("/");
+        }
       }
     },
   },
