@@ -11,23 +11,31 @@
     "version": "0.2.0"
   },
   "tauri": {
-
     "allowlist": {
       "all": true,
       "protocol": {
         "all": true,
-        "assetScope": ["*", "**", "$PUBLIC/*", "$DATA", "$AUDIO"]
+        "assetScope": [
+          "*",
+          "**",
+          "$PUBLIC/*",
+          "$DATA",
+          "$AUDIO"
+        ]
       },
-
       "fs": {
         "all": true,
         "readFile": true,
         "writeFile": true,
-        "scope": ["*", "**", "$PUBLIC/*", "$DATA", "$AUDIO"]
-
+        "scope": [
+          "*",
+          "**",
+          "$PUBLIC/*",
+          "$DATA",
+          "$AUDIO"
+        ]
       }
     },
-
     "bundle": {
       "active": true,
       "category": "DeveloperTool",
@@ -67,15 +75,17 @@
     "updater": {
       "active": false
     },
-    "windows": [{
-      "fullscreen": false,
-      "height": 600,
-      "resizable": true,
-      "title": "Sound Ninja",
-      "width": 800,
-      "minHeight": 600,
-      "minWidth": 650,
-      "decorations": false
-    }]
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 600,
+        "resizable": true,
+        "title": "Sound Ninja",
+        "width": 800,
+        "minHeight": 600,
+        "minWidth": 650,
+        "decorations": false
+      }
+    ]
   }
 }

@@ -14,16 +14,16 @@
     "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\""
   },
   "dependencies": {
-    "@pinia/nuxt": "^0.5.1",
-    "@tauri-apps/api": "^1.1.0",
-    "@vueuse/nuxt": "^10.11.0",
-    "howler": "^2.2.3",
-    "nuxt": "^3.13.0",
-    "pinia": "^2.1.7"
+    "@pinia/nuxt": "^0.11.3",
+    "@tauri-apps/api": "^1.6.0",
+    "@vueuse/nuxt": "^14.3.0",
+    "nuxt": "4.4.5",
+    "pinia": "^3.0.4"
   },
   "devDependencies": {
-    "prettier": "2.8.7",
-    "prettier-plugin-rust": "^0.1.8",
-    "sass": "^1.69.0"
+    "@tauri-apps/cli": "^1.6.3",
+    "prettier": "^3.8.4",
+    "prettier-plugin-rust": "^0.1.9",
+    "sass": "^1.101.0"
   }
 }
