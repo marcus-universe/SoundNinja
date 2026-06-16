@@ -44,10 +44,47 @@ pub fn get_out_devices() -> Vec<String> {
 
 #[tauri::command]
 pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    // Try the symphonia probe first – it reads XING/VBR headers and container
+    // metadata for accurate duration across MP3, WAV, OGG, and FLAC.
+    let file = File::open(&sound_path).map_err(|e| e.to_string())?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(ext) = std::path::Path::new(&sound_path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
+        hint.with_extension(ext);
+    }
+
+    let probe_result = symphonia::default::get_probe().format(
+        &hint,
+        mss,
+        &FormatOptions::default(),
+        &MetadataOptions::default(),
+    );
+    if let Ok(probed) = probe_result {
+        for track in probed.format.tracks() {
+            let params = &track.codec_params;
+            if let (Some(n_frames), Some(tb)) = (params.n_frames, params.time_base) {
+                let secs = n_frames as f64 * tb.numer as f64 / tb.denom as f64;
+                if secs > 0.0 {
+                    return Ok(secs);
+                }
+            }
+        }
+    }
+
+    // Fall back to rodio's Decoder (works reliably for WAV / CBR formats
+    // where total_duration() returns Some).
     let file = File::open(&sound_path).map_err(|e| e.to_string())?;
     let decoder = rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
-    let secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
-    Ok(secs)
+    Ok(decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0))
 }
 
 // --- Audio thread message ---

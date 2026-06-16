@@ -4,11 +4,13 @@
   --primary_color: hsl(189, 100%, 58%);
   --icon_size: 2.5rem;
   --icon_min_size: 30px;
-  --font_size_1: 1.2rem;
-  --font_size_2: 1rem;
+  --font_size_1: 1rem;
+  --font_size_2: 1.2rem;
   --tab_width: 5rem;
-  --btn_width: 11.5rem;
+  --btn_width: 11rem;
   --topbar_height: 0px;
+  // Navbar side is driven by the $navbar-position SCSS variable
+  --navbar-side: #{$navbar-position};
 }
 
 ::-webkit-scrollbar {
@@ -61,13 +63,13 @@
 // Font Classes
 // ########################################
 .NormalMessage {
-  font-family: $Nunito-R;
+  font-family: $fontRegular;
   font-size: var(--font_size_1);
   color: $white;
 }
 
 h1 {
-  font-family: $Nunito-Bo;
+  font-family: $fontBold;
   font-size: 2rem;
   color: var(--primary_color);
   text-align: center;
@@ -81,7 +83,7 @@ body {
   background-color: $color-bg;
   margin: 0;
   padding: 0;
-  font-family: $Nunito-R;
+  font-family: $fontRegular;
   box-sizing: border-box;
   overflow-y: hidden;
 }

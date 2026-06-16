@@ -13,16 +13,13 @@
                     class="Soundbtn flex_c_v flex_wrap"
                     :class="{ active: sound.active }"
                     :key="sound"
-                    :style="
-                        sound.active && playingInfo?.soundFileIndex === sound.index
-                            ? { '--sound-progress': progressPercent + '%' }
-                            : {}
-                    "
+                    :style="getBtnStyle(sound, soundindex)"
                     ref="dragButton"
                     draggable="true"
                     @dragstart="onDragStart($event, sound)"
                     @dragend="onDragEnd"
                     @click="setActiveSound(soundindex)"
+                    @contextmenu.prevent="(e) => openSoundMenu(e, sound)"
                 >
                     <span class="sound-label">{{ sound.name }}</span>
                 </div>
@@ -55,6 +52,30 @@ const JSONFile = computed(() => {
 })
 
 const Settings = computed(() => jsonStore.configFile?.settings)
+
+// ---- Styling helper ----
+function getBtnStyle(sound, soundindex) {
+  const style = {}
+  if (sound.active && playingInfo.value?.soundFileIndex === sound.index) {
+    style['--sound-progress'] = progressPercent.value + '%'
+  }
+  if (sound.color) {
+    style['--btn-accent'] = sound.color
+  }
+  return style
+}
+
+// ---- Context menu ----
+function openSoundMenu(event, sound) {
+  const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
+  appStore.openContextMenu({
+    x: event.clientX,
+    y: event.clientY,
+    type: 'sound',
+    targetName: sound.name,
+    targetIndex: fileArrayIndex,
+  })
+}
 
 // ---- Progress bar state ----
 const playingInfo = ref(null) // { soundFileIndex, duration, startTime }

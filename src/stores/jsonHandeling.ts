@@ -8,14 +8,21 @@ interface SoundFile {
   tabs: string[]
   active: boolean
   index: number
+  color?: string
+}
+
+interface TabEntry {
+  name: string
+  color?: string
 }
 
 interface Config {
-  tabList: string[]
   settings: {
-    hue: number
+    theme: string
+    customCss: string
     outputSource: string
   }
+  tabList: TabEntry[]
   files: SoundFile[]
 }
 
@@ -23,19 +30,20 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
   state: () => ({
     NewJsonData: {} as Record<string, unknown>,
     FileStruct: [] as unknown[],
-    TabList: [] as string[],
+    TabList: [] as TabEntry[],
     Settings: {
-      hue: 0,
+      theme: 'dark-cyan',
     },
     JSONFile: null as unknown,
     path: null as string | null,
     currentProjectPath: null as string | null,
     configFile: {
-      tabList: [],
       settings: {
-        hue: 0,
+        theme: 'dark-cyan',
+        customCss: '',
         outputSource: 'default',
       },
+      tabList: [],
       files: [],
     } as Config,
   }),
@@ -66,8 +74,18 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.currentProjectPath = p
     },
 
+    /** @deprecated use setTheme instead */
     setHue(val: number) {
-      this.configFile.settings.hue = val
+      // legacy shim – ignored, kept so old call sites don't crash
+    },
+
+    setTheme(val: string) {
+      this.configFile.settings.theme = val
+      this.writeConfig()
+    },
+
+    setCustomCss(val: string) {
+      this.configFile.settings.customCss = val
       this.writeConfig()
     },
 
@@ -86,10 +104,60 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
+    // ---- Tab actions ----
+    addTab(name: string) {
+      this.configFile.tabList.push({ name })
+      this.writeConfig()
+    },
+
+    removeTab(name: string) {
+      this.configFile.tabList = this.configFile.tabList.filter((t) => t.name !== name)
+      this.writeConfig()
+    },
+
+    renameTab(oldName: string, newName: string) {
+      const tab = this.configFile.tabList.find((t) => t.name === oldName)
+      if (tab) {
+        tab.name = newName
+        // update all sounds that reference this tab
+        this.configFile.files.forEach((f) => {
+          const idx = f.tabs.indexOf(oldName)
+          if (idx !== -1) f.tabs[idx] = newName
+        })
+        this.writeConfig()
+      }
+    },
+
+    setTabColor(name: string, color: string) {
+      const tab = this.configFile.tabList.find((t) => t.name === name)
+      if (tab) {
+        tab.color = color
+        this.writeConfig()
+      }
+    },
+
+    // ---- Sound actions ----
+    renameSound(soundindex: number, newName: string) {
+      this.configFile.files[soundindex].name = newName
+      this.writeConfig()
+    },
+
+    removeSound(soundindex: number) {
+      this.configFile.files.splice(soundindex, 1)
+      // re-index
+      this.configFile.files.forEach((f, i) => { f.index = i })
+      this.writeConfig()
+    },
+
+    setSoundColor(soundindex: number, color: string) {
+      this.configFile.files[soundindex].color = color
+      this.writeConfig()
+    },
+
     resetAll() {
       this.configFile = {
+        settings: { theme: 'dark-cyan', customCss: '', outputSource: 'default' },
         tabList: [],
-        settings: { hue: 189, outputSource: 'default' },
         files: [],
       }
       this.writeConfig()

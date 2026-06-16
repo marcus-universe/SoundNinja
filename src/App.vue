@@ -5,6 +5,7 @@
     <SettingsOverlay />
     <AboutOverlay />
     <ImportFolders v-if="appStore.importFoldersActive" />
+    <ContextMenu />
     <NuxtPage v-slot="{ Component }">
       <transition name="fade" mode="out-in">
         <component :is="Component" />
@@ -21,23 +22,13 @@ import { listen } from '@tauri-apps/api/event'
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
 
-const hue = computed(() => jsonStore.configFile?.settings?.hue)
-
-watch(hue, (hueval) => {
-  if (hueval !== undefined && hueval !== null) {
-    document.documentElement.style.setProperty(
-      '--primary_color',
-      `hsl(${hueval}, 100%, 58%)`
-    )
-  }
-})
-
 const defaultConfig = {
-  tabList: [],
   settings: {
-    hue: 189,
+    theme: 'dark-cyan',
+    customCss: '',
     outputSource: 'default',
   },
+  tabList: [],
   files: [],
 }
 
@@ -46,8 +37,9 @@ async function readConfigFile() {
     const contents = JSON.parse(
       await readTextFile('config.json', { baseDir: BaseDirectory.AppData })
     )
-    jsonStore.updateConfigFile(contents)
-    return contents
+    const migrated = migrateConfig(contents)
+    jsonStore.updateConfigFile(migrated)
+    return migrated
   } catch {
     await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true })
     await writeTextFile(
@@ -58,6 +50,25 @@ async function readConfigFile() {
     jsonStore.updateConfigFile(defaultConfig)
     return defaultConfig
   }
+}
+
+/** Migrate old config formats to the current schema */
+function migrateConfig(obj) {
+  // Migrate tabList: string[] → TabEntry[]
+  if (Array.isArray(obj.tabList) && obj.tabList.length > 0 && typeof obj.tabList[0] === 'string') {
+    obj.tabList = obj.tabList.map((name) => ({ name }))
+  }
+  // Migrate settings.hue → settings.theme
+  if (obj.settings && typeof obj.settings.hue === 'number' && !obj.settings.theme) {
+    obj.settings.theme = 'dark-cyan'
+    delete obj.settings.hue
+  }
+  // Ensure new settings fields exist
+  if (obj.settings) {
+    obj.settings.theme = obj.settings.theme ?? 'dark-cyan'
+    obj.settings.customCss = obj.settings.customCss ?? ''
+  }
+  return obj
 }
 
 function isValidConfig(obj) {
@@ -141,8 +152,33 @@ async function handleMenuImportAudio() {
   jsonStore.addFiles(soundlist)
 }
 
+// Built-in themes — must match SettingsOverlay.vue
+const builtinThemes = {
+  'dark-cyan':   { '--primary_color': 'hsl(189, 100%, 58%)', '--color-bg': '#222831' },
+  'dark-purple': { '--primary_color': 'hsl(270, 80%, 65%)',  '--color-bg': '#1e1b2e' },
+  'dark-orange': { '--primary_color': 'hsl(28, 100%, 58%)',  '--color-bg': '#231c15' },
+  'dark-green':  { '--primary_color': 'hsl(145, 80%, 50%)',  '--color-bg': '#162218' },
+  'dark-pink':   { '--primary_color': 'hsl(330, 80%, 65%)',  '--color-bg': '#231520' },
+}
+
+function applyPersistedTheme(config) {
+  const theme = config?.settings?.theme ?? 'dark-cyan'
+  if (theme === 'custom') {
+    const css = config?.settings?.customCss
+    if (css) {
+      let tag = document.getElementById('sn-custom-theme')
+      if (!tag) { tag = document.createElement('style'); tag.id = 'sn-custom-theme'; document.head.appendChild(tag) }
+      tag.textContent = css
+    }
+    return
+  }
+  const vars = builtinThemes[theme] ?? builtinThemes['dark-cyan']
+  const root = document.documentElement
+  Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v))
+}
+
 onMounted(() => {
-  readConfigFile()
+  readConfigFile().then(applyPersistedTheme)
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.setActiveOverlay('about'))
   listen('menu_open_project', handleMenuOpenProject)

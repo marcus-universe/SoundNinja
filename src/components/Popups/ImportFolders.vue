@@ -75,8 +75,8 @@ async function doImport() {
     const audioEntries = entries.filter((e) => isAudioFile(e.name))
     const name = folderName(folder)
 
-    if (importAsTabs.value && !jsonStore.configFile.tabList.includes(name)) {
-      jsonStore.configFile.tabList.push(name)
+    if (importAsTabs.value && !jsonStore.configFile.tabList.some((t) => t.name === name)) {
+      jsonStore.addTab(name)
     }
 
     for (const entry of audioEntries) {

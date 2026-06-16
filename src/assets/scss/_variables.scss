@@ -9,9 +9,25 @@ $warn: #f86d6d;
 $padding_1: 1rem;
 $padding_2: 0.5rem;
 
-$Nunito-R: "Nunito-Regular";
-$Nunito-Bo: "Nunito-Bold";
-$Nunito-SemiBo: "Nunito-SemiBold";
-$Nunito-Bl: "Nunito-Black";
+// ########################################
+// Font Variables
+// Change $fontRegular / $fontBold to switch the app font globally
+// ########################################
+$fontRegular: "Nunito-Regular";
+$fontBold: "Nunito-Bold";
+$fontSemiBold: "Nunito-SemiBold";
+$fontBlack: "Nunito-Black";
+
+// Legacy font aliases (kept for backwards compatibility)
+$Nunito-R: $fontRegular;
+$Nunito-Bo: $fontBold;
+$Nunito-SemiBo: $fontSemiBold;
+$Nunito-Bl: $fontBlack;
 $Caveat-R: "Caveat-Regular";
 $Caveat-Bo: "Caveat-Bold";
+
+// ########################################
+// Navbar Position
+// Change $navbar-position to 'left' or 'right' to reposition the navbar
+// ########################################
+$navbar-position: left;

@@ -5,7 +5,16 @@
   height: calc(100vh - var(--topbar_height));
   background-color: $color-bg;
   margin-top: var(--topbar_height);
-  margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+
+  // Shift the main content away from whichever side the navbar sits on
+  @if $navbar-position == right {
+    margin-right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+    margin-left: 0;
+  } @else {
+    margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+    margin-right: 0;
+  }
+
   transition: all 0.2s ease;
   overflow: hidden;
 
@@ -21,11 +30,12 @@
 
     .tab {
       flex-shrink: 0;
-      font-family: $Nunito-Bo;
+      font-family: $fontBold;
       font-size: var(--font_size_1);
       color: var(--color-bg);
       opacity: 0.7;
-      background-color:var(--primary_color);
+      // Per-tab accent color falls back to the global primary color
+      background-color: var(--tab-accent, var(--primary_color));
       min-width: var(--tab_width);
       text-align: center;
       margin: 0 0.2rem 0 0.2rem;
@@ -69,10 +79,12 @@
       min-height: 100px;
 
       .Soundbtn {
-        font-family: $Nunito-Bo;
+        font-family: $fontBold;
         font-size: var(--font_size_2);
         color: $white;
         background-color: $color-btn;
+        // Accent color (set by the color picker) drives the border
+        border: 0.2rem solid var(--btn-accent, var(--primary_color));
         padding: $padding_1;
         border-radius: 0.5rem;
         max-width: var(--btn_width);
@@ -82,7 +94,23 @@
         text-align: center;
         position: relative;
         overflow: hidden;
-        transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+
+        // Progress fill bar — width is driven by --sound-progress (set via inline
+        // style from the Vue component using requestAnimationFrame).
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: var(--sound-progress, 0%);
+          background-color: var(--btn-accent, var(--primary_color));
+          opacity: 0.3;
+          z-index: 0;
+          pointer-events: none;
+          // No CSS transition here — rAF handles frame-by-frame smoothness.
+        }
 
         .sound-label {
           position: relative;
@@ -93,25 +121,22 @@
         &:hover {
           cursor: pointer;
           background-color: $color-btn-hover;
-          color: var(--primary_color);
+          // Hover text uses the same accent color as the border
+          color: var(--btn-accent, var(--primary_color));
           outline: none;
         }
 
         &.active {
-          // Progress fill: left = filled (primary color), right = unfilled (btn color).
-          // --sound-progress is set via inline style by the Vue component.
-          background: linear-gradient(
-            to right,
-            var(--primary_color) var(--sound-progress, 0%),
-            $color-btn var(--sound-progress, 0%)
-          );
+          background-color: $color-btn;
           color: $white;
-          text-shadow: 0 0 6px rgba(0, 0, 0, 0.55);
-          font-family: $Nunito-Bo;
-          outline: none;
-          box-shadow: inset 0 0 0 2px var(--primary_color);
-          // Disable background transition so RAF-driven progress updates are instant.
-          transition: color 0.2s ease, box-shadow 0.2s ease;
+          text-shadow: 0 0 5px rgba(0, 0, 0, 0.6);
+          font-family: $fontBold;
+          // Slightly bolder border + soft glow make the active state clearly visible
+          // even before the progress bar starts filling.
+          border-width: 0.2rem;
+          box-shadow: 0 0 8px var(--btn-accent, var(--primary_color));
+          // Suppress background transition so rAF progress updates are instant.
+          transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
       }
     }
@@ -119,7 +144,7 @@
 }
 
 .searchMove {
-  margin-top: calc(var(--icon_size) + $padding_1);
+  margin-top: calc(var(--icon_size) + $padding_1 + $padding_1 + 0.5rem);
 }
 
 // ########################################
@@ -157,12 +182,12 @@
 .dialog-title {
   margin: 0;
   color: $white;
-  font-family: $Nunito-Bo;
+  font-family: $fontBold;
 }
 
 .dialog-error {
   color: $warn;
-  font-family: $Nunito-R;
+  font-family: $fontRegular;
   font-size: var(--font_size_1);
   margin: 0;
 }
@@ -174,7 +199,7 @@
   border: 0.2rem solid var(--primary_color);
   background: transparent;
   color: var(--primary_color);
-  font-family: $Nunito-Bo;
+  font-family: $fontBold;
   font-size: var(--font_size_1);
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
@@ -190,7 +215,7 @@
 
 .ui-checkbox {
   color: $white;
-  font-family: $Nunito-R;
+  font-family: $fontRegular;
   font-size: var(--font_size_1);
   cursor: pointer;
 
@@ -210,7 +235,7 @@
   border: 0.2rem solid var(--primary_color);
   background: $color-bg;
   color: var(--primary_color);
-  font-family: $Nunito-R;
+  font-family: $fontRegular;
   font-size: var(--font_size_1);
   transition: all 0.2s ease;
   box-sizing: border-box;
@@ -232,7 +257,7 @@
   padding: $padding_2 $padding_1;
   border-radius: 0.4rem;
   background: $color-btn;
-  font-family: $Nunito-R;
+  font-family: $fontRegular;
   font-size: var(--font_size_2);
   color: $white;
   overflow: hidden;
@@ -335,8 +360,8 @@
   background-color: $color-bg;
   border: 0.2rem solid var(--primary_color);
   border-radius: 0.75rem;
-  padding: calc($padding_1 * 1.5);
-  width: min(680px, calc(100vw - 4rem));
+  padding: calc($padding_1 * 2.5);
+  width: min(1080px, calc(100vw - 4rem));
   max-height: calc(100vh - 4rem);
   overflow-y: auto;
   box-sizing: border-box;
@@ -362,18 +387,14 @@
     p {
       font-size: 1.1rem;
       color: $white;
-      font-family: $Nunito-R;
+      font-family: $fontRegular;
     }
 
     .github-link {
       color: var(--primary_color);
       text-decoration: none;
       font-size: 1rem;
-      font-family: $Nunito-R;
-
-      &:hover {
-        text-decoration: underline;
-      }
+      font-family: $fontRegular;
     }
   }
 }
@@ -411,7 +432,7 @@
 
   label {
     color: var(--primary_color);
-    font-family: $Nunito-Bo;
+    font-family: $fontBold;
     font-size: var(--font_size_1);
     min-width: 30%;
   }
@@ -476,10 +497,10 @@
     width: 70%;
     padding: $padding_1;
     border-radius: 0.5rem;
-    border: 0.2rem solid var(--primary_color);
+    border: 0.15rem solid var(--primary_color);
     background: $color-bg;
     color: var(--primary_color);
-    font-family: $Nunito-R;
+    font-family: $fontRegular;
     font-size: var(--font_size_1);
     transition: background 0.2s ease;
 
@@ -496,7 +517,7 @@
 
     option {
       color: var(--primary_color);
-      font-family: $Nunito-Bo;
+      font-family: $fontBold;
       font-size: var(--font_size_1);
       background: $color-bg;
       border: 0.2rem solid var(--primary_color);
