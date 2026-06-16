@@ -21,8 +21,8 @@
 </template>
 
 <script setup>
-import { open } from '@tauri-apps/api/dialog'
-import { readDir } from '@tauri-apps/api/fs'
+import { open } from '@tauri-apps/plugin-dialog'
+import { readDir } from '@tauri-apps/plugin-fs'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -66,7 +66,7 @@ async function doImport() {
   for (const folder of selectedFolders.value) {
     let entries = []
     try {
-      entries = await readDir(folder, { recursive: false })
+      entries = await readDir(folder)
     } catch {
       appStore.setErrorActive(`Failed to read folder: ${folderName(folder)}`)
       return
@@ -92,7 +92,7 @@ async function doImport() {
           .replaceAll('_', ' ')
           .replace(/([A-Z])/g, ' $1')
           .trim(),
-        path: entry.path,
+        path: folder.replace(/[\/\\]$/, '') + '/' + entry.name,
         volume: 0.4,
         tabs,
         active: false,

@@ -31,7 +31,8 @@
       margin: 0 0.2rem 0 0.2rem;
       padding: $padding_2;
       filter: brightness(1);
-      border: 0;
+      border: none;
+      border-radius: 0.5rem 0.5rem 0 0;
       transition: background-color 0.1s ease, color 0.1s ease, border 0.1s ease, opacity 0.3s ease;
 
       &:hover {

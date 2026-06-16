@@ -1,14 +1,13 @@
 ﻿use anyhow::Result;
 use cpal::traits::{DeviceTrait, HostTrait};
-use lazy_static::lazy_static;
-use rodio::{self, cpal, Source};
+use rodio::{self, cpal, Source, Player, MixerDeviceSink, DeviceSinkBuilder};
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::mpsc::{channel, Sender};
-use std::sync::Mutex;
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-use tauri::Manager;
+use tauri::Emitter;
 
 // --- Device enumeration ---
 
@@ -26,7 +25,17 @@ pub fn get_out_devices() -> Vec<String> {
     get_output_devices()
         .unwrap_or_default()
         .into_iter()
-        .filter_map(|d| d.name().ok())
+        .filter_map(|d| {
+            d.description().ok().map(|desc| {
+                // On Windows, DEVPKEY_Device_FriendlyName (the full name like
+                // "Lautsprecher (3- Focusrite USB Audio)") is stored in extended()[0].
+                // DEVPKEY_Device_DeviceDesc ("Lautsprecher") is stored in name().
+                desc.extended()
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| desc.name().to_string())
+            })
+        })
         .inspect(|n| println!("Device: {}", n))
         .collect()
 }
@@ -36,49 +45,95 @@ pub fn get_out_devices() -> Vec<String> {
 #[tauri::command]
 pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
     let file = File::open(&sound_path).map_err(|e| e.to_string())?;
-    let reader = BufReader::new(file);
-    let decoder = rodio::Decoder::new(reader).map_err(|e| e.to_string())?;
-    let secs = decoder
-        .total_duration()
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
+    let decoder = rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
+    let secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
     Ok(secs)
 }
 
-// --- Audio thread types ---
+// --- Audio thread message ---
 
 enum AudioMsg {
     Play { path: String, device_name: String },
     Stop,
 }
 
-lazy_static! {
-    static ref AUDIO_SENDER: Mutex<Option<Sender<AudioMsg>>> = Mutex::new(None);
+// --- Global audio sender ---
+
+static AUDIO_SENDER: OnceLock<Mutex<Option<Sender<AudioMsg>>>> = OnceLock::new();
+
+fn audio_sender() -> &'static Mutex<Option<Sender<AudioMsg>>> {
+    AUDIO_SENDER.get_or_init(|| Mutex::new(None))
 }
 
-/// Persistent OutputStream kept alive across multiple sounds on the same device.
-/// We NEVER drop OutputStream while audio is playing - this prevents the
-/// "slice::get_unchecked_mut" WASAPI crash. Only the cheap Sink is swapped per sound.
+/// Persistent MixerDeviceSink kept alive across multiple sounds on the same device.
+/// We NEVER drop MixerDeviceSink while audio is playing - this prevents the
+/// "slice::get_unchecked_mut" WASAPI crash. Only the cheap Player is swapped per sound.
 struct AudioStream {
-    _stream: rodio::OutputStream,
-    handle: rodio::OutputStreamHandle,
+    device_sink: MixerDeviceSink,
     device_name: String,
 }
 
 impl AudioStream {
     fn open(device_name: &str) -> Result<Self, String> {
-        let devices = get_output_devices().map_err(|e| e.to_string())?;
-        let device = devices
-            .iter()
-            .find(|d| d.name().map(|n| n == device_name).unwrap_or(false))
+        let device = get_output_devices()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|d| {
+                d.description()
+                    .map(|desc| {
+                        let full_name = desc
+                            .extended()
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| desc.name().to_string());
+                        full_name == device_name
+                    })
+                    .unwrap_or(false)
+            })
             .ok_or_else(|| format!("Device '{}' not found", device_name))?;
-        let (stream, handle) =
-            rodio::OutputStream::try_from_device(device).map_err(|e| e.to_string())?;
-        Ok(AudioStream {
-            _stream: stream,
-            handle,
-            device_name: device_name.to_owned(),
-        })
+        let device_sink = DeviceSinkBuilder::from_device(device)
+            .map_err(|e| e.to_string())?
+            .open_stream()
+            .map_err(|e| e.to_string())?;
+        Ok(Self { device_sink, device_name: device_name.to_owned() })
+    }
+}
+
+// --- Audio helpers ---
+
+fn load_source(path: &str) -> Result<rodio::Decoder<BufReader<File>>, String> {
+    let file = File::open(path).map_err(|e| e.to_string())?;
+    rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())
+}
+
+/// Ensures the stream is open and targets `device_name`, reopening if necessary.
+fn ensure_stream(stream: &mut Option<AudioStream>, device_name: &str) -> Result<(), String> {
+    let needs_new = stream
+        .as_ref()
+        .map(|s| s.device_name != device_name)
+        .unwrap_or(true);
+
+    if !needs_new {
+        return Ok(());
+    }
+
+    if stream.is_some() {
+        thread::sleep(Duration::from_millis(100));
+    }
+    *stream = Some(AudioStream::open(device_name)?);
+    Ok(())
+}
+
+/// Receive the next message. Returns `Ok(None)` on timeout, `Err(())` on disconnect.
+fn recv_msg(rx: &Receiver<AudioMsg>, is_playing: bool) -> Result<Option<AudioMsg>, ()> {
+    if is_playing {
+        match rx.recv_timeout(Duration::from_millis(50)) {
+            Ok(msg) => Ok(Some(msg)),
+            Err(RecvTimeoutError::Timeout) => Ok(None),
+            Err(RecvTimeoutError::Disconnected) => Err(()),
+        }
+    } else {
+        rx.recv().map(Some).map_err(|_| ())
     }
 }
 
@@ -86,97 +141,72 @@ impl AudioStream {
 
 pub fn init_audio_thread(app_handle: tauri::AppHandle) {
     let (tx, rx) = channel::<AudioMsg>();
-    *AUDIO_SENDER.lock().expect("mutex poisoned") = Some(tx);
+    *audio_sender().lock().expect("mutex poisoned") = Some(tx);
 
     thread::spawn(move || {
         let mut stream: Option<AudioStream> = None;
-        let mut sink: Option<rodio::Sink> = None;
+        let mut player: Option<Player> = None;
 
         loop {
-            let is_playing = sink.as_ref().map(|s| !s.empty()).unwrap_or(false);
+            let is_playing = player.as_ref().map(|p| !p.empty()).unwrap_or(false);
 
-            let msg: Option<AudioMsg> = if is_playing {
-                match rx.recv_timeout(Duration::from_millis(50)) {
-                    Ok(m) => Some(m),
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                        if sink.as_ref().map(|s| s.empty()).unwrap_or(false) {
-                            sink = None;
-                            let _ = app_handle.emit_all("sound_finished", ());
-                        }
-                        None
+            // When idle, drain any lingering player before blocking on recv.
+            if !is_playing && player.is_some() {
+                player = None;
+                let _ = app_handle.emit("sound_finished", ());
+            }
+
+            let msg = match recv_msg(&rx, is_playing) {
+                Ok(Some(msg)) => msg,
+                Ok(None) => {
+                    // Timeout while playing: check if player finished naturally.
+                    if player.as_ref().map(|p| p.empty()).unwrap_or(false) {
+                        player = None;
+                        let _ = app_handle.emit("sound_finished", ());
                     }
-                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                    continue;
                 }
-            } else {
-                if sink.is_some() {
-                    sink = None;
-                    let _ = app_handle.emit_all("sound_finished", ());
-                }
-                match rx.recv() {
-                    Ok(m) => Some(m),
-                    Err(_) => break,
-                }
+                Err(()) => break,
             };
 
-            if let Some(msg) = msg {
-                match msg {
-                    AudioMsg::Stop => {
-                        if let Some(ref s) = sink {
-                            s.stop();
-                        }
-                        sink = None;
-                        let _ = app_handle.emit_all("sound_finished", ());
+            match msg {
+                AudioMsg::Stop => {
+                    if let Some(ref p) = player {
+                        p.stop();
                     }
-                    AudioMsg::Play { path, device_name } => {
-                        if let Some(ref s) = sink {
-                            s.stop();
+                    player = None;
+                    let _ = app_handle.emit("sound_finished", ());
+                }
+
+                AudioMsg::Play { path, device_name } => {
+                    if let Some(p) = player.take() {
+                        p.stop();
+                        // Allow WASAPI callbacks to drain before reusing the audio
+                        // device. Without this delay the WASAPI backend may still be
+                        // processing the old buffer when a new Player is created,
+                        // triggering the "slice::get_unchecked_mut" panic.
+                        thread::sleep(Duration::from_millis(50));
+                    }
+
+                    if let Err(e) = ensure_stream(&mut stream, &device_name) {
+                        eprintln!("Failed to open audio device: {}", e);
+                        let _ = app_handle.emit("sound_error", e);
+                        continue;
+                    }
+
+                    // stream is guaranteed Some after ensure_stream returns Ok.
+                    let st = stream.as_ref().expect("ensure_stream guarantees Some on Ok");
+
+                    let new_player = Player::connect_new(st.device_sink.mixer());
+
+                    match load_source(&path) {
+                        Ok(source) => {
+                            new_player.append(source);
+                            player = Some(new_player);
                         }
-                        sink = None;
-
-                        let need_new_stream = stream
-                            .as_ref()
-                            .map(|st| st.device_name != device_name)
-                            .unwrap_or(true);
-
-                        if need_new_stream {
-                            if stream.is_some() {
-                                thread::sleep(Duration::from_millis(100));
-                            }
-                            stream = None;
-                            match AudioStream::open(&device_name) {
-                                Ok(s) => stream = Some(s),
-                                Err(e) => {
-                                    eprintln!("Failed to open audio device: {}", e);
-                                    let _ = app_handle.emit_all("sound_error", e);
-                                    continue;
-                                }
-                            }
-                        }
-
-                        if let Some(ref st) = stream {
-                            match rodio::Sink::try_new(&st.handle) {
-                                Ok(s) => {
-                                    match File::open(&path)
-                                        .map_err(|e| e.to_string())
-                                        .and_then(|f| {
-                                            rodio::Decoder::new(BufReader::new(f))
-                                                .map_err(|e| e.to_string())
-                                        }) {
-                                        Ok(source) => {
-                                            s.append(source);
-                                            sink = Some(s);
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Failed to decode audio: {}", e);
-                                            let _ = app_handle.emit_all("sound_error", e);
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to create sink: {}", e);
-                                    let _ = app_handle.emit_all("sound_error", e.to_string());
-                                }
-                            }
+                        Err(e) => {
+                            eprintln!("Failed to decode audio: {}", e);
+                            let _ = app_handle.emit("sound_error", e);
                         }
                     }
                 }
@@ -193,8 +223,8 @@ pub fn play_sound(
     device_name: String,
     active: bool,
 ) -> Result<String, String> {
-    let guard = AUDIO_SENDER.lock().map_err(|e| e.to_string())?;
-    let tx = guard.as_ref().ok_or("Audio thread not initialized")?;
+    let guard = audio_sender().lock().map_err(|e| e.to_string())?;
+    let tx = (*guard).clone().ok_or("Audio thread not initialized")?;
 
     if active {
         tx.send(AudioMsg::Stop).map_err(|e| e.to_string())?;

@@ -14,8 +14,8 @@
 </template>
 
 <script setup>
-import { readTextFile, writeTextFile, createDir, BaseDirectory } from '@tauri-apps/api/fs'
-import { open as openDialog, save as saveDialog } from '@tauri-apps/api/dialog'
+import { readTextFile, writeTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
+import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { listen } from '@tauri-apps/api/event'
 
 const jsonStore = useJsonHandelingStore()
@@ -44,15 +44,16 @@ const defaultConfig = {
 async function readConfigFile() {
   try {
     const contents = JSON.parse(
-      await readTextFile('config.json', { dir: BaseDirectory.App })
+      await readTextFile('config.json', { baseDir: BaseDirectory.AppData })
     )
     jsonStore.updateConfigFile(contents)
     return contents
   } catch {
-    await createDir('', { dir: BaseDirectory.App, recursive: true })
+    await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true })
     await writeTextFile(
-      { path: 'config.json', contents: JSON.stringify(defaultConfig, null, 2) },
-      { dir: BaseDirectory.App }
+      'config.json',
+      JSON.stringify(defaultConfig, null, 2),
+      { baseDir: BaseDirectory.AppData }
     )
     jsonStore.updateConfigFile(defaultConfig)
     return defaultConfig

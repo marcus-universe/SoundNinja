@@ -20,11 +20,14 @@
           </div>
           <div class="flex_c gap1 w100 setting">
             <label>Select Output-Device</label>
-            <select v-model="outputSelected" @change="selectOutputDevice">
-              <option v-for="device in OutputDevices[0]" :key="device" :value="device">
-                {{ device }}
-              </option>
-            </select>
+            <div class="flex_c gap1 output-device-row">
+              <select v-model="outputSelected" @change="selectOutputDevice">
+                <option v-for="device in OutputDevices[0]" :key="device" :value="device">
+                  {{ device }}
+                </option>
+              </select>
+              <button class="refresh-btn" @click="getOutputDevices" title="Refresh devices">&#x21BB;</button>
+            </div>
           </div>
         </div>
       </div>
@@ -34,7 +37,7 @@
 </template>
 
 <script setup>
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -71,3 +74,32 @@ const selectOutputDevice = (event) => {
   jsonStore.setOutSource(event.target.value)
 }
 </script>
+
+<style lang="scss" scoped>
+.output-device-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+
+  select {
+    flex: 1;
+  }
+
+  .refresh-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: 0.1rem solid var(--primary_color);
+    border-radius: 0.4rem;
+    color: var(--primary_color);
+    font-size: 1.2rem;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    transition: background 0.15s;
+
+    &:hover {
+      background: var(--primary_color);
+      color: var(--color-bg, #1a1a1a);
+    }
+  }
+}
+</style>

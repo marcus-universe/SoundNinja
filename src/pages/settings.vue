@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 
 const jsonStore = useJsonHandelingStore()
 

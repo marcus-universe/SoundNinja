@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { writeTextFile, BaseDirectory } from '@tauri-apps/api/fs'
+import { writeTextFile, BaseDirectory } from '@tauri-apps/plugin-fs'
 
 interface SoundFile {
   name: string
@@ -52,8 +52,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     writeConfig() {
       writeTextFile(
-        { path: 'config.json', contents: JSON.stringify(this.configFile, null, 2) },
-        { dir: BaseDirectory.App }
+        'config.json',
+        JSON.stringify(this.configFile, null, 2),
+        { baseDir: BaseDirectory.AppData }
       )
     },
 

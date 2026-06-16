@@ -1,0 +1,24 @@
+{
+    "identifier": "default",
+    "description": "Default capability for Sound Ninja",
+    "windows": [
+        "main"
+    ],
+    "permissions": [
+        "core:default",
+        "fs:default",
+        "fs:allow-appdata-read-recursive",
+        "fs:allow-appdata-write-recursive",
+        "fs:allow-appdata-meta-recursive",
+        {
+            "identifier": "fs:allow-mkdir",
+            "allow": [
+                {
+                    "path": "$APPDATA/**"
+                }
+            ]
+        },
+        "dialog:default",
+        "shell:allow-open"
+    ]
+}
