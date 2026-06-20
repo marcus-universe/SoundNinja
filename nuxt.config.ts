@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { defineNuxtConfig } from 'nuxt/config'
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   srcDir: 'src/',
@@ -44,6 +46,9 @@ export default defineNuxtConfig({
       strictPort: true,
     },
     envPrefix: ['VITE_', 'TAURI_'],
+    build: {
+      sourcemap: true,
+    },
   },
 
   router: {

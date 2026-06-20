@@ -4,8 +4,17 @@
   --primary_color: hsl(189, 100%, 58%);
   --icon_size: 2.5rem;
   --icon_min_size: 30px;
-  --font_size_1: 1rem;
-  --font_size_2: 1.2rem;
+
+  /* ── Font families ───────────────────────────── */
+  --font-regular: #{$fontRegular};
+  --font-bold: #{$fontBold};
+  --font-semibold: #{$fontSemiBold};
+  --font-black: #{$fontBlack};
+
+  /* ── Font sizes ──────────────────────────────── */
+  --font-size-sm: 1rem;
+  --font-size-md: 1.2rem;
+
   --tab_width: 5rem;
   --btn_width: 11rem;
   --topbar_height: 0px;
@@ -64,7 +73,7 @@
 // ########################################
 .NormalMessage {
   font-family: $fontRegular;
-  font-size: var(--font_size_1);
+  font-size: var(--font-size-sm);
   color: $white;
 }
 

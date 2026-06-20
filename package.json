@@ -9,6 +9,9 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "tauri:build": "tauri build",
+    "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+    "tauri:build:macos": "tauri build --target universal-apple-darwin",
     "tauri:serve": "tauri dev",
     "tauri": "tauri",
     "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\""

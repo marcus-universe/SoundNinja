@@ -14,7 +14,12 @@
           v-if="appStore.Searchbar.SearchbarActive"
           class="searchBar flex_c_h align_c flex_start gap1"
         >
-          <input type="text" placeholder="Search" />
+          <input
+            type="text"
+            placeholder="Search"
+            v-model="appStore.Searchbar.SearchbarContent"
+            @input="jsonStore.filterSounds(appStore.Searchbar.SearchbarContent)"
+          />
           <Icons
             :icon="'check'"
             :customClass="'icon'"
@@ -116,7 +121,8 @@ function IconClicked(icon) {
   } else if (icon === 'search') {
     OpenSearch()
   } else if (icon === 'check') {
-    console.log('check')
+    appStore.setSearchContent('')
+    jsonStore.filterSounds('')
   } else if (icon === 'reset') {
     ResetAll()
   } else if (icon === 'settings') {

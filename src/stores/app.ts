@@ -75,6 +75,10 @@ export const useAppStore = defineStore('app', {
       this.Searchbar.SearchbarActive = val
     },
 
+    setSearchContent(val: string) {
+      this.Searchbar.SearchbarContent = val
+    },
+
     setCurrentTab(val: string) {
       this.currentTab = val
     },

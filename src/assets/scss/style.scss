@@ -31,7 +31,7 @@
     .tab {
       flex-shrink: 0;
       font-family: $fontBold;
-      font-size: var(--font_size_1);
+      font-size: var(--font-size-sm);
       color: var(--color-bg);
       opacity: 0.7;
       // Per-tab accent color falls back to the global primary color
@@ -80,7 +80,7 @@
 
       .Soundbtn {
         font-family: $fontBold;
-        font-size: var(--font_size_2);
+        font-size: var(--font-size-md);
         color: $white;
         background-color: $color-btn;
         // Accent color (set by the color picker) drives the border
@@ -188,7 +188,7 @@
 .dialog-error {
   color: $warn;
   font-family: $fontRegular;
-  font-size: var(--font_size_1);
+  font-size: var(--font-size-sm);
   margin: 0;
 }
 
@@ -200,7 +200,7 @@
   background: transparent;
   color: var(--primary_color);
   font-family: $fontBold;
-  font-size: var(--font_size_1);
+  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
 
@@ -216,7 +216,7 @@
 .ui-checkbox {
   color: $white;
   font-family: $fontRegular;
-  font-size: var(--font_size_1);
+  font-size: var(--font-size-sm);
   cursor: pointer;
 
   input[type='checkbox'] {
@@ -236,7 +236,7 @@
   background: $color-bg;
   color: var(--primary_color);
   font-family: $fontRegular;
-  font-size: var(--font_size_1);
+  font-size: var(--font-size-sm);
   transition: all 0.2s ease;
   box-sizing: border-box;
 
@@ -258,7 +258,7 @@
   border-radius: 0.4rem;
   background: $color-btn;
   font-family: $fontRegular;
-  font-size: var(--font_size_2);
+  font-size: var(--font-size-md);
   color: $white;
   overflow: hidden;
 }
@@ -433,13 +433,12 @@
   label {
     color: var(--primary_color);
     font-family: $fontBold;
-    font-size: var(--font_size_1);
+    font-size: var(--font-size-sm);
     min-width: 30%;
   }
 
   input[type='range'] {
     height: 1rem;
-    -webkit-appearance: none;
     width: 70%;
     border-radius: 1rem;
     border: none;
@@ -501,7 +500,7 @@
     background: $color-bg;
     color: var(--primary_color);
     font-family: $fontRegular;
-    font-size: var(--font_size_1);
+    font-size: var(--font-size-sm);
     transition: background 0.2s ease;
 
     &:focus {
@@ -518,7 +517,7 @@
     option {
       color: var(--primary_color);
       font-family: $fontBold;
-      font-size: var(--font_size_1);
+      font-size: var(--font-size-sm);
       background: $color-bg;
       border: 0.2rem solid var(--primary_color);
 

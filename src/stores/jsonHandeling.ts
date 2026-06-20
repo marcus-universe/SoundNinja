@@ -46,6 +46,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       tabList: [],
       files: [],
     } as Config,
+    filteredFiles: [] as SoundFile[],
   }),
 
   getters: {
@@ -56,6 +57,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
   actions: {
     updateConfigFile(contents: Config) {
       this.configFile = contents
+      this.filteredFiles = contents.files
     },
 
     writeConfig() {
@@ -168,6 +170,16 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         file.active = false
       })
       this.writeConfig()
+    },
+
+    filterSounds(searchTerm: string) {
+      if (!searchTerm) {
+        this.filteredFiles = this.configFile.files
+      } else {
+        this.filteredFiles = this.configFile.files.filter((file) =>
+          file.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      }
     },
   },
 })

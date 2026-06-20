@@ -1,0 +1,40 @@
+# Maintainer: marcus-universe <https://github.com/marcus-universe>
+pkgname=soundninja-bin
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="An open-source, cross-platform Soundboard Desktop App"
+arch=('x86_64')
+url="https://github.com/marcus-universe/SoundNinja"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'alsa-lib')
+provides=('soundninja')
+conflicts=('soundninja')
+source_x86_64=("soundninja-${pkgver}.AppImage::https://github.com/marcus-universe/SoundNinja/releases/download/v${pkgver}/soundninja_${pkgver}_amd64.AppImage"
+               "soundninja.desktop")
+sha256sums_x86_64=('SKIP'
+                   'SKIP')
+
+prepare() {
+    chmod +x "${srcdir}/soundninja-${pkgver}.AppImage"
+    "${srcdir}/soundninja-${pkgver}.AppImage" --appimage-extract
+}
+
+package() {
+    install -d "${pkgdir}/usr/bin"
+    install -d "${pkgdir}/usr/share/applications"
+    install -d "${pkgdir}/usr/share/pixmaps"
+
+    # Install extracted AppImage contents
+    cp -r "${srcdir}/squashfs-root/usr/"* "${pkgdir}/usr/"
+
+    # Wrapper script to launch the binary
+    cat > "${pkgdir}/usr/bin/soundninja" << 'EOF'
+#!/bin/sh
+exec /usr/lib/soundninja/soundninja "$@"
+EOF
+    chmod +x "${pkgdir}/usr/bin/soundninja"
+
+    # Desktop entry
+    install -Dm644 "${srcdir}/soundninja.desktop" \
+        "${pkgdir}/usr/share/applications/soundninja.desktop"
+}

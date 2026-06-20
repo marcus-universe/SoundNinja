@@ -46,7 +46,11 @@ const currentTab = computed(() => appStore.currentTab)
 
 const JSONFile = computed(() => {
   const sortByIndex = (a, b) => a.index - b.index
-  return jsonStore.configFile?.files
+  const filesToFilter = appStore.Searchbar.SearchbarActive
+    ? jsonStore.filteredFiles
+    : jsonStore.configFile?.files
+
+  return filesToFilter
     ?.filter((sound) => sound.tabs.includes(currentTab.value))
     .sort(sortByIndex)
 })

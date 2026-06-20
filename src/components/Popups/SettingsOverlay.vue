@@ -90,8 +90,8 @@ const CSS_TEMPLATE = `:root {
   --color-bg: #222831;
 
   /* ── Font sizes ──────────────────────────────── */
-  --font_size_1: 1.2rem;
-  --font_size_2: 1rem;
+  --font-size-sm: 1.2rem;
+  --font-size-md: 1rem;
 
   /* ── Layout sizes ────────────────────────────── */
   --icon_size: 2.5rem;

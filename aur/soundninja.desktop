@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Sound Ninja
+Comment=An open-source, cross-platform Soundboard Desktop App
+Exec=soundninja
+Icon=soundninja
+Type=Application
+Categories=AudioVideo;Audio;
+Keywords=soundboard;audio;streaming;
+StartupWMClass=soundninja
