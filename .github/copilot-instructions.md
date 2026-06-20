@@ -25,27 +25,36 @@
 ## Repository Structure
 
 ```
-src/                        # Vue 3 frontend
-  App.vue                   # Root component
-  main.js                   # Vue app entry point
+src/                        # Vue 3 / Nuxt 3 frontend
+  app.vue                   # Root component
+  pages/                    # Nuxt pages
+    index.vue               # Main soundboard view
+    settings.vue            # Settings page
+    about.vue               # About page
   assets/                   # Static assets (fonts, images, icons)
+    scss/                   # Global SCSS styles (_base.scss, _variables.scss, navbar.scss, style.scss)
   components/
     Assets/                 # Reusable UI elements (BlurBG, Icons)
-    Popups/                 # Modal / popup components (ErrorAlert, RenameField)
+    Popups/                 # Modal / overlay components
+      SettingsOverlay.vue   # Settings (Main, Audio, Theme Creator tabs) + Select Project dialog
+      AboutOverlay.vue
+      ErrorAlert.vue
+      RenameField.vue
+      DialogField.vue
+      ImportFolders.vue
     Section/                # Main layout sections (NavBar, SoundContainer, Tabs)
-  functions/                # Standalone utility functions (e.g. JsonHandle.js)
-  router/                   # Vue Router configuration
-  sass/                     # Global styles (_base.sass, navbar.sass, style.sass)
-  store/                    # Vuex store
-    index.js                # Store root
-    modules/                # Vuex modules (e.g. JsonHandeling.js)
-  views/                    # Page-level Vue components (Main.vue, Settings.vue)
+    UI/                     # Shared UI primitives (UIButton, UICheckbox, etc.)
+  stores/                   # Pinia stores
+    app.ts                  # UI state (overlays, searchbar, project dialog, context menu)
+    jsonHandeling.ts        # Config / sound data, file persistence, project management
 
 src-tauri/                  # Tauri / Rust backend
   src/
-    main.rs                 # Tauri entry point, command registration
+    main.rs                 # Tauri entry point, creates themes/ & projects/ in AppData on startup
     audio.rs                # Audio playback logic (rodio, cpal)
-  tauri.conf.json           # Tauri app configuration (allowlist, bundle, etc.)
+  capabilities/
+    default.json            # Tauri v2 permission capabilities
+  tauri.conf.json           # Tauri app configuration
   Cargo.toml                # Rust dependencies
 ```
 
@@ -135,12 +144,22 @@ npm run prettier-rust
 
 ---
 
+## Implemented Features
+
+- ✅ **Tab System** — `src/components/Section/Tabs.vue`, `src/stores/jsonHandeling.ts`
+- ✅ **Searchbar** — NavBar search with `filterSounds()` in `src/stores/jsonHandeling.ts`
+- ✅ **Theme Creator** — Settings → Theme Creator tab; sliders, color pickers, font selector, live preview, export `.css` / save to AppData `themes/`
+- ✅ **Project Management** — `themes/` and `projects/` folders auto-created in AppData on startup; folder icon opens Select Project dialog (load/create projects)
+- ✅ **Custom Themes** — Load `.css` file themes, built-in themes, saved user themes all selectable in Settings → Main
+
+---
+
 ## Planned Features (Do Not Implement Without Tracking Issue)
 
 The following features are on the roadmap. Check the [GitHub Project Board](https://github.com/users/marcus-universe/projects/1/views/1) before starting work on any of them:
 
-- Tab System, Tag System, Searchbar, Midi Support
-- Themes, Customizable Hotkeys
+- Tag System, Midi Support
+- Customizable Hotkeys
 - Soundboard Sharing / Import / Export
 - WebSocket (smartphone control), Recorder, Speech Search
 - Giphy integration, Twitch Chat Control, AI Assistant
@@ -155,3 +174,19 @@ The following features are on the roadmap. Check the [GitHub Project Board](http
 - [rodio (Rust audio)](https://docs.rs/rodio)
 - [cpal (Rust audio I/O)](https://docs.rs/cpal)
 - [Howler.js](https://howlerjs.com/)
+
+Respond terse like smart caveman. All technical substance stay. Only fluff die.
+
+Rules:
+- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging
+- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
+- Pattern: [thing] [action] [reason]. [next step].
+- Not: "Sure! I'd be happy to help you with that."
+- Yes: "Bug in auth middleware. Fix:"
+
+Switch level: /caveman lite|full|ultra|wenyan
+Stop: "stop caveman" or "normal mode"
+
+Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
+
+Boundaries: code/commits/PRs written normal.

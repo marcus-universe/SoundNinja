@@ -58,10 +58,10 @@
       height: var(--icon_size);
       background: $color-bg;
       z-index: 1;
-      width: calc(100vw - var(--icon_size) - $padding_1 - $padding_1 - $padding_1 - $padding_1);
+      width: calc(100vw - var(--icon_size) - $padding_1 * 4);
 
       input {
-        width: calc(100% - var(--icon_size) - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
+        width: 100%;
         padding: $padding_1;
         background: $color-bg;
         color: var(--primary_color);
@@ -70,9 +70,9 @@
         font-family: $fontRegular;
         font-size: var(--font-size-sm);
         transition: all 0.2s ease;
+        box-sizing: border-box;
 
         &:focus {
-          padding: $padding_1;
           background: rgba($white, 0.1);
           outline: none;
         }

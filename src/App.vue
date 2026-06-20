@@ -186,6 +186,7 @@ onMounted(() => {
   listen('menu_save_as', handleMenuSaveAs)
   listen('menu_import_audio', handleMenuImportAudio)
   listen('menu_import_folders', () => appStore.setImportFoldersActive(true))
+  listen('menu_select_project', () => appStore.setSelectProjectActive(true))
 })
 </script>
 

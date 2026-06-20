@@ -20,11 +20,6 @@
             v-model="appStore.Searchbar.SearchbarContent"
             @input="jsonStore.filterSounds(appStore.Searchbar.SearchbarContent)"
           />
-          <Icons
-            :icon="'check'"
-            :customClass="'icon'"
-            @triggered="IconClicked"
-          />
         </div>
       </transition>
 
@@ -120,9 +115,8 @@ function IconClicked(icon) {
     uploadFiles()
   } else if (icon === 'search') {
     OpenSearch()
-  } else if (icon === 'check') {
-    appStore.setSearchContent('')
-    jsonStore.filterSounds('')
+  } else if (icon === 'folder') {
+    appStore.setSelectProjectActive(true)
   } else if (icon === 'reset') {
     ResetAll()
   } else if (icon === 'settings') {

@@ -24,6 +24,7 @@ export const useAppStore = defineStore('app', {
       SearchbarContent: '',
     },
     importFoldersActive: false,
+    selectProjectActive: false,
     contextMenu: {
       visible: false,
       x: 0,
@@ -77,6 +78,10 @@ export const useAppStore = defineStore('app', {
 
     setSearchContent(val: string) {
       this.Searchbar.SearchbarContent = val
+    },
+
+    setSelectProjectActive(val: boolean) {
+      this.selectProjectActive = val
     },
 
     setCurrentTab(val: string) {

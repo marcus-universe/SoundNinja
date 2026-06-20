@@ -25,3 +25,6 @@ tauri-plugin-opener = "2"
 rodio = "0.22.2"
 anyhow = "1.0.66"
 symphonia = { version = "0.5", features = ["mp3", "wav", "ogg", "flac"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"

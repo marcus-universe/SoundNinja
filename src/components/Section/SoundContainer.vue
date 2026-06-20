@@ -1,34 +1,28 @@
 <template>
     <div class="SoundContainer">
-        <Suspense>
+        <div
+            class="SoundTab flex_c_h flex_start gap1 flex_wrap"
+            ref="dropZoneRef"
+            @drop="onDrop($event)"
+            @dragover.prevent
+            @dragenter.prevent
+        >
             <div
-                class="SoundTab flex_c_h flex_start gap1 flex_wrap"
-                ref="dropZoneRef"
-                @drop="onDrop($event)"
-                @dragover.prevent
-                @dragenter.prevent
+                v-for="(sound, soundindex) in JSONFile"
+                class="Soundbtn flex_c_v flex_wrap"
+                :class="{ active: sound.active }"
+                :key="sound"
+                :style="getBtnStyle(sound, soundindex)"
+                ref="dragButton"
+                draggable="true"
+                @dragstart="onDragStart($event, sound)"
+                @dragend="onDragEnd"
+                @click="setActiveSound(soundindex)"
+                @contextmenu.prevent="(e) => openSoundMenu(e, sound)"
             >
-                <div
-                    v-for="(sound, soundindex) in JSONFile"
-                    class="Soundbtn flex_c_v flex_wrap"
-                    :class="{ active: sound.active }"
-                    :key="sound"
-                    :style="getBtnStyle(sound, soundindex)"
-                    ref="dragButton"
-                    draggable="true"
-                    @dragstart="onDragStart($event, sound)"
-                    @dragend="onDragEnd"
-                    @click="setActiveSound(soundindex)"
-                    @contextmenu.prevent="(e) => openSoundMenu(e, sound)"
-                >
-                    <span class="sound-label">{{ sound.name }}</span>
-                </div>
+                <span class="sound-label">{{ sound.name }}</span>
             </div>
-
-            <template #fallback>
-                <div>Is loading...</div>
-            </template>
-        </Suspense>
+        </div>
     </div>
 </template>
 
@@ -60,8 +54,9 @@ const Settings = computed(() => jsonStore.configFile?.settings)
 // ---- Styling helper ----
 function getBtnStyle(sound, soundindex) {
   const style = {}
-  if (sound.active && playingInfo.value?.soundFileIndex === sound.index) {
-    style['--sound-progress'] = progressPercent.value + '%'
+  const info = playingSounds.get(sound.index)
+  if (sound.active && info) {
+    style['--sound-progress'] = info.percent + '%'
   }
   if (sound.color) {
     style['--btn-accent'] = sound.color
@@ -82,40 +77,66 @@ function openSoundMenu(event, sound) {
 }
 
 // ---- Progress bar state ----
-const playingInfo = ref(null) // { soundFileIndex, duration, startTime }
-const progressPercent = ref(0)
+// Map<soundFileIndex, { duration, startTime, percent }> — tracks every playing sound.
+const playingSounds = reactive(new Map())
 let rafId = null
 
 function tickProgress() {
-  if (!playingInfo.value) return
-  const elapsed = (Date.now() - playingInfo.value.startTime) / 1000
-  progressPercent.value = Math.min(100, (elapsed / playingInfo.value.duration) * 100)
-  if (progressPercent.value < 100) {
+  if (playingSounds.size === 0) {
+    rafId = null
+    return
+  }
+  const now = Date.now()
+  for (const info of playingSounds.values()) {
+    info.percent = Math.min(100, ((now - info.startTime) / 1000 / info.duration) * 100)
+  }
+  rafId = requestAnimationFrame(tickProgress)
+}
+
+function startProgress(soundFileIndex, duration) {
+  playingSounds.set(soundFileIndex, { duration, startTime: Date.now(), percent: 0 })
+  if (rafId === null) {
     rafId = requestAnimationFrame(tickProgress)
   }
 }
 
-function stopProgress() {
-  if (rafId) {
+function stopProgress(soundFileIndex) {
+  playingSounds.delete(soundFileIndex)
+  if (playingSounds.size === 0 && rafId !== null) {
     cancelAnimationFrame(rafId)
     rafId = null
   }
-  playingInfo.value = null
-  progressPercent.value = 0
+}
+
+function stopAllProgress() {
+  playingSounds.clear()
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
 }
 
 // ---- Tauri event listeners ----
 let unlistenFinished = null
 
 onMounted(async () => {
-  unlistenFinished = await listen('sound_finished', () => {
-    stopProgress()
-    jsonStore.ReturnStatusAll()
+  unlistenFinished = await listen('sound_finished', (event) => {
+    const path = event.payload
+    const idx = jsonStore.configFile.files.findIndex((f) => f.path === path)
+    if (idx !== -1) {
+      const fileIndex = jsonStore.configFile.files[idx].index
+      stopProgress(fileIndex)
+      jsonStore.setActiveSound({ soundindex: idx, status: false })
+    } else {
+      // Fallback: path not matched, clear all active state
+      stopAllProgress()
+      jsonStore.ReturnStatusAll()
+    }
   })
 })
 
 onUnmounted(() => {
-  stopProgress()
+  stopAllProgress()
   if (unlistenFinished) unlistenFinished()
 })
 
@@ -139,14 +160,17 @@ function onDrop(event) {
 // ---- Sound playback ----
 async function setActiveSound(soundindex) {
   const sound = JSONFile.value[soundindex]
-  // Resolve the true index in the full files array (not the filtered/sorted view).
   const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
+  const overlapSounds = Settings.value.overlapSounds ?? false
+  const stopOnRetrigger = Settings.value.stopOnRetrigger ?? true
 
   if (!sound.active) {
-    jsonStore.ReturnStatusAll()
+    if (!overlapSounds) {
+      jsonStore.ReturnStatusAll()
+      stopAllProgress()
+    }
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: true })
 
-    // Fetch duration for the progress bar before starting playback.
     let duration = 0
     try {
       duration = await invoke('get_sound_duration', { soundPath: sound.path })
@@ -154,29 +178,27 @@ async function setActiveSound(soundindex) {
       console.error('Could not get sound duration', e)
     }
 
-    // Guard: another sound may have been activated while we awaited.
     if (!sound.active) return
 
-    stopProgress()
     if (duration > 0) {
-      playingInfo.value = { soundFileIndex: sound.index, duration, startTime: Date.now() }
-      rafId = requestAnimationFrame(tickProgress)
+      startProgress(sound.index, duration)
     }
 
-    // play_sound now returns immediately; completion is signalled via sound_finished event.
     invoke('play_sound', {
       soundPath: sound.path,
       deviceName: Settings.value.outputSource,
       active: false,
+      overlap: overlapSounds,
     }).catch((e) => console.error('Sound playback error', e))
   } else {
-    stopProgress()
-    jsonStore.ReturnStatusAll()
+    if (!stopOnRetrigger) return
+    stopProgress(sound.index)
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
     invoke('play_sound', {
       soundPath: sound.path,
       deviceName: Settings.value.outputSource,
       active: true,
+      overlap: overlapSounds,
     }).catch((e) => console.error('Stop error', e))
   }
 }

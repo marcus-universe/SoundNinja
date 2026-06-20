@@ -1,8 +1,64 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 pub mod audio;
-use audio::{ get_out_devices, get_sound_duration, init_audio_thread, play_sound };
-use tauri::menu::{ Menu, MenuItemBuilder, SubmenuBuilder };
-use tauri::{ Emitter, Manager };
+pub mod menu;
+use tauri::Manager;
+
+#[tauri::command]
+fn get_system_fonts() -> Vec<String> {
+    get_system_fonts_platform()
+}
+
+#[cfg(target_os = "windows")]
+fn get_system_fonts_platform() -> Vec<String> {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    use std::collections::BTreeSet;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let key_path = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+    let fonts_key = match hklm.open_subkey(key_path) {
+        Ok(k) => k,
+        Err(_) => return vec![],
+    };
+    let type_suffixes = [
+        " (TrueType)", " (OpenType)", " (TrueType/OpenType)", " (All Res)",
+    ];
+    let style_suffixes = [
+        " Bold Italic", " Bold", " Italic", " Regular", " Light", " Black",
+        " Medium", " Thin", " ExtraBold", " ExtraLight", " SemiBold",
+        " Semi Bold", " Extra Bold", " Extra Light", " Condensed", " Narrow",
+        " Heavy", " Hairline", " Demi", " Book", " Display",
+    ];
+    let mut families: BTreeSet<String> = BTreeSet::new();
+    for item in fonts_key.enum_values().filter_map(|r| r.ok()) {
+        let (name, _) = item;
+        let mut family = name.clone();
+        for s in &type_suffixes {
+            family = family.replace(s, "");
+        }
+        let mut trimmed = family.trim().to_string();
+        for s in &style_suffixes {
+            if trimmed.ends_with(s) {
+                trimmed = trimmed[..trimmed.len() - s.len()].trim().to_string();
+                break;
+            }
+        }
+        if !trimmed.is_empty() {
+            families.insert(trimmed);
+        }
+    }
+    families.into_iter().collect()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_system_fonts_platform() -> Vec<String> {
+    vec![
+        "Arial".to_string(),
+        "Helvetica".to_string(),
+        "sans-serif".to_string(),
+        "serif".to_string(),
+        "monospace".to_string(),
+    ]
+}
 
 fn main() {
     tauri::Builder::default()
@@ -11,77 +67,19 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let file_menu = SubmenuBuilder::new(app, "File")
-                .item(&MenuItemBuilder::with_id("open_project", "Open Project").build(app)?)
-                .item(&MenuItemBuilder::with_id("save", "Save").build(app)?)
-                .item(&MenuItemBuilder::with_id("save_as", "Save As...").build(app)?)
-                .separator()
-                .item(&MenuItemBuilder::with_id("import_audio", "Import Audio Files").build(app)?)
-                .item(&MenuItemBuilder::with_id("import_folders", "Import Folders").build(app)?)
-                .separator()
-                .item(&MenuItemBuilder::with_id("quit", "Quit").build(app)?)
-                .build()?;
-
-            let settings_menu = SubmenuBuilder::new(app, "Edit")
-                .item(&MenuItemBuilder::with_id("open_settings", "Settings").build(app)?)
-                .item(
-                    &MenuItemBuilder::with_id("open_config", "Open Config File").build(app)?,
-                )
-                .build()?;
-
-            let help_menu = SubmenuBuilder::new(app, "Help")
-                .item(
-                    &MenuItemBuilder::with_id("about", "About Sound Ninja").build(app)?,
-                )
-                .build()?;
-
-            let menu = Menu::with_items(app, &[&file_menu, &settings_menu, &help_menu])?;
-            app.set_menu(menu)?;
-
-            app.on_menu_event(|app, event| {
-                match event.id.as_ref() {
-                    "quit" => {
-                        std::process::exit(0);
-                    }
-                    "open_project" => {
-                        app.emit("menu_open_project", ()).unwrap_or_default();
-                    }
-                    "save" => {
-                        app.emit("menu_save", ()).unwrap_or_default();
-                    }
-                    "save_as" => {
-                        app.emit("menu_save_as", ()).unwrap_or_default();
-                    }
-                    "import_audio" => {
-                        app.emit("menu_import_audio", ()).unwrap_or_default();
-                    }
-                    "import_folders" => {
-                        app.emit("menu_import_folders", ()).unwrap_or_default();
-                    }
-                    "open_settings" => {
-                        app.emit("menu_open_settings", ()).unwrap_or_default();
-                    }
-                    "open_config" => {
-                        use tauri_plugin_opener::OpenerExt;
-                        if let Ok(app_data_dir) = app.path().app_data_dir() {
-                            let config_path = app_data_dir.join("config.json");
-                            let _ = app.opener().open_path(
-                                config_path.to_string_lossy().to_string(),
-                                None::<String>,
-                            );
-                        }
-                    }
-                    "about" => {
-                        app.emit("menu_open_about", ()).unwrap_or_default();
-                    }
-                    _ => {}
-                }
-            });
-
-            init_audio_thread(app.handle().clone());
+            menu::setup(app)?;
+            audio::init_audio_thread(app.handle().clone());
+            let data_dir = app.path().app_data_dir().expect("cannot resolve app data dir");
+            std::fs::create_dir_all(data_dir.join("themes")).ok();
+            std::fs::create_dir_all(data_dir.join("projects")).ok();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_out_devices, play_sound, get_sound_duration])
+        .invoke_handler(tauri::generate_handler![
+            audio::devices::get_out_devices,
+            audio::playback::play_sound,
+            audio::playback::get_sound_duration,
+            get_system_fonts
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

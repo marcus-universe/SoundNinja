@@ -5,6 +5,9 @@
         "main"
     ],
     "permissions": [
+        "fs:allow-read-dir",
+        "fs:allow-mkdir",
+        "dialog:allow-save",
         "core:default",
         "fs:default",
         "fs:allow-appdata-read-recursive",

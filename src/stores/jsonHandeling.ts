@@ -21,6 +21,8 @@ interface Config {
     theme: string
     customCss: string
     outputSource: string
+    stopOnRetrigger: boolean
+    overlapSounds: boolean
   }
   tabList: TabEntry[]
   files: SoundFile[]
@@ -42,6 +44,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         theme: 'dark-cyan',
         customCss: '',
         outputSource: 'default',
+        stopOnRetrigger: true,
+        overlapSounds: false,
       },
       tabList: [],
       files: [],
@@ -93,6 +97,16 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     setOutSource(val: string) {
       this.configFile.settings.outputSource = val
+      this.writeConfig()
+    },
+
+    setStopOnRetrigger(val: boolean) {
+      this.configFile.settings.stopOnRetrigger = val
+      this.writeConfig()
+    },
+
+    setOverlapSounds(val: boolean) {
+      this.configFile.settings.overlapSounds = val
       this.writeConfig()
     },
 

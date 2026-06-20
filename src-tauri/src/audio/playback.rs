@@ -1,6 +1,5 @@
-﻿use anyhow::Result;
-use cpal::traits::{DeviceTrait, HostTrait};
-use rodio::{self, cpal, Source, Player, MixerDeviceSink, DeviceSinkBuilder};
+use cpal::traits::DeviceTrait;
+use rodio::{self, cpal, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
@@ -9,36 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
 
-// --- Device enumeration ---
-
-pub fn get_output_devices() -> Result<Vec<cpal::Device>> {
-    let mut devices = Vec::new();
-    for host_id in cpal::available_hosts() {
-        let host = cpal::host_from_id(host_id)?;
-        devices.extend(host.devices()?.filter(|d| d.default_output_config().is_ok()));
-    }
-    Ok(devices)
-}
-
-#[tauri::command]
-pub fn get_out_devices() -> Vec<String> {
-    get_output_devices()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|d| {
-            d.description().ok().map(|desc| {
-                // On Windows, DEVPKEY_Device_FriendlyName (the full name like
-                // "Lautsprecher (3- Focusrite USB Audio)") is stored in extended()[0].
-                // DEVPKEY_Device_DeviceDesc ("Lautsprecher") is stored in name().
-                desc.extended()
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| desc.name().to_string())
-            })
-        })
-        .inspect(|n| println!("Device: {}", n))
-        .collect()
-}
+use super::devices::get_output_devices;
 
 // --- Duration query ---
 
@@ -49,8 +19,6 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
     use symphonia::core::meta::MetadataOptions;
     use symphonia::core::probe::Hint;
 
-    // Try the symphonia probe first – it reads XING/VBR headers and container
-    // metadata for accurate duration across MP3, WAV, OGG, and FLAC.
     let file = File::open(&sound_path).map_err(|e| e.to_string())?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -80,8 +48,6 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
         }
     }
 
-    // Fall back to rodio's Decoder (works reliably for WAV / CBR formats
-    // where total_duration() returns Some).
     let file = File::open(&sound_path).map_err(|e| e.to_string())?;
     let decoder = rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
     Ok(decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0))
@@ -89,8 +55,18 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
 
 // --- Audio thread message ---
 
-enum AudioMsg {
-    Play { path: String, device_name: String },
+pub enum AudioMsg {
+    /// Play a sound. `overlap` = keep existing sounds running.
+    Play {
+        path: String,
+        device_name: String,
+        overlap: bool,
+    },
+    /// Stop a single playing sound matched by its file path.
+    StopOne {
+        path: String,
+    },
+    /// Stop every playing sound.
     Stop,
 }
 
@@ -102,9 +78,10 @@ fn audio_sender() -> &'static Mutex<Option<Sender<AudioMsg>>> {
     AUDIO_SENDER.get_or_init(|| Mutex::new(None))
 }
 
-/// Persistent MixerDeviceSink kept alive across multiple sounds on the same device.
-/// We NEVER drop MixerDeviceSink while audio is playing - this prevents the
-/// "slice::get_unchecked_mut" WASAPI crash. Only the cheap Player is swapped per sound.
+// --- Audio stream wrapper ---
+
+/// Persistent MixerDeviceSink kept alive across sounds on the same device.
+/// Multiple Player instances connected to the same mixer play simultaneously.
 struct AudioStream {
     device_sink: MixerDeviceSink,
     device_name: String,
@@ -136,14 +113,23 @@ impl AudioStream {
     }
 }
 
-// --- Audio helpers ---
+// --- Playing sound slot ---
+
+struct PlayingSound {
+    player: Player,
+    /// Original file path — sent back in the `sound_finished` event so the
+    /// frontend can deactivate exactly the sound that finished.
+    path: String,
+}
+
+// --- Helpers ---
 
 fn load_source(path: &str) -> Result<rodio::Decoder<BufReader<File>>, String> {
     let file = File::open(path).map_err(|e| e.to_string())?;
     rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())
 }
 
-/// Ensures the stream is open and targets `device_name`, reopening if necessary.
+/// Ensures the stream targets `device_name`, reopening only when the device changed.
 fn ensure_stream(stream: &mut Option<AudioStream>, device_name: &str) -> Result<(), String> {
     let needs_new = stream
         .as_ref()
@@ -155,13 +141,14 @@ fn ensure_stream(stream: &mut Option<AudioStream>, device_name: &str) -> Result<
     }
 
     if stream.is_some() {
+        // Allow WASAPI callbacks to drain before opening a new stream.
         thread::sleep(Duration::from_millis(100));
     }
     *stream = Some(AudioStream::open(device_name)?);
     Ok(())
 }
 
-/// Receive the next message. Returns `Ok(None)` on timeout, `Err(())` on disconnect.
+/// Non-blocking recv when sounds are playing; blocking recv when idle.
 fn recv_msg(rx: &Receiver<AudioMsg>, is_playing: bool) -> Result<Option<AudioMsg>, ()> {
     if is_playing {
         match rx.recv_timeout(Duration::from_millis(50)) {
@@ -182,46 +169,53 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 
     thread::spawn(move || {
         let mut stream: Option<AudioStream> = None;
-        let mut player: Option<Player> = None;
+        let mut playing: Vec<PlayingSound> = Vec::new();
 
         loop {
-            let is_playing = player.as_ref().map(|p| !p.empty()).unwrap_or(false);
-
-            // When idle, drain any lingering player before blocking on recv.
-            if !is_playing && player.is_some() {
-                player = None;
-                let _ = app_handle.emit("sound_finished", ());
+            // Drain naturally-finished sounds and notify frontend.
+            let mut i = 0;
+            while i < playing.len() {
+                if playing[i].player.empty() {
+                    let finished = playing.remove(i);
+                    let _ = app_handle.emit("sound_finished", finished.path);
+                } else {
+                    i += 1;
+                }
             }
+
+            // Use timeout-based recv while sounds are active so we keep draining.
+            let is_playing = !playing.is_empty();
 
             let msg = match recv_msg(&rx, is_playing) {
                 Ok(Some(msg)) => msg,
-                Ok(None) => {
-                    // Timeout while playing: check if player finished naturally.
-                    if player.as_ref().map(|p| p.empty()).unwrap_or(false) {
-                        player = None;
-                        let _ = app_handle.emit("sound_finished", ());
-                    }
-                    continue;
-                }
-                Err(()) => break,
+                Ok(None) => continue, // timeout — loop back to drain check
+                Err(()) => break,      // channel closed
             };
 
             match msg {
                 AudioMsg::Stop => {
-                    if let Some(ref p) = player {
-                        p.stop();
+                    for s in playing.drain(..) {
+                        s.player.stop();
+                        let _ = app_handle.emit("sound_finished", s.path);
                     }
-                    player = None;
-                    let _ = app_handle.emit("sound_finished", ());
                 }
 
-                AudioMsg::Play { path, device_name } => {
-                    if let Some(p) = player.take() {
-                        p.stop();
-                        // Allow WASAPI callbacks to drain before reusing the audio
-                        // device. Without this delay the WASAPI backend may still be
-                        // processing the old buffer when a new Player is created,
-                        // triggering the "slice::get_unchecked_mut" panic.
+                AudioMsg::StopOne { path } => {
+                    if let Some(pos) = playing.iter().position(|s| s.path == path) {
+                        let s = playing.remove(pos);
+                        s.player.stop();
+                        let _ = app_handle.emit("sound_finished", s.path);
+                    }
+                }
+
+                AudioMsg::Play { path, device_name, overlap } => {
+                    if !overlap {
+                        // Stop all currently playing sounds before starting the new one.
+                        for s in playing.drain(..) {
+                            s.player.stop();
+                            let _ = app_handle.emit("sound_finished", s.path);
+                        }
+                        // Allow WASAPI callbacks to drain before reusing the device.
                         thread::sleep(Duration::from_millis(50));
                     }
 
@@ -231,15 +225,14 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         continue;
                     }
 
-                    // stream is guaranteed Some after ensure_stream returns Ok.
                     let st = stream.as_ref().expect("ensure_stream guarantees Some on Ok");
-
+                    // Each Player connects to the shared MixerDeviceSink — sounds mix.
                     let new_player = Player::connect_new(st.device_sink.mixer());
 
                     match load_source(&path) {
                         Ok(source) => {
                             new_player.append(source);
-                            player = Some(new_player);
+                            playing.push(PlayingSound { player: new_player, path });
                         }
                         Err(e) => {
                             eprintln!("Failed to decode audio: {}", e);
@@ -259,15 +252,16 @@ pub fn play_sound(
     sound_path: String,
     device_name: String,
     active: bool,
+    overlap: bool,
 ) -> Result<String, String> {
     let guard = audio_sender().lock().map_err(|e| e.to_string())?;
     let tx = (*guard).clone().ok_or("Audio thread not initialized")?;
 
     if active {
-        tx.send(AudioMsg::Stop).map_err(|e| e.to_string())?;
+        tx.send(AudioMsg::StopOne { path: sound_path }).map_err(|e| e.to_string())?;
         Ok("stopped".to_string())
     } else {
-        tx.send(AudioMsg::Play { path: sound_path, device_name })
+        tx.send(AudioMsg::Play { path: sound_path, device_name, overlap })
             .map_err(|e| e.to_string())?;
         Ok("playing".to_string())
     }

@@ -1,5 +1,10 @@
 # Sound Ninja
 
+> **Status:** Active development — not yet production-ready.
+
+## 🚀 Planned Features
+
+
 ![Sound Ninja Logo Animated](./designs/Logo_Animated.gif)
 
 <div align="center">
@@ -30,15 +35,15 @@ Sound Ninja is a **Open Source Soundboard App** with the goal to provide the max
 | Feature                      | Description                                               | Status |
 | ---------------------------- | --------------------------------------------------------- | ------ |
 | **Soundboard**               | Create your own Soundboard with your favorite sounds      | ✅     |
-| **Tab System**               | Organize your sounds in Tabs                              | ⛔     |
+| **Tab System**               | Organize your sounds in Tabs                              | ✅     |
 | **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
-| **Searchbar**                | Find your sounds quick and easy                           | ⛔     |
+| **Searchbar**                | Find your sounds quick and easy                           | ✅     |
 | **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
-| **Themes**                   | Design your Soundboard how you like it                    | ⛔     |
+| **Themes**                   | Design your Soundboard how you like it                    | ✅     |
 | **Customizable Hotkeys**     | Customize the Hotkeys to your needs                       | ⛔     |
 | **Soundboard Sharing**       | Share your Soundboard with your friends                   | ⛔     |
 | **Soundboard Import/Export** | Import and Export your Soundboard                         | ⛔     |
-| **Custom Profiles**          | Create multiple Soundboards with different settings       | ⛔     |
+| **Custom Profiles**          | Create multiple Soundboards with different settings       | ✅     |
 | **Websocket**                | Control your Soundboard with your Smartphone              | ⛔     |
 | **Recorder**                 | Record your PC-Audio directly in Sound Ninja              | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
