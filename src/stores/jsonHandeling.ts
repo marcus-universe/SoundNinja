@@ -7,7 +7,10 @@ interface SoundFile {
   volume: number
   tabs: string[]
   active: boolean
+  /** Global position used by the "All" tab */
   index: number
+  /** Per-tab position, keyed by tab name (excludes "All") */
+  tabIndexes: Record<string, number>
   color?: string
 }
 
@@ -61,7 +64,39 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
   actions: {
     updateConfigFile(contents: Config) {
       this.configFile = contents
+      this.normalizeIndexes()
       this.filteredFiles = contents.files
+    },
+
+    /**
+     * Ensure every sound has a compact global `index` and a `tabIndexes` entry
+     * for each tab it belongs to. Prunes stale tab entries and appends new ones.
+     * Migrates old configs that lack `tabIndexes`.
+     */
+    normalizeIndexes() {
+      const files = this.configFile.files
+      if (!files) return
+
+      // Global index (drives the "All" tab): compact, preserving current order.
+      const byGlobal = [...files].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+      byGlobal.forEach((f, i) => { f.index = i })
+
+      // Per-tab indexes for real tabs only.
+      for (const f of files) {
+        if (!f.tabIndexes) f.tabIndexes = {}
+        for (const key of Object.keys(f.tabIndexes)) {
+          if (!f.tabs.includes(key)) delete f.tabIndexes[key]
+        }
+      }
+      for (const tab of (this.configFile.tabList ?? []).map((t) => t.name)) {
+        const inTab = files.filter((f) => f.tabs.includes(tab))
+        inTab.sort((a, b) => {
+          const av = a.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
+          const bv = b.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
+          return av !== bv ? av - bv : a.index - b.index
+        })
+        inTab.forEach((f, i) => { f.tabIndexes[tab] = i })
+      }
     },
 
     writeConfig() {
@@ -112,6 +147,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     addFiles(files: SoundFile[]) {
       this.configFile.files = [...this.configFile.files, ...files]
+      this.normalizeIndexes()
       this.writeConfig()
     },
 
@@ -139,6 +175,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         this.configFile.files.forEach((f) => {
           const idx = f.tabs.indexOf(oldName)
           if (idx !== -1) f.tabs[idx] = newName
+          if (f.tabIndexes && oldName in f.tabIndexes) {
+            f.tabIndexes[newName] = f.tabIndexes[oldName]
+            delete f.tabIndexes[oldName]
+          }
         })
         this.writeConfig()
       }
@@ -160,13 +200,60 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     removeSound(soundindex: number) {
       this.configFile.files.splice(soundindex, 1)
-      // re-index
-      this.configFile.files.forEach((f, i) => { f.index = i })
+      this.normalizeIndexes()
       this.writeConfig()
     },
 
     setSoundColor(soundindex: number, color: string) {
       this.configFile.files[soundindex].color = color
+      this.writeConfig()
+    },
+
+    setSoundTabs(soundFileIndex: number, tabs: string[]) {
+      this.configFile.files[soundFileIndex].tabs = tabs
+      this.normalizeIndexes()
+      this.writeConfig()
+    },
+
+    /**
+     * Reorder sounds within a tab. `draggedIdx`/`targetIdx` are global `index`
+     * values (stable keys). For the "All" tab the global index is updated;
+     * for any other tab the per-tab `tabIndexes[tab]` is updated.
+     */
+    reorderSounds(draggedIdx: number, targetIdx: number, tab: string) {
+      const files = this.configFile.files
+      if (tab === 'All') {
+        const sorted = [...files].sort((a, b) => a.index - b.index)
+        const from = sorted.findIndex((f) => f.index === draggedIdx)
+        const to = sorted.findIndex((f) => f.index === targetIdx)
+        if (from === -1 || to === -1 || from === to) return
+        const [item] = sorted.splice(from, 1)
+        sorted.splice(to, 0, item)
+        sorted.forEach((f, i) => { f.index = i })
+      } else {
+        const inTab = files
+          .filter((f) => f.tabs.includes(tab))
+          .sort((a, b) => (a.tabIndexes?.[tab] ?? 0) - (b.tabIndexes?.[tab] ?? 0))
+        const from = inTab.findIndex((f) => f.index === draggedIdx)
+        const to = inTab.findIndex((f) => f.index === targetIdx)
+        if (from === -1 || to === -1 || from === to) return
+        const [item] = inTab.splice(from, 1)
+        inTab.splice(to, 0, item)
+        inTab.forEach((f, i) => {
+          if (!f.tabIndexes) f.tabIndexes = {}
+          f.tabIndexes[tab] = i
+        })
+      }
+      this.writeConfig()
+    },
+
+    reorderTabs(draggedName: string, targetName: string) {
+      const list = this.configFile.tabList
+      const from = list.findIndex((t) => t.name === draggedName)
+      const to = list.findIndex((t) => t.name === targetName)
+      if (from === -1 || to === -1 || from === to) return
+      const [item] = list.splice(from, 1)
+      list.splice(to, 0, item)
       this.writeConfig()
     },
 

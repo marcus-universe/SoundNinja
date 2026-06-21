@@ -15,6 +15,7 @@ export const useAppStore = defineStore('app', {
     navbar: ['upload', 'folder', 'reset', 'settings', 'about'] as string[],
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
+    pendingSettingsTab: null as string | null,
     PopupActive: { active: false, type: 'addTab' } as { active: boolean; type: string },
     RenameContent: '',
     ErrorMessage: '',
@@ -25,6 +26,8 @@ export const useAppStore = defineStore('app', {
     },
     importFoldersActive: false,
     selectProjectActive: false,
+    draggingSoundIndex: null as number | null,
+    draggingTabName: null as string | null,
     contextMenu: {
       visible: false,
       x: 0,
@@ -92,8 +95,27 @@ export const useAppStore = defineStore('app', {
       this.activeOverlay = val
     },
 
+    openSettingsTab(tab: string) {
+      this.activeOverlay = 'settings'
+      this.pendingSettingsTab = tab
+    },
+
+    consumePendingSettingsTab(): string | null {
+      const t = this.pendingSettingsTab
+      this.pendingSettingsTab = null
+      return t
+    },
+
     setImportFoldersActive(val: boolean) {
       this.importFoldersActive = val
+    },
+
+    setDraggingSoundIndex(idx: number | null) {
+      this.draggingSoundIndex = idx
+    },
+
+    setDraggingTabName(name: string | null) {
+      this.draggingTabName = name
     },
 
     openContextMenu({

@@ -2,26 +2,16 @@
     <div class="SoundContainer">
         <div
             class="SoundTab flex_c_h flex_start gap1 flex_wrap"
-            ref="dropZoneRef"
-            @drop="onDrop($event)"
-            @dragover.prevent
-            @dragenter.prevent
+            ref="soundListRef"
         >
-            <div
+            <SoundButton
                 v-for="(sound, soundindex) in JSONFile"
-                class="Soundbtn flex_c_v flex_wrap"
-                :class="{ active: sound.active }"
-                :key="sound"
-                :style="getBtnStyle(sound, soundindex)"
-                ref="dragButton"
-                draggable="true"
-                @dragstart="onDragStart($event, sound)"
-                @dragend="onDragEnd"
-                @click="setActiveSound(soundindex)"
-                @contextmenu.prevent="(e) => openSoundMenu(e, sound)"
-            >
-                <span class="sound-label">{{ sound.name }}</span>
-            </div>
+                :key="sound.path"
+                :sound="sound"
+                :btnStyle="getBtnStyle(sound, soundindex)"
+                @play="setActiveSound(soundindex)"
+                @contextmenu="(e) => openSoundMenu(e, sound)"
+            />
         </div>
     </div>
 </template>
@@ -29,23 +19,54 @@
 <script setup>
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import Sortable from 'sortablejs'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 
-const dragButton = ref(null)
-const dropZoneRef = ref(null)
+const soundListRef = ref(null)
+let sortable = null
+
+onMounted(() => {
+  sortable = Sortable.create(soundListRef.value, {
+    animation: 180,
+    draggable: '.Soundbtn',
+    ghostClass: 'drag-over',
+    onEnd(evt) {
+      const { oldIndex, newIndex, item, from } = evt
+      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+      // Undo SortableJS's DOM mutation so Vue stays the single source of truth.
+      from.removeChild(item)
+      from.insertBefore(item, from.children[oldIndex] ?? null)
+      const list = JSONFile.value
+      const fromSound = list[oldIndex]
+      const toSound = list[newIndex]
+      if (fromSound && toSound) {
+        jsonStore.reorderSounds(fromSound.index, toSound.index, currentTab.value)
+      }
+    },
+  })
+})
+
+onUnmounted(() => {
+  sortable?.destroy()
+  sortable = null
+})
 
 const currentTab = computed(() => appStore.currentTab)
 
 const JSONFile = computed(() => {
-  const sortByIndex = (a, b) => a.index - b.index
+  const tab = currentTab.value
+  const sortByIndex =
+    tab === 'All'
+      ? (a, b) => a.index - b.index
+      : (a, b) => (a.tabIndexes?.[tab] ?? 0) - (b.tabIndexes?.[tab] ?? 0)
   const filesToFilter = appStore.Searchbar.SearchbarActive
     ? jsonStore.filteredFiles
     : jsonStore.configFile?.files
 
   return filesToFilter
-    ?.filter((sound) => sound.tabs.includes(currentTab.value))
+    ?.filter((sound) => sound.tabs.includes(tab))
     .sort(sortByIndex)
 })
 
@@ -141,21 +162,7 @@ onUnmounted(() => {
 })
 
 // ---- Drag & drop ----
-function onDragStart(event, sound) {
-  event.dataTransfer.setData('SoundID', sound.index)
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.dropEffect = 'move'
-  event.target.style.opacity = '0.5'
-}
-
-function onDragEnd(event) {
-  event.target.style.opacity = '1'
-}
-
-function onDrop(event) {
-  const itemID = event.dataTransfer.getData('SoundID')
-  console.log(itemID)
-}
+// (Handled per-button in SoundButton.vue via useDropZone)
 
 // ---- Sound playback ----
 async function setActiveSound(soundindex) {

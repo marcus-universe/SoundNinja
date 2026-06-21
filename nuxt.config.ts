@@ -23,7 +23,18 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ['@pinia/nuxt', '@vueuse/nuxt'],
+  modules: ['@pinia/nuxt', '@vueuse/nuxt', '@nuxtjs/i18n'],
+
+  i18n: {
+    strategy: 'no_prefix',
+    defaultLocale: 'en',
+    locales: [
+      { code: 'en', name: 'English', file: 'en.json' },
+      { code: 'de', name: 'Deutsch', file: 'de.json' },
+    ],
+    langDir: 'locales/',
+    detectBrowserLanguage: false,
+  },
 
   components: {
     dirs: [
@@ -38,6 +49,7 @@ export default defineNuxtConfig({
     '~/assets/scss/_base.scss',
     '~/assets/scss/style.scss',
     '~/assets/scss/navbar.scss',
+    '~/assets/scss/settings.scss',
   ],
 
   vite: {

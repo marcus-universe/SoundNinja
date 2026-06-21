@@ -54,6 +54,13 @@
         color:  var(--color-bg);
         opacity: 1;
       }
+
+      &.drag-over {
+        opacity: 1;
+        outline: 0.15rem dashed var(--color-bg);
+        outline-offset: -3px;
+        filter: brightness(1.25);
+      }
     }
 
     .addTab {
@@ -67,6 +74,17 @@
         transform: scale(1.1);
       }
     }
+  }
+
+  // Wrapper around the draggable tab list (SortableJS container).
+  // Real flex box so SortableJS can compute child positions; behaves like the
+  // surrounding tab row.
+  .tab-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    flex-shrink: 0;
   }
 
   .SoundContainer {
@@ -137,6 +155,12 @@
           box-shadow: 0 0 8px var(--btn-accent, var(--primary_color));
           // Suppress background transition so rAF progress updates are instant.
           transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        &.drag-over {
+          outline: 0.2rem dashed var(--btn-accent, var(--primary_color));
+          outline-offset: 2px;
+          background-color: rgba(255, 255, 255, 0.06);
         }
       }
     }
@@ -312,6 +336,7 @@
   backdrop-filter: blur(4px);
   background: rgba($color-bg, 0.5);
   z-index: 2;
+  pointer-events: none;
 }
 
 .exit {

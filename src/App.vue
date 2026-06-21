@@ -3,7 +3,6 @@
     <NavBar />
     <ErrorAlert />
     <SettingsOverlay />
-    <AboutOverlay />
     <ImportFolders v-if="appStore.importFoldersActive" />
     <ContextMenu />
     <NuxtPage v-slot="{ Component }">
@@ -18,9 +17,11 @@
 import { readTextFile, writeTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
+const { setLocale } = useI18n()
 
 const defaultConfig = {
   settings: {
@@ -178,9 +179,17 @@ function applyPersistedTheme(config) {
 }
 
 onMounted(() => {
+  // Restore locale from localStorage
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('sn-locale')
+    if (saved) {
+      setLocale(saved)
+      invoke('rebuild_menu', { lang: saved }).catch(() => {})
+    }
+  }
   readConfigFile().then(applyPersistedTheme)
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
-  listen('menu_open_about', () => appStore.setActiveOverlay('about'))
+  listen('menu_open_about', () => appStore.openSettingsTab('about'))
   listen('menu_open_project', handleMenuOpenProject)
   listen('menu_save', handleMenuSave)
   listen('menu_save_as', handleMenuSaveAs)

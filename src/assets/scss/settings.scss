@@ -1,0 +1,806 @@
+@use 'variables' as *;
+
+// ── Overlay backdrop ──────────────────────────────────────────────────────────
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// ── Panel ─────────────────────────────────────────────────────────────────────
+.settings-panel {
+  display: flex;
+  min-width: 90vw;
+  min-height: 90vh;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: $color-bg;
+  border: 0.15rem solid var(--primary_color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  z-index: 3;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+// ── Close button ──────────────────────────────────────────────────────────────
+.settings-close-btn {
+  all: unset;
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 10;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.35rem;
+  color: rgba(238, 238, 238, 0.5);
+  transition: color 0.15s, background 0.15s;
+
+  svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  &:hover {
+    color: $white;
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+.settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border-right: 0.1rem solid rgba(255, 255, 255, 0.07);
+  padding: 1.5rem 0.75rem;
+  gap: 0.25rem;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+
+  &--collapsed {
+    width: 56px;
+
+    .settings-sidebar__header-text {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .settings-nav__label {
+      opacity: 0;
+      max-width: 0;
+      overflow: hidden;
+    }
+
+    .settings-nav__item {
+      justify-content: center;
+      padding: 0.55rem;
+    }
+
+    .settings-collapse-btn {
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+
+  &__header {
+    font-family: $fontBold;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(238, 238, 238, 0.45);
+    padding: 0 0.5rem 0.75rem;
+    border-bottom: 0.1rem solid rgba(255, 255, 255, 0.07);
+    margin-bottom: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  &__header-text {
+    display: inline-block;
+    transition: opacity 0.2s ease;
+  }
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.settings-nav__item {
+  all: unset;
+  cursor: pointer;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.4rem;
+  font-family: $fontRegular;
+  font-size: 0.95rem;
+  color: rgba(238, 238, 238, 0.65);
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: $white;
+  }
+
+  &.active {
+    background: var(--primary_color);
+    color: $color-bg;
+    font-family: $fontBold;
+  }
+}
+
+.settings-nav__icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+
+.settings-nav__label {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  transition: opacity 0.2s ease, max-width 0.25s ease;
+  max-width: 160px;
+}
+
+// ── Collapse button ───────────────────────────────────────────────────────────
+.settings-collapse-btn {
+  all: unset;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.35rem;
+  color: rgba(238, 238, 238, 0.5);
+  margin-bottom: 0.75rem;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+
+  svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  &:hover {
+    color: $white;
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+// ── Content area ──────────────────────────────────────────────────────────────
+.settings-content {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 680px;
+  }
+
+  &__title {
+    font-family: $fontBold;
+    font-size: 1.4rem;
+    color: $white;
+    margin: 0 0 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 0.1rem solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+// ── Settings groups ───────────────────────────────────────────────────────────
+.settings-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 0.05rem solid rgba(255, 255, 255, 0.05);
+
+  &--stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  &--inline {
+    justify-content: space-between;
+  }
+
+  &--toggle {
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.settings-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+
+  .settings-label {
+    min-width: unset;
+  }
+}
+
+.settings-label {
+  font-family: $fontRegular;
+  font-size: 0.95rem;
+  color: $white;
+  flex-shrink: 0;
+  min-width: 160px;
+}
+
+.settings-hint {
+  font-family: $fontRegular;
+  font-size: 0.82rem;
+  color: rgba(238, 238, 238, 0.5);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.settings-section-divider {
+  font-family: $fontBold;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(238, 238, 238, 0.4);
+  margin: 1.25rem 0 0.25rem;
+}
+
+// ── Form controls ─────────────────────────────────────────────────────────────
+.settings-select,
+.settings-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.1rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.4rem;
+  color: $white;
+  font-family: $fontRegular;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.75rem;
+  transition: border-color 0.15s;
+  outline: none;
+
+  &:hover,
+  &:focus {
+    border-color: var(--primary_color);
+  }
+
+  option {
+    background: $color-bg;
+  }
+}
+
+.settings-row {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  align-items: center;
+
+  .settings-select {
+    flex: 1;
+  }
+}
+
+.settings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary_color);
+    cursor: pointer;
+  }
+}
+
+.settings-btn {
+  flex: 1;
+  padding: 0.45rem 1rem;
+  background: transparent;
+  border: 0.1rem solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.4rem;
+  color: $white;
+  font-family: $fontRegular;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary_color);
+  }
+
+  &--primary {
+    border-color: var(--primary_color);
+    color: var(--primary_color);
+
+    &:hover {
+      background: var(--primary_color);
+      color: $color-bg;
+    }
+  }
+
+  &--warn {
+    border-color: $warn;
+    color: $warn;
+
+    &:hover {
+      background: rgba($warn, 0.12);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  &--icon {
+    flex: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 1.1rem;
+  }
+}
+
+// ── Color picker ──────────────────────────────────────────────────────────────
+.settings-color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-color {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.4rem;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+    border-radius: 0.35rem;
+    overflow: hidden;
+  }
+
+  &::-webkit-color-swatch {
+    border: none;
+  }
+}
+
+.settings-color-value {
+  font-family: 'Consolas', monospace;
+  font-size: 0.85rem;
+  color: rgba(238, 238, 238, 0.55);
+}
+
+// ── Code editor ───────────────────────────────────────────────────────────────
+.code-editor-wrapper {
+  width: 100%;
+  border: 0.1rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.code-editor {
+  width: 100%;
+  min-height: 260px;
+  background: transparent;
+  color: #a8e6cf;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  padding: 1rem;
+  border: none;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+// ── Theme creator 2-column layout ─────────────────────────────────────────────
+.theme-creator-section {
+  max-width: unset;
+}
+
+.theme-creator-layout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.theme-creator-controls {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.theme-creator-preview-col {
+  flex: 0 1 260px;
+  width: 260px;
+  position: sticky;
+  top: 0;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0.5rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.07);
+}
+
+// ── Font dropdown ─────────────────────────────────────────────────────────────
+.font-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.font-dropdown__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.1rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  color: $white;
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+  gap: 0.5rem;
+
+  &:hover {
+    border-color: var(--primary_color);
+  }
+
+  span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.font-dropdown__arrow {
+  flex-shrink: 0;
+  opacity: 0.5;
+  font-style: normal;
+}
+
+.font-dropdown__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+  background: $color-bg;
+  border: 0.1rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.4rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+  }
+}
+
+.font-dropdown__option {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.95rem;
+  color: rgba(238, 238, 238, 0.75);
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $white;
+  }
+
+  &.active {
+    background: var(--primary_color);
+    color: $color-bg;
+  }
+}
+
+.font-dropdown__search {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 0.1rem solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  background: $color-bg;
+  z-index: 1;
+}
+
+.font-dropdown__search-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 0.1rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.3rem;
+  color: $white;
+  font-family: $fontRegular;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  outline: none;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: var(--primary_color);
+  }
+}
+
+// ── Preview column ────────────────────────────────────────────────────────────
+.tc-preview-label {
+  font-family: $fontBold;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(238, 238, 238, 0.4);
+  margin-bottom: 0.75rem;
+}
+
+.tc-preview-section {
+  font-family: $fontRegular;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(238, 238, 238, 0.4);
+  margin-bottom: 0.4rem;
+}
+
+.tc-tab-bar {
+  display: flex;
+  border-radius: 0.3rem;
+  overflow: hidden;
+  border: 0.1rem solid;
+  padding: 0.25rem 0.5rem 0;
+}
+
+.tc-tab {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.tc-btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.3rem;
+  border: 0.1rem solid;
+}
+
+.tc-btn {
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+// ── About section ─────────────────────────────────────────────────────────────
+.about-section {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.about-logo {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+
+  &__img {
+    max-width: 320px;
+    width: 100%;
+    border-radius: 0.5rem;
+  }
+}
+
+.about-version {
+  font-family: $fontBold;
+  font-size: 1.1rem;
+  color: $white;
+
+  &__num {
+    color: var(--primary_color);
+  }
+}
+
+.about-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.about-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  color: rgba(238, 238, 238, 0.7);
+  font-family: $fontRegular;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+
+  &__icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    border-color: var(--primary_color);
+    color: $white;
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+// ── Transitions ───────────────────────────────────────────────────────────────
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+// ── Project Dialog ────────────────────────────────────────────────────────────
+.project-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-dialog {
+  position: relative;
+  z-index: 1;
+  width: 480px;
+  max-width: 86vw;
+  max-height: 80vh;
+  background: $color-bg;
+  border: 0.15rem solid var(--primary_color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 0.1rem solid rgba(255, 255, 255, 0.08);
+
+    h2 {
+      font-family: $fontBold;
+      font-size: 1.1rem;
+      color: $white;
+      margin: 0;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+    min-height: 100px;
+  }
+
+  &__empty {
+    padding: 2.5rem;
+    text-align: center;
+    color: rgba(238, 238, 238, 0.35);
+    font-family: $fontRegular;
+    font-size: 0.9rem;
+  }
+
+  &__footer {
+    padding: 1rem 1.5rem;
+    border-top: 0.1rem solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: $fontRegular;
+    font-size: 0.95rem;
+    color: rgba(238, 238, 238, 0.85);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    &.active {
+      color: var(--primary_color);
+    }
+  }
+
+  &__check {
+    color: var(--primary_color);
+  }
+}
+
+.new-project-row {
+  display: flex;
+  gap: 0.5rem;
+
+  .settings-input {
+    flex: 1;
+  }
+}

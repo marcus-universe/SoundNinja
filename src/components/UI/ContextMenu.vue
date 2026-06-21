@@ -7,18 +7,54 @@
       @click.stop
     >
       <ul class="context-menu__list">
-        <li class="context-menu__item" @click="openRename">
-          <span class="context-menu__icon">✏️</span> Rename
+        <li class="context-menu__item" @click="openRename" @mouseenter="hoveredItem = 'rename'" @mouseleave="hoveredItem = null">
+          <span class="context-menu__icon">✏️</span>
+          <span class="context-menu__label">{{ $t('contextMenu.rename') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'rename'" class="context-menu__desc">{{ $t('contextMenu.renameDesc') }}</span>
+          </Transition>
         </li>
-        <li class="context-menu__item context-menu__item--danger" @click="remove">
-          <span class="context-menu__icon">🗑️</span> Remove
+        <li class="context-menu__item context-menu__item--danger" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
+          <span class="context-menu__icon">🗑️</span>
+          <span class="context-menu__label">{{ $t('contextMenu.remove') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'remove'" class="context-menu__desc">{{ $t('contextMenu.removeDesc') }}</span>
+          </Transition>
         </li>
-        <li class="context-menu__item context-menu__item--color" @click="toggleColorPicker">
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="toggleMoveToTab"
+          @mouseenter="hoveredItem = 'moveToTab'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">📂</span>
+          <span class="context-menu__label">{{ $t('contextMenu.moveToTab') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'moveToTab'" class="context-menu__desc">{{ $t('contextMenu.moveToTabDesc') }}</span>
+          </Transition>
+          <span class="context-menu__chevron">{{ moveToTabOpen ? '▲' : '▼' }}</span>
+        </li>
+        <template v-if="moveToTabOpen && appStore.contextMenu.type === 'sound'">
+          <li
+            v-for="tab in allTabs"
+            :key="tab.name"
+            class="context-menu__item context-menu__tab-row"
+            @click.stop="toggleSoundTab(tab.name)"
+          >
+            <span class="context-menu__check">{{ soundTabs.includes(tab.name) ? '☑' : '☐' }}</span>
+            {{ tab.name }}
+          </li>
+        </template>
+        <li class="context-menu__item context-menu__item--color" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
           <span
             class="context-menu__swatch"
             :style="swatchStyle"
           />
-          Accent Color
+          <span class="context-menu__label">{{ $t('contextMenu.color') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'color'" class="context-menu__desc">{{ $t('contextMenu.colorDesc') }}</span>
+          </Transition>
           <span class="context-menu__chevron">{{ colorPickerOpen ? '▲' : '▼' }}</span>
         </li>
         <li v-if="colorPickerOpen" class="context-menu__color-row">
@@ -28,7 +64,7 @@
             :value="currentColor"
             @input="onColorInput"
           />
-          <button class="context-menu__reset-color" @click="resetColor" title="Reset to default">↺</button>
+          <button class="context-menu__reset-color" @click="resetColor" :title="$t('contextMenu.resetColor')">↺</button>
         </li>
       </ul>
     </div>
@@ -43,10 +79,37 @@
 </template>
 
 <script setup>
+const { t: $t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 
 const colorPickerOpen = ref(false)
+const moveToTabOpen = ref(false)
+const hoveredItem = ref(null)
+
+const allTabs = computed(() => jsonStore.configFile.tabList)
+const soundTabs = computed(() => {
+  const { targetIndex } = appStore.contextMenu
+  return jsonStore.configFile.files[targetIndex]?.tabs ?? []
+})
+
+function toggleMoveToTab() {
+  moveToTabOpen.value = !moveToTabOpen.value
+}
+
+function toggleSoundTab(tabName) {
+  const { targetIndex } = appStore.contextMenu
+  const sound = jsonStore.configFile.files[targetIndex]
+  if (!sound) return
+  const tabs = [...sound.tabs]
+  const idx = tabs.indexOf(tabName)
+  if (idx !== -1) {
+    tabs.splice(idx, 1)
+  } else {
+    tabs.push(tabName)
+  }
+  jsonStore.setSoundTabs(targetIndex, tabs)
+}
 
 // Keep menu inside viewport
 const menuX = computed(() => {
@@ -103,6 +166,7 @@ function openRename() {
   const { type, targetName, targetIndex } = appStore.contextMenu
   appStore.closeContextMenu()
   colorPickerOpen.value = false
+  moveToTabOpen.value = false
   if (type === 'tab') {
     appStore.setPopupActive({ active: true, type: 'renameTab' })
   } else if (type === 'sound') {
@@ -114,6 +178,7 @@ function remove() {
   const { type, targetName, targetIndex } = appStore.contextMenu
   appStore.closeContextMenu()
   colorPickerOpen.value = false
+  moveToTabOpen.value = false
   if (type === 'tab') {
     jsonStore.removeTab(targetName)
     if (appStore.currentTab === targetName) {
@@ -127,6 +192,7 @@ function remove() {
 function close() {
   appStore.closeContextMenu()
   colorPickerOpen.value = false
+  moveToTabOpen.value = false
 }
 
 // Also close on Escape
@@ -154,7 +220,7 @@ onMounted(() => {
   border-radius: 0.5rem;
   min-width: 160px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
+  overflow: visible;
 
   &__list {
     list-style: none;
@@ -172,6 +238,7 @@ onMounted(() => {
     color: #eee;
     cursor: pointer;
     transition: background 0.15s;
+    position: relative;
 
     &:hover {
       background: rgba(255, 255, 255, 0.08);
@@ -187,6 +254,31 @@ onMounted(() => {
     }
   }
 
+  &__label {
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  &__desc {
+    position: absolute;
+    left: calc(100% + 0.5rem);
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    border: 0.1rem solid var(--primary_color);
+    border-radius: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+    max-width: 22rem;
+    white-space: normal;
+    width: max-content;
+    pointer-events: none;
+    z-index: 1001;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  }
+
   &__icon {
     font-size: 0.9rem;
   }
@@ -197,6 +289,17 @@ onMounted(() => {
     border-radius: 50%;
     border: 0.1rem solid rgba(255,255,255,0.3);
     flex-shrink: 0;
+  }
+
+  &__tab-row {
+    padding-left: 1.5rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  &__check {
+    font-size: 1rem;
+    min-width: 1rem;
   }
 
   &__chevron {
@@ -237,5 +340,15 @@ onMounted(() => {
       color: $color-bg;
     }
   }
+}
+
+.desc-fade-enter-active,
+.desc-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.desc-fade-enter-from,
+.desc-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-50%) translateX(-4px);
 }
 </style>

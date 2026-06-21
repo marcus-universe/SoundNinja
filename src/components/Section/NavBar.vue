@@ -16,7 +16,7 @@
         >
           <input
             type="text"
-            placeholder="Search"
+            :placeholder="$t('navbar.search')"
             v-model="appStore.Searchbar.SearchbarContent"
             @input="jsonStore.filterSounds(appStore.Searchbar.SearchbarContent)"
           />
@@ -36,6 +36,7 @@
 <script setup>
 import { open } from '@tauri-apps/plugin-dialog'
 
+const { t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 
@@ -122,7 +123,7 @@ function IconClicked(icon) {
   } else if (icon === 'settings') {
     appStore.setActiveOverlay(appStore.activeOverlay === 'settings' ? null : 'settings')
   } else if (icon === 'about') {
-    appStore.setActiveOverlay(appStore.activeOverlay === 'about' ? null : 'about')
+    appStore.openSettingsTab('about')
   }
 }
 </script>

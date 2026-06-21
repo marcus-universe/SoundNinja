@@ -17,13 +17,15 @@
     "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\""
   },
   "dependencies": {
+    "@nuxtjs/i18n": "^10.4.0",
     "@pinia/nuxt": "^0.11.3",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
     "@vueuse/nuxt": "^14.3.0",
     "nuxt": "4.4.5",
-    "pinia": "^3.0.4"
+    "pinia": "^3.0.4",
+    "sortablejs": "^1.15.7"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.2",

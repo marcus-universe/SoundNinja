@@ -78,7 +78,8 @@ fn main() {
             audio::devices::get_out_devices,
             audio::playback::play_sound,
             audio::playback::get_sound_duration,
-            get_system_fonts
+            get_system_fonts,
+            menu::rebuild_menu
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

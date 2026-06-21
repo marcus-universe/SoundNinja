@@ -1,0 +1,133 @@
+{
+  "settings": {
+    "title": "Settings",
+    "close": "Close",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "tabs": {
+      "main": "Main",
+      "audio": "Audio",
+      "theme": "Theme",
+      "about": "About"
+    },
+    "main": {
+      "title": "Main",
+      "theme": "Theme",
+      "customCssOption": "Custom CSS…",
+      "customCss": "Custom CSS",
+      "customCssHint": "Edit CSS variables to create your own theme. Changes apply live.",
+      "loadCssFile": "📂 Load .css File",
+      "resetTemplate": "↺ Reset Template",
+      "importCssFile": "📂 Import Theme File",
+      "importCssHint": "Import a CSS theme file. It will be saved to your themes folder and appear in the theme list.",
+      "themeNamePlaceholder": "Theme name…",
+      "themeNameRequired": "Please enter a theme name first.",
+      "notCompatibleTheme": "Not compatible theme CSS — no CSS variables found.",
+      "importSuccess": "Theme imported successfully!",
+      "playbackBehavior": "Playback Behavior",
+      "stopOnRetrigger": "Stop on retrigger",
+      "stopOnRetriggerHint": "Pressing active sound again stops it",
+      "overlapSounds": "Overlap sounds",
+      "overlapSoundsHint": "Multiple sounds play simultaneously",
+      "language": "Language"
+    },
+    "audio": {
+      "title": "Audio",
+      "outputDevice": "Output Device",
+      "refresh": "Refresh"
+    },
+    "themeCreator": {
+      "title": "Theme Creator",
+      "themeName": "Theme Name",
+      "themeNamePlaceholder": "My Custom Theme",
+      "colors": "Colors",
+      "primaryAccent": "Primary / Accent",
+      "background": "Background",
+      "buttonBackground": "Button Background",
+      "buttonTypography": "Button Typography",
+      "buttonFont": "Button Font",
+      "buttonFontSize": "Button Font Size",
+      "tabTypography": "Tab Typography",
+      "tabFont": "Tab Font",
+      "tabFontSize": "Tab Font Size",
+      "layout": "Layout",
+      "buttonWidth": "Button Width",
+      "borderRadius": "Border Radius",
+      "buttonPaddingX": "Button Padding X",
+      "buttonPaddingY": "Button Padding Y",
+      "exportCss": "⬇ Export .css",
+      "addToThemes": "＋ Add to Themes",
+      "importCss": "⬆ Import .css",
+      "importError": "Not compatible theme CSS. Missing variables:",
+      "livePreview": "Live Preview",
+      "searchFont": "Search font…",
+      "previewTabs": "Tabs",
+      "previewButtons": "Buttons",
+      "previewSounds": [
+        "Sample Sound",
+        "Playing…",
+        "Ambient",
+        "Effect"
+      ],
+      "previewTabNames": [
+        "Sounds",
+        "Music",
+        "SFX"
+      ]
+    },
+    "about": {
+      "title": "About",
+      "githubLink": "Support development on GitHub",
+      "licenseLink": "License — GNU General Public License v3"
+    }
+  },
+  "project": {
+    "title": "Select Project",
+    "loading": "Loading…",
+    "noProjects": "No projects found. Create one below.",
+    "create": "Create",
+    "newPlaceholder": "New project name…"
+  },
+  "contextMenu": {
+    "rename": "Rename",
+    "renameDesc": "Give this item a new name",
+    "remove": "Remove",
+    "removeDesc": "Delete from SoundNinja (not deleted from system storage)",
+    "moveToTab": "Move to Tab",
+    "moveToTabDesc": "Assign this sound to one or more tabs",
+    "color": "Color",
+    "colorDesc": "Change the accent color of this item",
+    "resetColor": "Reset to default"
+  },
+  "rename": {
+    "renameTab": "Rename Tab",
+    "renameSound": "Rename Button",
+    "addTab": "Add Tab",
+    "placeholder": "Type a name here",
+    "confirm": "Confirm"
+  },
+  "navbar": {
+    "search": "Search"
+  },
+  "about": {
+    "title": "About",
+    "by": "by"
+  },
+  "menu": {
+    "file": "File",
+    "openProject": "Open Project",
+    "selectProject": "Select Project",
+    "save": "Save",
+    "saveAs": "Save As...",
+    "importAudio": "Import Audio Files",
+    "importFolders": "Import Folders",
+    "quit": "Quit",
+    "edit": "Edit",
+    "settings": "Settings",
+    "openConfig": "Open Config File",
+    "openThemesFolder": "Open Themes Folder",
+    "openProjectsFolder": "Open Projects Folder",
+    "help": "Help",
+    "about": "About"
+  }
+}

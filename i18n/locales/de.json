@@ -1,0 +1,133 @@
+{
+  "settings": {
+    "title": "Einstellungen",
+    "close": "Schließen",
+    "collapse": "Einklappen",
+    "expand": "Ausklappen",
+    "tabs": {
+      "main": "Allgemein",
+      "audio": "Audio",
+      "theme": "Theme",
+      "about": "Info"
+    },
+    "main": {
+      "title": "Allgemein",
+      "theme": "Theme",
+      "customCssOption": "Eigenes CSS…",
+      "customCss": "Eigenes CSS",
+      "customCssHint": "CSS-Variablen bearbeiten, um ein eigenes Theme zu erstellen. Änderungen werden live übernommen.",
+      "loadCssFile": "📂 .css Datei laden",
+      "resetTemplate": "↺ Vorlage zurücksetzen",
+      "importCssFile": "📂 Theme-Datei importieren",
+      "importCssHint": "CSS-Theme-Datei importieren. Sie wird im Themes-Ordner gespeichert und in der Theme-Liste angezeigt.",
+      "themeNamePlaceholder": "Theme-Name…",
+      "themeNameRequired": "Bitte zuerst einen Theme-Namen eingeben.",
+      "notCompatibleTheme": "Inkompatibles Theme-CSS — keine CSS-Variablen gefunden.",
+      "importSuccess": "Theme erfolgreich importiert!",
+      "playbackBehavior": "Wiedergabeverhalten",
+      "stopOnRetrigger": "Bei erneutem Auslösen stoppen",
+      "stopOnRetriggerHint": "Erneutes Drücken eines aktiven Sounds stoppt ihn",
+      "overlapSounds": "Sounds überlappen",
+      "overlapSoundsHint": "Mehrere Sounds spielen gleichzeitig",
+      "language": "Sprache"
+    },
+    "audio": {
+      "title": "Audio",
+      "outputDevice": "Ausgabegerät",
+      "refresh": "Aktualisieren"
+    },
+    "themeCreator": {
+      "title": "Theme-Editor",
+      "themeName": "Theme-Name",
+      "themeNamePlaceholder": "Mein eigenes Theme",
+      "colors": "Farben",
+      "primaryAccent": "Primär / Akzent",
+      "background": "Hintergrund",
+      "buttonBackground": "Schaltflächen-Hintergrund",
+      "buttonTypography": "Schaltflächen-Schrift",
+      "buttonFont": "Schaltflächen-Schriftart",
+      "buttonFontSize": "Schaltflächen-Schriftgröße",
+      "tabTypography": "Tab-Schrift",
+      "tabFont": "Tab-Schriftart",
+      "tabFontSize": "Tab-Schriftgröße",
+      "layout": "Layout",
+      "buttonWidth": "Schaltflächenbreite",
+      "borderRadius": "Eckenradius",
+      "buttonPaddingX": "Schaltflächen-Innenabstand X",
+      "buttonPaddingY": "Schaltflächen-Innenabstand Y",
+      "exportCss": "⬇ .css exportieren",
+      "addToThemes": "＋ Zu Themes hinzufügen",
+      "importCss": "⬆ .css importieren",
+      "importError": "Inkompatibles Theme-CSS. Fehlende Variablen:",
+      "livePreview": "Live-Vorschau",
+      "searchFont": "Schriftart suchen…",
+      "previewTabs": "Tabs",
+      "previewButtons": "Schaltflächen",
+      "previewSounds": [
+        "Beispiel-Sound",
+        "Läuft…",
+        "Ambiente",
+        "Effekt"
+      ],
+      "previewTabNames": [
+        "Sounds",
+        "Musik",
+        "SFX"
+      ]
+    },
+    "about": {
+      "title": "Info",
+      "githubLink": "Entwicklung auf GitHub unterstützen",
+      "licenseLink": "Lizenz — GNU General Public License v3"
+    }
+  },
+  "project": {
+    "title": "Projekt auswählen",
+    "loading": "Lädt…",
+    "noProjects": "Keine Projekte gefunden. Unten ein neues erstellen.",
+    "create": "Erstellen",
+    "newPlaceholder": "Neuer Projektname…"
+  },
+  "contextMenu": {
+    "rename": "Umbenennen",
+    "renameDesc": "Diesem Eintrag einen neuen Namen geben",
+    "remove": "Entfernen",
+    "removeDesc": "Aus SoundNinja löschen (wird nicht vom Systemspeicher gelöscht)",
+    "moveToTab": "In Tab verschieben",
+    "moveToTabDesc": "Diesen Sound einem oder mehreren Tabs zuweisen",
+    "color": "Farbe",
+    "colorDesc": "Akzentfarbe dieses Eintrags ändern",
+    "resetColor": "Auf Standard zurücksetzen"
+  },
+  "rename": {
+    "renameTab": "Tab umbenennen",
+    "renameSound": "Schaltfläche umbenennen",
+    "addTab": "Tab hinzufügen",
+    "placeholder": "Hier Namen eingeben",
+    "confirm": "Bestätigen"
+  },
+  "navbar": {
+    "search": "Suchen"
+  },
+  "about": {
+    "title": "Über SoundNinja",
+    "by": "von"
+  },
+  "menu": {
+    "file": "Datei",
+    "openProject": "Projekt öffnen",
+    "selectProject": "Projekt auswählen",
+    "save": "Speichern",
+    "saveAs": "Speichern unter…",
+    "importAudio": "Audiodateien importieren",
+    "importFolders": "Ordner importieren",
+    "quit": "Beenden",
+    "edit": "Bearbeiten",
+    "settings": "Einstellungen",
+    "openConfig": "Konfigurationsdatei öffnen",
+    "openThemesFolder": "Themes-Ordner öffnen",
+    "openProjectsFolder": "Projekte-Ordner öffnen",
+    "help": "Hilfe",
+    "about": "Über SoundNinja"
+  }
+}
