@@ -173,6 +173,17 @@ function applyPersistedTheme(config) {
     }
     return
   }
+  if (theme.startsWith('file:')) {
+    const filename = theme.slice(5)
+    readTextFile(`themes/${filename}`, { baseDir: BaseDirectory.AppData })
+      .then((css) => {
+        let tag = document.getElementById('sn-custom-theme')
+        if (!tag) { tag = document.createElement('style'); tag.id = 'sn-custom-theme'; document.head.appendChild(tag) }
+        tag.textContent = css
+      })
+      .catch((e) => console.error('Failed to load persisted theme file', e))
+    return
+  }
   const vars = builtinThemes[theme] ?? builtinThemes['dark-cyan']
   const root = document.documentElement
   Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v))

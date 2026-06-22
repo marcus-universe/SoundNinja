@@ -243,7 +243,9 @@ const tabActivePreviewStyle = computed(() => ({
 
 // ── Export / save ─────────────────────────────────────────────────────────────
 function buildThemeCss() {
-  return `:root {
+  const name = (themeCreator.name || 'theme').trim()
+  return `/* SoundNinja Theme: ${name} */
+:root {
   --primary_color: ${themeCreator.primaryColor};
   --color-bg: ${themeCreator.bgColor};
   --color-btn: ${themeCreator.btnColor};
@@ -319,6 +321,12 @@ function parsePadding(v: string): [number, number] {
   return [parseFloat(parts[0]), parseFloat(parts[1] ?? parts[0])]
 }
 
+// Reads the `/* SoundNinja Theme: NAME */` comment (first line) from a theme CSS.
+function parseThemeName(css: string): string {
+  const m = css.match(/\/\*\s*SoundNinja Theme:\s*(.+?)\s*\*\//i)
+  return m ? m[1].trim() : ''
+}
+
 async function importThemeFromFile() {
   importError.value = ''
   try {
@@ -341,6 +349,8 @@ async function importThemeFromFile() {
       importError.value = `${t('settings.themeCreator.importError')} ${missing.join(', ')}`
       return
     }
+    const parsedName = parseThemeName(css)
+    if (parsedName) themeCreator.name = parsedName
     themeCreator.primaryColor = cssColorToHex(vars['--primary_color'])
     themeCreator.bgColor = cssColorToHex(vars['--color-bg'])
     themeCreator.btnColor = cssColorToHex(vars['--color-btn'])

@@ -15,7 +15,9 @@
     margin-right: 0;
   }
 
-  transition: all 0.2s ease;
+  // Only animate the navbar-side margin shift — height/width changes from window
+  // resizing must be snappy (no transition), otherwise the bottom edge animates in.
+  transition: margin 0.2s ease;
   overflow: hidden;
 
   .TabContainer {
@@ -30,8 +32,8 @@
 
     .tab {
       flex-shrink: 0;
-      font-family: $fontBold;
-      font-size: var(--font-size-sm);
+      font-family: var(--font-tab, #{$fontBold});
+      font-size: var(--font-size-tab, var(--font-size-sm));
       color: var(--color-bg);
       opacity: 0.7;
       // Per-tab accent color falls back to the global primary color
@@ -97,14 +99,14 @@
       min-height: 100px;
 
       .Soundbtn {
-        font-family: $fontBold;
-        font-size: var(--font-size-md);
+        font-family: var(--font-btn, #{$fontBold});
+        font-size: var(--font-size-btn, var(--font-size-md));
         color: $white;
-        background-color: $color-btn;
+        background-color: var(--color-btn, #{$color-btn});
         // Accent color (set by the color picker) drives the border
         border: 0.2rem solid var(--btn-accent, var(--primary_color));
-        padding: $padding_1;
-        border-radius: 0.5rem;
+        padding: var(--btn_padding, #{$padding_1});
+        border-radius: var(--border-radius, 0.5rem);
         max-width: var(--btn_width);
         min-width: var(--btn_width);
         word-wrap: break-word;
@@ -145,10 +147,10 @@
         }
 
         &.active {
-          background-color: $color-btn;
+          background-color: var(--color-btn, #{$color-btn});
           color: $white;
           text-shadow: 0 0 5px rgba(0, 0, 0, 0.6);
-          font-family: $fontBold;
+          font-family: var(--font-btn, #{$fontBold});
           // Slightly bolder border + soft glow make the active state clearly visible
           // even before the progress bar starts filling.
           border-width: 0.2rem;
