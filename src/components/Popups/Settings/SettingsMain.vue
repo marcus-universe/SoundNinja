@@ -67,6 +67,44 @@
       <UICheckbox :modelValue="overlapSounds" @update:modelValue="onOverlapSounds" />
     </div>
 
+    <div class="settings-section-divider">{{ $t('settings.main.performanceCache') }}</div>
+
+    <div class="settings-group">
+      <div class="settings-label-info">
+        <span class="settings-label">{{ $t('settings.main.cacheMaxSize') }}</span>
+        <span class="settings-info-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span class="settings-info-icon__tip">{{ $t('settings.main.cacheMaxSizeHint') }}</span>
+        </span>
+      </div>
+      <div class="settings-unit-input">
+        <input type="number" class="settings-input" v-model.number="cacheMaxSizeMib" min="32" max="4096" @change="onCacheConfig" />
+        <span class="settings-unit-label">MiB</span>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label-info">
+        <span class="settings-label">{{ $t('settings.main.cacheMaxEntry') }}</span>
+        <span class="settings-info-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span class="settings-info-icon__tip">{{ $t('settings.main.cacheMaxEntryHint') }}</span>
+        </span>
+      </div>
+      <div class="settings-unit-input">
+        <input type="number" class="settings-input" v-model.number="cacheMaxEntryMib" min="1" max="500" @change="onCacheConfig" />
+        <span class="settings-unit-label">MiB</span>
+      </div>
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.cacheStatus') }}</span>
+        <span class="settings-hint">{{ cacheStatsText }}</span>
+      </div>
+      <button class="settings-btn" style="flex: 0; white-space: nowrap" @click="onClearCache">{{ $t('settings.main.clearCache') }}</button>
+    </div>
+
    
   </section>
 </template>
@@ -97,6 +135,9 @@ const importSuccess = ref('')
 const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
 const currentLanguage = ref(locale.value)
+const cacheMaxSizeMib = ref(256)
+const cacheMaxEntryMib = ref(50)
+const cacheStatsText = ref('')
 
 // Name-prompt dialog state (shown when an imported CSS has no theme-name comment)
 const nameDialogOpen = ref(false)
@@ -255,6 +296,40 @@ function onOverlapSounds(val: boolean) {
   jsonStore.setOverlapSounds(val)
 }
 
+// ── Cache ─────────────────────────────────────────────────────────────────────
+async function refreshCacheStats() {
+  try {
+    const stats = await invoke<{ cached_count: number; total_size_bytes: number }>('get_cache_stats')
+    const usedMib = (stats.total_size_bytes / 1048576).toFixed(1)
+    cacheStatsText.value = t('settings.main.cacheStatsText', { count: stats.cached_count, size: usedMib })
+  } catch {
+    cacheStatsText.value = ''
+  }
+}
+
+async function onCacheConfig() {
+  const maxSize = Math.max(32, Math.min(4096, Number(cacheMaxSizeMib.value) || 256))
+  const maxEntry = Math.max(1, Math.min(500, Number(cacheMaxEntryMib.value) || 50))
+  cacheMaxSizeMib.value = maxSize
+  cacheMaxEntryMib.value = maxEntry
+  jsonStore.setCacheConfig(maxSize, maxEntry)
+  try {
+    await invoke('set_cache_config', { maxSizeMib: maxSize, maxEntryMib: maxEntry })
+  } catch (e) {
+    console.error('set_cache_config failed', e)
+  }
+  await refreshCacheStats()
+}
+
+async function onClearCache() {
+  try {
+    await invoke('clear_sound_cache')
+    await refreshCacheStats()
+  } catch (e) {
+    console.error('clear_sound_cache failed', e)
+  }
+}
+
 // ── Refresh when settings panel opens ────────────────────────────────────────
 async function syncFromStore() {
   // Load the saved-theme options first so the dropdown always has a matching
@@ -263,7 +338,16 @@ async function syncFromStore() {
   selectedTheme.value = jsonStore.configFile?.settings?.theme ?? 'dark-cyan'
   stopOnRetrigger.value = jsonStore.configFile?.settings?.stopOnRetrigger ?? true
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
+  cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
+  cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 50
   applyTheme()
+  try {
+    await invoke('set_cache_config', {
+      maxSizeMib: cacheMaxSizeMib.value,
+      maxEntryMib: cacheMaxEntryMib.value,
+    })
+  } catch { /* not critical */ }
+  await refreshCacheStats()
 }
 
 watch(() => appStore.activeOverlay, async (val) => {

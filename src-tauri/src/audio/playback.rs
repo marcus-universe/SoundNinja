@@ -1,9 +1,8 @@
 use cpal::traits::DeviceTrait;
 use rodio::{self, cpal, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
-use std::fs::File;
-use std::io::BufReader;
+use std::io::Cursor;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
@@ -15,12 +14,17 @@ use super::devices::get_output_devices;
 #[tauri::command]
 pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
     use symphonia::core::formats::FormatOptions;
+    use symphonia::core::formats::probe::Hint;
     use symphonia::core::io::MediaSourceStream;
     use symphonia::core::meta::MetadataOptions;
-    use symphonia::core::probe::Hint;
 
-    let file = File::open(&sound_path).map_err(|e| e.to_string())?;
-    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    // Load from cache (or disk on first access — result is cached for next time).
+    let bytes = super::cache::load_bytes(&sound_path)?;
+
+    let mss = MediaSourceStream::new(
+        Box::new(Cursor::new(bytes.clone())),
+        Default::default(),
+    );
 
     let mut hint = Hint::new();
     if let Some(ext) = std::path::Path::new(&sound_path)
@@ -30,17 +34,16 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
         hint.with_extension(ext);
     }
 
-    let probe_result = symphonia::default::get_probe().format(
+    let probe_result = symphonia::default::get_probe().probe(
         &hint,
         mss,
-        &FormatOptions::default(),
-        &MetadataOptions::default(),
+        FormatOptions::default(),
+        MetadataOptions::default(),
     );
-    if let Ok(probed) = probe_result {
-        for track in probed.format.tracks() {
-            let params = &track.codec_params;
-            if let (Some(n_frames), Some(tb)) = (params.n_frames, params.time_base) {
-                let secs = n_frames as f64 * tb.numer as f64 / tb.denom as f64;
+    if let Ok(format) = probe_result {
+        for track in format.tracks() {
+            if let (Some(n_frames), Some(tb)) = (track.num_frames, track.time_base) {
+                let secs = n_frames as f64 * tb.numer.get() as f64 / tb.denom.get() as f64;
                 if secs > 0.0 {
                     return Ok(secs);
                 }
@@ -48,8 +51,8 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
         }
     }
 
-    let file = File::open(&sound_path).map_err(|e| e.to_string())?;
-    let decoder = rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
+    // Fallback: let rodio decode from the in-memory bytes.
+    let decoder = rodio::Decoder::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
     Ok(decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0))
 }
 
@@ -124,9 +127,9 @@ struct PlayingSound {
 
 // --- Helpers ---
 
-fn load_source(path: &str) -> Result<rodio::Decoder<BufReader<File>>, String> {
-    let file = File::open(path).map_err(|e| e.to_string())?;
-    rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())
+fn load_source(path: &str) -> Result<rodio::Decoder<Cursor<Arc<[u8]>>>, String> {
+    let bytes = super::cache::load_bytes(path)?;
+    rodio::Decoder::new(Cursor::new(bytes)).map_err(|e| e.to_string())
 }
 
 /// Ensures the stream targets `device_name`, reopening only when the device changed.

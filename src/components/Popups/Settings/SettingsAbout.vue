@@ -7,7 +7,7 @@
     </div>
 
     <div class="about-version">
-      Sound Ninja <span class="about-version__num">v{{ appVersion }}</span>
+      <span class="about-version__num">v{{ appVersion }}</span>
     </div>
 
     <div class="about-links">

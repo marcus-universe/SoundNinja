@@ -13,9 +13,9 @@
 // ── Panel ─────────────────────────────────────────────────────────────────────
 .settings-panel {
   display: flex;
-  min-width: 90vw;
+  width: 90vw;
   min-height: 90vh;
-  max-width: 90vw;
+  max-width: fit-content;
   max-height: 90vh;
   background: $color-bg;
   border: 0.15rem solid var(--primary_color);
@@ -203,7 +203,7 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    max-width: 680px;
+    max-width: 860px;
   }
 
   &__title {
@@ -630,6 +630,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 1.5rem;
+  text-align: center;
 }
 
 .about-logo {
@@ -648,6 +649,8 @@
   font-family: $fontBold;
   font-size: 1.1rem;
   color: $white;
+  width: 100%;
+  text-align: center;
 
   &__num {
     color: var(--primary_color);
@@ -664,6 +667,7 @@
 .about-link {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.6rem;
   padding: 0.6rem 0.9rem;
   border: 0.1rem solid rgba(255, 255, 255, 0.12);
@@ -803,4 +807,81 @@
   .settings-input {
     flex: 1;
   }
+}
+
+// ── Label + info icon row ──────────────────────────────────────────────────────
+.settings-label-info {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+// ── Info icon with CSS tooltip ────────────────────────────────────────────────
+.settings-info-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+  color: rgba(238, 238, 238, 0.3);
+  transition: color 0.15s;
+  line-height: 1;
+
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  &:hover {
+    color: var(--primary_color);
+
+    .settings-info-icon__tip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+  }
+
+  &__tip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.5rem);
+    transform: translateX(-50%) translateY(6px);
+    background: rgba(18, 18, 28, 0.97);
+    border: 0.1rem solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    font-family: $fontRegular;
+    font-size: 0.8rem;
+    color: rgba(238, 238, 238, 0.85);
+    width: 230px;
+    white-space: normal;
+    line-height: 1.5;
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s;
+    text-align: left;
+  }
+}
+
+// ── Number input with unit suffix ─────────────────────────────────────────────
+.settings-unit-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .settings-input {
+    width: 90px;
+    flex: none;
+    text-align: right;
+  }
+}
+
+.settings-unit-label {
+  font-family: $fontRegular;
+  font-size: 0.85rem;
+  color: rgba(238, 238, 238, 0.45);
+  flex-shrink: 0;
 }

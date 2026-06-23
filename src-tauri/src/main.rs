@@ -78,6 +78,10 @@ fn main() {
             audio::devices::get_out_devices,
             audio::playback::play_sound,
             audio::playback::get_sound_duration,
+            audio::cache::warm_sound_cache,
+            audio::cache::clear_sound_cache,
+            audio::cache::get_cache_stats,
+            audio::cache::set_cache_config,
             get_system_fonts,
             menu::rebuild_menu
         ])

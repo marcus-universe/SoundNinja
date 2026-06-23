@@ -26,6 +26,8 @@ interface Config {
     outputSource: string
     stopOnRetrigger: boolean
     overlapSounds: boolean
+    cacheMaxSizeMib?: number
+    cacheMaxEntryMib?: number
   }
   tabList: TabEntry[]
   files: SoundFile[]
@@ -142,6 +144,12 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     setOverlapSounds(val: boolean) {
       this.configFile.settings.overlapSounds = val
+      this.writeConfig()
+    },
+
+    setCacheConfig(maxSizeMib: number, maxEntryMib: number) {
+      this.configFile.settings.cacheMaxSizeMib = maxSizeMib
+      this.configFile.settings.cacheMaxEntryMib = maxEntryMib
       this.writeConfig()
     },
 

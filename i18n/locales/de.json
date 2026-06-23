@@ -32,7 +32,15 @@
       "stopOnRetriggerHint": "Erneutes Drücken eines aktiven Sounds stoppt ihn",
       "overlapSounds": "Sounds überlappen",
       "overlapSoundsHint": "Mehrere Sounds spielen gleichzeitig",
-      "language": "Sprache"
+      "language": "Sprache",
+      "performanceCache": "Performance-Cache",
+      "cacheMaxSize": "Max. Cache-Gr\u00f6\u00dfe",
+      "cacheMaxSizeHint": "Gesamter RAM-Speicher f\u00fcr den Sound-Cache. Bei \u00dcberschreitung werden zuletzt-genutzte Sounds ausgelagert (LRU).",
+      "cacheMaxEntry": "Max. Dateigr\u00f6\u00dfe pro Eintrag",
+      "cacheMaxEntryHint": "Dateien \u00fcber diesem Limit werden nie gecacht und immer direkt von der Festplatte gelesen.",
+      "cacheStatus": "Cache-Status",
+      "cacheStatsText": "{count} Sound(s) gecacht \u00b7 {size} MiB belegt",
+      "clearCache": "Cache leeren"
     },
     "audio": {
       "title": "Audio",
