@@ -1,7 +1,7 @@
-@use 'variables' as *;
+﻿@use 'variables' as *;
 
 .navbar {
-  height: calc(100vh);
+  height: 100dvh;
   padding: 0 $padding_1;
   width: var(--icon_size);
   position: fixed;
@@ -9,10 +9,10 @@
   // Position the navbar on the side defined by $navbar-position
   @if $navbar-position == right {
     right: 0;
-    border-left: 0.2rem solid var(--primary_color);
+    border-left: 0.32rem solid var(--primary_color);
   } @else {
     left: 0;
-    border-right: 0.2rem solid var(--primary_color);
+    border-right: 0.32rem solid var(--primary_color);
   }
 
   .iconContainer {
@@ -37,7 +37,7 @@
       top: 0;
       z-index: 2;
       background: $color-bg;
-      padding: 20px $padding_1;
+      padding: 2rem $padding_1;
       left: 0;
 
       &:hover {
@@ -53,20 +53,20 @@
 
     .searchBar {
       position: absolute;
-      top: 20px;
+      top: 2rem;
       left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
       height: var(--icon_size);
       background: $color-bg;
       z-index: 1;
-      width: calc(100vw - var(--icon_size) - $padding_1 * 4);
+      width: calc(100dvw - var(--icon_size) - $padding_1 * 4);
 
       input {
         width: 100%;
         padding: $padding_1;
         background: $color-bg;
         color: var(--primary_color);
-        border: 0.2rem solid var(--primary_color);
-        border-radius: 0.5rem;
+        border: 0.32rem solid var(--primary_color);
+        border-radius: 0.8rem;
         font-family: $fontRegular;
         font-size: var(--font-size-sm);
         transition: all 0.2s ease;

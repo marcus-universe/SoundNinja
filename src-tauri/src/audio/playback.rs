@@ -1,6 +1,7 @@
 use cpal::traits::DeviceTrait;
 use rodio::{self, cpal, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
 use std::io::Cursor;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -8,6 +9,19 @@ use std::time::Duration;
 use tauri::Emitter;
 
 use super::devices::get_output_devices;
+
+// --- Global output volume (stored as f32 bits in an atomic) ---
+
+static OUTPUT_VOLUME: AtomicU32 = AtomicU32::new(0x3F800000); // 1.0f32 bits
+
+fn current_volume() -> f32 {
+    f32::from_bits(OUTPUT_VOLUME.load(Ordering::Relaxed))
+}
+
+#[tauri::command]
+pub fn set_output_volume(volume: f32) {
+    OUTPUT_VOLUME.store(volume.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+}
 
 // --- Duration query ---
 
@@ -234,7 +248,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 
                     match load_source(&path) {
                         Ok(source) => {
-                            new_player.append(source);
+                            new_player.append(source.amplify(current_volume()));
                             playing.push(PlayingSound { player: new_player, path });
                         }
                         Err(e) => {

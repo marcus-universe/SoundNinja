@@ -28,6 +28,7 @@ interface Config {
     overlapSounds: boolean
     cacheMaxSizeMib?: number
     cacheMaxEntryMib?: number
+    outputVolume?: number
   }
   tabList: TabEntry[]
   files: SoundFile[]
@@ -150,6 +151,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setCacheConfig(maxSizeMib: number, maxEntryMib: number) {
       this.configFile.settings.cacheMaxSizeMib = maxSizeMib
       this.configFile.settings.cacheMaxEntryMib = maxEntryMib
+      this.writeConfig()
+    },
+
+    setOutputVolume(val: number) {
+      this.configFile.settings.outputVolume = val
       this.writeConfig()
     },
 

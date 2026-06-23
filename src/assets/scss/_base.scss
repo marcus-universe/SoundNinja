@@ -1,9 +1,19 @@
 @use 'variables' as *;
 
+// 62.5% trick: 1rem = 10px at default 16px browser font size
+// This makes rem values easier to reason about and respects user font-size prefs.
+html {
+  font-size: 62.5%;
+}
+
+body {
+  font-size: 1.6rem;
+}
+
 :root {
   --primary_color: hsl(189, 100%, 58%);
-  --icon_size: 2.5rem;
-  --icon_min_size: 30px;
+  --icon_size: 4rem;
+  --icon_min_size: 3rem;
 
   /* ── Font families ───────────────────────────── */
   --font-regular: #{$fontRegular};
@@ -12,19 +22,19 @@
   --font-black: #{$fontBlack};
 
   /* ── Font sizes ──────────────────────────────── */
-  --font-size-sm: 1rem;
-  --font-size-md: 1.2rem;
+  --font-size-sm: 1.6rem;
+  --font-size-md: 1.92rem;
 
-  --tab_width: 5rem;
-  --btn_width: 11rem;
+  --tab_width: 8rem;
+  --btn_width: 17.6rem;
   --topbar_height: 0px;
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
 }
 
 ::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.2rem;
+  width: 0.8rem;
+  height: 0.32rem;
 }
 
 ::-webkit-scrollbar-thumb {

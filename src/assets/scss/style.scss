@@ -1,8 +1,8 @@
-@use 'variables' as *;
+﻿@use 'variables' as *;
 
 .main {
   width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
-  height: calc(100vh - var(--topbar_height));
+  height: calc(100dvh - var(--topbar_height));
   background-color: $color-bg;
   margin-top: var(--topbar_height);
 
@@ -40,11 +40,11 @@
       background-color: var(--tab-accent, var(--primary_color));
       min-width: var(--tab_width);
       text-align: center;
-      margin: 0 0.2rem 0 0.2rem;
+      margin: 0 0.32rem 0 0.32rem;
       padding: $padding_2;
       filter: brightness(1);
       border: none;
-      border-radius: 0.5rem 0.5rem 0 0;
+      border-radius: 0.8rem 0.8rem 0 0;
       transition: background-color 0.1s ease, color 0.1s ease, border 0.1s ease, opacity 0.3s ease;
 
       &:hover {
@@ -59,15 +59,15 @@
 
       &.drag-over {
         opacity: 1;
-        outline: 0.15rem dashed var(--color-bg);
-        outline-offset: -3px;
+        outline: 0.24rem dashed var(--color-bg);
+        outline-offset: -0.3rem;
         filter: brightness(1.25);
       }
     }
 
     .addTab {
       fill: var(--primary_color);
-      width: calc(var(--icon_size) - 1rem);
+      width: calc(var(--icon_size) - 1.6rem);
       transition: fill 0.2s ease, transform 0.2s ease;
 
       &:hover {
@@ -96,7 +96,7 @@
     padding: 0 $padding_2 $padding_2 0;
 
     .SoundTab {
-      min-height: 100px;
+      min-height: 10rem;
 
       .Soundbtn {
         font-family: var(--font-btn, #{$fontBold});
@@ -104,9 +104,9 @@
         color: $white;
         background-color: var(--color-btn, #{$color-btn});
         // Accent color (set by the color picker) drives the border
-        border: 0.2rem solid var(--btn-accent, var(--primary_color));
+        border: 0.32rem solid var(--btn-accent, var(--primary_color));
         padding: var(--btn_padding, #{$padding_1});
-        border-radius: var(--border-radius, 0.5rem);
+        border-radius: var(--border-radius, 0.8rem);
         max-width: var(--btn_width);
         min-width: var(--btn_width);
         word-wrap: break-word;
@@ -149,19 +149,19 @@
         &.active {
           background-color: var(--color-btn, #{$color-btn});
           color: $white;
-          text-shadow: 0 0 5px rgba(0, 0, 0, 0.6);
+          text-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.6);
           font-family: var(--font-btn, #{$fontBold});
           // Slightly bolder border + soft glow make the active state clearly visible
           // even before the progress bar starts filling.
-          border-width: 0.2rem;
-          box-shadow: 0 0 8px var(--btn-accent, var(--primary_color));
+          border-width: 0.32rem;
+          box-shadow: 0 0 0.8rem var(--btn-accent, var(--primary_color));
           // Suppress background transition so rAF progress updates are instant.
           transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         &.drag-over {
-          outline: 0.2rem dashed var(--btn-accent, var(--primary_color));
-          outline-offset: 2px;
+          outline: 0.32rem dashed var(--btn-accent, var(--primary_color));
+          outline-offset: 0.2rem;
           background-color: rgba(255, 255, 255, 0.06);
         }
       }
@@ -170,7 +170,7 @@
 }
 
 .searchMove {
-  margin-top: calc(var(--icon_size) + $padding_1 + $padding_1 + 0.5rem);
+  margin-top: calc(var(--icon_size) + $padding_1 + $padding_1 + 0.8rem);
 }
 
 // ########################################
@@ -191,11 +191,11 @@
   position: relative;
   z-index: 11;
   background-color: $color-bg;
-  border: 0.2rem solid var(--primary_color);
-  border-radius: 0.75rem;
+  border: 0.32rem solid var(--primary_color);
+  border-radius: 1.2rem;
   padding: calc($padding_1 * 1.5);
-  width: min(680px, calc(100vw - 4rem));
-  max-height: calc(100vh - 4rem);
+  width: min(68rem, calc(100dvw - 4rem));
+  max-height: calc(100dvh - 4rem);
   overflow-y: auto;
   box-sizing: border-box;
 }
@@ -221,8 +221,8 @@
 // ---- Reusable UI components ----
 .ui-btn {
   padding: $padding_2 $padding_1;
-  border-radius: 0.5rem;
-  border: 0.2rem solid var(--primary_color);
+  border-radius: 0.8rem;
+  border: 0.32rem solid var(--primary_color);
   background: transparent;
   color: var(--primary_color);
   font-family: $fontBold;
@@ -256,9 +256,9 @@
 .ui-input {
   width: 100%;
   padding: $padding_2 $padding_1;
-  border-radius: 0.4rem;
+  border-radius: 0.64rem;
   min-height: var(--icon_size);
-  border: 0.2rem solid var(--primary_color);
+  border: 0.32rem solid var(--primary_color);
   background: $color-bg;
   color: var(--primary_color);
   font-family: $fontRegular;
@@ -281,7 +281,7 @@
 
 .ui-listitem {
   padding: $padding_2 $padding_1;
-  border-radius: 0.4rem;
+  border-radius: 0.64rem;
   background: $color-btn;
   font-family: $fontRegular;
   font-size: var(--font-size-md);
@@ -298,8 +298,8 @@
 
 .ui-listitem-remove {
   flex-shrink: 0;
-  width: 1rem !important;
-  height: 1rem !important;
+  width: 1.6rem !important;
+  height: 1.6rem !important;
   min-width: unset !important;
   min-height: unset !important;
 }
@@ -313,14 +313,14 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    border-radius: 0.5rem;
+    border-radius: 0.8rem;
     width: 30%;
-    min-width: 500px;
-    max-width: 700px;
+    min-width: 50rem;
+    max-width: 70rem;
     padding: $padding_1;
     min-height: 20%;
     background: $color-bg;
-    border: 0.2rem solid var(--primary_color);
+    border: 0.32rem solid var(--primary_color);
     z-index: 3;
     text-align: center;
   }
@@ -335,7 +335,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(0.4rem);
   background: rgba($color-bg, 0.5);
   z-index: 2;
   pointer-events: none;
@@ -343,10 +343,10 @@
 
 .exit {
   fill: var(--primary_color);
-  width: calc(var(--icon_size) - 0.5rem);
+  width: calc(var(--icon_size) - 0.8rem);
   position: absolute;
-  right: 1rem;
-  top: 1rem;
+  right: 1.6rem;
+  top: 1.6rem;
   transition: all 0.2s ease;
 
   &:hover {
@@ -385,11 +385,11 @@
   position: relative;
   z-index: 11;
   background-color: $color-bg;
-  border: 0.2rem solid var(--primary_color);
-  border-radius: 0.75rem;
+  border: 0.32rem solid var(--primary_color);
+  border-radius: 1.2rem;
   padding: calc($padding_1 * 2.5);
-  width: min(1080px, calc(100vw - 4rem));
-  max-height: calc(100vh - 4rem);
+  width: min(1080px, calc(100dvw - 4rem));
+  max-height: calc(100dvh - 4rem);
   overflow-y: auto;
   box-sizing: border-box;
 
@@ -412,7 +412,7 @@
     margin-top: $padding_1;
 
     p {
-      font-size: 1.1rem;
+      font-size: 1.76rem;
       color: $white;
       font-family: $fontRegular;
     }
@@ -420,7 +420,7 @@
     .github-link {
       color: var(--primary_color);
       text-decoration: none;
-      font-size: 1rem;
+      font-size: 1.6rem;
       font-family: $fontRegular;
     }
   }
@@ -454,7 +454,7 @@
 
   .setting {
     padding-bottom: $padding_1;
-    border-bottom: 0.1rem solid var(--primary_color);
+    border-bottom: 0.16rem solid var(--primary_color);
   }
 
   label {
@@ -465,28 +465,28 @@
   }
 
   input[type='range'] {
-    height: 1rem;
+    height: 1.6rem;
     width: 70%;
-    border-radius: 1rem;
+    border-radius: 1.6rem;
     border: none;
 
     &::-webkit-slider-thumb {
-      height: 2rem;
-      width: 2rem;
+      height: 3.2rem;
+      width: 3.2rem;
       border-radius: 50%;
       background: var(--primary_color);
-      border: 0.2rem solid $color-bg;
+      border: 0.32rem solid $color-bg;
       cursor: pointer;
       -webkit-appearance: none;
-      margin-top: -0.5rem;
+      margin-top: -0.8rem;
       transition: width 0.2s ease, height 0.2s ease, border 0.2s ease, margin-top 0.2s ease;
     }
 
     &::-webkit-slider-runnable-track {
       width: 70%;
-      height: 1rem;
+      height: 1.6rem;
       cursor: pointer;
-      box-shadow: 0.2rem 0.2rem 1rem rgba(0, 0, 0, 0.7);
+      box-shadow: 0.32rem 0.32rem 1.6rem rgba(0, 0, 0, 0.7);
       background: linear-gradient(
         90deg,
         hsl(0, 100%, 58%) 0%,
@@ -501,7 +501,7 @@
         hsl(324, 100%, 58%) 90%,
         hsl(360, 100%, 58%) 100%
       );
-      border-radius: 1rem;
+      border-radius: 1.6rem;
     }
 
     &:hover {
@@ -509,8 +509,8 @@
         outline: none;
         height: 3rem;
         width: 3rem;
-        margin-top: -1rem;
-        border: 0.4rem solid $color-bg;
+        margin-top: -1.6rem;
+        border: 0.64rem solid $color-bg;
       }
     }
   }
@@ -522,8 +522,8 @@
   select {
     width: 70%;
     padding: $padding_1;
-    border-radius: 0.5rem;
-    border: 0.15rem solid var(--primary_color);
+    border-radius: 0.8rem;
+    border: 0.24rem solid var(--primary_color);
     background: $color-bg;
     color: var(--primary_color);
     font-family: $fontRegular;
@@ -546,12 +546,12 @@
       font-family: $fontBold;
       font-size: var(--font-size-sm);
       background: $color-bg;
-      border: 0.2rem solid var(--primary_color);
+      border: 0.32rem solid var(--primary_color);
 
       &:hover,
       &:checked,
       &:active {
-        box-shadow: 0 0 10px 100px #000 inset;
+        box-shadow: 0 0 10px 10rem #000 inset;
         background: var(--primary_color) !important;
         color: $color-bg !important;
       }

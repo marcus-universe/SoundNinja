@@ -17,21 +17,21 @@
           <label class="settings-label">{{ $t('settings.themeCreator.primaryAccent') }}</label>
           <div class="settings-color-row">
             <input type="color" class="settings-color" v-model="themeCreator.primaryColor" />
-            <span class="settings-color-value">{{ themeCreator.primaryColor }}</span>
+            <input type="text" class="settings-color-text" v-model="themeCreator.primaryColor" @change="fixColorInput('primaryColor')" maxlength="9" spellcheck="false" />
           </div>
         </div>
         <div class="settings-group settings-group--inline">
           <label class="settings-label">{{ $t('settings.themeCreator.background') }}</label>
           <div class="settings-color-row">
             <input type="color" class="settings-color" v-model="themeCreator.bgColor" />
-            <span class="settings-color-value">{{ themeCreator.bgColor }}</span>
+            <input type="text" class="settings-color-text" v-model="themeCreator.bgColor" @change="fixColorInput('bgColor')" maxlength="9" spellcheck="false" />
           </div>
         </div>
         <div class="settings-group settings-group--inline">
           <label class="settings-label">{{ $t('settings.themeCreator.buttonBackground') }}</label>
           <div class="settings-color-row">
             <input type="color" class="settings-color" v-model="themeCreator.btnColor" />
-            <span class="settings-color-value">{{ themeCreator.btnColor }}</span>
+            <input type="text" class="settings-color-text" v-model="themeCreator.btnColor" @change="fixColorInput('btnColor')" maxlength="9" spellcheck="false" />
           </div>
         </div>
 
@@ -60,7 +60,13 @@
           </div>
         </div>
         <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonFontSize') }} — {{ themeCreator.fontSizeBtn }}rem</label>
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.buttonFontSize') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0.7" max="1.8" step="0.05" v-model.number="themeCreator.fontSizeBtn" @change="clampValue('fontSizeBtn', 0.7, 1.8)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
           <input type="range" class="settings-slider" min="0.7" max="1.8" step="0.05" v-model.number="themeCreator.fontSizeBtn" />
         </div>
 
@@ -89,26 +95,56 @@
           </div>
         </div>
         <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.tabFontSize') }} — {{ themeCreator.fontSizeTab }}rem</label>
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.tabFontSize') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0.7" max="1.8" step="0.05" v-model.number="themeCreator.fontSizeTab" @change="clampValue('fontSizeTab', 0.7, 1.8)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
           <input type="range" class="settings-slider" min="0.7" max="1.8" step="0.05" v-model.number="themeCreator.fontSizeTab" />
         </div>
 
         <div class="settings-section-divider">{{ $t('settings.themeCreator.layout') }}</div>
 
         <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonWidth') }} — {{ themeCreator.btnWidth }}rem</label>
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.buttonWidth') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="7" max="18" step="0.5" v-model.number="themeCreator.btnWidth" @change="clampValue('btnWidth', 7, 18)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
           <input type="range" class="settings-slider" min="7" max="18" step="0.5" v-model.number="themeCreator.btnWidth" />
         </div>
         <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.borderRadius') }} — {{ themeCreator.borderRadius }}rem</label>
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.borderRadius') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0" max="2" step="0.05" v-model.number="themeCreator.borderRadius" @change="clampValue('borderRadius', 0, 2)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
           <input type="range" class="settings-slider" min="0" max="2" step="0.05" v-model.number="themeCreator.borderRadius" />
         </div>
         <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingX') }} — {{ themeCreator.btnPaddingX }}rem</label>
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingX') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0.25" max="2.5" step="0.05" v-model.number="themeCreator.btnPaddingX" @change="clampValue('btnPaddingX', 0.25, 2.5)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
           <input type="range" class="settings-slider" min="0.25" max="2.5" step="0.05" v-model.number="themeCreator.btnPaddingX" />
         </div>
         <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingY') }} — {{ themeCreator.btnPaddingY }}rem</label>
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingY') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0.1" max="1.5" step="0.05" v-model.number="themeCreator.btnPaddingY" @change="clampValue('btnPaddingY', 0.1, 1.5)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
           <input type="range" class="settings-slider" min="0.1" max="1.5" step="0.05" v-model.number="themeCreator.btnPaddingY" />
         </div>
 
@@ -304,6 +340,20 @@ function cssColorToHex(color: string): string {
   } catch {
     return c
   }
+}
+
+function fixColorInput(key: 'primaryColor' | 'bgColor' | 'btnColor') {
+  const hex = cssColorToHex(themeCreator[key])
+  if (/^#[0-9a-f]{6}$/i.test(hex)) themeCreator[key] = hex
+}
+
+function clampValue(
+  key: 'fontSizeBtn' | 'fontSizeTab' | 'btnWidth' | 'borderRadius' | 'btnPaddingX' | 'btnPaddingY',
+  min: number,
+  max: number,
+) {
+  const v = Number(themeCreator[key])
+  themeCreator[key] = isNaN(v) ? min : parseFloat(Math.max(min, Math.min(max, v)).toFixed(2))
 }
 
 function extractFontFamily(v: string): string {

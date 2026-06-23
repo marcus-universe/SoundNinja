@@ -1,4 +1,4 @@
-@use 'variables' as *;
+﻿@use 'variables' as *;
 
 // ── Overlay backdrop ──────────────────────────────────────────────────────────
 .settings-overlay {
@@ -13,16 +13,16 @@
 // ── Panel ─────────────────────────────────────────────────────────────────────
 .settings-panel {
   display: flex;
-  width: 90vw;
-  min-height: 90vh;
+  width: 90dvw;
+  min-height: 90dvh;
   max-width: fit-content;
-  max-height: 90vh;
+  max-height: 90dvh;
   background: $color-bg;
-  border: 0.15rem solid var(--primary_color);
-  border-radius: 0.75rem;
+  border: 0.24rem solid var(--primary_color);
+  border-radius: 1.2rem;
   overflow: hidden;
   z-index: 3;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0.8rem 4rem rgba(0, 0, 0, 0.6);
   position: relative;
 }
 
@@ -30,22 +30,22 @@
 .settings-close-btn {
   all: unset;
   position: absolute;
-  top: 0.85rem;
-  right: 0.85rem;
+  top: 1.36rem;
+  right: 1.36rem;
   z-index: 10;
   cursor: pointer;
-  width: 2rem;
-  height: 2rem;
+  width: 3.2rem;
+  height: 3.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.35rem;
+  border-radius: 0.56rem;
   color: rgba(238, 238, 238, 0.5);
   transition: color 0.15s, background 0.15s;
 
   svg {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.76rem;
+    height: 1.76rem;
   }
 
   &:hover {
@@ -58,17 +58,17 @@
 .settings-sidebar {
   display: flex;
   flex-direction: column;
-  width: 220px;
+  width: 22rem;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.25);
-  border-right: 0.1rem solid rgba(255, 255, 255, 0.07);
-  padding: 1.5rem 0.75rem;
-  gap: 0.25rem;
+  border-right: 0.16rem solid rgba(255, 255, 255, 0.07);
+  padding: 2.4rem 1.2rem;
+  gap: 0.4rem;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 
   &--collapsed {
-    width: 56px;
+    width: 5.6rem;
 
     .settings-sidebar__header-text {
       opacity: 0;
@@ -83,7 +83,7 @@
 
     .settings-nav__item {
       justify-content: center;
-      padding: 0.55rem;
+      padding: 0.88rem;
     }
 
     .settings-collapse-btn {
@@ -94,13 +94,13 @@
 
   &__header {
     font-family: $fontBold;
-    font-size: 0.75rem;
+    font-size: 1.2rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(238, 238, 238, 0.45);
-    padding: 0 0.5rem 0.75rem;
-    border-bottom: 0.1rem solid rgba(255, 255, 255, 0.07);
-    margin-bottom: 0.5rem;
+    padding: 0 0.8rem 1.2rem;
+    border-bottom: 0.16rem solid rgba(255, 255, 255, 0.07);
+    margin-bottom: 0.8rem;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -114,21 +114,21 @@
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.24rem;
 }
 
 .settings-nav__item {
   all: unset;
   cursor: pointer;
-  padding: 0.55rem 0.75rem;
-  border-radius: 0.4rem;
+  padding: 0.88rem 1.2rem;
+  border-radius: 0.64rem;
   font-family: $fontRegular;
-  font-size: 0.95rem;
+  font-size: 1.52rem;
   color: rgba(238, 238, 238, 0.65);
   transition: background 0.15s, color 0.15s;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.8rem;
 
   &:hover {
     background: rgba(255, 255, 255, 0.07);
@@ -143,8 +143,8 @@
 }
 
 .settings-nav__icon {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.76rem;
+  height: 1.76rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -158,30 +158,30 @@
 }
 
 .settings-nav__label {
-  font-size: 0.9rem;
+  font-size: 1.44rem;
   white-space: nowrap;
   transition: opacity 0.2s ease, max-width 0.25s ease;
-  max-width: 160px;
+  max-width: 16rem;
 }
 
 // ── Collapse button ───────────────────────────────────────────────────────────
 .settings-collapse-btn {
   all: unset;
   cursor: pointer;
-  width: 2rem;
-  height: 2rem;
+  width: 3.2rem;
+  height: 3.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.35rem;
+  border-radius: 0.56rem;
   color: rgba(238, 238, 238, 0.5);
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.2rem;
   transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
 
   svg {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.76rem;
+    height: 1.76rem;
   }
 
   &:hover {
@@ -193,7 +193,7 @@
 // ── Content area ──────────────────────────────────────────────────────────────
 .settings-content {
   flex: 1;
-  padding: 2rem 2.5rem;
+  padding: 3.2rem 4rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -203,16 +203,16 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    max-width: 860px;
+    max-width: 86rem;
   }
 
   &__title {
     font-family: $fontBold;
-    font-size: 1.4rem;
+    font-size: 2.24rem;
     color: $white;
-    margin: 0 0 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 0.1rem solid rgba(255, 255, 255, 0.1);
+    margin: 0 0 2.4rem;
+    padding-bottom: 1.2rem;
+    border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -220,14 +220,14 @@
 .settings-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 0.05rem solid rgba(255, 255, 255, 0.05);
+  gap: 1.6rem;
+  padding: 1.2rem 0;
+  border-bottom: 0.08rem solid rgba(255, 255, 255, 0.05);
 
   &--stacked {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: 0.8rem;
   }
 
   &--inline {
@@ -243,7 +243,7 @@
 .settings-toggle-text {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.24rem;
 
   .settings-label {
     min-width: unset;
@@ -252,15 +252,15 @@
 
 .settings-label {
   font-family: $fontRegular;
-  font-size: 0.95rem;
+  font-size: 1.52rem;
   color: $white;
   flex-shrink: 0;
-  min-width: 160px;
+  min-width: 16rem;
 }
 
 .settings-hint {
   font-family: $fontRegular;
-  font-size: 0.82rem;
+  font-size: 1.31rem;
   color: rgba(238, 238, 238, 0.5);
   margin: 0;
   line-height: 1.5;
@@ -268,11 +268,11 @@
 
 .settings-section-divider {
   font-family: $fontBold;
-  font-size: 0.72rem;
+  font-size: 1.15rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(238, 238, 238, 0.4);
-  margin: 1.25rem 0 0.25rem;
+  margin: 2rem 0 0.4rem;
 }
 
 // ── Form controls ─────────────────────────────────────────────────────────────
@@ -280,12 +280,12 @@
 .settings-input {
   flex: 1;
   background: rgba(255, 255, 255, 0.05);
-  border: 0.1rem solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.4rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.64rem;
   color: $white;
   font-family: $fontRegular;
-  font-size: 0.9rem;
-  padding: 0.45rem 0.75rem;
+  font-size: 1.44rem;
+  padding: 0.72rem 1.2rem;
   transition: border-color 0.15s;
   outline: none;
 
@@ -301,7 +301,7 @@
 
 .settings-row {
   display: flex;
-  gap: 0.75rem;
+  gap: 1.2rem;
   width: 100%;
   align-items: center;
 
@@ -314,7 +314,7 @@
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 4px;
+  height: 0.4rem;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.15);
   outline: none;
@@ -322,8 +322,8 @@
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 1.6rem;
+    height: 1.6rem;
     border-radius: 50%;
     background: var(--primary_color);
     cursor: pointer;
@@ -332,13 +332,13 @@
 
 .settings-btn {
   flex: 1;
-  padding: 0.45rem 1rem;
+  padding: 0.72rem 1.6rem;
   background: transparent;
-  border: 0.1rem solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.4rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.64rem;
   color: $white;
   font-family: $fontRegular;
-  font-size: 0.9rem;
+  font-size: 1.44rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 
@@ -374,8 +374,8 @@
 
   &--icon {
     flex: 0;
-    padding: 0.45rem 0.75rem;
-    font-size: 1.1rem;
+    padding: 0.72rem 1.2rem;
+    font-size: 1.76rem;
   }
 }
 
@@ -383,23 +383,23 @@
 .settings-color-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1.2rem;
 }
 
 .settings-color {
   -webkit-appearance: none;
   appearance: none;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 0.1rem solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.4rem;
+  width: 4rem;
+  height: 4rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.64rem;
   padding: 0;
   cursor: pointer;
   background: transparent;
 
   &::-webkit-color-swatch-wrapper {
     padding: 0;
-    border-radius: 0.35rem;
+    border-radius: 0.56rem;
     overflow: hidden;
   }
 
@@ -410,28 +410,28 @@
 
 .settings-color-value {
   font-family: 'Consolas', monospace;
-  font-size: 0.85rem;
+  font-size: 1.36rem;
   color: rgba(238, 238, 238, 0.55);
 }
 
 // ── Code editor ───────────────────────────────────────────────────────────────
 .code-editor-wrapper {
   width: 100%;
-  border: 0.1rem solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.5rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.8rem;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.3);
 }
 
 .code-editor {
   width: 100%;
-  min-height: 260px;
+  min-height: 26rem;
   background: transparent;
   color: #a8e6cf;
   font-family: 'Consolas', 'Fira Code', monospace;
-  font-size: 0.82rem;
+  font-size: 1.31rem;
   line-height: 1.55;
-  padding: 1rem;
+  padding: 1.6rem;
   border: none;
   resize: vertical;
   outline: none;
@@ -445,7 +445,7 @@
 
 .theme-creator-layout {
   display: flex;
-  gap: 2rem;
+  gap: 3.2rem;
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -456,14 +456,14 @@
 }
 
 .theme-creator-preview-col {
-  flex: 0 1 260px;
-  width: 260px;
+  flex: 0 1 26rem;
+  width: 26rem;
   position: sticky;
   top: 0;
-  padding: 1rem;
+  padding: 1.6rem;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 0.5rem;
-  border: 0.1rem solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.8rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.07);
 }
 
 // ── Font dropdown ─────────────────────────────────────────────────────────────
@@ -476,15 +476,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.45rem 0.75rem;
+  padding: 0.72rem 1.2rem;
   background: rgba(255, 255, 255, 0.05);
-  border: 0.1rem solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.4rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.64rem;
   cursor: pointer;
   color: $white;
-  font-size: 0.9rem;
+  font-size: 1.44rem;
   transition: border-color 0.15s;
-  gap: 0.5rem;
+  gap: 0.8rem;
 
   &:hover {
     border-color: var(--primary_color);
@@ -505,28 +505,28 @@
 
 .font-dropdown__list {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 0.4rem);
   left: 0;
   right: 0;
   z-index: 200;
-  max-height: 220px;
+  max-height: 22rem;
   overflow-y: auto;
   background: $color-bg;
-  border: 0.1rem solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.4rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.64rem;
+  box-shadow: 0 0.8rem 2.4rem rgba(0, 0, 0, 0.5);
 
-  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar { width: 0.6rem; }
   &::-webkit-scrollbar-track { background: transparent; }
   &::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
+    border-radius: 0.3rem;
   }
 }
 
 .font-dropdown__option {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.95rem;
+  padding: 0.72rem 1.2rem;
+  font-size: 1.52rem;
   color: rgba(238, 238, 238, 0.75);
   cursor: pointer;
   transition: background 0.1s;
@@ -546,8 +546,8 @@
 }
 
 .font-dropdown__search {
-  padding: 0.4rem 0.5rem;
-  border-bottom: 0.1rem solid rgba(255, 255, 255, 0.08);
+  padding: 0.64rem 0.8rem;
+  border-bottom: 0.16rem solid rgba(255, 255, 255, 0.08);
   position: sticky;
   top: 0;
   background: $color-bg;
@@ -557,12 +557,12 @@
 .font-dropdown__search-input {
   width: 100%;
   background: rgba(255, 255, 255, 0.07);
-  border: 0.1rem solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.3rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.48rem;
   color: $white;
   font-family: $fontRegular;
-  font-size: 0.85rem;
-  padding: 0.3rem 0.5rem;
+  font-size: 1.36rem;
+  padding: 0.48rem 0.8rem;
   outline: none;
   box-sizing: border-box;
 
@@ -574,49 +574,49 @@
 // ── Preview column ────────────────────────────────────────────────────────────
 .tc-preview-label {
   font-family: $fontBold;
-  font-size: 0.72rem;
+  font-size: 1.15rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(238, 238, 238, 0.4);
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.2rem;
 }
 
 .tc-preview-section {
   font-family: $fontRegular;
-  font-size: 0.78rem;
+  font-size: 1.25rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: rgba(238, 238, 238, 0.4);
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.64rem;
 }
 
 .tc-tab-bar {
   display: flex;
-  border-radius: 0.3rem;
+  border-radius: 0.48rem;
   overflow: hidden;
-  border: 0.1rem solid;
-  padding: 0.25rem 0.5rem 0;
+  border: 0.16rem solid;
+  padding: 0.4rem 0.8rem 0;
 }
 
 .tc-tab {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.9rem;
+  padding: 0.64rem 1.2rem;
+  font-size: 1.44rem;
   user-select: none;
 }
 
 .tc-btn-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border-radius: 0.3rem;
-  border: 0.1rem solid;
+  gap: 0.8rem;
+  padding: 1.2rem;
+  border-radius: 0.48rem;
+  border: 0.16rem solid;
 }
 
 .tc-btn {
-  padding: 0.5rem 0.75rem;
+  padding: 0.8rem 1.2rem;
   text-align: center;
-  font-size: 0.9rem;
+  font-size: 1.44rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -625,11 +625,11 @@
 
 // ── About section ─────────────────────────────────────────────────────────────
 .about-section {
-  max-width: 480px;
+  max-width: 48rem;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1.5rem;
+  gap: 2.4rem;
   text-align: center;
 }
 
@@ -639,15 +639,15 @@
   justify-content: center;
 
   &__img {
-    max-width: 320px;
+    max-width: 32rem;
     width: 100%;
-    border-radius: 0.5rem;
+    border-radius: 0.8rem;
   }
 }
 
 .about-version {
   font-family: $fontBold;
-  font-size: 1.1rem;
+  font-size: 1.76rem;
   color: $white;
   width: 100%;
   text-align: center;
@@ -660,7 +660,7 @@
 .about-links {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.2rem;
   width: 100%;
 }
 
@@ -668,19 +668,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.9rem;
-  border: 0.1rem solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.5rem;
+  gap: 0.96rem;
+  padding: 0.96rem 1.44rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.8rem;
   color: rgba(238, 238, 238, 0.7);
   font-family: $fontRegular;
-  font-size: 0.9rem;
+  font-size: 1.44rem;
   text-decoration: none;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 
   &__icon {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.76rem;
+    height: 1.76rem;
     flex-shrink: 0;
   }
 
@@ -723,14 +723,14 @@
 .project-dialog {
   position: relative;
   z-index: 1;
-  width: 480px;
-  max-width: 86vw;
-  max-height: 80vh;
+  width: 48rem;
+  max-width: 86dvw;
+  max-height: 80dvh;
   background: $color-bg;
-  border: 0.15rem solid var(--primary_color);
-  border-radius: 0.75rem;
+  border: 0.24rem solid var(--primary_color);
+  border-radius: 1.2rem;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0.8rem 4rem rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
 
@@ -738,12 +738,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 0.1rem solid rgba(255, 255, 255, 0.08);
+    padding: 2rem 2.4rem;
+    border-bottom: 0.16rem solid rgba(255, 255, 255, 0.08);
 
     h2 {
       font-family: $fontBold;
-      font-size: 1.1rem;
+      font-size: 1.76rem;
       color: $white;
       margin: 0;
     }
@@ -752,21 +752,21 @@
   &__body {
     flex: 1;
     overflow-y: auto;
-    padding: 0.5rem 0;
-    min-height: 100px;
+    padding: 0.8rem 0;
+    min-height: 10rem;
   }
 
   &__empty {
-    padding: 2.5rem;
+    padding: 4rem;
     text-align: center;
     color: rgba(238, 238, 238, 0.35);
     font-family: $fontRegular;
-    font-size: 0.9rem;
+    font-size: 1.44rem;
   }
 
   &__footer {
-    padding: 1rem 1.5rem;
-    border-top: 0.1rem solid rgba(255, 255, 255, 0.08);
+    padding: 1.6rem 2.4rem;
+    border-top: 0.16rem solid rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -779,11 +779,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1.5rem;
+    padding: 1.2rem 2.4rem;
     cursor: pointer;
     transition: background 0.15s;
     font-family: $fontRegular;
-    font-size: 0.95rem;
+    font-size: 1.52rem;
     color: rgba(238, 238, 238, 0.85);
 
     &:hover {
@@ -802,7 +802,7 @@
 
 .new-project-row {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.8rem;
 
   .settings-input {
     flex: 1;
@@ -813,8 +813,8 @@
 .settings-label-info {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  min-width: 160px;
+  gap: 0.64rem;
+  min-width: 16rem;
   flex-shrink: 0;
 }
 
@@ -829,8 +829,8 @@
   line-height: 1;
 
   svg {
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 1.44rem;
+    height: 1.44rem;
   }
 
   &:hover {
@@ -846,16 +846,16 @@
   &__tip {
     position: absolute;
     left: 50%;
-    bottom: calc(100% + 0.5rem);
-    transform: translateX(-50%) translateY(6px);
+    bottom: calc(100% + 0.8rem);
+    transform: translateX(-50%) translateY(0.6rem);
     background: rgba(18, 18, 28, 0.97);
-    border: 0.1rem solid rgba(255, 255, 255, 0.15);
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.75rem;
+    border: 0.16rem solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.64rem;
+    padding: 0.8rem 1.2rem;
     font-family: $fontRegular;
-    font-size: 0.8rem;
+    font-size: 1.28rem;
     color: rgba(238, 238, 238, 0.85);
-    width: 230px;
+    width: 23rem;
     white-space: normal;
     line-height: 1.5;
     z-index: 50;
@@ -870,10 +870,10 @@
 .settings-unit-input {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.8rem;
 
   .settings-input {
-    width: 90px;
+    width: 9rem;
     flex: none;
     text-align: right;
   }
@@ -881,7 +881,43 @@
 
 .settings-unit-label {
   font-family: $fontRegular;
-  font-size: 0.85rem;
+  font-size: 1.36rem;
   color: rgba(238, 238, 238, 0.45);
   flex-shrink: 0;
+}
+
+// ── Slider label + inline number input row ────────────────────────────────────
+.settings-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0.48rem;
+
+  .settings-label {
+    min-width: unset;
+    margin-bottom: 0;
+  }
+}
+
+// ── Editable color hex text input ─────────────────────────────────────────────
+.settings-color-text {
+  flex: none;
+  width: 9ch;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 1.36rem;
+  padding: 0.16rem 0.32rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.32rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(238, 238, 238, 0.55);
+  outline: none;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+
+  &:hover,
+  &:focus {
+    border-color: var(--primary_color);
+    color: $white;
+  }
 }

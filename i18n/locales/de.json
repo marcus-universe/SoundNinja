@@ -45,7 +45,9 @@
     "audio": {
       "title": "Audio",
       "outputDevice": "Ausgabegerät",
-      "refresh": "Aktualisieren"
+      "refresh": "Aktualisieren",
+      "outputVolume": "Ausgabelautstärke",
+      "outputVolumeHint": "Gesamt-Wiedergabelautstärke für alle Sounds (0–100 %)"
     },
     "themeCreator": {
       "title": "Theme-Editor",

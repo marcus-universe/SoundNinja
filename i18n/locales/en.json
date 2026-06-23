@@ -45,7 +45,9 @@
     "audio": {
       "title": "Audio",
       "outputDevice": "Output Device",
-      "refresh": "Refresh"
+      "refresh": "Refresh",
+      "outputVolume": "Output Volume",
+      "outputVolumeHint": "Master playback volume applied to all sounds (0–100 %)"
     },
     "themeCreator": {
       "title": "Theme Creator",

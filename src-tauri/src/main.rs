@@ -82,6 +82,7 @@ fn main() {
             audio::cache::clear_sound_cache,
             audio::cache::get_cache_stats,
             audio::cache::set_cache_config,
+            audio::playback::set_output_volume,
             get_system_fonts,
             menu::rebuild_menu
         ])
