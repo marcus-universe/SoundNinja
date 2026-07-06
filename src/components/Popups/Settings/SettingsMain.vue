@@ -11,11 +11,16 @@
 
     <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.theme') }}</label>
-      <select v-model="selectedTheme" @change="applyTheme" class="settings-select">
-        <option v-for="t in builtinThemes" :key="t.id" :value="t.id">{{ t.label }}</option>
-        <option v-for="t in savedThemes" :key="t" :value="'file:' + t">{{ t.replace('.css', '') }}</option>
-        <option value="custom">{{ $t('settings.main.customCssOption') }}</option>
-      </select>
+      <div class="settings-row settings-row--nowrap">
+        <select v-model="selectedTheme" @change="applyTheme" class="settings-select">
+          <option v-for="t in builtinThemes" :key="t.id" :value="t.id">{{ t.label }}</option>
+          <option v-for="t in savedThemes" :key="t" :value="'file:' + t">{{ t.replace('.css', '') }}</option>
+          <option value="custom">{{ $t('settings.main.customCssOption') }}</option>
+        </select>
+        <button class="settings-btn settings-btn--primary settings-btn--icon-only" :title="$t('settings.main.openThemeCreator')" @click="openThemeCreator">
+          <Icons icon="palette" custom-class="settings-btn-icon" />
+        </button>
+      </div>
     </div>
 
     <Transition name="fade">
@@ -29,6 +34,14 @@
         <p v-if="importSuccess" class="settings-success" style="margin-top:0.5rem">{{ importSuccess }}</p>
       </div>
     </Transition>
+
+    <div class="settings-group">
+      <label class="settings-label">{{ $t('settings.main.navbarSide') }}</label>
+      <select v-model="navbarSide" @change="onNavbarSide" class="settings-select">
+        <option value="left">{{ $t('settings.main.navbarLeft') }}</option>
+        <option value="right">{{ $t('settings.main.navbarRight') }}</option>
+      </select>
+    </div>
 
     <DialogField
       v-if="nameDialogOpen"
@@ -112,11 +125,41 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { readTextFile, writeTextFile, mkdir, readDir, BaseDirectory } from '@tauri-apps/plugin-fs'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
+
+function joinPath(base: string, ...parts: string[]) {
+  const sep = base.includes('\\') ? '\\' : '/'
+  return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
+}
+
+// ── Theme Creator window ──────────────────────────────────────────────────────
+async function openThemeCreator() {
+  try {
+    const existing = await WebviewWindow.getByLabel('theme-creator')
+    if (existing) {
+      await existing.setFocus()
+    } else {
+      const win = new WebviewWindow('theme-creator', {
+        url: '#/theme-creator',
+        title: 'Theme Creator',
+        width: 940,
+        height: 720,
+        minWidth: 720,
+        minHeight: 560,
+        resizable: true,
+      })
+      win.once('tauri://error', (e) => console.error('Theme Creator window error', e))
+    }
+  } catch (e) {
+    console.error('Failed to open Theme Creator window', e)
+  }
+  appStore.setActiveOverlay(null)
+}
 
 
 
@@ -135,9 +178,15 @@ const importSuccess = ref('')
 const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
 const currentLanguage = ref(locale.value)
+const navbarSide = ref<'left' | 'right'>('left')
 const cacheMaxSizeMib = ref(256)
 const cacheMaxEntryMib = ref(50)
 const cacheStatsText = ref('')
+
+// ── Navbar side ───────────────────────────────────────────────────────────────
+async function onNavbarSide() {
+  await appSettings.setNavbarSide(navbarSide.value)
+}
 
 // Name-prompt dialog state (shown when an imported CSS has no theme-name comment)
 const nameDialogOpen = ref(false)
@@ -169,7 +218,7 @@ function applyTheme() {
   if (id.startsWith('file:')) {
     clearInlineThemeVars()
     const filename = id.slice(5)
-    readTextFile(`themes/${filename}`, { baseDir: BaseDirectory.AppData })
+    invoke<string>('read_text_file_abs', { path: joinPath(appSettings.themesPath, filename) })
       .then(injectCustomCss)
       .catch((e) => console.error('Failed to load theme file', e))
     return
@@ -207,9 +256,12 @@ function injectCustomCss(css: string) {
 
 async function loadSavedThemes() {
   try {
-    await mkdir('themes', { baseDir: BaseDirectory.AppData, recursive: true })
-    const entries = await readDir('themes', { baseDir: BaseDirectory.AppData })
-    savedThemes.value = entries.filter((e) => e.name?.endsWith('.css')).map((e) => e.name as string)
+    await invoke('make_dir_abs', { path: appSettings.themesPath })
+    const files = await invoke<string[]>('list_dir_files_abs', {
+      dir: appSettings.themesPath,
+      exts: ['css'],
+    })
+    savedThemes.value = files
   } catch {
     savedThemes.value = []
   }
@@ -226,7 +278,7 @@ async function importCustomCssFile() {
       filters: [{ name: 'CSS Files', extensions: ['css'] }],
     })
     if (!filePath) return
-    const css = await readTextFile(filePath as string)
+    const css = await invoke<string>('read_text_file_abs', { path: filePath as string })
     if (!css.includes('--')) {
       importError.value = t('settings.main.notCompatibleTheme')
       return
@@ -254,8 +306,11 @@ function parseThemeName(css: string): string {
 
 async function saveImportedTheme(css: string, name: string) {
   const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
-  await mkdir('themes', { baseDir: BaseDirectory.AppData, recursive: true })
-  await writeTextFile(`themes/${safeName}.css`, css, { baseDir: BaseDirectory.AppData })
+  await invoke('make_dir_abs', { path: appSettings.themesPath })
+  await invoke('write_text_file_abs', {
+    path: joinPath(appSettings.themesPath, `${safeName}.css`),
+    contents: css,
+  })
   importSuccess.value = t('settings.main.importSuccess')
   await loadSavedThemes()
   selectedTheme.value = `file:${safeName}.css`
@@ -332,6 +387,8 @@ async function onClearCache() {
 
 // ── Refresh when settings panel opens ────────────────────────────────────────
 async function syncFromStore() {
+  if (!appSettings.loaded) await appSettings.load()
+  navbarSide.value = appSettings.navbarSide
   // Load the saved-theme options first so the dropdown always has a matching
   // <option> for a persisted `file:` theme — otherwise v-model can't select it.
   await loadSavedThemes()

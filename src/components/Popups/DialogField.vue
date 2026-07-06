@@ -8,7 +8,6 @@
       <p v-if="errorMessage" class="dialog-error">{{ errorMessage }}</p>
       <slot />
     </div>
-    <BlurBG @click="$emit('close')" />
   </div>
 </template>
 

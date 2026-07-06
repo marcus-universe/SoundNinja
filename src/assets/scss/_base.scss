@@ -15,19 +15,35 @@ body {
   --icon_size: 4rem;
   --icon_min_size: 3rem;
 
+  /* ── Theme colors (overridable by themes) ────── */
+  --color-bg: #{$color-bg};
+  --color-btn: #{$color-btn};
+
   /* ── Font families ───────────────────────────── */
   --font-regular: #{$fontRegular};
   --font-bold: #{$fontBold};
   --font-semibold: #{$fontSemiBold};
   --font-black: #{$fontBlack};
 
+  /* ── Theme typography (overridable by themes) ── */
+  --font-btn: #{$fontBold};
+  --font-tab: #{$fontBold};
+
   /* ── Font sizes ──────────────────────────────── */
   --font-size-sm: 1.6rem;
   --font-size-md: 1.92rem;
+  --font-size-btn: var(--font-size-md);
+  --font-size-tab: var(--font-size-sm);
 
   --tab_width: 8rem;
   --btn_width: 17.6rem;
   --topbar_height: 0px;
+
+  /* ── Sound button layout (overridable by themes) ── */
+  --button-gap: #{$padding_1};
+  --btn-border-width: 0.32rem;
+  --border-radius: 0.8rem;
+  --btn_padding: #{$padding_1};
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
 }
@@ -42,7 +58,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: $color-bg;
+  background: var(--color-bg, #{$color-bg});
 }
 
 // ########################################
@@ -99,7 +115,7 @@ h1 {
 // ########################################
 html,
 body {
-  background-color: $color-bg;
+  background-color: var(--color-bg, #{$color-bg});
   margin: 0;
   padding: 0;
   font-family: $fontRegular;
@@ -171,6 +187,11 @@ body {
   gap: $padding_1;
 }
 
+// Spacing between sound buttons ("button gaps"), overridable by themes.
+.button-gaps {
+  gap: var(--button-gap, #{$padding_1});
+}
+
 .w100 {
   width: 100%;
 }
@@ -198,4 +219,12 @@ body {
   transform: translateX(-10%);
   opacity: 0;
   z-index: 1;
+}
+
+// When the navbar sits on the right, the search bar slides in from the right.
+.navbar-right {
+  .slideIn-enter-from,
+  .slideIn-leave-to {
+    transform: translateX(10%);
+  }
 }

@@ -1,17 +1,25 @@
 <template>
     <div class="SoundContainer">
         <div
-            class="SoundTab flex_c_h flex_start gap1 flex_wrap"
+            class="SoundTab flex_c_h flex_start button-gaps flex_wrap"
             ref="soundListRef"
         >
-            <SoundButton
-                v-for="(sound, soundindex) in JSONFile"
-                :key="sound.path"
-                :sound="sound"
-                :btnStyle="getBtnStyle(sound, soundindex)"
-                @play="setActiveSound(soundindex)"
-                @contextmenu="(e) => openSoundMenu(e, sound)"
-            />
+            <template v-for="item in displayItems" :key="item.domKey">
+                <div
+                    v-if="item.kind === 'sep'"
+                    class="tab-separator"
+                    :data-sep-id="item.sep.id"
+                    @contextmenu.prevent="(e) => openSeparatorMenu(e, item.sep)"
+                />
+                <SoundButton
+                    v-else
+                    :sound="item.sound"
+                    :btnStyle="getBtnStyle(item.sound)"
+                    :data-sound-path="item.sound.path"
+                    @play="setActiveSound(item.sound)"
+                    @contextmenu="(e) => openSoundMenu(e, item.sound)"
+                />
+            </template>
         </div>
     </div>
 </template>
@@ -30,7 +38,7 @@ let sortable = null
 onMounted(() => {
   sortable = Sortable.create(soundListRef.value, {
     animation: 180,
-    draggable: '.Soundbtn',
+    draggable: '.Soundbtn, .tab-separator',
     ghostClass: 'drag-over',
     onEnd(evt) {
       const { oldIndex, newIndex, item, from } = evt
@@ -38,11 +46,36 @@ onMounted(() => {
       // Undo SortableJS's DOM mutation so Vue stays the single source of truth.
       from.removeChild(item)
       from.insertBefore(item, from.children[oldIndex] ?? null)
-      const list = JSONFile.value
-      const fromSound = list[oldIndex]
-      const toSound = list[newIndex]
-      if (fromSound && toSound) {
-        jsonStore.reorderSounds(fromSound.index, toSound.index, currentTab.value)
+
+      const items = displayItems.value
+      const moved = items[oldIndex]
+      if (!moved) return
+
+      // Rebuild the intended order to read the moved item's new neighbors.
+      const arr = items.slice()
+      arr.splice(oldIndex, 1)
+      arr.splice(newIndex, 0, moved)
+      const prev = arr[newIndex - 1]
+      const next = arr[newIndex + 1]
+
+      if (moved.kind === 'sep') {
+        // Reposition the separator between its new neighbors.
+        let pos
+        if (prev && next) pos = (orderOf(prev) + orderOf(next)) / 2
+        else if (prev) pos = orderOf(prev) + 0.5
+        else if (next) pos = orderOf(next) - 0.5
+        else pos = 0
+        jsonStore.setSeparatorPosition(moved.sep.id, pos)
+      } else {
+        // Sound moved: reorder relative to the nearest sound neighbor so the
+        // existing per-tab reorder logic (and drag/drop) is unaffected.
+        const neighbor =
+          (next && next.kind === 'sound' && next) ||
+          (prev && prev.kind === 'sound' && prev) ||
+          null
+        if (neighbor && neighbor.sound !== moved.sound) {
+          jsonStore.reorderSounds(moved.sound.index, neighbor.sound.index, currentTab.value)
+        }
       }
     },
   })
@@ -72,8 +105,40 @@ const JSONFile = computed(() => {
 
 const Settings = computed(() => jsonStore.configFile?.settings)
 
+// ---- Separators ----
+// Per-tab order key for a sound (global index in "All", per-tab index elsewhere).
+function tabOrder(sound) {
+  return currentTab.value === 'All' ? sound.index : (sound.tabIndexes?.[currentTab.value] ?? 0)
+}
+
+function orderOf(item) {
+  return item.kind === 'sep' ? item.sep.position : tabOrder(item.sound)
+}
+
+// Sounds + separators for the current tab, interleaved by their order key.
+const displayItems = computed(() => {
+  const sounds = JSONFile.value ?? []
+  const seps = (jsonStore.separators ?? []).filter((s) => s.tab === currentTab.value)
+  const items = [
+    ...sounds.map((sound) => ({ kind: 'sound', sound, domKey: 's:' + sound.path })),
+    ...seps.map((sep) => ({ kind: 'sep', sep, domKey: 'sep:' + sep.id })),
+  ]
+  items.sort((a, b) => orderOf(a) - orderOf(b))
+  return items
+})
+
+function openSeparatorMenu(event, sep) {
+  appStore.openContextMenu({
+    x: event.clientX,
+    y: event.clientY,
+    type: 'separator',
+    targetName: sep.id,
+    targetIndex: -1,
+  })
+}
+
 // ---- Styling helper ----
-function getBtnStyle(sound, soundindex) {
+function getBtnStyle(sound) {
   const style = {}
   const info = playingSounds.get(sound.index)
   if (sound.active && info) {
@@ -165,8 +230,7 @@ onUnmounted(() => {
 // (Handled per-button in SoundButton.vue via useDropZone)
 
 // ---- Sound playback ----
-async function setActiveSound(soundindex) {
-  const sound = JSONFile.value[soundindex]
+async function setActiveSound(sound) {
   const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
   const overlapSounds = Settings.value.overlapSounds ?? false
   const stopOnRetrigger = Settings.value.stopOnRetrigger ?? true

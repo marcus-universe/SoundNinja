@@ -37,6 +37,11 @@
 
         <div class="settings-section-divider">{{ $t('settings.themeCreator.buttonTypography') }}</div>
 
+        <div class="settings-row" style="margin-bottom: 0.75rem">
+          <button class="settings-btn" @click="uploadFont">{{ $t('settings.themeCreator.uploadFont') }}</button>
+          <span v-if="fontUploadMsg" class="settings-hint" style="align-self:center">{{ fontUploadMsg }}</span>
+        </div>
+
         <div class="settings-group settings-group--stacked">
           <label class="settings-label">{{ $t('settings.themeCreator.buttonFont') }}</label>
           <div class="font-dropdown" ref="btnFontDropdownRef">
@@ -129,6 +134,26 @@
         </div>
         <div class="settings-group settings-group--stacked">
           <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.borderWidth') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0" max="1" step="0.02" v-model.number="themeCreator.borderWidth" @change="clampValue('borderWidth', 0, 1)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
+          <input type="range" class="settings-slider" min="0" max="1" step="0.02" v-model.number="themeCreator.borderWidth" />
+        </div>
+        <div class="settings-group settings-group--stacked">
+          <div class="settings-slider-header">
+            <label class="settings-label">{{ $t('settings.themeCreator.buttonGap') }}</label>
+            <div class="settings-unit-input">
+              <input type="number" class="settings-input" min="0" max="3" step="0.05" v-model.number="themeCreator.buttonGap" @change="clampValue('buttonGap', 0, 3)" />
+              <span class="settings-unit-label">rem</span>
+            </div>
+          </div>
+          <input type="range" class="settings-slider" min="0" max="3" step="0.05" v-model.number="themeCreator.buttonGap" />
+        </div>
+        <div class="settings-group settings-group--stacked">
+          <div class="settings-slider-header">
             <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingX') }}</label>
             <div class="settings-unit-input">
               <input type="number" class="settings-input" min="0.25" max="2.5" step="0.05" v-model.number="themeCreator.btnPaddingX" @change="clampValue('btnPaddingX', 0.25, 2.5)" />
@@ -155,36 +180,36 @@
         </div>
         <p v-if="importError" class="settings-error" style="margin-top:0.5rem">{{ importError }}</p>
       </div>
-
-      <!-- Preview column -->
-      <div class="theme-creator-preview-col">
-        <div class="tc-preview-label">{{ $t('settings.themeCreator.livePreview') }}</div>
-
-        <div class="tc-preview-section">{{ $t('settings.themeCreator.previewTabs') }}</div>
-        <div class="tc-tab-bar" :style="previewBgStyle">
-          <div class="tc-tab" :style="tabPreviewStyle">{{ $t('settings.themeCreator.previewTabNames[0]') }}</div>
-          <div class="tc-tab" :style="tabActivePreviewStyle">{{ $t('settings.themeCreator.previewTabNames[1]') }}</div>
-          <div class="tc-tab" :style="tabPreviewStyle">{{ $t('settings.themeCreator.previewTabNames[2]') }}</div>
-        </div>
-
-        <div class="tc-preview-section" style="margin-top: 1.25rem">{{ $t('settings.themeCreator.previewButtons') }}</div>
-        <div class="tc-btn-grid" :style="previewBgStyle">
-          <div class="tc-btn" :style="btnPreviewStyle">{{ $t('settings.themeCreator.previewSounds[0]') }}</div>
-          <div class="tc-btn" :style="btnActivePreviewStyle">{{ $t('settings.themeCreator.previewSounds[1]') }}</div>
-          <div class="tc-btn" :style="btnPreviewStyle">{{ $t('settings.themeCreator.previewSounds[2]') }}</div>
-          <div class="tc-btn" :style="btnPreviewStyle">{{ $t('settings.themeCreator.previewSounds[3]') }}</div>
-        </div>
-      </div>
     </div>
+
+    <DialogField
+      v-if="closePrompt"
+      :title="$t('settings.themeCreator.closeTitle')"
+      @close="cancelClose"
+    >
+      <p class="dialog-text">{{ $t('settings.themeCreator.closeMessage') }}</p>
+      <div class="flex_c_h gap1 dialog-actions">
+        <button class="settings-btn settings-btn--primary" @click="saveAndClose">{{ $t('dialog.save') }}</button>
+        <button class="settings-btn" @click="discardAndClose">{{ $t('dialog.discard') }}</button>
+        <button class="settings-btn" @click="cancelClose">{{ $t('dialog.cancel') }}</button>
+      </div>
+    </DialogField>
   </section>
 </template>
 
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
-import { readTextFile, writeTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
+import { emit } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const { t } = useI18n()
+const appSettings = useAppSettingsStore()
+
+function joinPath(base: string, ...parts: string[]) {
+  const sep = base.includes('\\') ? '\\' : '/'
+  return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
+}
 
 const themeCreator = reactive({
   name: 'My Theme',
@@ -198,21 +223,110 @@ const themeCreator = reactive({
   fontSizeMd: 1.2,
   btnWidth: 11,
   borderRadius: 0.5,
+  borderWidth: 0.2,
+  buttonGap: 1.0,
   btnPaddingX: 0.75,
   btnPaddingY: 0.5,
 })
 
 // ── System fonts ──────────────────────────────────────────────────────────────
 const systemFonts = ref(['Segoe UI', 'Arial', 'Verdana', 'Georgia', 'Courier New'])
+const customFonts = ref<string[]>([])
+const fontUploadMsg = ref('')
 
 onMounted(async () => {
+  if (!appSettings.loaded) await appSettings.load()
   try {
     const fonts = await invoke<string[]>('get_system_fonts')
-    if (Array.isArray(fonts) && fonts.length > 0) systemFonts.value = fonts
+    if (Array.isArray(fonts) && fonts.length > 0) systemFonts.value = fonts.map((f) => f.replace(/;+$/, '').trim())
   } catch (e) {
     console.warn('get_system_fonts failed', e)
   }
+  try {
+    customFonts.value = await loadCustomFonts(appSettings.fontsPath)
+  } catch (e) {
+    console.warn('loadCustomFonts failed', e)
+  }
+  // Push the current draft to the main window immediately so its preview matches.
+  emitPreview()
 })
+
+// Uploaded fonts are listed first so they are easy to find.
+const allFonts = computed(() => [...customFonts.value, ...systemFonts.value])
+
+async function uploadFont() {
+  fontUploadMsg.value = ''
+  try {
+    const selected = await open({
+      multiple: true,
+      title: 'Upload Font',
+      filters: [{ name: 'Fonts', extensions: ['ttf', 'otf'] }],
+    })
+    if (!selected) return
+    const paths = Array.isArray(selected) ? selected : [selected]
+    await invoke('make_dir_abs', { path: appSettings.fontsPath })
+    let added = 0
+    for (const src of paths) {
+      const dst = await invoke<string>('copy_file_abs', { src, dstDir: appSettings.fontsPath })
+      const name = (dst.split(/[\\/]/).pop() ?? '').replace(/\.(ttf|otf)$/i, '')
+      try {
+        await registerFontFace(name, dst)
+        if (!customFonts.value.includes(name)) customFonts.value.push(name)
+        added++
+      } catch (e) {
+        console.warn('register font failed', e)
+      }
+    }
+    fontUploadMsg.value = t('settings.themeCreator.fontUploaded', { count: added })
+  } catch (e) {
+    console.error('uploadFont failed', e)
+  }
+}
+
+// ── Live preview → main window ─────────────────────────────────────────────────
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+function emitPreview() {
+  emit('theme_preview', buildThemeCss()).catch(() => {})
+}
+watch(themeCreator, () => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(emitPreview, 80)
+}, { deep: true })
+
+// When the window closes without saving, tell the main window to restore its
+// persisted theme so the live preview does not stick.
+onBeforeUnmount(() => {
+  emit('theme_saved').catch(() => {})
+})
+
+// ── Close prompt (Save theme before closing the window) ────────────────────
+const closePrompt = ref(false)
+let allowClose = false
+
+onMounted(() => {
+  getCurrentWindow().onCloseRequested((event) => {
+    if (allowClose) return
+    event.preventDefault()
+    closePrompt.value = true
+  }).catch(() => {})
+})
+
+async function saveAndClose() {
+  closePrompt.value = false
+  allowClose = true
+  await saveThemeToFolder()
+}
+
+async function discardAndClose() {
+  closePrompt.value = false
+  allowClose = true
+  await emit('theme_saved').catch(() => {})
+  await getCurrentWindow().destroy()
+}
+
+function cancelClose() {
+  closePrompt.value = false
+}
 
 // ── Font dropdown state ───────────────────────────────────────────────────────
 const btnFontOpen = ref(false)
@@ -229,53 +343,13 @@ watch(tabFontOpen, (v) => { if (!v) tabFontSearch.value = '' })
 
 const filteredBtnFonts = computed(() => {
   const q = btnFontSearch.value.trim().toLowerCase()
-  return q ? systemFonts.value.filter((f) => f.toLowerCase().includes(q)) : systemFonts.value
+  return q ? allFonts.value.filter((f) => f.toLowerCase().includes(q)) : allFonts.value
 })
 
 const filteredTabFonts = computed(() => {
   const q = tabFontSearch.value.trim().toLowerCase()
-  return q ? systemFonts.value.filter((f) => f.toLowerCase().includes(q)) : systemFonts.value
+  return q ? allFonts.value.filter((f) => f.toLowerCase().includes(q)) : allFonts.value
 })
-
-// ── Preview styles ────────────────────────────────────────────────────────────
-const previewBgStyle = computed(() => ({
-  background: themeCreator.bgColor,
-  borderColor: themeCreator.primaryColor,
-}))
-
-const btnPreviewStyle = computed(() => ({
-  background: themeCreator.btnColor,
-  border: `0.15rem solid ${themeCreator.primaryColor}`,
-  borderRadius: themeCreator.borderRadius + 'rem',
-  color: '#eee',
-  fontFamily: `'${themeCreator.btnFontFamily}', sans-serif`,
-  fontSize: themeCreator.fontSizeBtn + 'rem',
-  width: themeCreator.btnWidth + 'rem',
-  padding: `${themeCreator.btnPaddingY}rem ${themeCreator.btnPaddingX}rem`,
-  textAlign: 'center' as const,
-}))
-
-const btnActivePreviewStyle = computed(() => ({
-  ...btnPreviewStyle.value,
-  background: themeCreator.primaryColor,
-  color: themeCreator.bgColor,
-}))
-
-const tabPreviewStyle = computed(() => ({
-  fontFamily: `'${themeCreator.tabFontFamily}', sans-serif`,
-  fontSize: themeCreator.fontSizeTab + 'rem',
-  color: 'rgba(238,238,238,0.65)',
-  padding: '0.4rem 1rem',
-  borderBottom: '2px solid transparent',
-  cursor: 'default',
-  whiteSpace: 'nowrap' as const,
-}))
-
-const tabActivePreviewStyle = computed(() => ({
-  ...tabPreviewStyle.value,
-  color: themeCreator.primaryColor,
-  borderBottomColor: themeCreator.primaryColor,
-}))
 
 // ── Export / save ─────────────────────────────────────────────────────────────
 function buildThemeCss() {
@@ -292,6 +366,8 @@ function buildThemeCss() {
   --font-size-md: ${themeCreator.fontSizeMd}rem;
   --btn_width: ${themeCreator.btnWidth}rem;
   --border-radius: ${themeCreator.borderRadius}rem;
+  --btn-border-width: ${themeCreator.borderWidth}rem;
+  --button-gap: ${themeCreator.buttonGap}rem;
   --btn_padding: ${themeCreator.btnPaddingY}rem ${themeCreator.btnPaddingX}rem;
 }
 `
@@ -307,7 +383,7 @@ async function exportTheme() {
       filters: [{ name: 'CSS', extensions: ['css'] }],
     })
     if (!filePath) return
-    await writeTextFile(filePath, css)
+    await invoke('write_text_file_abs', { path: filePath, contents: css })
   } catch (e) {
     console.error('Export failed', e)
   }
@@ -348,7 +424,7 @@ function fixColorInput(key: 'primaryColor' | 'bgColor' | 'btnColor') {
 }
 
 function clampValue(
-  key: 'fontSizeBtn' | 'fontSizeTab' | 'btnWidth' | 'borderRadius' | 'btnPaddingX' | 'btnPaddingY',
+  key: 'fontSizeBtn' | 'fontSizeTab' | 'btnWidth' | 'borderRadius' | 'borderWidth' | 'buttonGap' | 'btnPaddingX' | 'btnPaddingY',
   min: number,
   max: number,
 ) {
@@ -358,8 +434,8 @@ function clampValue(
 
 function extractFontFamily(v: string): string {
   const m = v.match(/['"]([^'"]+)['"]/);
-  if (m) return m[1]
-  return v.split(',')[0].trim()
+  if (m) return m[1].replace(/;+$/, '').trim()
+  return v.split(',')[0].replace(/;+$/, '').trim()
 }
 
 function parseRem(v: string): number {
@@ -386,7 +462,7 @@ async function importThemeFromFile() {
       filters: [{ name: 'CSS Files', extensions: ['css'] }],
     })
     if (!filePath) return
-    const css = await readTextFile(filePath as string)
+    const css = await invoke<string>('read_text_file_abs', { path: filePath as string })
     const vars = parseCssVars(css)
     const required = [
       '--primary_color', '--color-bg', '--color-btn',
@@ -411,6 +487,8 @@ async function importThemeFromFile() {
     if (vars['--font-size-md']) themeCreator.fontSizeMd = parseRem(vars['--font-size-md'])
     themeCreator.btnWidth = parseRem(vars['--btn_width'])
     themeCreator.borderRadius = parseRem(vars['--border-radius'])
+    if (vars['--btn-border-width']) themeCreator.borderWidth = parseRem(vars['--btn-border-width'])
+    if (vars['--button-gap']) themeCreator.buttonGap = parseRem(vars['--button-gap'])
     const [py, px] = parsePadding(vars['--btn_padding'])
     themeCreator.btnPaddingY = py
     themeCreator.btnPaddingX = px
@@ -423,8 +501,15 @@ async function saveThemeToFolder() {
   const css = buildThemeCss()
   const safeName = (themeCreator.name || 'theme').replace(/[^a-z0-9_-]/gi, '_')
   try {
-    await mkdir('themes', { baseDir: BaseDirectory.AppData, recursive: true })
-    await writeTextFile(`themes/${safeName}.css`, css, { baseDir: BaseDirectory.AppData })
+    await invoke('make_dir_abs', { path: appSettings.themesPath })
+    await invoke('write_text_file_abs', {
+      path: joinPath(appSettings.themesPath, `${safeName}.css`),
+      contents: css,
+    })
+    // Tell the main window to select + persist this theme, then close.
+    await emit('theme_apply', { theme: `file:${safeName}.css` })
+    allowClose = true
+    await getCurrentWindow().destroy()
   } catch (e) {
     console.error('Save to themes folder failed', e)
   }

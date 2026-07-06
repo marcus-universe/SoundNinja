@@ -1,4 +1,11 @@
 {
+  "dialog": {
+    "unsavedTitle": "Unsaved Changes",
+    "unsavedMessage": "You have unsaved changes. What would you like to do?",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
   "settings": {
     "title": "Settings",
     "close": "Close",
@@ -13,6 +20,10 @@
     "main": {
       "title": "Main",
       "theme": "Theme",
+      "openThemeCreator": "Theme Creator",
+      "navbarSide": "Navbar Side",
+      "navbarLeft": "Left",
+      "navbarRight": "Right",
       "customCssOption": "Custom CSS…",
       "customCss": "Custom CSS",
       "customCssHint": "Edit CSS variables to create your own theme. Changes apply live.",
@@ -58,6 +69,8 @@
       "background": "Background",
       "buttonBackground": "Button Background",
       "buttonTypography": "Button Typography",
+      "uploadFont": "⬆ Upload Font",
+      "fontUploaded": "Uploaded {count} font(s).",
       "buttonFont": "Button Font",
       "buttonFontSize": "Button Font Size",
       "tabTypography": "Tab Typography",
@@ -66,12 +79,16 @@
       "layout": "Layout",
       "buttonWidth": "Button Width",
       "borderRadius": "Border Radius",
+      "borderWidth": "Border Thickness",
+      "buttonGap": "Button Gaps",
       "buttonPaddingX": "Button Padding X",
       "buttonPaddingY": "Button Padding Y",
       "exportCss": "⬇ Export .css",
       "addToThemes": "＋ Add to Themes",
       "importCss": "⬆ Import .css",
       "importError": "Not compatible theme CSS. Missing variables:",
+      "closeTitle": "Save Theme?",
+      "closeMessage": "Do you want to save the current theme before closing the Theme Creator?",
       "livePreview": "Live Preview",
       "searchFont": "Search font…",
       "previewTabs": "Tabs",
@@ -108,6 +125,8 @@
     "removeDesc": "Delete from SoundNinja (not deleted from system storage)",
     "moveToTab": "Move to Tab",
     "moveToTabDesc": "Assign this sound to one or more tabs",
+    "addSeparator": "Add Separator",
+    "addSeparatorDesc": "Insert a horizontal separator before this button",
     "color": "Color",
     "colorDesc": "Change the accent color of this item",
     "resetColor": "Reset to default"

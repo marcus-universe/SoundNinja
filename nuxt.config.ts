@@ -19,7 +19,7 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'static',
     output: {
-      publicDir: '../dist',
+      publicDir: 'dist',
     },
   },
 

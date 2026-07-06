@@ -4,6 +4,7 @@ use tauri::Manager;
 
 struct MenuLabels {
     file: &'static str,
+    new_project: &'static str,
     open_project: &'static str,
     select_project: &'static str,
     save: &'static str,
@@ -24,6 +25,7 @@ fn labels_for(lang: &str) -> MenuLabels {
     match lang {
         "de" => MenuLabels {
             file: "Datei",
+            new_project: "Neues Projekt",
             open_project: "Projekt öffnen",
             select_project: "Projekt auswählen",
             save: "Speichern",
@@ -41,6 +43,7 @@ fn labels_for(lang: &str) -> MenuLabels {
         },
         _ => MenuLabels {
             file: "File",
+            new_project: "New Project",
             open_project: "Open Project",
             select_project: "Select Project",
             save: "Save",
@@ -63,6 +66,7 @@ fn build_menu(app: &tauri::AppHandle, lang: &str) -> tauri::Result<Menu<tauri::W
     let l = labels_for(lang);
 
     let file_menu = SubmenuBuilder::new(app, l.file)
+        .item(&MenuItemBuilder::with_id("new_project", l.new_project).build(app)?)
         .item(&MenuItemBuilder::with_id("open_project", l.open_project).build(app)?)
         .item(&MenuItemBuilder::with_id("select_project", l.select_project).build(app)?)
         .item(&MenuItemBuilder::with_id("save", l.save).build(app)?)
@@ -97,6 +101,9 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
         match event.id.as_ref() {
             "quit" => {
                 std::process::exit(0);
+            }
+            "new_project" => {
+                app.emit("menu_new_project", ()).unwrap_or_default();
             }
             "open_project" => {
                 app.emit("menu_open_project", ()).unwrap_or_default();

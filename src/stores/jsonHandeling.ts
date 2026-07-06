@@ -1,90 +1,131 @@
 import { defineStore } from 'pinia'
-import { writeTextFile, BaseDirectory } from '@tauri-apps/plugin-fs'
+import {
+  openDb, getDb, loadConfig, saveConfig, emptyConfig,
+  type ProjectConfig, type SoundFile, type TabEntry, type Separator,
+} from '~/utils/db'
 
-interface SoundFile {
-  name: string
-  path: string
-  volume: number
-  tabs: string[]
-  active: boolean
-  /** Global position used by the "All" tab */
-  index: number
-  /** Per-tab position, keyed by tab name (excludes "All") */
-  tabIndexes: Record<string, number>
-  color?: string
-}
-
-interface TabEntry {
-  name: string
-  color?: string
-}
-
-interface Config {
-  settings: {
-    theme: string
-    customCss: string
-    outputSource: string
-    stopOnRetrigger: boolean
-    overlapSounds: boolean
-    cacheMaxSizeMib?: number
-    cacheMaxEntryMib?: number
-    outputVolume?: number
-  }
-  tabList: TabEntry[]
-  files: SoundFile[]
+/** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
+ *  deep-clones and strips Vue reactive Proxies (which structuredClone rejects). */
+function clone<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v))
 }
 
 export const useJsonHandelingStore = defineStore('JsonHandeling', {
   state: () => ({
-    NewJsonData: {} as Record<string, unknown>,
-    FileStruct: [] as unknown[],
-    TabList: [] as TabEntry[],
-    Settings: {
-      theme: 'dark-cyan',
-    },
-    JSONFile: null as unknown,
-    path: null as string | null,
     currentProjectPath: null as string | null,
-    configFile: {
-      settings: {
-        theme: 'dark-cyan',
-        customCss: '',
-        outputSource: 'default',
-        stopOnRetrigger: true,
-        overlapSounds: false,
-      },
-      tabList: [],
-      files: [],
-    } as Config,
+    configFile: emptyConfig() as ProjectConfig,
     filteredFiles: [] as SoundFile[],
+    /** Snapshot taken when a project is opened — used to Discard changes. */
+    openingSnapshot: null as ProjectConfig | null,
+    dirty: false,
+    _persistTimer: null as ReturnType<typeof setTimeout> | null,
   }),
 
   getters: {
-    getJsonFile: (state) => state.JSONFile,
     getConfig: (state) => state.configFile,
+    separators: (state) => state.configFile.separators ?? [],
   },
 
   actions: {
-    updateConfigFile(contents: Config) {
-      this.configFile = contents
+    // ── Project lifecycle ─────────────────────────────────────────────────────
+    /** Opens a project DB, loads it into state, and snapshots for Discard. */
+    async openProject(dbAbsPath: string) {
+      const d = await openDb(dbAbsPath)
+      const config = await loadConfig(d)
+      this.configFile = config
       this.normalizeIndexes()
-      this.filteredFiles = contents.files
+      this.filteredFiles = this.configFile.files
+      this.currentProjectPath = dbAbsPath
+      this.openingSnapshot = clone(this.configFile)
+      this.dirty = false
+    },
+
+    /** Loads config into an already-open project DB (used by JSON import/migration). */
+    async importConfig(config: ProjectConfig, dbAbsPath?: string) {
+      if (dbAbsPath) {
+        await openDb(dbAbsPath)
+        this.currentProjectPath = dbAbsPath
+      }
+      this.configFile = {
+        settings: config.settings,
+        tabList: config.tabList ?? [],
+        files: config.files ?? [],
+        separators: config.separators ?? [],
+      }
+      this.normalizeIndexes()
+      this.filteredFiles = this.configFile.files
+      this.openingSnapshot = clone(this.configFile)
+      this.dirty = false
+      await this.persistNow()
+    },
+
+    /** Reverts in-memory state to the last opened snapshot and re-saves. */
+    async discardChanges() {
+      if (!this.openingSnapshot) return
+      this.configFile = clone(this.openingSnapshot)
+      this.normalizeIndexes()
+      this.filteredFiles = this.configFile.files
+      this.dirty = false
+      await this.persistNow()
+    },
+
+    setCurrentProjectPath(p: string | null) {
+      this.currentProjectPath = p
+    },
+
+    /** @deprecated legacy no-op kept for the old settings page. */
+    setHue(_val: number) {
+      // hue was replaced by the theme system; intentionally does nothing.
+    },
+
+    // ── Persistence ───────────────────────────────────────────────────────────
+    /** Public compat alias — schedules a debounced save to the project DB. */
+    writeConfig() {
+      this.dirty = true
+      if (this._persistTimer) clearTimeout(this._persistTimer)
+      this._persistTimer = setTimeout(() => { this.persistNow() }, 200)
+    },
+
+    /** Flushes any pending changes to the project DB immediately. */
+    async persistNow() {
+      if (this._persistTimer) {
+        clearTimeout(this._persistTimer)
+        this._persistTimer = null
+      }
+      const d = getDb()
+      if (!d) return
+      try {
+        await saveConfig(d, this.configFile)
+        this.openingSnapshot = clone(this.configFile)
+        this.dirty = false
+      } catch (e) {
+        console.error('Failed to persist project', e)
+      }
+    },
+
+    updateConfigFile(contents: ProjectConfig) {
+      this.configFile = {
+        settings: contents.settings,
+        tabList: contents.tabList ?? [],
+        files: contents.files ?? [],
+        separators: contents.separators ?? [],
+      }
+      this.normalizeIndexes()
+      this.filteredFiles = this.configFile.files
+      this.writeConfig()
     },
 
     /**
      * Ensure every sound has a compact global `index` and a `tabIndexes` entry
      * for each tab it belongs to. Prunes stale tab entries and appends new ones.
-     * Migrates old configs that lack `tabIndexes`.
      */
     normalizeIndexes() {
       const files = this.configFile.files
       if (!files) return
 
-      // Global index (drives the "All" tab): compact, preserving current order.
       const byGlobal = [...files].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
       byGlobal.forEach((f, i) => { f.index = i })
 
-      // Per-tab indexes for real tabs only.
       for (const f of files) {
         if (!f.tabIndexes) f.tabIndexes = {}
         for (const key of Object.keys(f.tabIndexes)) {
@@ -102,63 +143,38 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       }
     },
 
-    writeConfig() {
-      writeTextFile(
-        'config.json',
-        JSON.stringify(this.configFile, null, 2),
-        { baseDir: BaseDirectory.AppData }
-      )
-    },
-
-    saveToPath(filePath: string): Promise<void> {
-      return writeTextFile(filePath, JSON.stringify(this.configFile, null, 2))
-    },
-
-    setCurrentProjectPath(p: string | null) {
-      this.currentProjectPath = p
-    },
-
-    /** @deprecated use setTheme instead */
-    setHue(val: number) {
-      // legacy shim – ignored, kept so old call sites don't crash
-    },
-
+    // ── Settings ──────────────────────────────────────────────────────────────
     setTheme(val: string) {
       this.configFile.settings.theme = val
       this.writeConfig()
     },
-
     setCustomCss(val: string) {
       this.configFile.settings.customCss = val
       this.writeConfig()
     },
-
     setOutSource(val: string) {
       this.configFile.settings.outputSource = val
       this.writeConfig()
     },
-
     setStopOnRetrigger(val: boolean) {
       this.configFile.settings.stopOnRetrigger = val
       this.writeConfig()
     },
-
     setOverlapSounds(val: boolean) {
       this.configFile.settings.overlapSounds = val
       this.writeConfig()
     },
-
     setCacheConfig(maxSizeMib: number, maxEntryMib: number) {
       this.configFile.settings.cacheMaxSizeMib = maxSizeMib
       this.configFile.settings.cacheMaxEntryMib = maxEntryMib
       this.writeConfig()
     },
-
     setOutputVolume(val: number) {
       this.configFile.settings.outputVolume = val
       this.writeConfig()
     },
 
+    // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
       this.configFile.files = [...this.configFile.files, ...files]
       this.normalizeIndexes()
@@ -170,43 +186,6 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    // ---- Tab actions ----
-    addTab(name: string) {
-      this.configFile.tabList.push({ name })
-      this.writeConfig()
-    },
-
-    removeTab(name: string) {
-      this.configFile.tabList = this.configFile.tabList.filter((t) => t.name !== name)
-      this.writeConfig()
-    },
-
-    renameTab(oldName: string, newName: string) {
-      const tab = this.configFile.tabList.find((t) => t.name === oldName)
-      if (tab) {
-        tab.name = newName
-        // update all sounds that reference this tab
-        this.configFile.files.forEach((f) => {
-          const idx = f.tabs.indexOf(oldName)
-          if (idx !== -1) f.tabs[idx] = newName
-          if (f.tabIndexes && oldName in f.tabIndexes) {
-            f.tabIndexes[newName] = f.tabIndexes[oldName]
-            delete f.tabIndexes[oldName]
-          }
-        })
-        this.writeConfig()
-      }
-    },
-
-    setTabColor(name: string, color: string) {
-      const tab = this.configFile.tabList.find((t) => t.name === name)
-      if (tab) {
-        tab.color = color
-        this.writeConfig()
-      }
-    },
-
-    // ---- Sound actions ----
     renameSound(soundindex: number, newName: string) {
       this.configFile.files[soundindex].name = newName
       this.writeConfig()
@@ -229,11 +208,6 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    /**
-     * Reorder sounds within a tab. `draggedIdx`/`targetIdx` are global `index`
-     * values (stable keys). For the "All" tab the global index is updated;
-     * for any other tab the per-tab `tabIndexes[tab]` is updated.
-     */
     reorderSounds(draggedIdx: number, targetIdx: number, tab: string) {
       const files = this.configFile.files
       if (tab === 'All') {
@@ -261,6 +235,44 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
+    // ── Tabs ──────────────────────────────────────────────────────────────────
+    addTab(name: string) {
+      this.configFile.tabList.push({ name })
+      this.writeConfig()
+    },
+
+    removeTab(name: string) {
+      this.configFile.tabList = this.configFile.tabList.filter((t) => t.name !== name)
+      this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.tab !== name)
+      this.writeConfig()
+    },
+
+    renameTab(oldName: string, newName: string) {
+      const tab = this.configFile.tabList.find((t) => t.name === oldName)
+      if (!tab) return
+      tab.name = newName
+      this.configFile.files.forEach((f) => {
+        const idx = f.tabs.indexOf(oldName)
+        if (idx !== -1) f.tabs[idx] = newName
+        if (f.tabIndexes && oldName in f.tabIndexes) {
+          f.tabIndexes[newName] = f.tabIndexes[oldName]
+          delete f.tabIndexes[oldName]
+        }
+      })
+      ;(this.configFile.separators ?? []).forEach((s) => {
+        if (s.tab === oldName) s.tab = newName
+      })
+      this.writeConfig()
+    },
+
+    setTabColor(name: string, color: string) {
+      const tab = this.configFile.tabList.find((t) => t.name === name)
+      if (tab) {
+        tab.color = color
+        this.writeConfig()
+      }
+    },
+
     reorderTabs(draggedName: string, targetName: string) {
       const list = this.configFile.tabList
       const from = list.findIndex((t) => t.name === draggedName)
@@ -271,19 +283,37 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    resetAll() {
-      this.configFile = {
-        settings: { theme: 'dark-cyan', customCss: '', outputSource: 'default' },
-        tabList: [],
-        files: [],
+    // ── Separators ────────────────────────────────────────────────────────────
+    addSeparator(tab: string, position: number) {
+      if (!this.configFile.separators) this.configFile.separators = []
+      const id = `sep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      this.configFile.separators.push({ id, tab, position })
+      this.writeConfig()
+    },
+
+    removeSeparator(id: string) {
+      this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.id !== id)
+      this.writeConfig()
+    },
+
+    setSeparatorPosition(id: string, position: number) {
+      const sep = (this.configFile.separators ?? []).find((s) => s.id === id)
+      if (sep) {
+        sep.position = position
+        this.writeConfig()
       }
+    },
+
+    // ── Bulk / misc ───────────────────────────────────────────────────────────
+    resetAll() {
+      this.configFile = emptyConfig()
+      this.normalizeIndexes()
+      this.filteredFiles = []
       this.writeConfig()
     },
 
     ReturnStatusAll() {
-      this.configFile.files.forEach((file) => {
-        file.active = false
-      })
+      this.configFile.files.forEach((file) => { file.active = false })
       this.writeConfig()
     },
 

@@ -23,6 +23,7 @@
 <script setup>
 import { open } from '@tauri-apps/plugin-dialog'
 import { readDir } from '@tauri-apps/plugin-fs'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -54,6 +55,8 @@ function close() {
 
 async function selectFolders() {
   const result = await open({ directory: true, multiple: true, title: 'Select Folders' })
+  // Restore WebView focus after native dialog closes (Tauri/Windows focus loss bug)
+  try { await getCurrentWindow().setFocus() } catch { /* non-tauri */ }
   if (!result) return
   const folders = Array.isArray(result) ? result : [result]
   selectedFolders.value = [...new Set([...selectedFolders.value, ...folders])]

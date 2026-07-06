@@ -6,15 +6,21 @@
   width: var(--icon_size);
   position: fixed;
 
-  // Position the navbar on the side defined by $navbar-position
-  @if $navbar-position == right {
-    right: 0;
-    border-left: 0.32rem solid var(--primary_color);
-  } @else {
-    left: 0;
-    border-right: 0.32rem solid var(--primary_color);
-  }
+  // Default side is left; the navbar-left / navbar-right classes on <html>
+  // (set at runtime from the app settings) drive the actual side.
+  left: 0;
+  right: auto;
+  border-right: 0.32rem solid var(--primary_color);
+}
 
+.navbar-right .navbar {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 0.32rem solid var(--primary_color);
+}
+
+.navbar {
   .iconContainer {
     padding: $padding_1 $padding_1 $padding_1 0;
     width: var(--icon_size);
@@ -78,5 +84,18 @@
         }
       }
     }
+  }
+}
+
+// ── Right-side navbar: mirror the search elements to the opposite edge ──────────
+.navbar-right {
+  .searchButton {
+    left: auto;
+    right: 0;
+  }
+
+  .searchBar {
+    left: auto;
+    right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
   }
 }

@@ -51,12 +51,10 @@
         <main class="settings-content">
           <SettingsMain v-if="activeTab === 'main'" />
           <SettingsAudio v-else-if="activeTab === 'audio'" />
-          <SettingsThemeCreator v-else-if="activeTab === 'theme-creator'" />
           <SettingsAbout v-else-if="activeTab === 'about'" />
         </main>
 
       </div>
-      <BlurBG />
     </div>
   </Transition>
 
@@ -80,11 +78,6 @@ const tabs = computed(() => [
     id: 'audio',
     label: t('settings.tabs.audio'),
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>`,
-  },
-  {
-    id: 'theme-creator',
-    label: t('settings.tabs.theme'),
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.47-1.125-.29-.289-.47-.688-.47-1.125a1.64 1.64 0 011.648-1.688h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
   },
   {
     id: 'about',

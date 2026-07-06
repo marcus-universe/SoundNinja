@@ -1,7 +1,8 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 pub mod audio;
 pub mod menu;
-use tauri::Manager;
+pub mod paths;
+pub mod fsx;
 
 #[tauri::command]
 fn get_system_fonts() -> Vec<String> {
@@ -66,12 +67,17 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
             menu::setup(app)?;
             audio::init_audio_thread(app.handle().clone());
-            let data_dir = app.path().app_data_dir().expect("cannot resolve app data dir");
-            std::fs::create_dir_all(data_dir.join("themes")).ok();
-            std::fs::create_dir_all(data_dir.join("projects")).ok();
+            let settings = paths::load_settings(app.handle());
+            paths::ensure_dirs(&settings);
+            // Allow plugin-fs access to the (possibly relocated) data folders.
+            use tauri_plugin_fs::FsExt;
+            let scope = app.fs_scope();
+            let _ = scope.allow_directory(&settings.projects_path, true);
+            let _ = scope.allow_directory(&settings.themes_path, true);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -84,7 +90,19 @@ fn main() {
             audio::cache::set_cache_config,
             audio::playback::set_output_volume,
             get_system_fonts,
-            menu::rebuild_menu
+            menu::rebuild_menu,
+            paths::get_app_settings,
+            paths::set_app_settings,
+            paths::relocate_data,
+            paths::list_projects,
+            fsx::read_text_file_abs,
+            fsx::read_file_base64_abs,
+            fsx::write_text_file_abs,
+            fsx::path_exists_abs,
+            fsx::make_dir_abs,
+            fsx::list_dir_files_abs,
+            fsx::copy_file_abs,
+            fsx::delete_file_abs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

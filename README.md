@@ -1,10 +1,5 @@
 # Sound Ninja
 
-> **Status:** Active development — not yet production-ready.
-
-## 🚀 Planned Features
-
-
 ![Sound Ninja Logo Animated](./designs/Logo_Animated.gif)
 
 <div align="center">
@@ -16,7 +11,7 @@
 ![Forks](https://img.shields.io/github/forks/marcus-universe/SoundNinja.svg)
 
 </div>
-**Sound Ninja** is an **Open Source Soundboard App** with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**. 😉👍
+<b>Sound Ninja</b> is an **Open Source Soundboard App** with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**. 😉👍
 
 ## How is the progress going?
 

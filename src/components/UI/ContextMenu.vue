@@ -7,7 +7,7 @@
       @click.stop
     >
       <ul class="context-menu__list">
-        <li class="context-menu__item" @click="openRename" @mouseenter="hoveredItem = 'rename'" @mouseleave="hoveredItem = null">
+        <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item" @click="openRename" @mouseenter="hoveredItem = 'rename'" @mouseleave="hoveredItem = null">
           <span class="context-menu__icon">✏️</span>
           <span class="context-menu__label">{{ $t('contextMenu.rename') }}</span>
           <Transition name="desc-fade">
@@ -46,7 +46,20 @@
             {{ tab.name }}
           </li>
         </template>
-        <li class="context-menu__item context-menu__item--color" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="addSeparator"
+          @mouseenter="hoveredItem = 'separator'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">➖</span>
+          <span class="context-menu__label">{{ $t('contextMenu.addSeparator') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'separator'" class="context-menu__desc">{{ $t('contextMenu.addSeparatorDesc') }}</span>
+          </Transition>
+        </li>
+        <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item context-menu__item--color" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
           <span
             class="context-menu__swatch"
             :style="swatchStyle"
@@ -95,6 +108,18 @@ const soundTabs = computed(() => {
 
 function toggleMoveToTab() {
   moveToTabOpen.value = !moveToTabOpen.value
+}
+
+function addSeparator() {
+  const { targetIndex } = appStore.contextMenu
+  const sound = jsonStore.configFile.files[targetIndex]
+  appStore.closeContextMenu()
+  colorPickerOpen.value = false
+  moveToTabOpen.value = false
+  if (!sound) return
+  const tab = appStore.currentTab
+  const order = tab === 'All' ? (sound.index ?? 0) : (sound.tabIndexes?.[tab] ?? 0)
+  jsonStore.addSeparator(tab, order - 0.5)
 }
 
 function toggleSoundTab(tabName) {
@@ -186,6 +211,8 @@ function remove() {
     }
   } else if (type === 'sound') {
     jsonStore.removeSound(targetIndex)
+  } else if (type === 'separator') {
+    jsonStore.removeSeparator(targetName)
   }
 }
 

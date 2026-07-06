@@ -103,10 +103,6 @@ async function uploadFiles() {
   }
 }
 
-async function ResetAll() {
-  jsonStore.resetAll()
-}
-
 function OpenSearch() {
   appStore.setSearchOpen(!appStore.Searchbar.SearchbarActive)
 }
@@ -118,8 +114,6 @@ function IconClicked(icon) {
     OpenSearch()
   } else if (icon === 'folder') {
     appStore.setSelectProjectActive(true)
-  } else if (icon === 'reset') {
-    ResetAll()
   } else if (icon === 'settings') {
     appStore.setActiveOverlay(appStore.activeOverlay === 'settings' ? null : 'settings')
   } else if (icon === 'about') {

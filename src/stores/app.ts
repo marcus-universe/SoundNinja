@@ -5,14 +5,14 @@ interface ContextMenuState {
   visible: boolean
   x: number
   y: number
-  type: 'tab' | 'sound' | null
+  type: 'tab' | 'sound' | 'separator' | null
   targetName: string
   targetIndex: number
 }
 
 export const useAppStore = defineStore('app', {
   state: () => ({
-    navbar: ['upload', 'folder', 'reset', 'settings', 'about'] as string[],
+    navbar: ['upload', 'folder', 'settings', 'about'] as string[],
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
     pendingSettingsTab: null as string | null,

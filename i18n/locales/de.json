@@ -1,4 +1,11 @@
 {
+  "dialog": {
+    "unsavedTitle": "Ungespeicherte Änderungen",
+    "unsavedMessage": "Du hast ungespeicherte Änderungen. Was möchtest du tun?",
+    "save": "Speichern",
+    "discard": "Verwerfen",
+    "cancel": "Abbrechen"
+  },
   "settings": {
     "title": "Einstellungen",
     "close": "Schließen",
@@ -13,6 +20,10 @@
     "main": {
       "title": "Allgemein",
       "theme": "Theme",
+      "openThemeCreator": "Theme Creator",
+      "navbarSide": "Navbar-Seite",
+      "navbarLeft": "Links",
+      "navbarRight": "Rechts",
       "customCssOption": "Eigenes CSS…",
       "customCss": "Eigenes CSS",
       "customCssHint": "CSS-Variablen bearbeiten, um ein eigenes Theme zu erstellen. Änderungen werden live übernommen.",
@@ -58,6 +69,8 @@
       "background": "Hintergrund",
       "buttonBackground": "Schaltflächen-Hintergrund",
       "buttonTypography": "Schaltflächen-Schrift",
+      "uploadFont": "⬆ Schriftart hochladen",
+      "fontUploaded": "{count} Schriftart(en) hochgeladen.",
       "buttonFont": "Schaltflächen-Schriftart",
       "buttonFontSize": "Schaltflächen-Schriftgröße",
       "tabTypography": "Tab-Schrift",
@@ -66,12 +79,16 @@
       "layout": "Layout",
       "buttonWidth": "Schaltflächenbreite",
       "borderRadius": "Eckenradius",
+      "borderWidth": "Rahmenstärke",
+      "buttonGap": "Schaltflächen-Abstand",
       "buttonPaddingX": "Schaltflächen-Innenabstand X",
       "buttonPaddingY": "Schaltflächen-Innenabstand Y",
       "exportCss": "⬇ .css exportieren",
       "addToThemes": "＋ Zu Themes hinzufügen",
       "importCss": "⬆ .css importieren",
       "importError": "Inkompatibles Theme-CSS. Fehlende Variablen:",
+      "closeTitle": "Theme speichern?",
+      "closeMessage": "Möchtest du das aktuelle Theme speichern, bevor der Theme-Editor geschlossen wird?",
       "livePreview": "Live-Vorschau",
       "searchFont": "Schriftart suchen…",
       "previewTabs": "Tabs",
@@ -108,6 +125,8 @@
     "removeDesc": "Aus SoundNinja löschen (wird nicht vom Systemspeicher gelöscht)",
     "moveToTab": "In Tab verschieben",
     "moveToTabDesc": "Diesen Sound einem oder mehreren Tabs zuweisen",
+    "addSeparator": "Trenner hinzufügen",
+    "addSeparatorDesc": "Horizontalen Trenner vor dieser Schaltfläche einfügen",
     "color": "Farbe",
     "colorDesc": "Akzentfarbe dieses Eintrags ändern",
     "resetColor": "Auf Standard zurücksetzen"

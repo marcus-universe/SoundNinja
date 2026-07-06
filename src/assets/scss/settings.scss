@@ -8,6 +8,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(0.4rem);
+  background: rgba($color-bg, 0.5);
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
@@ -377,6 +379,28 @@
     padding: 0.72rem 1.2rem;
     font-size: 1.76rem;
   }
+
+  &--icon-only {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.56rem;
+    width: 4rem;
+    height: 4rem;
+
+    .settings-btn-icon {
+      width: 2rem;
+      height: 2rem;
+      fill: var(--primary_color);
+      transition: fill 0.15s;
+      pointer-events: none;
+    }
+
+    &:hover .settings-btn-icon {
+      fill: $color-bg;
+    }
+  }
 }
 
 // ── Color picker ──────────────────────────────────────────────────────────────
@@ -444,26 +468,13 @@
 }
 
 .theme-creator-layout {
-  display: flex;
-  gap: 3.2rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  display: block;
 }
 
 .theme-creator-controls {
-  flex: 1 1 300px;
-  min-width: 0;
-}
-
-.theme-creator-preview-col {
-  flex: 0 1 26rem;
-  width: 26rem;
-  position: sticky;
-  top: 0;
-  padding: 1.6rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 0.8rem;
-  border: 0.16rem solid rgba(255, 255, 255, 0.07);
+  width: 100%;
+  max-width: 72rem;
+  padding-bottom: 2.4rem;
 }
 
 // ── Font dropdown ─────────────────────────────────────────────────────────────
@@ -571,58 +582,6 @@
   }
 }
 
-// ── Preview column ────────────────────────────────────────────────────────────
-.tc-preview-label {
-  font-family: $fontBold;
-  font-size: 1.15rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(238, 238, 238, 0.4);
-  margin-bottom: 1.2rem;
-}
-
-.tc-preview-section {
-  font-family: $fontRegular;
-  font-size: 1.25rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(238, 238, 238, 0.4);
-  margin-bottom: 0.64rem;
-}
-
-.tc-tab-bar {
-  display: flex;
-  border-radius: 0.48rem;
-  overflow: hidden;
-  border: 0.16rem solid;
-  padding: 0.4rem 0.8rem 0;
-}
-
-.tc-tab {
-  padding: 0.64rem 1.2rem;
-  font-size: 1.44rem;
-  user-select: none;
-}
-
-.tc-btn-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
-  padding: 1.2rem;
-  border-radius: 0.48rem;
-  border: 0.16rem solid;
-}
-
-.tc-btn {
-  padding: 0.8rem 1.2rem;
-  text-align: center;
-  font-size: 1.44rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
 // ── About section ─────────────────────────────────────────────────────────────
 .about-section {
   max-width: 48rem;
@@ -718,6 +677,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(0.4rem);
+  background: rgba($color-bg, 0.5);
 }
 
 .project-dialog {

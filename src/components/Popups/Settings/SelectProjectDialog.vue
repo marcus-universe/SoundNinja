@@ -17,13 +17,13 @@
           <ul v-else class="project-list">
             <li
               v-for="proj in projectsList"
-              :key="proj"
+              :key="proj.dbPath"
               class="project-list__item"
-              :class="{ active: jsonStore.currentProjectPath === proj }"
+              :class="{ active: jsonStore.currentProjectPath === proj.dbPath }"
               @click="selectProject(proj)"
             >
-              <span class="project-list__name">{{ proj.replace('.json', '') }}</span>
-              <span v-if="jsonStore.currentProjectPath === proj" class="project-list__check">✓</span>
+              <span class="project-list__name">{{ proj.name }}</span>
+              <span v-if="jsonStore.currentProjectPath === proj.dbPath" class="project-list__check">✓</span>
             </li>
           </ul>
         </div>
@@ -47,30 +47,25 @@
           </div>
         </div>
       </div>
-      <BlurBG />
     </div>
   </Transition>
 </template>
 
 <script setup lang="ts">
-import { readTextFile, writeTextFile, mkdir, readDir, BaseDirectory } from '@tauri-apps/plugin-fs'
+import type { ProjectInfo } from '~/utils/projects'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
 
-const projectsList = ref<string[]>([])
+const projectsList = ref<ProjectInfo[]>([])
 const projectsLoading = ref(false)
 const newProjectName = ref('')
 
 async function refreshProjects() {
   projectsLoading.value = true
   try {
-    await mkdir('projects', { baseDir: BaseDirectory.AppData, recursive: true })
-    const entries = await readDir('projects', { baseDir: BaseDirectory.AppData })
-    projectsList.value = entries
-      .filter((e) => e.name?.endsWith('.json'))
-      .map((e) => e.name as string)
-      .sort()
+    projectsList.value = await listProjects(appSettings.projectsPath)
   } catch {
     projectsList.value = []
   } finally {
@@ -78,12 +73,10 @@ async function refreshProjects() {
   }
 }
 
-async function selectProject(filename: string) {
+async function selectProject(proj: ProjectInfo) {
   try {
-    const content = await readTextFile(`projects/${filename}`, { baseDir: BaseDirectory.AppData })
-    const config = JSON.parse(content)
-    jsonStore.updateConfigFile(config)
-    jsonStore.setCurrentProjectPath(filename)
+    await jsonStore.openProject(proj.dbPath)
+    await appSettings.setLastProject(proj.dbPath)
     appStore.setSelectProjectActive(false)
   } catch (e) {
     console.error('Failed to load project', e)
@@ -93,20 +86,10 @@ async function selectProject(filename: string) {
 async function createProject() {
   const name = newProjectName.value.trim()
   if (!name) return
-  const safeName = name.replace(/[^a-z0-9_\- ]/gi, '_').replace(/\s+/g, '_')
-  const filename = `${safeName}.json`
-  const emptyConfig = {
-    settings: { theme: 'dark-cyan', customCss: '', outputSource: 'default' },
-    tabList: [],
-    files: [],
-  }
   try {
-    await mkdir('projects', { baseDir: BaseDirectory.AppData, recursive: true })
-    await writeTextFile(`projects/${filename}`, JSON.stringify(emptyConfig, null, 2), {
-      baseDir: BaseDirectory.AppData,
-    })
-    jsonStore.updateConfigFile(emptyConfig)
-    jsonStore.setCurrentProjectPath(filename)
+    const dbPath = await createProjectFolder(appSettings.projectsPath, name)
+    await jsonStore.openProject(dbPath)
+    await appSettings.setLastProject(dbPath)
     newProjectName.value = ''
     await refreshProjects()
     appStore.setSelectProjectActive(false)

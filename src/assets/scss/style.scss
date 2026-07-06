@@ -3,17 +3,13 @@
 .main {
   width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
   height: calc(100dvh - var(--topbar_height));
-  background-color: $color-bg;
+  background-color: var(--color-bg, #{$color-bg});
   margin-top: var(--topbar_height);
 
-  // Shift the main content away from whichever side the navbar sits on
-  @if $navbar-position == right {
-    margin-right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
-    margin-left: 0;
-  } @else {
-    margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
-    margin-right: 0;
-  }
+  // Shift the main content away from whichever side the navbar sits on.
+  // Default is left; .navbar-right on <html> flips it (see rule below).
+  margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+  margin-right: 0;
 
   // Only animate the navbar-side margin shift — height/width changes from window
   // resizing must be snappy (no transition), otherwise the bottom edge animates in.
@@ -98,13 +94,35 @@
     .SoundTab {
       min-height: 10rem;
 
+      // Full-width horizontal separator between sound buttons. Forces a line
+      // break in the flex-wrap row so following buttons start on a new line.
+      .tab-separator {
+        flex: 0 0 100%;
+        width: 100%;
+        height: 0;
+        margin: 0.4rem 0;
+        border-top: 0.24rem solid var(--btn-accent, var(--primary_color));
+        border-radius: 0.2rem;
+        opacity: 0.6;
+        cursor: grab;
+
+        &:hover {
+          opacity: 1;
+        }
+
+        &.drag-over {
+          opacity: 1;
+          border-top-style: dashed;
+        }
+      }
+
       .Soundbtn {
         font-family: var(--font-btn, #{$fontBold});
         font-size: var(--font-size-btn, var(--font-size-md));
         color: $white;
         background-color: var(--color-btn, #{$color-btn});
         // Accent color (set by the color picker) drives the border
-        border: 0.32rem solid var(--btn-accent, var(--primary_color));
+        border: var(--btn-border-width, 0.32rem) solid var(--btn-accent, var(--primary_color));
         padding: var(--btn_padding, #{$padding_1});
         border-radius: var(--border-radius, 0.8rem);
         max-width: var(--btn_width);
@@ -153,7 +171,7 @@
           font-family: var(--font-btn, #{$fontBold});
           // Slightly bolder border + soft glow make the active state clearly visible
           // even before the progress bar starts filling.
-          border-width: 0.32rem;
+          border-width: var(--btn-border-width, 0.32rem);
           box-shadow: 0 0 0.8rem var(--btn-accent, var(--primary_color));
           // Suppress background transition so rAF progress updates are instant.
           transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -167,6 +185,12 @@
       }
     }
   }
+}
+
+// Right-side navbar: content shifts to the left instead.
+.navbar-right .main {
+  margin-left: 0;
+  margin-right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
 }
 
 .searchMove {
@@ -185,6 +209,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(0.4rem);
+  background: rgba($color-bg, 0.5);
 }
 
 .dialog-panel {
@@ -216,6 +242,18 @@
   font-family: $fontRegular;
   font-size: var(--font-size-sm);
   margin: 0;
+}
+
+.dialog-text {
+  color: $white;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  margin: 0;
+  text-align: center;
+}
+
+.dialog-actions {
+  margin-top: $padding_1;
 }
 
 // ---- Reusable UI components ----
