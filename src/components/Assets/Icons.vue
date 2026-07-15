@@ -64,22 +64,9 @@
     </g>
 </svg>
 
-<!-- About Page -->
-<svg v-if="icon === 'about'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" :class="[customClass]" @click="$emit('triggered', icon)">
-    <g id="About">
-        <rect
-            class="cls-1"
-            x="84.9"
-            y="65.18"
-            width="30.2"
-            height="115.96"
-            rx="5.33" />
-        <circle
-            class="cls-1"
-            cx="100"
-            cy="34.04"
-            r="15.1" />
-    </g>
+<!-- About Page (mdi:about) -->
+<svg v-if="icon === 'about'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M13 9h-2V7h2m0 10h-2v-6h2m-1-9A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2"/>
 </svg>
 
 <!-- Plus Icon -->
@@ -87,6 +74,11 @@
   <g id="Plus">
     <path class="cls-1" d="M112.86,87.19V25.94a5.68,5.68,0,0,0-5.66-5.67H92.8a5.68,5.68,0,0,0-5.66,5.67V87.19H25.88a5.68,5.68,0,0,0-5.67,5.67v14.4a5.68,5.68,0,0,0,5.67,5.66H87.14v61.26a5.67,5.67,0,0,0,5.66,5.66h14.4a5.67,5.67,0,0,0,5.66-5.66V112.92h61.26a5.68,5.68,0,0,0,5.67-5.66V92.86a5.68,5.68,0,0,0-5.67-5.67Z"/>
   </g>
+</svg>
+
+<!-- Drag Icon (mdi:drag) -->
+<svg v-if="icon === 'drag'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M7 19v-2h2v2zm4 0v-2h2v2zm4 0v-2h2v2zm-8-4v-2h2v2zm4 0v-2h2v2zm4 0v-2h2v2zm-8-4V9h2v2zm4 0V9h2v2zm4 0V9h2v2zM7 7V5h2v2zm4 0V5h2v2zm4 0V5h2v2z"/>
 </svg>
 
 <!-- Exit -->
@@ -112,6 +104,21 @@
   <g id="Palette">
     <path class="cls-1" d="M100,20A80,80,0,0,0,20,100c0,44.18,35.82,76,80,76a20,20,0,0,0,20-20,19.7,19.7,0,0,0-4.6-12.72,4,4,0,0,1-.9-2.48,4,4,0,0,1,4-4H136a44,44,0,0,0,44-44C180,50.14,144.18,20,100,20ZM54,116a14,14,0,1,1,14-14A14,14,0,0,1,54,116ZM74,68A14,14,0,1,1,88,54,14,14,0,0,1,74,68Zm52,0a14,14,0,1,1,14-14A14,14,0,0,1,126,68Zm32,48a14,14,0,1,1,14-14A14,14,0,0,1,158,116Z"/>
   </g>
+</svg>
+
+<!-- Multi-select active (mingcute:multiselect-fill) -->
+<svg v-if="icon === 'multiselect-active'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M20 2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2V4a2 2 0 0 1 2-2zM6 9H4v11h11v-2H8a2 2 0 0 1-2-2zm11.89-1.768a1 1 0 0 0-1.32-.083l-.095.083l-3.536 3.536l-1.414-1.414a1 1 0 0 0-1.497 1.32l.083.094l2.05 2.05a1.1 1.1 0 0 0 1.46.086l.096-.085l4.172-4.172a1 1 0 0 0 0-1.415Z"/>
+</svg>
+
+<!-- Multi-select inactive (mingcute:multiselect-line) -->
+<svg v-if="icon === 'multiselect-inactive'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M20 2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2V4a2 2 0 0 1 2-2zM6 9H4v11h11v-2H8a2 2 0 0 1-2-2zm14-5H8v12h12zm-2.11 3.233a1 1 0 0 1 0 1.414l-4.173 4.172a1.1 1.1 0 0 1-1.556 0l-2.05-2.05a1 1 0 0 1 1.414-1.415l1.414 1.414l3.536-3.535a1 1 0 0 1 1.414 0Z"/>
+</svg>
+
+<!-- Question / Info (pajamas:question) -->
+<svg v-if="icon === 'question'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" fill-rule="evenodd" d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16M4.927 4.99Q4.5 5.634 4.5 6.26q0 .305.27.566t.661.26q.665 0 .903-.746q.252-.713.616-1.08q.364-.366 1.134-.366q.658 0 1.075.363q.416.364.416.892a.97.97 0 0 1-.136.502a2 2 0 0 1-.336.419a14 14 0 0 1-.648.558q-.51.423-.812.73q-.3.308-.483.713c-.322 1.245 1.35 1.345 1.736.456q.07-.128.213-.284q.144-.155.382-.36a41 41 0 0 0 1.194-1.034q.332-.306.573-.73a1.95 1.95 0 0 0 .242-.984q0-.712-.424-1.32q-.423-.609-1.2-.962T8.084 3.5q-1.092 0-1.911.423T4.927 4.989Zm2.14 7.08a1 1 0 1 0 2 0a1 1 0 0 0-2 0" clip-rule="evenodd"/>
 </svg>
 
 </template>

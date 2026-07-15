@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
 
-use super::devices::get_output_devices;
+use super::devices::get_output_devices_for_host_name;
 
 // --- Global output volume (stored as f32 bits in an atomic) ---
 
@@ -77,6 +77,8 @@ pub enum AudioMsg {
     Play {
         path: String,
         device_name: String,
+        /// Optional audio host name (e.g. "WASAPI", "ASIO"). None = search all hosts.
+        host_name: Option<String>,
         overlap: bool,
     },
     /// Stop a single playing sound matched by its file path.
@@ -102,11 +104,12 @@ fn audio_sender() -> &'static Mutex<Option<Sender<AudioMsg>>> {
 struct AudioStream {
     device_sink: MixerDeviceSink,
     device_name: String,
+    host_name: Option<String>,
 }
 
 impl AudioStream {
-    fn open(device_name: &str) -> Result<Self, String> {
-        let device = get_output_devices()
+    fn open(device_name: &str, host_name: Option<&str>) -> Result<Self, String> {
+        let device = get_output_devices_for_host_name(host_name)
             .map_err(|e| e.to_string())?
             .into_iter()
             .find(|d| {
@@ -126,7 +129,11 @@ impl AudioStream {
             .map_err(|e| e.to_string())?
             .open_stream()
             .map_err(|e| e.to_string())?;
-        Ok(Self { device_sink, device_name: device_name.to_owned() })
+        Ok(Self {
+            device_sink,
+            device_name: device_name.to_owned(),
+            host_name: host_name.map(str::to_owned),
+        })
     }
 }
 
@@ -146,11 +153,15 @@ fn load_source(path: &str) -> Result<rodio::Decoder<Cursor<Arc<[u8]>>>, String> 
     rodio::Decoder::new(Cursor::new(bytes)).map_err(|e| e.to_string())
 }
 
-/// Ensures the stream targets `device_name`, reopening only when the device changed.
-fn ensure_stream(stream: &mut Option<AudioStream>, device_name: &str) -> Result<(), String> {
+/// Ensures the stream targets `device_name`/`host_name`, reopening only when they changed.
+fn ensure_stream(
+    stream: &mut Option<AudioStream>,
+    device_name: &str,
+    host_name: Option<&str>,
+) -> Result<(), String> {
     let needs_new = stream
         .as_ref()
-        .map(|s| s.device_name != device_name)
+        .map(|s| s.device_name != device_name || s.host_name.as_deref() != host_name)
         .unwrap_or(true);
 
     if !needs_new {
@@ -161,7 +172,7 @@ fn ensure_stream(stream: &mut Option<AudioStream>, device_name: &str) -> Result<
         // Allow WASAPI callbacks to drain before opening a new stream.
         thread::sleep(Duration::from_millis(100));
     }
-    *stream = Some(AudioStream::open(device_name)?);
+    *stream = Some(AudioStream::open(device_name, host_name)?);
     Ok(())
 }
 
@@ -225,7 +236,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     }
                 }
 
-                AudioMsg::Play { path, device_name, overlap } => {
+                AudioMsg::Play { path, device_name, host_name, overlap } => {
                     if !overlap {
                         // Stop all currently playing sounds before starting the new one.
                         for s in playing.drain(..) {
@@ -236,7 +247,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         thread::sleep(Duration::from_millis(50));
                     }
 
-                    if let Err(e) = ensure_stream(&mut stream, &device_name) {
+                    if let Err(e) = ensure_stream(&mut stream, &device_name, host_name.as_deref()) {
                         eprintln!("Failed to open audio device: {}", e);
                         let _ = app_handle.emit("sound_error", e);
                         continue;
@@ -268,6 +279,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 pub fn play_sound(
     sound_path: String,
     device_name: String,
+    host_name: Option<String>,
     active: bool,
     overlap: bool,
 ) -> Result<String, String> {
@@ -278,7 +290,7 @@ pub fn play_sound(
         tx.send(AudioMsg::StopOne { path: sound_path }).map_err(|e| e.to_string())?;
         Ok("stopped".to_string())
     } else {
-        tx.send(AudioMsg::Play { path: sound_path, device_name, overlap })
+        tx.send(AudioMsg::Play { path: sound_path, device_name, host_name, overlap })
             .map_err(|e| e.to_string())?;
         Ok("playing".to_string())
     }

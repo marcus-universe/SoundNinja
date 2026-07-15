@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.3.0"
+version = "0.4.0"
 description = "Your best Soundboard App"
 authors = ["you"]
 license = ""
@@ -10,6 +10,13 @@ edition = "2021"
 rust-version = "1.70"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+# Enables ASIO audio output support (Windows only).
+# Requires the Steinberg ASIO SDK: set CPAL_ASIO_DIR before building.
+# Official builds are WASAPI-only (MIT-clean); ASIO is opt-in:
+#   cargo tauri build --features asio
+asio = ["cpal/asio"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
@@ -23,10 +30,14 @@ tauri-plugin-fs = "2.5.1"
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-shell = "2.3.5"
 tauri-plugin-opener = "2.5.4"
+tauri-plugin-os = "2.3.2"
 tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 rodio = "0.22.2"
 anyhow = "1.0.102"
+cpal = "0.17"   # same version rodio uses; direct dep enables [features] asio = ["cpal/asio"]
 symphonia = { version = "0.6.0", features = ["mp3", "wav", "ogg", "flac"] }
+# GPU detection — only adapter enumeration, no compute usage yet.
+wgpu = { version = "22", default-features = false, features = ["wgsl"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.56"

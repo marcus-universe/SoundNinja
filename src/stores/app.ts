@@ -26,6 +26,8 @@ export const useAppStore = defineStore('app', {
     },
     importFoldersActive: false,
     selectProjectActive: false,
+    multiSelectActive: false,
+    selectedSoundPaths: [] as string[],
     draggingSoundIndex: null as number | null,
     draggingTabName: null as string | null,
     contextMenu: {
@@ -108,6 +110,25 @@ export const useAppStore = defineStore('app', {
 
     setImportFoldersActive(val: boolean) {
       this.importFoldersActive = val
+    },
+
+    setMultiSelectActive(val: boolean) {
+      this.multiSelectActive = val
+      if (!val) this.selectedSoundPaths = []
+    },
+
+    toggleMultiSelectActive() {
+      this.setMultiSelectActive(!this.multiSelectActive)
+    },
+
+    toggleSoundSelection(path: string) {
+      const i = this.selectedSoundPaths.indexOf(path)
+      if (i === -1) this.selectedSoundPaths.push(path)
+      else this.selectedSoundPaths.splice(i, 1)
+    },
+
+    clearSoundSelection() {
+      this.selectedSoundPaths = []
     },
 
     setDraggingSoundIndex(idx: number | null) {

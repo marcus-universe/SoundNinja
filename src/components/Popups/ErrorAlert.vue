@@ -17,4 +17,3 @@ function Exit() {
   appStore.setErrorActive(false)
 }
 </script>
-<style lang=""></style>

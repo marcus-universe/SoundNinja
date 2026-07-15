@@ -29,6 +29,12 @@
         :icon="appStore.navbar[index]"
         @triggered="IconClicked"
       />
+
+      <Icons
+        :icon="appStore.multiSelectActive ? 'multiselect-active' : 'multiselect-inactive'"
+        :customClass="['icon', { active: appStore.multiSelectActive }]"
+        @triggered="IconClicked"
+      />
     </div>
   </div>
 </template>
@@ -118,6 +124,8 @@ function IconClicked(icon) {
     appStore.setActiveOverlay(appStore.activeOverlay === 'settings' ? null : 'settings')
   } else if (icon === 'about') {
     appStore.openSettingsTab('about')
+  } else if (icon === 'check' || icon === 'multiselect-active' || icon === 'multiselect-inactive') {
+    appStore.toggleMultiSelectActive()
   }
 }
 </script>

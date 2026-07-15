@@ -1,6 +1,6 @@
 {
   "name": "soundninja",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "nuxt dev --port 3000",
@@ -25,6 +25,8 @@
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-os": "^2.3.2",
     "@tauri-apps/plugin-sql": "^2.4.0",
     "@vueuse/nuxt": "^14.3.0",
     "nuxt": "4.4.8",

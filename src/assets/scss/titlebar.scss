@@ -1,0 +1,159 @@
+@use 'variables' as *;
+
+.titlebar-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: var(--color-bg, #{$color-bg});
+  border-bottom: 0.12rem solid var(--primary_color);
+  user-select: none;
+}
+
+.titlebar {
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.8rem 0 1.6rem;
+
+  &__title {
+    font-family: $fontBold;
+    font-size: 1.36rem;
+    color: var(--primary_color);
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.24rem;
+  }
+
+  &__btn {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.8rem;
+    height: 2.4rem;
+    border-radius: 0.4rem;
+    color: rgba(238, 238, 238, 0.55);
+    transition: background 0.12s, color 0.12s;
+
+    svg {
+      width: 1.2rem;
+      height: 1.2rem;
+    }
+
+    &:hover {
+      color: $white;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    &--close:hover {
+      background: #c0392b;
+      color: $white;
+    }
+  }
+}
+
+.menubar {
+  height: 2.6rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  border-top: 0.08rem solid rgba(255, 255, 255, 0.06);
+
+  &__item {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 1.2rem;
+    font-family: $fontRegular;
+    font-size: 1.28rem;
+    color: rgba(238, 238, 238, 0.7);
+    cursor: pointer;
+    border-radius: 0.32rem;
+    transition: background 0.1s, color 0.1s;
+
+    &:hover,
+    &.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: $white;
+    }
+  }
+
+  &__dropdown,
+  &__subdropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 22rem;
+    background: var(--color-bg, #{$color-bg});
+    border: 0.12rem solid var(--primary_color);
+    border-radius: 0.48rem;
+    box-shadow: 0 0.8rem 2.4rem rgba(0, 0, 0, 0.5);
+    padding: 0.4rem 0;
+    z-index: 10000;
+  }
+
+  &__subdropdown {
+    top: 0;
+    left: 100%;
+    margin-left: 0.24rem;
+  }
+
+  &__entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.72rem 1.6rem;
+    font-family: $fontRegular;
+    font-size: 1.36rem;
+    color: rgba(238, 238, 238, 0.8);
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
+
+    &:hover {
+      background: var(--primary_color);
+      color: var(--color-bg, #{$color-bg});
+
+      .menubar__subdropdown {
+        display: block;
+      }
+    }
+
+    &--disabled {
+      opacity: 0.35;
+      cursor: default;
+
+      &:hover {
+        background: transparent;
+        color: rgba(238, 238, 238, 0.35);
+      }
+    }
+
+    &--sub .menubar__subdropdown {
+      display: none;
+    }
+  }
+
+  &__arrow {
+    font-size: 0.96rem;
+    opacity: 0.5;
+    margin-left: 1.2rem;
+  }
+
+  &__sep {
+    height: 0.08rem;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0.32rem 0.8rem;
+  }
+}

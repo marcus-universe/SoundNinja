@@ -1,6 +1,7 @@
 <template>
   <div class="soundninja flex_c_h flex_space_between">
     <template v-if="isMain">
+      <TitleBar />
       <NavBar />
       <ErrorAlert />
       <SettingsOverlay />
@@ -18,6 +19,12 @@
           <UIButton @click="resolveUnsaved('cancel')">{{ $t('dialog.cancel') }}</UIButton>
         </div>
       </DialogField>
+      <Transition name="fade">
+        <div v-if="jsonStore.saving" class="saving-indicator flex_c_h align_c gap1">
+          <span class="saving-indicator__spinner" aria-hidden="true" />
+          <span>{{ $t('common.saving') }}</span>
+        </div>
+      </Transition>
     </template>
     <NuxtPage v-slot="{ Component }">
       <transition name="fade" mode="out-in">
@@ -31,8 +38,10 @@
 import { readTextFile, rename, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { listen } from '@tauri-apps/api/event'
+import { emit } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { openPath } from '@tauri-apps/plugin-opener'
 import { defaultSettings } from '~/utils/db'
 
 const jsonStore = useJsonHandelingStore()
@@ -79,12 +88,23 @@ function isValidConfig(obj) {
 }
 
 // ── Project bootstrap ─────────────────────────────────────────────────────────
+// Opens a project DB and records it in the recent-projects list.
+async function openProjectPath(dbPath) {
+  await jsonStore.openProject(dbPath)
+  try {
+    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
+  } catch (e) {
+    // Project open is primary action; recents update failure should not abort flow.
+    console.error('Failed to update recent projects', e)
+  }
+}
+
 async function bootstrapProject() {
   // 1. Re-open the last project when it still exists.
   if (appSettings.lastProjectPath) {
     const exists = await invoke('path_exists_abs', { path: appSettings.lastProjectPath })
     if (exists) {
-      await jsonStore.openProject(appSettings.lastProjectPath)
+      await openProjectPath(appSettings.lastProjectPath)
       return
     }
   }
@@ -92,8 +112,7 @@ async function bootstrapProject() {
   if (await tryMigrateOldConfig()) return
   // 3. Otherwise open/create the Default project.
   const dbPath = await createProjectFolder(appSettings.projectsPath, 'Default')
-  await jsonStore.openProject(dbPath)
-  await appSettings.setLastProject(dbPath)
+  await openProjectPath(dbPath)
 }
 
 async function tryMigrateOldConfig() {
@@ -102,7 +121,7 @@ async function tryMigrateOldConfig() {
     const old = migrateConfig(JSON.parse(txt))
     const dbPath = await createProjectFolder(appSettings.projectsPath, 'Default')
     await jsonStore.importConfig(toProjectConfig(old), dbPath)
-    await appSettings.setLastProject(dbPath)
+    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
     // Prevent re-migration on future launches.
     try {
       await rename('config.json', 'config.migrated.json', {
@@ -143,14 +162,14 @@ async function handleMenuNewProject() {
   if (choice === 'save') await jsonStore.persistNow()
   try {
     const existing = await listProjects(appSettings.projectsPath)
-    const names = new Set(existing.map((p) => p.name))
+    const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
     let name = 'New Project'
     let n = 2
-    while (names.has(name)) name = `New Project ${n++}`
+    while (names.has(safeProjectName(name).toLowerCase())) name = `New Project ${n++}`
     const dbPath = await createProjectFolder(appSettings.projectsPath, name)
-    await jsonStore.openProject(dbPath)
-    await appSettings.setLastProject(dbPath)
-  } catch {
+    await openProjectPath(dbPath)
+  } catch (e) {
+    console.error('Failed to create project', e)
     appStore.setErrorActive('Failed to create project.')
   }
 }
@@ -163,8 +182,7 @@ async function handleMenuOpenProject() {
   })
   if (!selected || Array.isArray(selected)) return
   try {
-    await jsonStore.openProject(selected)
-    await appSettings.setLastProject(selected)
+    await openProjectPath(selected)
   } catch {
     appStore.setErrorActive('Failed to open project database.')
   }
@@ -188,7 +206,7 @@ async function handleMenuSaveAs() {
   try {
     const dbPath = path.endsWith('.db') ? path : path + '.db'
     await jsonStore.importConfig(jsonStore.configFile, dbPath)
-    await appSettings.setLastProject(dbPath)
+    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
   } catch {
     appStore.setErrorActive('Failed to save project.')
   }
@@ -238,25 +256,43 @@ function injectThemeCss(css) {
   tag.textContent = css
 }
 
+// Removes any inline theme CSS variables so an injected <style> theme (custom /
+// file) can take effect (inline styles otherwise outrank :root rules).
+function clearInlineThemeVars() {
+  const root = document.documentElement
+  ;[
+    '--primary_color', '--color-bg', '--color-btn', '--sound-text',
+    '--color-bg-light', '--color-bg-dark', '--color-btn-light', '--color-btn-dark',
+    '--text-light', '--text-dark',
+  ].forEach((v) => root.style.removeProperty(v))
+}
+
 async function applyPersistedTheme(config) {
-  const theme = config?.settings?.theme ?? 'dark-cyan'
-  if (theme === 'custom') {
-    if (config?.settings?.customCss) injectThemeCss(config.settings.customCss)
-    return
-  }
-  if (theme.startsWith('file:')) {
-    const filename = theme.slice(5)
-    try {
-      const css = await invoke('read_text_file_abs', { path: joinPath(appSettings.themesPath, filename) })
-      injectThemeCss(css)
-    } catch (e) {
-      console.error('Failed to load persisted theme file', e)
+  const s = config?.settings
+  const theme = s?.theme ?? 'dark-cyan'
+  if (theme === 'custom' || theme.startsWith('file:')) {
+    // Injected-CSS themes define their own vars; clear inline overrides + just
+    // toggle the light/dark root class.
+    clearInlineThemeVars()
+    const root = document.documentElement
+    root.classList.toggle('theme-light', s?.themeMode === 'light')
+    root.classList.toggle('theme-dark', s?.themeMode !== 'light')
+    if (theme === 'custom') {
+      if (s?.customCss) injectThemeCss(s.customCss)
+    } else {
+      const filename = theme.slice(5)
+      try {
+        const css = await invoke('read_text_file_abs', { path: joinPath(appSettings.themesPath, filename) })
+        injectThemeCss(css)
+      } catch (e) {
+        console.error('Failed to load persisted theme file', e)
+      }
     }
     return
   }
-  const vars = builtinThemes[theme] ?? builtinThemes['dark-cyan']
-  const root = document.documentElement
-  Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v))
+  // Builtin / default: the per-project color model is authoritative.
+  document.getElementById('sn-custom-theme')?.remove()
+  applyThemeColors(s)
 }
 
 onMounted(async () => {
@@ -281,11 +317,32 @@ onMounted(async () => {
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
   listen('menu_new_project', handleMenuNewProject)
   listen('menu_open_project', handleMenuOpenProject)
+  listen('menu_open_recent', async (e) => {
+    const path = e?.payload
+    if (!path || typeof path !== 'string') return
+    const choice = await confirmUnsaved()
+    if (choice === 'cancel') return
+    if (choice === 'save') await jsonStore.persistNow()
+    const stillExists = await invoke('path_exists_abs', { path })
+    if (!stillExists) {
+      await appSettings.removeRecentProject(path)
+      appStore.setErrorActive('Project no longer exists.')
+      return
+    }
+    try {
+      await openProjectPath(path)
+      await applyPersistedTheme(jsonStore.configFile)
+    } catch {
+      appStore.setErrorActive('Failed to open project database.')
+    }
+  })
   listen('menu_save', handleMenuSave)
   listen('menu_save_as', handleMenuSaveAs)
   listen('menu_import_audio', handleMenuImportAudio)
   listen('menu_import_folders', () => appStore.setImportFoldersActive(true))
   listen('menu_select_project', () => appStore.setSelectProjectActive(true))
+  listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
+  listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
 
   // Prompt to save unsaved changes before the window closes.
   const mainWindow = getCurrentWindow()
@@ -303,14 +360,47 @@ onMounted(async () => {
   // Live theme preview coming from the Theme Creator window.
   listen('theme_preview', (e) => {
     if (!e?.payload) return
-    // Inline vars set by a builtin theme outrank the injected :root rule, so
-    // clear them first, then inject the preview CSS.
-    const root = document.documentElement
-    root.style.removeProperty('--primary_color')
-    root.style.removeProperty('--color-bg')
+    // Inline vars outrank the injected :root rule, so clear them all first, then
+    // inject the preview CSS.
+    clearInlineThemeVars()
     injectThemeCss(e.payload)
   })
+  // Preview-only mode switch from the Theme Creator (does not persist themeMode).
+  listen('theme_preview_mode', (e) => {
+    const mode = e?.payload === 'light' ? 'light' : 'dark'
+    document.documentElement.classList.toggle('theme-light', mode === 'light')
+    document.documentElement.classList.toggle('theme-dark', mode === 'dark')
+  })
   listen('theme_saved', () => applyPersistedTheme(jsonStore.configFile))
+  // Theme Creator asks for the currently applied theme so it can open showing
+  // exactly what is on screen. Reply with the computed CSS variables.
+  listen('theme_request_current', () => {
+    const cs = getComputedStyle(document.documentElement)
+    const get = (n) => cs.getPropertyValue(n).trim()
+    const mode = document.documentElement.classList.contains('theme-light') ? 'light' : 'dark'
+    emit('theme_current', {
+      '--primary_color': get('--primary_color'),
+      '--color-bg': get('--color-bg'),
+      '--color-btn': get('--color-btn'),
+      '--color-bg-light': get('--color-bg-light'),
+      '--color-bg-dark': get('--color-bg-dark'),
+      '--color-btn-light': get('--color-btn-light'),
+      '--color-btn-dark': get('--color-btn-dark'),
+      '--text-light': get('--text-light'),
+      '--text-dark': get('--text-dark'),
+      '--font-btn': get('--font-btn'),
+      '--font-tab': get('--font-tab'),
+      '--font-size-btn': get('--font-size-btn'),
+      '--font-size-tab': get('--font-size-tab'),
+      '--font-size-md': get('--font-size-md'),
+      '--btn_width': get('--btn_width'),
+      '--border-radius': get('--border-radius'),
+      '--btn-border-width': get('--btn-border-width'),
+      '--button-gap': get('--button-gap'),
+      '--btn_padding': get('--btn_padding'),
+      __mode: mode,
+    }).catch(() => {})
+  })
   // Theme Creator "Save & Apply": persist the selected theme, then apply it.
   listen('theme_apply', async (e) => {
     const theme = e?.payload?.theme

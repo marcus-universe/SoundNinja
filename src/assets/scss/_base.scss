@@ -19,6 +19,14 @@ body {
   --color-bg: #{$color-bg};
   --color-btn: #{$color-btn};
 
+  /* ── Light/dark color pairs (P9, set at runtime) ── */
+  --color-bg-light: #eeeeee;
+  --color-bg-dark: #{$color-bg};
+  --color-btn-light: #7184a2;
+  --color-btn-dark: #{$color-btn};
+  --text-light: #eeeeee;
+  --text-dark: #222831;
+
   /* ── Font families ───────────────────────────── */
   --font-regular: #{$fontRegular};
   --font-bold: #{$fontBold};
@@ -46,6 +54,9 @@ body {
   --btn_padding: #{$padding_1};
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
+
+  /* ── Theme mode text color (P9) ──────────────── */
+  --sound-text: #{$white};
 }
 
 ::-webkit-scrollbar {

@@ -36,6 +36,14 @@
     </Transition>
 
     <div class="settings-group">
+      <label class="settings-label">{{ $t('settings.main.themeMode') }}</label>
+      <select v-model="themeMode" @change="onThemeMode" class="settings-select">
+        <option value="dark">{{ $t('settings.main.themeModeDark') }}</option>
+        <option value="light">{{ $t('settings.main.themeModeLight') }}</option>
+      </select>
+    </div>
+
+    <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.navbarSide') }}</label>
       <select v-model="navbarSide" @change="onNavbarSide" class="settings-select">
         <option value="left">{{ $t('settings.main.navbarLeft') }}</option>
@@ -80,6 +88,32 @@
       <UICheckbox :modelValue="overlapSounds" @update:modelValue="onOverlapSounds" />
     </div>
 
+    <div class="settings-section-divider">{{ $t('settings.main.behavior') }}</div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.uniformButtonHeight') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.uniformButtonHeightHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="uniformButtonHeight" @update:modelValue="onUniformButtonHeight" />
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.allowReorder') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.allowReorderHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="allowReorder" @update:modelValue="onAllowReorder" />
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.recentLimit') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.recentLimitHint') }}</span>
+      </div>
+      <input type="number" class="settings-input" v-model.number="recentLimit" min="1" max="100" @change="onRecentLimit" />
+    </div>
+
     <div class="settings-section-divider">{{ $t('settings.main.performanceCache') }}</div>
 
     <div class="settings-group">
@@ -116,6 +150,14 @@
         <span class="settings-hint">{{ cacheStatsText }}</span>
       </div>
       <button class="settings-btn" style="flex: 0; white-space: nowrap" @click="onClearCache">{{ $t('settings.main.clearCache') }}</button>
+    </div>
+
+    <div v-if="hasDedicatedGpu" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.gpuAudio') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.gpuAudioHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="gpuAudioEnabled" @update:modelValue="onGpuAudio" />
     </div>
 
    
@@ -164,11 +206,11 @@ async function openThemeCreator() {
 
 
 const builtinThemes = [
-  { id: 'dark-cyan',   label: 'Dark Cyan',   vars: { '--primary_color': 'hsl(189, 100%, 58%)', '--color-bg': '#222831' } },
-  { id: 'dark-purple', label: 'Dark Purple',  vars: { '--primary_color': 'hsl(270, 80%, 65%)',  '--color-bg': '#1e1b2e' } },
-  { id: 'dark-orange', label: 'Dark Orange',  vars: { '--primary_color': 'hsl(28, 100%, 58%)',  '--color-bg': '#231c15' } },
-  { id: 'dark-green',  label: 'Dark Green',   vars: { '--primary_color': 'hsl(145, 80%, 50%)',  '--color-bg': '#162218' } },
-  { id: 'dark-pink',   label: 'Dark Pink',    vars: { '--primary_color': 'hsl(330, 80%, 65%)',  '--color-bg': '#231520' } },
+  { id: 'dark-cyan',   label: 'Dark Cyan',   colors: { primaryColor: '#00d4ff', bgDark: '#222831' } },
+  { id: 'dark-purple', label: 'Dark Purple', colors: { primaryColor: '#a855f7', bgDark: '#1e1b2e' } },
+  { id: 'dark-orange', label: 'Dark Orange', colors: { primaryColor: '#ff8a29', bgDark: '#231c15' } },
+  { id: 'dark-green',  label: 'Dark Green',  colors: { primaryColor: '#22e06a', bgDark: '#162218' } },
+  { id: 'dark-pink',   label: 'Dark Pink',   colors: { primaryColor: '#f062a6', bgDark: '#231520' } },
 ]
 
 const selectedTheme = ref('dark-cyan')
@@ -177,11 +219,17 @@ const importError = ref('')
 const importSuccess = ref('')
 const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
+const uniformButtonHeight = ref(false)
+const allowReorder = ref(true)
+const themeMode = ref<'dark' | 'light'>('dark')
+const recentLimit = ref(30)
 const currentLanguage = ref(locale.value)
 const navbarSide = ref<'left' | 'right'>('left')
 const cacheMaxSizeMib = ref(256)
 const cacheMaxEntryMib = ref(50)
 const cacheStatsText = ref('')
+const hasDedicatedGpu = ref(false)
+const gpuAudioEnabled = ref(false)
 
 // ── Navbar side ───────────────────────────────────────────────────────────────
 async function onNavbarSide() {
@@ -197,6 +245,7 @@ const pendingCss = ref('')
 // ── Language ──────────────────────────────────────────────────────────────────
 async function changeLanguage() {
   await setLocale(currentLanguage.value as 'en' | 'de')
+  await appSettings.setLocale(currentLanguage.value)
   if (typeof window !== 'undefined') {
     localStorage.setItem('sn-locale', currentLanguage.value)
   }
@@ -226,18 +275,21 @@ function applyTheme() {
   removeCustomCssTag()
   const theme = builtinThemes.find((t) => t.id === id)
   if (!theme) return
-  const root = document.documentElement
-  Object.entries(theme.vars).forEach(([k, v]) => root.style.setProperty(k, v))
+  // Builtin themes are presets for the per-project color model.
+  jsonStore.setThemeColors(theme.colors)
+  applyThemeColors(jsonStore.configFile?.settings)
 }
 
-// Removes every theme variable a builtin theme may have set inline on <html>.
-// Inline styles outrank the injected `:root {}` rule, so they must be cleared
-// before a file/custom theme can take effect.
+// Removes every theme variable a builtin/model theme may have set inline on
+// <html>. Inline styles outrank the injected `:root {}` rule, so they must be
+// cleared before a file/custom theme can take effect.
 function clearInlineThemeVars() {
   const root = document.documentElement
-  const keys = new Set<string>()
-  builtinThemes.forEach((t) => Object.keys(t.vars).forEach((k) => keys.add(k)))
-  keys.forEach((k) => root.style.removeProperty(k))
+  ;[
+    '--primary_color', '--color-bg', '--color-btn', '--sound-text',
+    '--color-bg-light', '--color-bg-dark', '--color-btn-light', '--color-btn-dark',
+    '--text-light', '--text-dark',
+  ].forEach((k) => root.style.removeProperty(k))
 }
 
 function removeCustomCssTag() {
@@ -351,6 +403,28 @@ function onOverlapSounds(val: boolean) {
   jsonStore.setOverlapSounds(val)
 }
 
+// ── Behavior (P8/P9) ──────────────────────────────────────────────────────────
+function onUniformButtonHeight(val: boolean) {
+  uniformButtonHeight.value = val
+  jsonStore.setUniformButtonHeight(val)
+}
+
+function onAllowReorder(val: boolean) {
+  allowReorder.value = val
+  jsonStore.setAllowReorder(val)
+}
+
+function onThemeMode() {
+  jsonStore.setThemeMode(themeMode.value)
+  applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
+}
+
+async function onRecentLimit() {
+  const n = Math.max(1, Math.min(100, Number(recentLimit.value) || 30))
+  recentLimit.value = n
+  await appSettings.setRecentLimit(n)
+}
+
 // ── Cache ─────────────────────────────────────────────────────────────────────
 async function refreshCacheStats() {
   try {
@@ -395,6 +469,11 @@ async function syncFromStore() {
   selectedTheme.value = jsonStore.configFile?.settings?.theme ?? 'dark-cyan'
   stopOnRetrigger.value = jsonStore.configFile?.settings?.stopOnRetrigger ?? true
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
+  uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
+  allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
+  themeMode.value = jsonStore.configFile?.settings?.themeMode ?? 'dark'
+  applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
+  recentLimit.value = appSettings.recentLimit ?? 30
   cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
   cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 50
   applyTheme()
@@ -405,6 +484,25 @@ async function syncFromStore() {
     })
   } catch { /* not critical */ }
   await refreshCacheStats()
+  // GPU detection — runs once; result cached in ref.
+  if (!hasDedicatedGpu.value) {
+    try {
+      hasDedicatedGpu.value = await invoke<boolean>('has_dedicated_gpu')
+    } catch { /* ignore — GPU toggle stays hidden */ }
+  }
+  if (hasDedicatedGpu.value) {
+    gpuAudioEnabled.value = jsonStore.configFile?.settings?.gpuAudioEnabled ?? false
+  }
+}
+
+async function onGpuAudio(val: boolean) {
+  gpuAudioEnabled.value = val
+  jsonStore.setSetting('gpuAudioEnabled', val)
+  try {
+    await invoke('set_gpu_audio', { enabled: val })
+  } catch (e) {
+    console.error('set_gpu_audio failed', e)
+  }
 }
 
 watch(() => appStore.activeOverlay, async (val) => {

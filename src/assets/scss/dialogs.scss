@@ -1,0 +1,103 @@
+@use 'variables' as *;
+
+.dialog-box {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: calc(var(--topbar_height) + #{$padding_1}) 2rem 2rem;
+  backdrop-filter: blur(0.4rem);
+  background: rgba($color-bg, 0.5);
+}
+
+.dialog-panel {
+  position: relative;
+  z-index: 11;
+  background-color: $color-bg;
+  margin-top: 0;
+  border: 0.32rem solid var(--primary_color);
+  border-radius: 1.2rem;
+  padding: calc($padding_1 * 1.5);
+  width: min(68rem, calc(100dvw - 4rem));
+//   max-height: calc(100dvh - var(--topbar_height));
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dialog-title {
+  margin: 0;
+  color: $white;
+  font-family: $fontBold;
+}
+
+.dialog-error {
+  color: $warn;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.dialog-close-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dialog-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+
+  &::-webkit-scrollbar {
+    width: 0.4rem;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 0.3rem;
+  }
+}
+
+.dialog-text {
+  color: $white;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  margin: 0;
+  text-align: center;
+}
+
+.dialog-actions {
+  margin-top: $padding_1;
+}
+
+.dialog-close {
+  fill: var(--primary_color);
+  width: 1.9rem;
+  height: 1.9rem;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  border-radius: 0.56rem;
+  padding: 0.2rem;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s, transform 0.15s;
+
+  &:hover {
+    fill: $white;
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.06);
+    cursor: pointer;
+  }
+}

@@ -6,25 +6,16 @@
 //! builds where the program directory is read-only).
 //!
 //! App-level preferences (the configurable Projects/Themes paths, the navbar
-//! side, the last opened project) always live in a fixed, guaranteed-writable
-//! `app-settings.json` inside the app-data directory — the app must always be
-//! able to find these even after the user relocates the data folders.
+//! side, the recent projects list) live in a fixed, guaranteed-writable
+//! `app-config.db` SQLite database inside the app-data directory — the app
+//! must always be able to find these even after the user relocates the data
+//! folders. The database itself is owned by the frontend (`utils/appConfig.ts`);
+//! Rust only resolves the portable-first default paths.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct AppSettings {
-    pub projects_path: String,
-    pub themes_path: String,
-    /// "left" | "right"
-    pub navbar_side: String,
-    pub last_project_path: Option<String>,
-    pub locale: Option<String>,
-}
 
 /// Returns true when a temp file can be created inside `dir` (i.e. writable).
 fn is_writable(dir: &Path) -> bool {
@@ -60,54 +51,21 @@ pub fn default_base_dir(app: &tauri::AppHandle) -> PathBuf {
         .expect("cannot resolve app data dir")
 }
 
-/// Location of the always-writable app-settings file (app-data dir).
-fn settings_file(app: &tauri::AppHandle) -> PathBuf {
+/// The always-writable app-data directory (holds `app-config.db`).
+fn app_data_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
         .path()
         .app_data_dir()
         .expect("cannot resolve app data dir");
     let _ = fs::create_dir_all(&dir);
-    dir.join("app-settings.json")
+    dir
 }
 
-fn default_settings(app: &tauri::AppHandle) -> AppSettings {
-    let base = default_base_dir(app);
-    AppSettings {
-        projects_path: base.join("projects").to_string_lossy().to_string(),
-        themes_path: base.join("themes").to_string_lossy().to_string(),
-        navbar_side: "left".to_string(),
-        last_project_path: None,
-        locale: None,
-    }
-}
-
-/// Loads app settings, creating defaults on first run.
-pub fn load_settings(app: &tauri::AppHandle) -> AppSettings {
-    let file = settings_file(app);
-    if let Ok(txt) = fs::read_to_string(&file) {
-        if let Ok(mut s) = serde_json::from_str::<AppSettings>(&txt) {
-            if s.navbar_side != "right" {
-                s.navbar_side = "left".to_string();
-            }
-            return s;
-        }
-    }
-    let defaults = default_settings(app);
-    let _ = save_settings_inner(app, &defaults);
-    defaults
-}
-
-fn save_settings_inner(app: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String> {
-    let file = settings_file(app);
-    let txt = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
-    fs::write(&file, txt).map_err(|e| e.to_string())
-}
-
-/// Creates the projects/, themes/ and themes/fonts/ folders.
-pub fn ensure_dirs(settings: &AppSettings) {
-    let _ = fs::create_dir_all(&settings.projects_path);
-    let _ = fs::create_dir_all(&settings.themes_path);
-    let _ = fs::create_dir_all(Path::new(&settings.themes_path).join("fonts"));
+/// Creates the projects/, themes/ and themes/fonts/ folders under `base`.
+pub fn ensure_default_dirs(base: &Path) {
+    let _ = fs::create_dir_all(base.join("projects"));
+    let _ = fs::create_dir_all(base.join("themes"));
+    let _ = fs::create_dir_all(base.join("themes").join("fonts"));
 }
 
 /// Recursively copies the contents of `src` into `dst`.
@@ -128,35 +86,39 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub fn get_app_settings(app: tauri::AppHandle) -> Result<AppSettings, String> {
-    let settings = load_settings(&app);
-    ensure_dirs(&settings);
-    Ok(settings)
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DefaultPaths {
+    pub projects_path: String,
+    pub themes_path: String,
+    pub app_config_db_path: String,
+    pub app_settings_json_path: String,
 }
 
+/// Resolves the portable-first default data paths plus the fixed app-config DB
+/// location. The frontend uses these as defaults and to locate `app-config.db`.
 #[tauri::command]
-pub fn set_app_settings(app: tauri::AppHandle, settings: AppSettings) -> Result<(), String> {
-    ensure_dirs(&settings);
-    save_settings_inner(&app, &settings)
+pub fn get_default_paths(app: tauri::AppHandle) -> Result<DefaultPaths, String> {
+    let base = default_base_dir(&app);
+    ensure_default_dirs(&base);
+    let data = app_data_dir(&app);
+    Ok(DefaultPaths {
+        projects_path: base.join("projects").to_string_lossy().to_string(),
+        themes_path: base.join("themes").to_string_lossy().to_string(),
+        app_config_db_path: data.join("app-config.db").to_string_lossy().to_string(),
+        app_settings_json_path: data.join("app-settings.json").to_string_lossy().to_string(),
+    })
 }
 
-/// Relocates the projects or themes folder to `target`.
-/// `kind` = "projects" | "themes". `mode` = "copy" | "blank".
-/// Returns the new absolute path.
+/// Relocates a data folder from `oldPath` to `target`.
+/// `mode` = "copy" | "blank". Returns the new absolute path. The caller is
+/// responsible for persisting the new path in `app-config.db`.
 #[tauri::command]
 pub fn relocate_data(
-    app: tauri::AppHandle,
-    kind: String,
+    old_path: String,
     target: String,
     mode: String,
 ) -> Result<String, String> {
-    let mut settings = load_settings(&app);
-    let old_path = match kind.as_str() {
-        "projects" => settings.projects_path.clone(),
-        "themes" => settings.themes_path.clone(),
-        _ => return Err(format!("unknown kind: {kind}")),
-    };
     let target_path = PathBuf::from(&target);
     fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
 
@@ -166,14 +128,6 @@ pub fn relocate_data(
             copy_dir_all(old, &target_path).map_err(|e| e.to_string())?;
         }
     }
-
-    match kind.as_str() {
-        "projects" => settings.projects_path = target.clone(),
-        "themes" => settings.themes_path = target.clone(),
-        _ => {}
-    }
-    ensure_dirs(&settings);
-    save_settings_inner(&app, &settings)?;
     Ok(target)
 }
 

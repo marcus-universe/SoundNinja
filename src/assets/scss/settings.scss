@@ -6,7 +6,8 @@
   inset: 0;
   z-index: 100;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  
   justify-content: center;
   backdrop-filter: blur(0.4rem);
   background: rgba($color-bg, 0.5);
@@ -17,7 +18,7 @@
   display: flex;
   width: 90dvw;
   min-height: 90dvh;
-  max-width: fit-content;
+  max-width: 96rem;
   max-height: 90dvh;
   background: $color-bg;
   border: 0.24rem solid var(--primary_color);
@@ -26,6 +27,32 @@
   z-index: 3;
   box-shadow: 0 0.8rem 4rem rgba(0, 0, 0, 0.6);
   position: relative;
+  margin-top: calc(var(--topbar_height) + 2rem);
+  .dialog-close-btn{
+    position: absolute;
+    top: 1.36rem;
+    right: 1.36rem;
+    z-index: 10;
+    cursor: pointer;
+    width: 3.2rem;
+    height: 3.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.56rem;
+    color: rgba(238, 238, 238, 0.5);
+    transition: color 0.15s, background 0.15s;
+
+    svg {
+      width: 1.76rem;
+      height: 1.76rem;
+    }
+
+    &:hover {
+      color: $white;
+      background: rgba(255, 255, 255, 0.08);
+    }
+  }
 }
 
 // ── Close button ──────────────────────────────────────────────────────────────
@@ -195,17 +222,22 @@
 // ── Content area ──────────────────────────────────────────────────────────────
 .settings-content {
   flex: 1;
-  padding: 3.2rem 4rem;
+  padding: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
 
   section {
     display: flex;
     flex-direction: column;
     gap: 0;
     max-width: 86rem;
+    min-width: 40%;
+    padding: 0rem 4rem 3.2rem 0rem;
+    overflow-x: hidden;
+    animation: settings-tab-fade 0.15s ease;
   }
 
   &__title {
@@ -214,7 +246,14 @@
     color: $white;
     margin: 0 0 2.4rem;
     padding-bottom: 1.2rem;
+    padding-top: 3rem;
+    padding-left: 4rem;
     border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-bg, #{$color-bg});
+    width: 100%;
   }
 }
 
@@ -223,7 +262,7 @@
   display: flex;
   align-items: center;
   gap: 1.6rem;
-  padding: 1.2rem 0;
+  padding: 1.2rem 0 0 4rem;
   border-bottom: 0.08rem solid rgba(255, 255, 255, 0.05);
 
   &--stacked {
@@ -651,6 +690,11 @@
 }
 
 // ── Transitions ───────────────────────────────────────────────────────────────
+@keyframes settings-tab-fade {
+  from { opacity: 0; transform: translateY(0.4rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .overlay-fade-enter-active,
 .overlay-fade-leave-active {
   transition: opacity 0.2s ease;
@@ -725,6 +769,14 @@
     font-size: 1.44rem;
   }
 
+  &__error {
+    margin: 0;
+    padding: 0 2.4rem 1rem;
+    font-family: $fontRegular;
+    font-size: var(--font-size-sm);
+    color: $warn;
+  }
+
   &__footer {
     padding: 1.6rem 2.4rem;
     border-top: 0.16rem solid rgba(255, 255, 255, 0.08);
@@ -759,11 +811,41 @@
   &__check {
     color: var(--primary_color);
   }
+
+  &__remove {
+    all: unset;
+    flex-shrink: 0;
+    margin-left: 0.8rem;
+    width: 2.4rem;
+    height: 2.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    transition: background 0.15s;
+
+    .project-list__remove-icon {
+      width: 1.6rem;
+      height: 1.6rem;
+      min-width: 1.6rem;
+      min-height: 1.6rem;
+    }
+
+    &:hover {
+      background: rgba(255, 80, 80, 0.15);
+    }
+  }
 }
 
 .new-project-row {
   display: flex;
   gap: 0.8rem;
+  margin-bottom: 0.8rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   .settings-input {
     flex: 1;
@@ -880,5 +962,74 @@
   &:focus {
     border-color: var(--primary_color);
     color: $white;
+  }
+}
+
+// ── Question icon (clickable, opens modal) ────────────────────────────────────
+.settings-question-icon {
+  width: 1.76rem !important;
+  height: 1.76rem !important;
+  fill: rgba(238, 238, 238, 0.35);
+  cursor: pointer;
+  transition: fill 0.15s;
+  flex-shrink: 0;
+
+  &:hover {
+    fill: var(--primary_color);
+  }
+}
+
+// ── Theme Creator sticky toolbar ──────────────────────────────────────────────
+.theme-creator-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 0 1.2rem;
+  border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 2.4rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-bg, #{$color-bg});
+
+  &__title {
+    font-family: $fontBold;
+    font-size: 2.24rem;
+    color: $white;
+    margin: 0;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.64rem;
+  }
+}
+
+.tc-toolbar-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 0.56rem;
+  border: 0.16rem solid rgba(255, 255, 255, 0.12);
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary_color);
+  }
+}
+
+.tc-toolbar-icon {
+  width: 2rem !important;
+  height: 2rem !important;
+  fill: rgba(238, 238, 238, 0.65);
+
+  .tc-toolbar-btn:hover & {
+    fill: var(--primary_color);
   }
 }

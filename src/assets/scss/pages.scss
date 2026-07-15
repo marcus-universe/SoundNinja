@@ -1,0 +1,42 @@
+@use 'variables' as *;
+
+.about {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+
+  h1 {
+    text-align: center;
+  }
+
+  .aboutContainer {
+    margin-top: 1rem;
+    text-align: center;
+    align-items: center;
+
+    p {
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    .github-link {
+      color: var(--primary_color);
+      text-decoration: none;
+      font-size: 1rem;
+      text-align: center;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+.theme-creator-window {
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 1.25rem 1.25rem 3rem;
+  background: var(--color-bg, #{$color-bg});
+  color: #eee;
+}

@@ -35,9 +35,14 @@ export async function createProjectFolder(projectsPath: string, name: string): P
   return join(folder, 'project.db')
 }
 
-/** Derives a display name from a project DB path. */
+/** Derives a display name from a project DB path.
+ *  - `.../<name>/project.db`  → `<name>` (legacy folder-based layout)
+ *  - `.../<name>.db`          → `<name>` (arbitrary standalone file) */
 export function projectNameFromDbPath(dbPath: string): string {
   const parts = dbPath.split(/[\\/]/).filter(Boolean)
-  // .../<name>/project.db  → <name>
-  return parts.length >= 2 ? parts[parts.length - 2] : dbPath
+  const file = parts[parts.length - 1] ?? dbPath
+  if (file.toLowerCase() === 'project.db') {
+    return parts.length >= 2 ? parts[parts.length - 2] : dbPath
+  }
+  return file.replace(/\.db$/i, '')
 }

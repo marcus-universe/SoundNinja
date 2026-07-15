@@ -1,10 +1,11 @@
 ﻿@use 'variables' as *;
 
 .navbar {
-  height: 100dvh;
+  height: calc(100dvh - var(--topbar_height, 0px));
   padding: 0 $padding_1;
   width: var(--icon_size);
   position: fixed;
+  top: var(--topbar_height, 0px);
 
   // Default side is left; the navbar-left / navbar-right classes on <html>
   // (set at runtime from the app settings) drive the actual side.
@@ -42,7 +43,7 @@
       position: absolute;
       top: 0;
       z-index: 2;
-      background: $color-bg;
+      background: var(--color-bg, #{$color-bg});
       padding: 2rem $padding_1;
       left: 0;
 
@@ -58,18 +59,18 @@
     }
 
     .searchBar {
-      position: absolute;
-      top: 2rem;
+      position: fixed;
+      top: calc(var(--topbar_height, 0px) + 2rem);
       left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+      right: $padding_1;
       height: var(--icon_size);
-      background: $color-bg;
-      z-index: 1;
-      width: calc(100dvw - var(--icon_size) - $padding_1 * 4);
+      background: var(--color-bg, #{$color-bg});
+      z-index: 3;
 
       input {
         width: 100%;
         padding: $padding_1;
-        background: $color-bg;
+        background: var(--color-bg, #{$color-bg});
         color: var(--primary_color);
         border: 0.32rem solid var(--primary_color);
         border-radius: 0.8rem;
@@ -95,7 +96,18 @@
   }
 
   .searchBar {
-    left: auto;
+    left: $padding_1;
     right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+  }
+}
+
+// ── Light mode: dark text on hover so icons stay visible on light backgrounds ──
+.theme-light .navbar .iconContainer {
+  svg:hover {
+    fill: var(--text-dark, #222831);
+  }
+
+  .active {
+    fill: var(--text-dark, #222831);
   }
 }

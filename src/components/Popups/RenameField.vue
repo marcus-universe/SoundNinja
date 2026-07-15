@@ -43,5 +43,5 @@ onMounted(() => {
   onKeyStroke('Escape', () => Exit())
 })
 </script>
-<style lang=""></style>
+
 

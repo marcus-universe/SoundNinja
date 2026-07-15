@@ -1,4 +1,24 @@
 {
+  "menu": {
+    "file": "Datei",
+    "edit": "Bearbeiten",
+    "help": "Hilfe",
+    "newProject": "Neues Projekt",
+    "openProject": "Projekt öffnen",
+    "openRecent": "Zuletzt geöffnet",
+    "noRecent": "Keine kürzlichen Projekte",
+    "selectProject": "Projekt auswählen",
+    "save": "Speichern",
+    "saveAs": "Speichern unter…",
+    "importAudio": "Audiodateien importieren",
+    "importFolders": "Ordner importieren",
+    "quit": "Beenden",
+    "settings": "Einstellungen",
+    "openConfig": "Konfigurationsdatei öffnen",
+    "openThemesFolder": "Themes-Ordner öffnen",
+    "openProjectsFolder": "Projekte-Ordner öffnen",
+    "about": "Über SoundNinja"
+  },
   "dialog": {
     "unsavedTitle": "Ungespeicherte Änderungen",
     "unsavedMessage": "Du hast ungespeicherte Änderungen. Was möchtest du tun?",
@@ -43,6 +63,16 @@
       "stopOnRetriggerHint": "Erneutes Drücken eines aktiven Sounds stoppt ihn",
       "overlapSounds": "Sounds überlappen",
       "overlapSoundsHint": "Mehrere Sounds spielen gleichzeitig",
+      "behavior": "Verhalten",
+      "themeMode": "Theme-Modus",
+      "themeModeDark": "Dunkel",
+      "themeModeLight": "Hell",
+      "uniformButtonHeight": "Einheitliche Buttonhöhe",
+      "uniformButtonHeightHint": "Alle Buttons auf die Höhe des höchsten setzen",
+      "allowReorder": "Ziehen zum Sortieren",
+      "allowReorderHint": "Drag-and-drop-Sortierung von Sounds und Trennern aktivieren",
+      "recentLimit": "Limit kürzlicher Projekte",
+      "recentLimitHint": "Wie viele kürzliche Projekte gemerkt werden",
       "language": "Sprache",
       "performanceCache": "Performance-Cache",
       "cacheMaxSize": "Max. Cache-Gr\u00f6\u00dfe",
@@ -51,14 +81,22 @@
       "cacheMaxEntryHint": "Dateien \u00fcber diesem Limit werden nie gecacht und immer direkt von der Festplatte gelesen.",
       "cacheStatus": "Cache-Status",
       "cacheStatsText": "{count} Sound(s) gecacht \u00b7 {size} MiB belegt",
-      "clearCache": "Cache leeren"
+      "clearCache": "Cache leeren",
+      "gpuAudio": "GPU-beschleunigte DSP (Experimentell)",
+      "gpuAudioHint": "Dedizierte GPU für Audio-Signalverarbeitung nutzen. Standard: CPU. Neustart empfohlen."
     },
     "audio": {
       "title": "Audio",
+      "audioDriver": "Audiotreiber",
+      "audioDriverHint": "WASAPI ist standardmäßig verfügbar. ASIO erfordert einen speziellen Build mit --features asio und dem Steinberg ASIO SDK.",
+      "asioInfoTitle": "Audiotreiber-Info",
       "outputDevice": "Ausgabegerät",
       "refresh": "Aktualisieren",
       "outputVolume": "Ausgabelautstärke",
-      "outputVolumeHint": "Gesamt-Wiedergabelautstärke für alle Sounds (0–100 %)"
+      "outputVolumeHint": "Gesamt-Wiedergabelautstärke für alle Sounds (0–100 %)",
+      "asioChannelMatrix": "ASIO-Kanal-Matrix",
+      "asioChannelHint": "Genau einen linken und einen rechten Ausgangskanal wählen.",
+      "asioChannel": "Kanal"
     },
     "themeCreator": {
       "title": "Theme-Editor",
@@ -68,6 +106,17 @@
       "primaryAccent": "Primär / Akzent",
       "background": "Hintergrund",
       "buttonBackground": "Schaltflächen-Hintergrund",
+      "backgroundLight": "Hintergrund (Hell)",
+      "backgroundDark": "Hintergrund (Dunkel)",
+      "buttonLight": "Button (Hell)",
+      "buttonDark": "Button (Dunkel)",
+      "textColors": "Textfarben",
+      "textLight": "Text (Hell)",
+      "textDark": "Text (Dunkel)",
+      "previewMode": "Vorschau-Modus",
+      "previewDark": "Dunkel",
+      "previewLight": "Hell",
+      "reset": "↺ Auf Standard zurücksetzen",
       "buttonTypography": "Schaltflächen-Schrift",
       "uploadFont": "⬆ Schriftart hochladen",
       "fontUploaded": "{count} Schriftart(en) hochgeladen.",
@@ -115,8 +164,26 @@
     "title": "Projekt auswählen",
     "loading": "Lädt…",
     "noProjects": "Keine Projekte gefunden. Unten ein neues erstellen.",
+    "noRecent": "Keine kürzlichen Projekte. Unten eins erstellen oder öffnen.",
+    "openExisting": "📂 Vorhandenes öffnen…",
+    "removeProject": "Projekt löschen",
+    "deleteConfirm": "Projekt \"{name}\" dauerhaft löschen?",
+    "deleteCurrentError": "Öffne zuerst ein anderes Projekt, bevor du dieses löschst.",
+    "duplicateNameError": "Ein Projekt mit diesem Namen existiert bereits.",
+    "removeRecent": "Aus Liste entfernen",
     "create": "Erstellen",
     "newPlaceholder": "Neuer Projektname…"
+  },
+  "common": {
+    "saving": "Speichern…",
+    "loading": "Laden…"
+  },
+  "bulk": {
+    "selected": "{count} ausgewählt",
+    "color": "Farbe",
+    "moveToTab": "In Tab verschieben…",
+    "delete": "Löschen",
+    "done": "Fertig"
   },
   "contextMenu": {
     "rename": "Umbenennen",
@@ -144,22 +211,5 @@
   "about": {
     "title": "Über SoundNinja",
     "by": "von"
-  },
-  "menu": {
-    "file": "Datei",
-    "openProject": "Projekt öffnen",
-    "selectProject": "Projekt auswählen",
-    "save": "Speichern",
-    "saveAs": "Speichern unter…",
-    "importAudio": "Audiodateien importieren",
-    "importFolders": "Ordner importieren",
-    "quit": "Beenden",
-    "edit": "Bearbeiten",
-    "settings": "Einstellungen",
-    "openConfig": "Konfigurationsdatei öffnen",
-    "openThemesFolder": "Themes-Ordner öffnen",
-    "openProjectsFolder": "Projekte-Ordner öffnen",
-    "help": "Hilfe",
-    "about": "Über SoundNinja"
   }
 }

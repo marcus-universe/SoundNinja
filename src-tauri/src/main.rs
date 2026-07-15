@@ -1,5 +1,6 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 pub mod audio;
+pub mod gpu;
 pub mod menu;
 pub mod paths;
 pub mod fsx;
@@ -67,21 +68,31 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
+            // On macOS keep native decorations (traffic lights) — the custom
+            // HTML title bar in TitleBar.vue only renders on Windows/Linux.
+            #[cfg(target_os = "macos")]
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_decorations(true);
+            }
             menu::setup(app)?;
             audio::init_audio_thread(app.handle().clone());
-            let settings = paths::load_settings(app.handle());
-            paths::ensure_dirs(&settings);
-            // Allow plugin-fs access to the (possibly relocated) data folders.
+            let base = paths::default_base_dir(app.handle());
+            paths::ensure_default_dirs(&base);
+            // Allow plugin-fs access to the portable-first data folders.
             use tauri_plugin_fs::FsExt;
             let scope = app.fs_scope();
-            let _ = scope.allow_directory(&settings.projects_path, true);
-            let _ = scope.allow_directory(&settings.themes_path, true);
+            let _ = scope.allow_directory(base.join("projects"), true);
+            let _ = scope.allow_directory(base.join("themes"), true);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             audio::devices::get_out_devices,
+            audio::devices::get_audio_hosts,
+            audio::devices::get_out_devices_host,
+            audio::devices::get_asio_device_channels,
             audio::playback::play_sound,
             audio::playback::get_sound_duration,
             audio::cache::warm_sound_cache,
@@ -91,8 +102,8 @@ fn main() {
             audio::playback::set_output_volume,
             get_system_fonts,
             menu::rebuild_menu,
-            paths::get_app_settings,
-            paths::set_app_settings,
+            menu::set_recent_projects,
+            paths::get_default_paths,
             paths::relocate_data,
             paths::list_projects,
             fsx::read_text_file_abs,
@@ -102,7 +113,12 @@ fn main() {
             fsx::make_dir_abs,
             fsx::list_dir_files_abs,
             fsx::copy_file_abs,
-            fsx::delete_file_abs
+            fsx::delete_file_abs,
+            fsx::delete_dir_abs,
+            fsx::collect_audio_buckets_abs,
+            gpu::has_dedicated_gpu,
+            gpu::set_gpu_audio,
+            gpu::get_gpu_audio_enabled
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

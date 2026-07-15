@@ -50,6 +50,13 @@ export default defineNuxtConfig({
     '~/assets/scss/style.scss',
     '~/assets/scss/navbar.scss',
     '~/assets/scss/settings.scss',
+    '~/assets/scss/dialogs.scss',
+    '~/assets/scss/ui-elements.scss',
+    '~/assets/scss/titlebar.scss',
+    '~/assets/scss/context-menu.scss',
+    '~/assets/scss/import-folders.scss',
+    '~/assets/scss/pages.scss',
+    '~/assets/scss/settings-audio.scss',
   ],
 
   vite: {
@@ -59,7 +66,18 @@ export default defineNuxtConfig({
     },
     envPrefix: ['VITE_', 'TAURI_'],
     build: {
-      sourcemap: true,
+      // Disable source maps in production to reduce bundle size and startup I/O.
+      sourcemap: process.env.NODE_ENV !== 'production',
+      rollupOptions: {
+        output: {
+          // Split heavy settings/theme-creator panels into separate chunks so
+          // the main soundboard loads without waiting for them.
+          manualChunks(id) {
+            if (id.includes('SettingsThemeCreator')) return 'chunk-theme-creator'
+            if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsOverlay')) return 'chunk-settings'
+          },
+        },
+      },
     },
   },
 

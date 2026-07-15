@@ -2,6 +2,8 @@
     <div
         class="TabContainer flex_c_h flex_start"
         :class="{ searchMove: appStore.Searchbar.SearchbarActive }"
+        ref="tabContainerRef"
+        @wheel.prevent="onTabWheel"
     >
         <div
             class="tab grid_c"
@@ -39,11 +41,21 @@ const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 
 const tabListRef = ref(null)
+const tabContainerRef = ref(null)
 let sortable = null
+
+const allowReorder = computed(() => jsonStore.configFile?.settings?.allowReorder !== false)
+
+function onTabWheel(e) {
+  if (tabContainerRef.value) {
+    tabContainerRef.value.scrollBy({ left: e.deltaY + e.deltaX, behavior: 'smooth' })
+  }
+}
 
 onMounted(() => {
   sortable = Sortable.create(tabListRef.value, {
     animation: 180,
+    disabled: !allowReorder.value,
     draggable: '.tab',
     ghostClass: 'drag-over',
     onEnd(evt) {
@@ -60,6 +72,14 @@ onMounted(() => {
       }
     },
   })
+
+  watch(
+    () => jsonStore.configFile?.settings?.allowReorder,
+    (val) => {
+      sortable?.option('disabled', val === false)
+    },
+    { immediate: true }
+  )
 })
 
 onUnmounted(() => {

@@ -3,10 +3,12 @@
     <div class="dialog-panel flex_c_v gap1">
       <div class="dialog-header flex_c_h flex_space_between w100">
         <h2 class="dialog-title">{{ title }}</h2>
-        <Icons :icon="'exit'" :customClass="'exit overlay-close'" @triggered="$emit('close')" />
+        <DialogCloseButton @close="$emit('close')" />
       </div>
       <p v-if="errorMessage" class="dialog-error">{{ errorMessage }}</p>
-      <slot />
+      <div class="dialog-content flex_c_v gap1">
+        <slot />
+      </div>
     </div>
   </div>
 </template>

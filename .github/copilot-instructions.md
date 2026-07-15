@@ -89,7 +89,8 @@ src-tauri/                  # Tauri / Rust backend
 - Data location is **portable-first**: `themes/` and `projects/` sit next to the executable when writable, else in AppData. Legacy `config.json` is auto-migrated to a `Default` project DB on first launch.
 
 ### Styling
-- Use **SCSS** (`.scss` syntax). Global styles live in `src/assets/scss/` (`_base.scss`, `_variables.scss`, `navbar.scss`, `style.scss`, `settings.scss`); component styles go in scoped `<style lang="scss">` blocks.
+- Use **SCSS** (`.scss` syntax). All app styling must live in `src/assets/scss/` as `.scss` files (`_base.scss`, `_variables.scss`, `navbar.scss`, `style.scss`, `settings.scss`, and split feature files as needed).
+- Do not add or keep `<style>` blocks in Vue/Nuxt components (`.vue` files). Move component-specific rules into appropriate files under `src/assets/scss/`.
 - Theme values are CSS custom properties declared in `:root` (`_base.scss`) with SCSS fallbacks, e.g. `var(--color-bg, #{$color-bg})`. Do not hardcode compile-time theme colors in backgrounds.
 - Do not introduce plain CSS files unless explicitly required.
 

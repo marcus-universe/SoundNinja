@@ -18,37 +18,3 @@
 <script setup>
 const { t } = useI18n()
 </script>
-
-<style lang="scss">
-.about {
-  text-align: center;
-  justify-content: center;
-  align-items: center;
-
-  h1 {
-    text-align: center;
-  }
-
-  .aboutContainer {
-    margin-top: 1rem;
-    text-align: center;
-    align-items: center;
-
-    p {
-      font-size: 1.1rem;
-      text-align: center;
-    }
-
-    .github-link {
-      color: var(--primary_color);
-      text-decoration: none;
-      font-size: 1rem;
-      text-align: center;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-}
-</style>

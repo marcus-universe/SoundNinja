@@ -1,4 +1,24 @@
 {
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "help": "Help",
+    "newProject": "New Project",
+    "openProject": "Open Project",
+    "openRecent": "Open Recent",
+    "noRecent": "No recent projects",
+    "selectProject": "Select Project",
+    "save": "Save",
+    "saveAs": "Save As...",
+    "importAudio": "Import Audio Files",
+    "importFolders": "Import Folders",
+    "quit": "Quit",
+    "settings": "Settings",
+    "openConfig": "Open Config File",
+    "openThemesFolder": "Open Themes Folder",
+    "openProjectsFolder": "Open Projects Folder",
+    "about": "About"
+  },
   "dialog": {
     "unsavedTitle": "Unsaved Changes",
     "unsavedMessage": "You have unsaved changes. What would you like to do?",
@@ -43,6 +63,16 @@
       "stopOnRetriggerHint": "Pressing active sound again stops it",
       "overlapSounds": "Overlap sounds",
       "overlapSoundsHint": "Multiple sounds play simultaneously",
+      "behavior": "Behavior",
+      "themeMode": "Theme Mode",
+      "themeModeDark": "Dark",
+      "themeModeLight": "Light",
+      "uniformButtonHeight": "Uniform button height",
+      "uniformButtonHeightHint": "Force every button to the height of the tallest one",
+      "allowReorder": "Allow drag reordering",
+      "allowReorderHint": "Enable drag-and-drop reordering of sounds and separators",
+      "recentLimit": "Recent projects limit",
+      "recentLimitHint": "How many recent projects to remember",
       "language": "Language",
       "performanceCache": "Performance Cache",
       "cacheMaxSize": "Max cache size",
@@ -51,14 +81,22 @@
       "cacheMaxEntryHint": "Files larger than this limit are never cached and are always read directly from disk.",
       "cacheStatus": "Cache status",
       "cacheStatsText": "{count} sound(s) cached \u00b7 {size} MiB used",
-      "clearCache": "Clear cache"
+      "clearCache": "Clear cache",
+      "gpuAudio": "GPU-accelerated DSP (Experimental)",
+      "gpuAudioHint": "Use the dedicated GPU for audio signal processing. Default is CPU. Requires restart to take full effect."
     },
     "audio": {
       "title": "Audio",
+      "audioDriver": "Audio Driver",
+      "audioDriverHint": "WASAPI is available by default. ASIO requires a special build with --features asio and the Steinberg ASIO SDK.",
+      "asioInfoTitle": "Audio Driver Info",
       "outputDevice": "Output Device",
       "refresh": "Refresh",
       "outputVolume": "Output Volume",
-      "outputVolumeHint": "Master playback volume applied to all sounds (0–100 %)"
+      "outputVolumeHint": "Master playback volume applied to all sounds (0\u2013100\u00a0%)",
+      "asioChannelMatrix": "ASIO Channel Matrix",
+      "asioChannelHint": "Select exactly one Left and one Right output channel.",
+      "asioChannel": "Channel"
     },
     "themeCreator": {
       "title": "Theme Creator",
@@ -68,6 +106,17 @@
       "primaryAccent": "Primary / Accent",
       "background": "Background",
       "buttonBackground": "Button Background",
+      "backgroundLight": "Background (Light)",
+      "backgroundDark": "Background (Dark)",
+      "buttonLight": "Button (Light)",
+      "buttonDark": "Button (Dark)",
+      "textColors": "Text Colors",
+      "textLight": "Text (Light)",
+      "textDark": "Text (Dark)",
+      "previewMode": "Preview Mode",
+      "previewDark": "Dark",
+      "previewLight": "Light",
+      "reset": "↺ Reset to Defaults",
       "buttonTypography": "Button Typography",
       "uploadFont": "⬆ Upload Font",
       "fontUploaded": "Uploaded {count} font(s).",
@@ -115,8 +164,26 @@
     "title": "Select Project",
     "loading": "Loading…",
     "noProjects": "No projects found. Create one below.",
+    "noRecent": "No recent projects. Create or open one below.",
+    "openExisting": "📂 Open Existing…",
+    "removeProject": "Delete project",
+    "deleteConfirm": "Delete project \"{name}\" permanently?",
+    "deleteCurrentError": "Open another project before deleting this one.",
+    "duplicateNameError": "A project with this name already exists.",
+    "removeRecent": "Remove from list",
     "create": "Create",
     "newPlaceholder": "New project name…"
+  },
+  "common": {
+    "saving": "Saving…",
+    "loading": "Loading…"
+  },
+  "bulk": {
+    "selected": "{count} selected",
+    "color": "Color",
+    "moveToTab": "Move to tab…",
+    "delete": "Delete",
+    "done": "Done"
   },
   "contextMenu": {
     "rename": "Rename",
@@ -144,22 +211,5 @@
   "about": {
     "title": "About",
     "by": "by"
-  },
-  "menu": {
-    "file": "File",
-    "openProject": "Open Project",
-    "selectProject": "Select Project",
-    "save": "Save",
-    "saveAs": "Save As...",
-    "importAudio": "Import Audio Files",
-    "importFolders": "Import Folders",
-    "quit": "Quit",
-    "edit": "Edit",
-    "settings": "Settings",
-    "openConfig": "Open Config File",
-    "openThemesFolder": "Open Themes Folder",
-    "openProjectsFolder": "Open Projects Folder",
-    "help": "Help",
-    "about": "About"
   }
 }

@@ -1,0 +1,125 @@
+@use 'variables' as *;
+
+.ui-btn {
+  padding: $padding_2 $padding_1;
+  border-radius: 0.8rem;
+  border: 0.32rem solid var(--primary_color);
+  background: transparent;
+  color: var(--primary_color);
+  font-family: $fontBold;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    background: rgba($white, 0.1);
+  }
+
+  &.ui-btn--full {
+    width: 100%;
+  }
+}
+
+.ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: rgba(238, 238, 238, 0.9);
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  line-height: 1.25;
+
+  &__input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  &__box {
+    flex-shrink: 0;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 0.48rem;
+    border: 0.2rem solid var(--primary_color);
+    background: var(--color-bg, #{$color-bg});
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+
+  &__check {
+    width: 1.2rem;
+    height: 1.2rem;
+    color: transparent;
+    transition: color 0.1s;
+  }
+
+  &__input:checked + &__box {
+    background: var(--primary_color);
+    box-shadow: 0 0 0.6rem var(--primary_color);
+
+    .ui-checkbox__check {
+      color: var(--color-bg, #{$color-bg});
+    }
+  }
+
+  &:hover .ui-checkbox__box {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.ui-input {
+  width: 100%;
+  padding: $padding_2 $padding_1;
+  border-radius: 0.64rem;
+  min-height: var(--icon_size);
+  border: 0.32rem solid var(--primary_color);
+  background: $color-bg;
+  color: var(--primary_color);
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+
+  &:focus {
+    background: rgba($white, 0.1);
+    outline: none;
+  }
+}
+
+.ui-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.ui-listitem {
+  padding: $padding_2 $padding_1;
+  border-radius: 0.64rem;
+  background: $color-btn;
+  font-family: $fontRegular;
+  font-size: var(--font-size-md);
+  color: $white;
+  overflow: hidden;
+}
+
+.ui-listitem-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-listitem-remove {
+  flex-shrink: 0;
+  width: 1.6rem !important;
+  height: 1.6rem !important;
+  min-width: unset !important;
+  min-height: unset !important;
+}

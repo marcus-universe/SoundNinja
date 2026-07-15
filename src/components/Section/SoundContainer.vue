@@ -1,8 +1,10 @@
 <template>
     <div class="SoundContainer">
+        <div class="SoundContainer__scroll">
         <div
             class="SoundTab flex_c_h flex_start button-gaps flex_wrap"
             ref="soundListRef"
+            :style="uniformHeight ? { '--btn-min-height': uniformHeight + 'px' } : {}"
         >
             <template v-for="item in displayItems" :key="item.domKey">
                 <div
@@ -15,12 +17,33 @@
                     v-else
                     :sound="item.sound"
                     :btnStyle="getBtnStyle(item.sound)"
+                    :loading="loadingPaths.has(item.sound.path)"
+                    :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(item.sound.path)"
                     :data-sound-path="item.sound.path"
-                    @play="setActiveSound(item.sound)"
+                    @play="onSoundClick(item.sound)"
                     @contextmenu="(e) => openSoundMenu(e, item.sound)"
                 />
             </template>
         </div>
+        </div>
+
+        <Transition name="fade">
+            <div v-if="appStore.multiSelectActive" class="bulk-bar flex_c_h align_c gap1">
+                <span class="bulk-bar__count">{{ $t('bulk.selected', { count: appStore.selectedSoundPaths.length }) }}</span>
+                <label class="bulk-bar__color">
+                    {{ $t('bulk.color') }}
+                    <input type="color" v-model="bulkColor" @change="applyBulkColor" />
+                </label>
+                <select class="bulk-bar__select" v-model="bulkTab" @change="applyBulkTab">
+                    <option value="">{{ $t('bulk.moveToTab') }}</option>
+                    <option v-for="t in tabOptions" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <button class="bulk-bar__btn bulk-bar__btn--danger" :disabled="appStore.selectedSoundPaths.length === 0" @click="applyBulkDelete">
+                    {{ $t('bulk.delete') }}
+                </button>
+                <button class="bulk-bar__btn" @click="appStore.setMultiSelectActive(false)">{{ $t('bulk.done') }}</button>
+            </div>
+        </Transition>
     </div>
 </template>
 
@@ -35,9 +58,18 @@ const jsonStore = useJsonHandelingStore()
 const soundListRef = ref(null)
 let sortable = null
 
+// P5: sounds currently resolving their duration / starting playback.
+const loadingPaths = reactive(new Set())
+// P8: enforced uniform button height (0 = natural height).
+const uniformHeight = ref(0)
+// P7: multi-select bulk-edit controls.
+const bulkColor = ref('#7184a2')
+const bulkTab = ref('')
+
 onMounted(() => {
   sortable = Sortable.create(soundListRef.value, {
     animation: 180,
+    disabled: jsonStore.configFile?.settings?.allowReorder === false,
     draggable: '.Soundbtn, .tab-separator',
     ghostClass: 'drag-over',
     onEnd(evt) {
@@ -105,6 +137,33 @@ const JSONFile = computed(() => {
 
 const Settings = computed(() => jsonStore.configFile?.settings)
 
+// P8: enable/disable drag reordering based on the per-project setting.
+watch(
+  () => Settings.value?.allowReorder,
+  (v) => sortable?.option('disabled', v === false),
+)
+
+// P8: measure the tallest button and enforce a uniform height when enabled.
+function updateUniformHeight() {
+  if (!Settings.value?.uniformButtonHeight) {
+    uniformHeight.value = 0
+    return
+  }
+  uniformHeight.value = 0
+  nextTick(() => {
+    const el = soundListRef.value
+    if (!el) return
+    let max = 0
+    el.querySelectorAll('.Soundbtn').forEach((b) => {
+      max = Math.max(max, b.offsetHeight)
+    })
+    uniformHeight.value = max
+  })
+}
+
+// P7: available tab names for the "move to tab" bulk action.
+const tabOptions = computed(() => (jsonStore.configFile?.tabList ?? []).map((t) => t.name).filter(Boolean))
+
 // ---- Separators ----
 // Per-tab order key for a sound (global index in "All", per-tab index elsewhere).
 function tabOrder(sound) {
@@ -126,6 +185,13 @@ const displayItems = computed(() => {
   items.sort((a, b) => orderOf(a) - orderOf(b))
   return items
 })
+
+// P8: re-measure uniform button height when the setting or the item list changes.
+watch(
+  [() => Settings.value?.uniformButtonHeight, () => displayItems.value.length],
+  () => updateUniformHeight(),
+  { flush: 'post' },
+)
 
 function openSeparatorMenu(event, sep) {
   appStore.openContextMenu({
@@ -230,6 +296,35 @@ onUnmounted(() => {
 // (Handled per-button in SoundButton.vue via useDropZone)
 
 // ---- Sound playback ----
+// P7: in multi-select mode a click toggles selection instead of playing.
+function onSoundClick(sound) {
+  if (appStore.multiSelectActive) {
+    appStore.toggleSoundSelection(sound.path)
+    return
+  }
+  setActiveSound(sound)
+}
+
+// ---- P7 bulk actions ----
+function applyBulkColor() {
+  const paths = appStore.selectedSoundPaths
+  if (paths.length) jsonStore.setSoundColorMany(paths, bulkColor.value)
+}
+
+function applyBulkTab() {
+  const tab = bulkTab.value
+  const paths = appStore.selectedSoundPaths
+  if (tab && paths.length) jsonStore.setSoundTabsMany(paths, tab)
+  bulkTab.value = ''
+}
+
+function applyBulkDelete() {
+  const paths = appStore.selectedSoundPaths
+  if (!paths.length) return
+  jsonStore.removeSoundsMany(paths)
+  appStore.clearSoundSelection()
+}
+
 async function setActiveSound(sound) {
   const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
   const overlapSounds = Settings.value.overlapSounds ?? false
@@ -243,13 +338,17 @@ async function setActiveSound(sound) {
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: true })
 
     let duration = 0
+    loadingPaths.add(sound.path)
     try {
       duration = await invoke('get_sound_duration', { soundPath: sound.path })
     } catch (e) {
       console.error('Could not get sound duration', e)
     }
 
-    if (!sound.active) return
+    if (!sound.active) {
+      loadingPaths.delete(sound.path)
+      return
+    }
 
     if (duration > 0) {
       startProgress(sound.index, duration)
@@ -258,16 +357,21 @@ async function setActiveSound(sound) {
     invoke('play_sound', {
       soundPath: sound.path,
       deviceName: Settings.value.outputSource,
+      hostName: Settings.value.outputHost ?? null,
       active: false,
       overlap: overlapSounds,
-    }).catch((e) => console.error('Sound playback error', e))
+    })
+      .catch((e) => console.error('Sound playback error', e))
+      .finally(() => loadingPaths.delete(sound.path))
   } else {
     if (!stopOnRetrigger) return
     stopProgress(sound.index)
+    loadingPaths.delete(sound.path)
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
     invoke('play_sound', {
       soundPath: sound.path,
       deviceName: Settings.value.outputSource,
+      hostName: Settings.value.outputHost ?? null,
       active: true,
       overlap: overlapSounds,
     }).catch((e) => console.error('Stop error', e))

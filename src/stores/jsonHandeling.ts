@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import {
   openDb, getDb, loadConfig, saveConfig, emptyConfig,
-  type ProjectConfig, type SoundFile, type TabEntry, type Separator,
+  type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
 } from '~/utils/db'
 
 /** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
@@ -18,6 +18,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     /** Snapshot taken when a project is opened — used to Discard changes. */
     openingSnapshot: null as ProjectConfig | null,
     dirty: false,
+    saving: false,
     _persistTimer: null as ReturnType<typeof setTimeout> | null,
   }),
 
@@ -59,14 +60,15 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       await this.persistNow()
     },
 
-    /** Reverts in-memory state to the last opened snapshot and re-saves. */
+    /** Reverts in-memory state to the last opened snapshot. No disk write is
+     *  needed because the snapshot always mirrors what is already on disk, so
+     *  we simply clear the dirty flag (avoids a costly, freeze-inducing save). */
     async discardChanges() {
       if (!this.openingSnapshot) return
       this.configFile = clone(this.openingSnapshot)
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.dirty = false
-      await this.persistNow()
     },
 
     setCurrentProjectPath(p: string | null) {
@@ -94,12 +96,15 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       }
       const d = getDb()
       if (!d) return
+      this.saving = true
       try {
         await saveConfig(d, this.configFile)
         this.openingSnapshot = clone(this.configFile)
         this.dirty = false
       } catch (e) {
         console.error('Failed to persist project', e)
+      } finally {
+        this.saving = false
       }
     },
 
@@ -174,6 +179,39 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
+    setOutputHost(val: string) {
+      this.configFile.settings.outputHost = val
+      this.writeConfig()
+    },
+    setAsioChannels(left: number | null, right: number | null) {
+      this.configFile.settings.asioLeftChannel = left ?? undefined
+      this.configFile.settings.asioRightChannel = right ?? undefined
+      this.writeConfig()
+    },
+
+    setUniformButtonHeight(val: boolean) {
+      this.configFile.settings.uniformButtonHeight = val
+      this.writeConfig()
+    },
+    setAllowReorder(val: boolean) {
+      this.configFile.settings.allowReorder = val
+      this.writeConfig()
+    },
+    setThemeMode(val: 'dark' | 'light') {
+      this.configFile.settings.themeMode = val
+      this.writeConfig()
+    },
+    // Generic single-setting update — avoids a dedicated action per field.
+    setSetting(key: keyof Settings, val: unknown) {
+      (this.configFile.settings as Record<string, unknown>)[key] = val
+      this.writeConfig()
+    },
+    // Bulk-apply theme color-model fields (used by builtin presets + reset).
+    setThemeColors(colors: Partial<Settings>) {
+      Object.assign(this.configFile.settings, colors)
+      this.writeConfig()
+    },
+
     // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
       this.configFile.files = [...this.configFile.files, ...files]
@@ -204,6 +242,31 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     setSoundTabs(soundFileIndex: number, tabs: string[]) {
       this.configFile.files[soundFileIndex].tabs = tabs
+      this.normalizeIndexes()
+      this.writeConfig()
+    },
+
+    // ── Bulk (multi-select) actions, keyed by sound path ──────────────────────
+    setSoundColorMany(paths: string[], color: string) {
+      const set = new Set(paths)
+      for (const f of this.configFile.files) {
+        if (set.has(f.path)) f.color = color
+      }
+      this.writeConfig()
+    },
+
+    setSoundTabsMany(paths: string[], tab: string) {
+      const set = new Set(paths)
+      for (const f of this.configFile.files) {
+        if (set.has(f.path) && !f.tabs.includes(tab)) f.tabs = [...f.tabs, tab]
+      }
+      this.normalizeIndexes()
+      this.writeConfig()
+    },
+
+    removeSoundsMany(paths: string[]) {
+      const set = new Set(paths)
+      this.configFile.files = this.configFile.files.filter((f) => !set.has(f.path))
       this.normalizeIndexes()
       this.writeConfig()
     },

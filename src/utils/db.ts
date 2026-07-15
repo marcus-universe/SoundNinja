@@ -32,6 +32,34 @@ export interface Settings {
   cacheMaxSizeMib?: number
   cacheMaxEntryMib?: number
   outputVolume?: number
+  /** Force every sound button to the height of the tallest one in the tab. */
+  uniformButtonHeight?: boolean
+  /** Allow drag-and-drop reordering of sounds/tabs (default on). */
+  allowReorder?: boolean
+  /** Active theme mode for this project. */
+  themeMode?: 'dark' | 'light'
+  /** Accent color (single, shared by both modes). */
+  primaryColor?: string
+  /** Background color for light mode. */
+  bgLight?: string
+  /** Background color for dark mode. */
+  bgDark?: string
+  /** Button background for light mode. */
+  btnLight?: string
+  /** Button background for dark mode. */
+  btnDark?: string
+  /** Text color used on light-mode surfaces. */
+  textLight?: string
+  /** Text color used on dark-mode surfaces. */
+  textDark?: string
+  /** Audio driver/host name (e.g. 'WASAPI', 'ASIO'). */
+  outputHost?: string
+  /** ASIO left-channel index (0-based). Only used when outputHost === 'ASIO'. */
+  asioLeftChannel?: number
+  /** ASIO right-channel index (0-based). Only used when outputHost === 'ASIO'. */
+  asioRightChannel?: number
+  /** Enable GPU-accelerated DSP (experimental; only shown when discrete GPU detected). */
+  gpuAudioEnabled?: boolean
 }
 
 export interface ProjectConfig {
@@ -48,6 +76,19 @@ export function defaultSettings(): Settings {
     outputSource: 'default',
     stopOnRetrigger: true,
     overlapSounds: false,
+    uniformButtonHeight: false,
+    allowReorder: true,
+    themeMode: 'dark',
+    primaryColor: '#00d4ff',
+    bgLight: '#eeeeee',
+    bgDark: '#222831',
+    btnLight: '#7184a2',
+    btnDark: '#363f4d',
+    textLight: '#eeeeee',
+    textDark: '#222831',
+    outputHost: 'WASAPI',
+    asioLeftChannel: undefined,
+    asioRightChannel: undefined,
   }
 }
 
@@ -127,6 +168,19 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
+      case 'uniformButtonHeight': settings.uniformButtonHeight = value === 'true'; break
+      case 'allowReorder': settings.allowReorder = value === 'true'; break
+      case 'themeMode': settings.themeMode = value === 'light' ? 'light' : 'dark'; break
+      case 'primaryColor': settings.primaryColor = value; break
+      case 'bgLight': settings.bgLight = value; break
+      case 'bgDark': settings.bgDark = value; break
+      case 'btnLight': settings.btnLight = value; break
+      case 'btnDark': settings.btnDark = value; break
+      case 'textLight': settings.textLight = value; break
+      case 'textDark': settings.textDark = value; break
+      case 'outputHost': settings.outputHost = value; break
+      case 'asioLeftChannel': settings.asioLeftChannel = Number(value); break
+      case 'asioRightChannel': settings.asioRightChannel = Number(value); break
     }
   }
 
@@ -180,6 +234,31 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
 }
 
 // ── Save (full re-sync inside a transaction) ──────────────────────────────────
+/** Inserts many rows in a few batched multi-VALUES statements to cut the number
+ *  of IPC round-trips (one execute per row is very slow over the Tauri bridge).
+ *  Chunked so the bound-parameter count stays well under SQLite's limit. */
+async function batchInsert(
+  d: Database,
+  table: string,
+  cols: string[],
+  rows: unknown[][],
+  chunkRows = 100
+): Promise<void> {
+  if (rows.length === 0) return
+  const colSql = cols.join(', ')
+  for (let i = 0; i < rows.length; i += chunkRows) {
+    const chunk = rows.slice(i, i + chunkRows)
+    const placeholders: string[] = []
+    const params: unknown[] = []
+    let p = 1
+    for (const row of chunk) {
+      placeholders.push('(' + cols.map(() => `$${p++}`).join(', ') + ')')
+      params.push(...row)
+    }
+    await d.execute(`INSERT INTO ${table} (${colSql}) VALUES ${placeholders.join(', ')}`, params)
+  }
+}
+
 export async function saveConfig(d: Database, config: ProjectConfig): Promise<void> {
   await d.execute('BEGIN')
   try {
@@ -190,7 +269,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     await d.execute('DELETE FROM separators')
 
     const s = config.settings
-    const settingsEntries: [string, string][] = [
+    const settingsRows: [string, string][] = [
       ['theme', s.theme ?? 'dark-cyan'],
       ['customCss', s.customCss ?? ''],
       ['outputSource', s.outputSource ?? 'default'],
@@ -199,37 +278,44 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
       ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
       ['outputVolume', String(s.outputVolume ?? 1)],
+      ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
+      ['allowReorder', String(s.allowReorder ?? true)],
+      ['themeMode', s.themeMode ?? 'dark'],
+      ['primaryColor', s.primaryColor ?? '#00d4ff'],
+      ['bgLight', s.bgLight ?? '#eeeeee'],
+      ['bgDark', s.bgDark ?? '#222831'],
+      ['btnLight', s.btnLight ?? '#7184a2'],
+      ['btnDark', s.btnDark ?? '#363f4d'],
+      ['textLight', s.textLight ?? '#eeeeee'],
+      ['textDark', s.textDark ?? '#222831'],
+      ['outputHost', s.outputHost ?? 'WASAPI'],
+      ...(s.asioLeftChannel != null ? [['asioLeftChannel', String(s.asioLeftChannel)] as [string, string]] : []),
+      ...(s.asioRightChannel != null ? [['asioRightChannel', String(s.asioRightChannel)] as [string, string]] : []),
     ]
-    for (const [key, value] of settingsEntries) {
-      await d.execute('INSERT INTO settings (key, value) VALUES ($1, $2)', [key, value])
-    }
+    await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
-    for (let i = 0; i < config.tabList.length; i++) {
-      const t = config.tabList[i]
-      await d.execute('INSERT INTO tabs (name, color, position) VALUES ($1, $2, $3)', [
-        t.name, t.color ?? null, i,
-      ])
-    }
+    const tabRows = config.tabList.map((t, i) => [t.name, t.color ?? null, i])
+    await batchInsert(d, 'tabs', ['name', 'color', 'position'], tabRows)
 
+    const soundRows: unknown[][] = []
+    const soundTabRows: unknown[][] = []
     for (const f of config.files) {
-      await d.execute(
-        'INSERT INTO sounds (path, name, volume, color, global_index, active) VALUES ($1, $2, $3, $4, $5, $6)',
-        [f.path, f.name, f.volume ?? 0.4, f.color ?? null, f.index ?? 0, f.active ? 1 : 0]
-      )
+      soundRows.push([f.path, f.name, f.volume ?? 0.4, f.color ?? null, f.index ?? 0, f.active ? 1 : 0])
       for (const tab of f.tabs) {
         const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
-        await d.execute(
-          'INSERT INTO sound_tabs (sound_path, tab, tab_index) VALUES ($1, $2, $3)',
-          [f.path, tab, tabIdx]
-        )
+        soundTabRows.push([f.path, tab, tabIdx])
       }
     }
+    await batchInsert(
+      d,
+      'sounds',
+      ['path', 'name', 'volume', 'color', 'global_index', 'active'],
+      soundRows
+    )
+    await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
 
-    for (const sep of config.separators ?? []) {
-      await d.execute('INSERT INTO separators (id, tab, position) VALUES ($1, $2, $3)', [
-        sep.id, sep.tab, sep.position,
-      ])
-    }
+    const sepRows = (config.separators ?? []).map((sep) => [sep.id, sep.tab, sep.position])
+    await batchInsert(d, 'separators', ['id', 'tab', 'position'], sepRows)
 
     await d.execute('COMMIT')
   } catch (e) {
