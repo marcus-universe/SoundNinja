@@ -1,6 +1,6 @@
 # Maintainer: marcus-universe <https://github.com/marcus-universe>
 pkgname=soundninja-bin
-pkgver=0.2.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="An open-source, cross-platform Soundboard Desktop App"
 arch=('x86_64')

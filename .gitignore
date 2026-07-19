@@ -27,5 +27,4 @@ pnpm-debug.log*
 *.sw?
 node_modules
 agents
-aur
 .agents

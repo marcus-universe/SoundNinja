@@ -29,6 +29,7 @@
   },
   "bundle": {
     "active": true,
+    "targets": ["nsis", "msi", "deb", "appimage", "dmg", "app"],
     "category": "DeveloperTool",
     "copyright": "",
     "externalBin": [],
