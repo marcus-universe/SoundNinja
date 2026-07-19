@@ -293,7 +293,7 @@ onUnmounted(() => {
 })
 
 // ---- Drag & drop ----
-// (Handled per-button in SoundButton.vue via useDropZone)
+// (Handled per-button in SoundButton.vue)
 
 // ---- Sound playback ----
 // P7: in multi-select mode a click toggles selection instead of playing.

@@ -23,7 +23,7 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ['@pinia/nuxt', '@vueuse/nuxt', '@nuxtjs/i18n'],
+  modules: ['@pinia/nuxt', '@nuxtjs/i18n'],
 
   i18n: {
     strategy: 'no_prefix',

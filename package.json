@@ -15,9 +15,9 @@
     "tauri:serve": "tauri dev",
     "tauri": "tauri",
     "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\"",
-    "version:major": "bun scripts/bump-version.mjs major",
-    "version:minor": "bun scripts/bump-version.mjs minor",
-    "version:patch": "bun scripts/bump-version.mjs patch"
+    "version:major": "node scripts/bump-version.mjs major",
+    "version:minor": "node scripts/bump-version.mjs minor",
+    "version:patch": "node scripts/bump-version.mjs patch"
   },
   "dependencies": {
     "@nuxtjs/i18n": "^10.4.0",
@@ -28,7 +28,6 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-os": "^2.3.2",
     "@tauri-apps/plugin-sql": "^2.4.0",
-    "@vueuse/nuxt": "^14.3.0",
     "nuxt": "4.4.8",
     "pinia": "^3.0.4",
     "sortablejs": "^1.15.7"

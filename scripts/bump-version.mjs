@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "fs";
 const releaseType = process.argv[2];
 
 if (!["major", "minor", "patch"].includes(releaseType)) {
-  console.error("Usage: bun scripts/bump-version.mjs [major|minor|patch]");
+  console.error("Usage: node scripts/bump-version.mjs [major|minor|patch]");
   process.exit(1);
 }
 

@@ -11,7 +11,7 @@
 ![Forks](https://img.shields.io/github/forks/marcus-universe/SoundNinja.svg)
 
 </div>
-<b>Sound Ninja</b> is an **Open Source Soundboard App** with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**. 😉👍
+<b>Sound Ninja</b> is an <b>Open Source Soundboard App</b> with maximal customizability option to create your best Soundboard. Perfect for **live streaming, chatting with friends or podcast recording**. 😉👍
 
 ## How is the progress going?
 
@@ -23,7 +23,7 @@ The progress can be tracked on the [GitHub Project Board](https://github.com/use
 
 ## Why Sound Ninja?
 
-Sound Ninja is a **Open Source Soundboard App** with the goal to provide the maximal customizability options and a modern UI. Its build with **Tauri.js and Vue.js** and doesn't take much space on your pc and ram not like other soundboard apps. The main reason was to create a Soundboard-App that lets you organize really efficiently your sounds to find them really fast and easy in the moment you need them. On top, it gives everyone the option to share there soundboards with others to become together the biggest Meme-Loards of our time. 😎
+Sound Ninja is a **Open Source Soundboard App** with the goal to provide the maximal customizability options and a modern UI. Its build with **Tauri v2 and Nuxt 4** and doesn't take much space on your pc and ram not like other soundboard apps. The main reason was to create a Soundboard-App that lets you organize really efficiently your sounds to find them really fast and easy in the moment you need them and to have a better gui for VR experiences. On top, it gives everyone the option to share there soundboards with others to become together the biggest Meme-Loards of our time. 😎
 
 ## Features (+upcoming)
 
@@ -31,18 +31,18 @@ Sound Ninja is a **Open Source Soundboard App** with the goal to provide the max
 | ---------------------------- | --------------------------------------------------------- | ------ |
 | **Soundboard**               | Create your own Soundboard with your favorite sounds      | ✅     |
 | **Tab System**               | Organize your sounds in Tabs                              | ✅     |
-| **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
 | **Searchbar**                | Find your sounds quick and easy                           | ✅     |
-| **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
 | **Themes**                   | Design your Soundboard how you like it                    | ✅     |
+| **Custom Profiles**          | Create multiple Soundboards with different settings       | ✅     |
+| **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
+| **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
 | **Customizable Hotkeys**     | Customize the Hotkeys to your needs                       | ⛔     |
 | **Soundboard Sharing**       | Share your Soundboard with your friends                   | ⛔     |
 | **Soundboard Import/Export** | Import and Export your Soundboard                         | ⛔     |
-| **Custom Profiles**          | Create multiple Soundboards with different settings       | ✅     |
 | **Websocket**                | Control your Soundboard with your Smartphone              | ⛔     |
 | **Recorder**                 | Record your PC-Audio directly in Sound Ninja              | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
-| **Giphy**                    | Give your Sounds an Image/Gif                             | ⛔     |
+| **Gifs & Images**            | Give your Sounds an Image/Gif                             | ⛔     |
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |
 | **AI Assistant**             | Recommends you sounds that works in the current situation | ⛔     |
 
@@ -71,50 +71,54 @@ Sound Ninja currently supports theoretically the following platforms:
 
 ## Project setup
 
-```
+Requires [Node.js](https://nodejs.org/) (for npm/pnpm) or [Bun](https://bun.sh/) / [Deno](https://deno.com/). Also needs the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for desktop builds.
+
+Install dependencies with any of:
+
+```bash
+# bun (recommended)
+bun install
+
+# npm
 npm install
+
+# pnpm
+pnpm install
+
+# deno
+deno install
 ```
 
 ### Available dependencies
 
-- [Vue.js (Vue3 CLI)](https://vuejs.org/)
-- [Tauri.js](https://tauri.studio/)
+- [Nuxt 4](https://nuxt.com/) (Vue 3)
+- [Tauri v2](https://tauri.app/)
+- [Pinia](https://pinia.vuejs.org/)
 - [SASS](https://sass-lang.com/)
-- [Vue Router](https://router.vuejs.org/)
-- [Vuex](https://vuex.vuejs.org/)
-- [Vue Use](https://vueuse.org/)
-- [Howler.js](https://howlerjs.com/)
-
-#### Available dependencies in future
-
-- [Socket.io](https://socket.io/)
+- [@nuxtjs/i18n](https://i18n.nuxtjs.org/)
+- [SortableJS](https://sortablejs.github.io/Sortable/)
 
 ### Compiles and hot-reloads for development
 
-```
-npm run tauri:serve
+```bash
+bun run tauri:serve
+# or: npm run tauri:serve / pnpm tauri:serve / deno task tauri:serve
 ```
 
 ### Compiles and minifies for production
 
-```
-npm run tauri:build
-```
-
-### Vue Devtools
-
-[How to install Vue Devtools Standalone](https://devtools.vuejs.org/guide/installation.html#standalone)
-
-```
-npm run vue-devtools
+```bash
+bun run tauri:build
+# or: npm run tauri:build / pnpm tauri:build / deno task tauri:build
 ```
 
-### Lints and fixes files
+### Frontend only (no Tauri shell)
 
-```
-npm run lint
+```bash
+bun run dev
+# or: npm run dev / pnpm dev / deno task dev
 ```
 
 ### Customize configuration
 
-See [Configuration Reference](https://cli.vuejs.org/config/).
+See [Nuxt Configuration](https://nuxt.com/docs/api/configuration/nuxt-config) and [Tauri Configuration](https://v2.tauri.app/reference/config/).
