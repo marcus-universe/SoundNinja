@@ -27,27 +27,28 @@ jobs:
         include:
           # Windows x64 → NSIS installer (+ MSI if enabled in bundle targets)
           - platform: windows-latest
-            target: x86_64-pc-windows-msvc
+            rust_targets: x86_64-pc-windows-msvc
             args: "--target x86_64-pc-windows-msvc"
 
           # Linux x64 → .deb + AppImage (AppImage feeds AUR package)
           - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+            rust_targets: x86_64-unknown-linux-gnu
             args: "--target x86_64-unknown-linux-gnu"
 
           # macOS universal → single DMG/app covering Apple Silicon + Intel
+          # rustup has no "universal-apple-darwin" target; install both arches, Tauri lipo merges them
           - platform: macos-latest
-            target: universal-apple-darwin
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
             args: "--target universal-apple-darwin"
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -55,11 +56,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-
-      - name: Add macOS universal targets
-        if: matrix.platform == 'macos-latest'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          targets: ${{ matrix.rust_targets }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -92,10 +89,12 @@ jobs:
           echo "Using tagName=$TAG"
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # Force npm — repo has pnpm-lock.yaml/bun.lock which otherwise make the action pick pnpm/bun
+          tauriScript: npm run tauri
           tagName: ${{ steps.meta.outputs.tag }}
           releaseName: "Sound Ninja ${{ steps.meta.outputs.tag }}"
           releaseBody: |
@@ -124,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get version
         id: version
