@@ -35,11 +35,11 @@ jobs:
             rust_targets: x86_64-unknown-linux-gnu
             args: "--target x86_64-unknown-linux-gnu"
 
-          # macOS universal → single DMG/app covering Apple Silicon + Intel
+          # macOS universal → DMG covering Apple Silicon + Intel
           # rustup has no "universal-apple-darwin" target; install both arches, Tauri lipo merges them
           - platform: macos-latest
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
-            args: "--target universal-apple-darwin"
+            args: "--target universal-apple-darwin --bundles dmg"
 
     runs-on: ${{ matrix.platform }}
 
