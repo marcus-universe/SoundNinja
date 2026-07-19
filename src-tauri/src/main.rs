@@ -74,8 +74,11 @@ fn main() {
             // On macOS keep native decorations (traffic lights) — the custom
             // HTML title bar in TitleBar.vue only renders on Windows/Linux.
             #[cfg(target_os = "macos")]
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_decorations(true);
+            {
+                use tauri::Manager;
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.set_decorations(true);
+                }
             }
             menu::setup(app)?;
             audio::init_audio_thread(app.handle().clone());

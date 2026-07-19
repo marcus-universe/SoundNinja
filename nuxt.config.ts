@@ -59,6 +59,12 @@ export default defineNuxtConfig({
     '~/assets/scss/settings-audio.scss',
   ],
 
+  // Nuxt 4.4.x plugins often transform without emitting maps; keep them off for Tauri builds.
+  sourcemap: {
+    client: false,
+    server: false,
+  },
+
   vite: {
     clearScreen: false,
     server: {
@@ -66,9 +72,14 @@ export default defineNuxtConfig({
     },
     envPrefix: ['VITE_', 'TAURI_'],
     build: {
-      // Disable source maps in production to reduce bundle size and startup I/O.
-      sourcemap: process.env.NODE_ENV !== 'production',
+      sourcemap: false,
       rollupOptions: {
+        onwarn(warning, warn) {
+          // Known Nuxt 4.4 noise: transform plugins skip sourcemap output.
+          if (warning.code === 'SOURCEMAP_BROKEN') return
+          if (typeof warning.message === 'string' && warning.message.includes('Sourcemap is likely to be incorrect')) return
+          warn(warning)
+        },
         output: {
           // Split heavy settings/theme-creator panels into separate chunks so
           // the main soundboard loads without waiting for them.
