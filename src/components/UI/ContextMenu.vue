@@ -9,14 +9,18 @@
     >
       <ul class="context-menu__list">
         <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item" @click="openRename" @mouseenter="hoveredItem = 'rename'" @mouseleave="hoveredItem = null">
-          <span class="context-menu__icon">✏️</span>
+          <span class="context-menu__icon">
+            <Icons icon="rename" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.rename') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'rename'" class="context-menu__desc">{{ $t('contextMenu.renameDesc') }}</span>
           </Transition>
         </li>
         <li class="context-menu__item context-menu__item--danger" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
-          <span class="context-menu__icon">🗑️</span>
+          <span class="context-menu__icon">
+            <Icons icon="delete" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.remove') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'remove'" class="context-menu__desc">{{ $t('contextMenu.removeDesc') }}</span>
@@ -29,7 +33,9 @@
           @mouseenter="hoveredItem = 'moveToTab'"
           @mouseleave="hoveredItem = null"
         >
-          <span class="context-menu__icon">📂</span>
+          <span class="context-menu__icon">
+            <Icons icon="tab" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.moveToTab') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'moveToTab'" class="context-menu__desc">{{ $t('contextMenu.moveToTabDesc') }}</span>
@@ -54,7 +60,9 @@
           @mouseenter="hoveredItem = 'separator'"
           @mouseleave="hoveredItem = null"
         >
-          <span class="context-menu__icon">➖</span>
+          <span class="context-menu__icon">
+            <Icons icon="page-separator" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.addSeparator') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'separator'" class="context-menu__desc">{{ $t('contextMenu.addSeparatorDesc') }}</span>

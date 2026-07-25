@@ -78,14 +78,28 @@
   }
 
   &__icon {
-    font-size: 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2em;
+    height: 1.2em;
+    flex-shrink: 0;
     line-height: 1;
+  }
+
+  &__icon-svg {
+    width: 1.2em !important;
+    height: 1.2em !important;
+    min-width: 1.2em !important;
+    min-height: 1.2em !important;
+    fill: currentColor;
+    pointer-events: none;
   }
 
   &__swatch {
     width: 1em;
     height: 1em;
-    border-radius: 50%;
+    border-radius: 0.25em;
     border: 0.1rem solid rgba(255, 255, 255, 0.3);
     flex-shrink: 0;
   }

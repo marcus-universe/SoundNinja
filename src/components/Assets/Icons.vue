@@ -144,6 +144,21 @@
   <path class="cls-1" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zm2-4h2V8H9zm4 0h2V8h-2z"/>
 </svg>
 
+<!-- Rename (mdi:rename) -->
+<svg v-if="icon === 'rename'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="m15 16l-4 4h10v-4zm-2.94-8.81L3 16.25V20h3.75l9.06-9.06zm6.65.85c.39-.39.39-1.04 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83l3.75 3.75z"/>
+</svg>
+
+<!-- Tab / Move to Tab (material-symbols:tab) -->
+<svg v-if="icon === 'tab'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M4 20q-.825 0-1.412-.587T2 18V6q0-.825.588-1.412T4 4h16q.825 0 1.413.588T22 6v12q0 .825-.587 1.413T20 20zm9-10h7V6h-7z"/>
+</svg>
+
+<!-- Page Separator (ri:page-separator) -->
+<svg v-if="icon === 'page-separator'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M17 21v-4H7v4H5v-5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5zM7 3v4h10V3h2v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3zM2 9l4 3l-4 3zm20 0v6l-4-3z"/>
+</svg>
+
 </template>
 
 <script>
