@@ -14,12 +14,24 @@
           v-if="appStore.Searchbar.SearchbarActive"
           class="searchBar flex_c_h align_c flex_start gap1"
         >
-          <input
-            type="text"
-            :placeholder="$t('navbar.search')"
-            v-model="appStore.Searchbar.SearchbarContent"
-            @input="jsonStore.filterSounds(appStore.Searchbar.SearchbarContent)"
-          />
+          <div class="searchBar__field">
+            <input
+              ref="searchInput"
+              type="text"
+              :placeholder="$t('navbar.search')"
+              v-model="appStore.Searchbar.SearchbarContent"
+              @input="jsonStore.filterSounds(appStore.Searchbar.SearchbarContent)"
+            />
+            <button
+              v-if="appStore.Searchbar.SearchbarContent"
+              type="button"
+              class="searchBar__clear"
+              :title="$t('navbar.clearSearch')"
+              @click="clearSearch"
+            >
+              <Icons icon="delete" custom-class="searchBar__clear-icon" />
+            </button>
+          </div>
         </div>
       </transition>
 
@@ -32,7 +44,10 @@
 
       <Icons
         :icon="appStore.multiSelectActive ? 'multiselect-active' : 'multiselect-inactive'"
-        :customClass="['icon', { active: appStore.multiSelectActive }]"
+        :customClass="[
+          'icon multiSelectButton',
+          { active: appStore.multiSelectActive },
+        ]"
         @triggered="IconClicked"
       />
     </div>
@@ -45,6 +60,15 @@ import { open } from '@tauri-apps/plugin-dialog'
 const { t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
+const searchInput = ref(null)
+
+async function focusSearchInput() {
+  await nextTick()
+  // Wait a frame so the slide-in transition has mounted the input.
+  requestAnimationFrame(() => {
+    searchInput.value?.focus?.()
+  })
+}
 
 async function uploadFiles() {
   const selected = await open({
@@ -109,8 +133,24 @@ async function uploadFiles() {
   }
 }
 
+function clearSearch() {
+  appStore.setSearchContent('')
+  jsonStore.filterSounds('')
+  focusSearchInput()
+}
+
 function OpenSearch() {
-  appStore.setSearchOpen(!appStore.Searchbar.SearchbarActive)
+  const next = !appStore.Searchbar.SearchbarActive
+  appStore.setSearchOpen(next)
+  if (next) focusSearchInput()
+}
+
+/** Open search (or refocus if already open). Used by Ctrl/Cmd+F. */
+function activateSearch() {
+  if (!appStore.Searchbar.SearchbarActive) {
+    appStore.setSearchOpen(true)
+  }
+  focusSearchInput()
 }
 
 function IconClicked(icon) {
@@ -128,4 +168,27 @@ function IconClicked(icon) {
     appStore.toggleMultiSelectActive()
   }
 }
+
+function onGlobalKeydown(e) {
+  // Ctrl+F (Windows/Linux) or Cmd+F (macOS)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    activateSearch()
+  }
+}
+
+watch(
+  () => appStore.Searchbar.SearchbarActive,
+  (active) => {
+    if (active) focusSearchInput()
+  },
+)
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+})
 </script>

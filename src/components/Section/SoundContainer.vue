@@ -54,6 +54,7 @@ import Sortable from 'sortablejs'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
 
 const soundListRef = ref(null)
 let sortable = null
@@ -356,8 +357,8 @@ async function setActiveSound(sound) {
 
     invoke('play_sound', {
       soundPath: sound.path,
-      deviceName: Settings.value.outputSource,
-      hostName: Settings.value.outputHost ?? null,
+      deviceName: appSettings.outputSource,
+      hostName: appSettings.outputHost || null,
       active: false,
       overlap: overlapSounds,
     })
@@ -370,8 +371,8 @@ async function setActiveSound(sound) {
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
     invoke('play_sound', {
       soundPath: sound.path,
-      deviceName: Settings.value.outputSource,
-      hostName: Settings.value.outputHost ?? null,
+      deviceName: appSettings.outputSource,
+      hostName: appSettings.outputHost || null,
       active: true,
       overlap: overlapSounds,
     }).catch((e) => console.error('Stop error', e))

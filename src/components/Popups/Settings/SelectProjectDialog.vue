@@ -61,7 +61,14 @@
 <script setup lang="ts">
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
-import type { ProjectInfo } from '~/utils/projects'
+import {
+  PROJECT_FILE_FILTER,
+  createProjectFolder,
+  listProjects,
+  projectNameFromDbPath,
+  safeProjectName,
+  type ProjectInfo,
+} from '~/utils/projects'
 
 const { t } = useI18n()
 
@@ -131,7 +138,7 @@ async function removeProject(proj: ProjectInfo) {
 async function openExisting() {
   const selected = await openDialog({
     title: 'Open Project',
-    filters: [{ name: 'Sound Ninja Project', extensions: ['db'] }],
+    filters: [PROJECT_FILE_FILTER],
     multiple: false,
   })
   if (!selected || Array.isArray(selected)) return

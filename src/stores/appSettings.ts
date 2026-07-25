@@ -16,6 +16,8 @@ import type Database from '@tauri-apps/plugin-sql'
 
 const DEFAULT_RECENT_LIMIT = 30
 
+export type TitlebarMode = 'styled' | 'system'
+
 export const useAppSettingsStore = defineStore('appSettings', {
   state: () => ({
     projectsPath: '',
@@ -26,6 +28,20 @@ export const useAppSettingsStore = defineStore('appSettings', {
     locale: null as string | null,
     recentProjects: [] as RecentProject[],
     recentLimit: DEFAULT_RECENT_LIMIT,
+    /** 'styled' = custom HTML titlebar+menu; 'system' = OS decorations + native menu */
+    titlebarMode: 'styled' as TitlebarMode,
+    /** When true, hide titlebar/menu chrome entirely (no drag / window controls via GUI). */
+    hideTitlebar: false,
+    /** Skip the "hide title bar" warning dialog on future toggles. */
+    hideTitlebarSkipWarn: false,
+    /** App-wide audio prefs (not stored in project files). */
+    outputSource: 'default',
+    outputHost: 'WASAPI',
+    outputVolume: 1,
+    asioLeftChannel: null as number | null,
+    asioRightChannel: null as number | null,
+    /** True once audio keys exist in app-config.db (or after one-time project migrate). */
+    audioMigrated: false,
     loaded: false,
   }),
 
@@ -56,10 +72,29 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.lastProjectPath = s.lastProjectPath || null
       this.locale = s.locale || null
       this.recentLimit = s.recentLimit ? Number(s.recentLimit) || DEFAULT_RECENT_LIMIT : DEFAULT_RECENT_LIMIT
+      this.titlebarMode = s.titlebarMode === 'system' ? 'system' : 'styled'
+      this.hideTitlebar = s.hideTitlebar === '1' || s.hideTitlebar === 'true'
+      this.hideTitlebarSkipWarn = s.hideTitlebarSkipWarn === '1' || s.hideTitlebarSkipWarn === 'true'
+      this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
+        || s.outputSource != null || s.outputHost != null || s.outputVolume != null
+      if (this.audioMigrated) {
+        this.outputSource = s.outputSource || 'default'
+        this.outputHost = s.outputHost || 'WASAPI'
+        const vol = s.outputVolume != null ? Number(s.outputVolume) : 1
+        this.outputVolume = Number.isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 1
+        this.asioLeftChannel = s.asioLeftChannel != null && s.asioLeftChannel !== ''
+          ? Number(s.asioLeftChannel) : null
+        this.asioRightChannel = s.asioRightChannel != null && s.asioRightChannel !== ''
+          ? Number(s.asioRightChannel) : null
+        if (this.asioLeftChannel != null && !Number.isFinite(this.asioLeftChannel)) this.asioLeftChannel = null
+        if (this.asioRightChannel != null && !Number.isFinite(this.asioRightChannel)) this.asioRightChannel = null
+      }
 
       await this.refreshRecents()
       this.loaded = true
       this.applyNavbarSide()
+      await this.applyWindowChrome()
+      await this.applyAudioVolume()
       return s
     },
 
@@ -144,6 +179,134 @@ export const useAppSettingsStore = defineStore('appSettings', {
       root.classList.toggle('navbar-right', this.navbarSide === 'right')
       root.classList.toggle('navbar-left', this.navbarSide !== 'right')
       root.style.setProperty('--navbar-side', this.navbarSide)
+    },
+
+    async setTitlebarMode(mode: TitlebarMode) {
+      this.titlebarMode = mode === 'system' ? 'system' : 'styled'
+      const d = await this._db()
+      await saveSetting(d, 'titlebarMode', this.titlebarMode)
+      await this.applyWindowChrome()
+    },
+
+    async setHideTitlebar(hidden: boolean) {
+      this.hideTitlebar = !!hidden
+      const d = await this._db()
+      await saveSetting(d, 'hideTitlebar', this.hideTitlebar ? '1' : '0')
+      await this.applyWindowChrome()
+    },
+
+    async setHideTitlebarSkipWarn(skip: boolean) {
+      this.hideTitlebarSkipWarn = !!skip
+      const d = await this._db()
+      await saveSetting(d, 'hideTitlebarSkipWarn', this.hideTitlebarSkipWarn ? '1' : '0')
+    },
+
+    /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */
+    async applyWindowChrome() {
+      const nativeChrome = this.titlebarMode === 'system'
+      const hidden = this.hideTitlebar
+      try {
+        await invoke('set_window_chrome', { nativeChrome, hidden })
+      } catch (e) {
+        console.error('set_window_chrome failed', e)
+      }
+      if (typeof document === 'undefined') return
+      // Styled custom bar is 3rem title + 2.6rem menubar ≈ 5.6rem; system/hidden = 0.
+      const showStyled = !hidden && this.titlebarMode === 'styled'
+      document.documentElement.style.setProperty('--topbar_height', showStyled ? '5.6rem' : '0px')
+    },
+
+    /** Pushes master volume into the Rust audio engine. */
+    async applyAudioVolume() {
+      try {
+        await invoke('set_output_volume', { volume: this.outputVolume })
+      } catch (e) {
+        console.error('set_output_volume failed', e)
+      }
+    },
+
+    /**
+     * One-time copy of audio prefs from a project settings object into app-config.db.
+     * Call after the first project open when audioMigrated is still false.
+     */
+    async migrateAudioFromProject(projectSettings: {
+      outputSource?: string
+      outputHost?: string
+      outputVolume?: number
+      asioLeftChannel?: number
+      asioRightChannel?: number
+    } | null | undefined) {
+      if (this.audioMigrated) return
+      if (projectSettings) {
+        if (projectSettings.outputSource) this.outputSource = projectSettings.outputSource
+        if (projectSettings.outputHost) this.outputHost = projectSettings.outputHost
+        if (typeof projectSettings.outputVolume === 'number' && Number.isFinite(projectSettings.outputVolume)) {
+          this.outputVolume = Math.max(0, Math.min(1, projectSettings.outputVolume))
+        }
+        if (typeof projectSettings.asioLeftChannel === 'number') {
+          this.asioLeftChannel = projectSettings.asioLeftChannel
+        }
+        if (typeof projectSettings.asioRightChannel === 'number') {
+          this.asioRightChannel = projectSettings.asioRightChannel
+        }
+      }
+      await this.persistAudioSettings()
+      await this.applyAudioVolume()
+    },
+
+    async persistAudioSettings() {
+      const d = await this._db()
+      await saveSetting(d, 'outputSource', this.outputSource || 'default')
+      await saveSetting(d, 'outputHost', this.outputHost || 'WASAPI')
+      await saveSetting(d, 'outputVolume', String(this.outputVolume))
+      await saveSetting(d, 'asioLeftChannel', this.asioLeftChannel != null ? String(this.asioLeftChannel) : '')
+      await saveSetting(d, 'asioRightChannel', this.asioRightChannel != null ? String(this.asioRightChannel) : '')
+      await saveSetting(d, 'audioMigrated', '1')
+      this.audioMigrated = true
+    },
+
+    async setOutputSource(source: string) {
+      this.outputSource = source || 'default'
+      const d = await this._db()
+      await saveSetting(d, 'outputSource', this.outputSource)
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+    },
+
+    async setOutputHost(host: string) {
+      this.outputHost = host || 'WASAPI'
+      const d = await this._db()
+      await saveSetting(d, 'outputHost', this.outputHost)
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+    },
+
+    async setOutputVolume(volume: number) {
+      const vol = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1
+      this.outputVolume = vol
+      const d = await this._db()
+      await saveSetting(d, 'outputVolume', String(vol))
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+      await this.applyAudioVolume()
+    },
+
+    async setAsioChannels(left: number | null, right: number | null) {
+      this.asioLeftChannel = left
+      this.asioRightChannel = right
+      const d = await this._db()
+      await saveSetting(d, 'asioLeftChannel', left != null ? String(left) : '')
+      await saveSetting(d, 'asioRightChannel', right != null ? String(right) : '')
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
     },
 
     async setLastProject(path: string | null) {

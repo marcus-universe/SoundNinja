@@ -24,7 +24,9 @@
     "unsavedMessage": "Du hast ungespeicherte Änderungen. Was möchtest du tun?",
     "save": "Speichern",
     "discard": "Verwerfen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "errorTitle": "Fehler",
+    "ok": "OK"
   },
   "settings": {
     "title": "Einstellungen",
@@ -71,6 +73,14 @@
       "uniformButtonHeightHint": "Alle Buttons auf die Höhe des höchsten setzen",
       "allowReorder": "Ziehen zum Sortieren",
       "allowReorderHint": "Drag-and-drop-Sortierung von Sounds und Trennern aktivieren",
+      "systemTitlebar": "System-Titelleiste und Menü verwenden",
+      "systemTitlebarHint": "Nutzt den normalen Fensterrahmen und die Menüleiste deines Betriebssystems statt des eigenen App-Designs.",
+      "hideTitlebar": "Titelleiste ausblenden",
+      "hideTitlebarHint": "Mehr Platz oben. Einstellungen öffnest du weiter über die Seiten-Icons.",
+      "hideTitlebarWarnTitle": "Titelleiste ausblenden?",
+      "hideTitlebarWarnText": "Ohne Titelleiste kannst du das Fenster nicht mehr per Maus verschieben, verkleinern, maximieren oder schließen. Beende die App mit Alt+F4 (Windows) oder dem System-Shortcut. Die Einstellungen erreichst du weiter über die Seiten-Icons.",
+      "hideTitlebarWarnConfirm": "Titelleiste ausblenden",
+      "hideTitlebarDontRemind": "Nicht mehr erinnern",
       "recentLimit": "Limit kürzlicher Projekte",
       "recentLimitHint": "Wie viele kürzliche Projekte gemerkt werden",
       "language": "Sprache",
@@ -206,7 +216,8 @@
     "confirm": "Bestätigen"
   },
   "navbar": {
-    "search": "Suchen"
+    "search": "Suchen",
+    "clearSearch": "Suche leeren"
   },
   "about": {
     "title": "Über SoundNinja",

@@ -109,7 +109,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 
-const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
 const appStore = useAppStore()
 
 const audioHosts = ref<string[]>([])
@@ -157,58 +157,51 @@ async function loadAsioChannels() {
 }
 
 async function onHostChange() {
-  jsonStore.setOutputHost(hostSelected.value)
+  await appSettings.setOutputHost(hostSelected.value)
   await loadOutputDevices()
   // Reset to first device on host switch.
   if (outputDevices.value.length > 0) {
     outputSelected.value = outputDevices.value[0]
-    jsonStore.setOutSource(outputSelected.value)
+    await appSettings.setOutputSource(outputSelected.value)
   }
   await loadAsioChannels()
 }
 
 async function selectOutputDevice(event: Event) {
   const val = (event.target as HTMLSelectElement).value
-  jsonStore.setOutSource(val)
+  await appSettings.setOutputSource(val)
   await loadAsioChannels()
 }
 
-function saveAsioChannels() {
-  jsonStore.setAsioChannels(asioLeft.value, asioRight.value)
+async function saveAsioChannels() {
+  await appSettings.setAsioChannels(asioLeft.value, asioRight.value)
 }
 
 async function onVolumeChange() {
   const pct = Math.max(0, Math.min(100, Math.round(outputVolumePct.value)))
   outputVolumePct.value = pct
-  const vol = pct / 100
-  jsonStore.setOutputVolume(vol)
-  try {
-    await invoke('set_output_volume', { volume: vol })
-  } catch (e) {
-    console.error('set_output_volume failed', e)
-  }
+  await appSettings.setOutputVolume(pct / 100)
 }
 
 async function syncFromStore() {
+  if (!appSettings.loaded) await appSettings.load()
   await loadAudioHosts()
-  const settings = jsonStore.configFile?.settings
-  hostSelected.value = settings?.outputHost ?? 'WASAPI'
+  hostSelected.value = appSettings.outputHost || 'WASAPI'
   await loadOutputDevices()
-  const saved = settings?.outputSource
-  if (saved && outputDevices.value.includes(saved)) {
+  const saved = appSettings.outputSource
+  if (saved && saved !== 'default' && outputDevices.value.includes(saved)) {
     outputSelected.value = saved
   } else if (outputDevices.value.length > 0) {
     outputSelected.value = outputDevices.value[0]
-    jsonStore.setOutSource(outputDevices.value[0])
+    if (saved !== outputDevices.value[0]) {
+      await appSettings.setOutputSource(outputDevices.value[0])
+    }
   }
-  asioLeft.value = settings?.asioLeftChannel ?? null
-  asioRight.value = settings?.asioRightChannel ?? null
+  asioLeft.value = appSettings.asioLeftChannel
+  asioRight.value = appSettings.asioRightChannel
   await loadAsioChannels()
-  const savedVol = settings?.outputVolume
-  outputVolumePct.value = Math.round((savedVol ?? 1) * 100)
-  try {
-    await invoke('set_output_volume', { volume: savedVol ?? 1 })
-  } catch (e) { /* ignore */ }
+  outputVolumePct.value = Math.round((appSettings.outputVolume ?? 1) * 100)
+  await appSettings.applyAudioVolume()
 }
 
 watch(() => appStore.activeOverlay, (val) => {

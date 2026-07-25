@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItemBuilder, SubmenuBuilder};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,12 +16,54 @@ pub struct RecentProject {
 struct MenuState {
     lang: String,
     recents: Vec<RecentProject>,
+    /// When false (styled/hidden chrome on Win/Linux), skip installing the native menu.
+    native_menu_enabled: bool,
 }
 
 static MENU_STATE: Mutex<MenuState> = Mutex::new(MenuState {
     lang: String::new(),
     recents: Vec::new(),
+    // Default matches tauri.conf decorations:false + custom HTML titlebar.
+    native_menu_enabled: false,
 });
+
+/// Installs or removes the app menu based on `MENU_STATE.native_menu_enabled`.
+fn apply_menu_from_state(app: &tauri::AppHandle) -> Result<(), String> {
+    let (lang, recents, enabled) = {
+        let state = MENU_STATE.lock().unwrap();
+        (
+            if state.lang.is_empty() {
+                "en".to_string()
+            } else {
+                state.lang.clone()
+            },
+            state.recents.clone(),
+            state.native_menu_enabled,
+        )
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = enabled; // macOS always keeps the menu bar
+        let menu = build_menu(app, &lang, &recents).map_err(|e| e.to_string())?;
+        app.set_menu(menu).map_err(|e| e.to_string())?;
+        let _ = app.show_menu();
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        if enabled {
+            let menu = build_menu(app, &lang, &recents).map_err(|e| e.to_string())?;
+            app.set_menu(menu).map_err(|e| e.to_string())?;
+            let _ = app.show_menu();
+        } else {
+            let _ = app.hide_menu();
+            let _ = app.remove_menu();
+        }
+        Ok(())
+    }
+}
 
 struct MenuLabels {
     file: &'static str,
@@ -139,9 +181,18 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
     {
         let mut state = MENU_STATE.lock().unwrap();
         state.lang = "en".to_string();
+        // Styled custom titlebar is the default on Win/Linux; macOS keeps native menu.
+        #[cfg(target_os = "macos")]
+        {
+            state.native_menu_enabled = true;
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            state.native_menu_enabled = false;
+        }
     }
-    let menu = build_menu(app.handle(), "en", &[])?;
-    app.set_menu(menu)?;
+    // Install native menu only when enabled (macOS always; Win/Linux after user opts in).
+    let _ = apply_menu_from_state(app.handle());
 
     app.on_menu_event(|app, event| {
         let id = event.id.as_ref();
@@ -215,14 +266,11 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
 
 #[tauri::command]
 pub fn rebuild_menu(app: tauri::AppHandle, lang: String) -> Result<(), String> {
-    let recents = {
+    {
         let mut state = MENU_STATE.lock().unwrap();
-        state.lang = lang.clone();
-        state.recents.clone()
-    };
-    let menu = build_menu(&app, &lang, &recents).map_err(|e| e.to_string())?;
-    app.set_menu(menu).map_err(|e| e.to_string())?;
-    Ok(())
+        state.lang = lang;
+    }
+    apply_menu_from_state(&app)
 }
 
 /// Replaces the recent-projects list and rebuilds the menu, keeping the
@@ -232,15 +280,54 @@ pub fn set_recent_projects(
     app: tauri::AppHandle,
     recents: Vec<RecentProject>,
 ) -> Result<(), String> {
-    let lang = {
+    {
         let mut state = MENU_STATE.lock().unwrap();
-        state.recents = recents.clone();
+        state.recents = recents;
         if state.lang.is_empty() {
             state.lang = "en".to_string();
         }
-        state.lang.clone()
-    };
-    let menu = build_menu(&app, &lang, &recents).map_err(|e| e.to_string())?;
-    app.set_menu(menu).map_err(|e| e.to_string())?;
-    Ok(())
+    }
+    apply_menu_from_state(&app)
+}
+
+/// Applies window chrome: native OS decorations + menu vs undecorated custom UI.
+///
+/// - `native_chrome`: use the OS title bar and native app menu
+/// - `hidden`: hide title bar entirely (no decorations, no menu on Win/Linux)
+///
+/// macOS always keeps its menu bar (platform convention).
+#[tauri::command]
+pub fn set_window_chrome(
+    app: tauri::AppHandle,
+    native_chrome: bool,
+    hidden: bool,
+) -> Result<(), String> {
+    let use_native = native_chrome && !hidden;
+
+    if let Some(win) = app.get_webview_window("main") {
+        // macOS keeps traffic-light decorations; elsewhere follow the setting.
+        #[cfg(target_os = "macos")]
+        {
+            let _ = win.set_decorations(true);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            win.set_decorations(use_native).map_err(|e| e.to_string())?;
+        }
+    }
+
+    {
+        let mut state = MENU_STATE.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        {
+            state.native_menu_enabled = true;
+            let _ = use_native;
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            state.native_menu_enabled = use_native;
+        }
+    }
+
+    apply_menu_from_state(&app)
 }

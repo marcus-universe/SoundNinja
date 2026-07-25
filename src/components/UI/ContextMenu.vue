@@ -2,6 +2,7 @@
   <Teleport to="body">
     <div
       v-if="appStore.contextMenu.visible"
+      ref="menuEl"
       class="context-menu"
       :style="{ top: menuY + 'px', left: menuX + 'px' }"
       @click.stop
@@ -99,6 +100,8 @@ const jsonStore = useJsonHandelingStore()
 const colorPickerOpen = ref(false)
 const moveToTabOpen = ref(false)
 const hoveredItem = ref(null)
+const menuEl = ref(null)
+const menuSize = ref({ w: 220, h: 180 })
 
 const allTabs = computed(() => jsonStore.configFile.tabList)
 const soundTabs = computed(() => {
@@ -136,16 +139,38 @@ function toggleSoundTab(tabName) {
   jsonStore.setSoundTabs(targetIndex, tabs)
 }
 
-// Keep menu inside viewport
+async function measureMenu() {
+  await nextTick()
+  const el = menuEl.value
+  if (!el || typeof window === 'undefined') return
+  const rect = el.getBoundingClientRect()
+  menuSize.value = { w: rect.width || 220, h: rect.height || 180 }
+}
+
+watch(
+  () => [
+    appStore.contextMenu.visible,
+    appStore.contextMenu.x,
+    appStore.contextMenu.y,
+    colorPickerOpen.value,
+    moveToTabOpen.value,
+  ],
+  ([visible]) => {
+    if (visible) measureMenu()
+  },
+  { flush: 'post' },
+)
+
+// Keep menu inside viewport using measured size
 const menuX = computed(() => {
   const x = appStore.contextMenu.x
   if (typeof window === 'undefined') return x
-  return Math.min(x, window.innerWidth - 200)
+  return Math.min(x, Math.max(4, window.innerWidth - menuSize.value.w - 8))
 })
 const menuY = computed(() => {
   const y = appStore.contextMenu.y
   if (typeof window === 'undefined') return y
-  return Math.min(y, window.innerHeight - 160)
+  return Math.min(y, Math.max(4, window.innerHeight - menuSize.value.h - 8))
 })
 
 const currentColor = computed(() => {

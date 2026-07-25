@@ -138,7 +138,8 @@ pub struct ProjectInfo {
     pub db_path: String,
 }
 
-/// Lists all projects (sub-folders of `projects_path` containing a project.db).
+/// Lists all projects (sub-folders of `projects_path` containing a project file).
+/// Prefers `project.sninja`; falls back to legacy `project.db`.
 #[tauri::command]
 pub fn list_projects(projects_path: String) -> Result<Vec<ProjectInfo>, String> {
     let root = Path::new(&projects_path);
@@ -151,13 +152,20 @@ pub fn list_projects(projects_path: String) -> Result<Vec<ProjectInfo>, String> 
         if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
         }
-        let db = entry.path().join("project.db");
-        if db.exists() {
-            out.push(ProjectInfo {
-                name: entry.file_name().to_string_lossy().to_string(),
-                db_path: db.to_string_lossy().to_string(),
-            });
-        }
+        let dir = entry.path();
+        let sninja = dir.join("project.sninja");
+        let legacy = dir.join("project.db");
+        let db = if sninja.exists() {
+            sninja
+        } else if legacy.exists() {
+            legacy
+        } else {
+            continue;
+        };
+        out.push(ProjectInfo {
+            name: entry.file_name().to_string_lossy().to_string(),
+            db_path: db.to_string_lossy().to_string(),
+        });
     }
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(out)

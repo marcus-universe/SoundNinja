@@ -106,6 +106,7 @@ fn main() {
             get_system_fonts,
             menu::rebuild_menu,
             menu::set_recent_projects,
+            menu::set_window_chrome,
             paths::get_default_paths,
             paths::relocate_data,
             paths::list_projects,

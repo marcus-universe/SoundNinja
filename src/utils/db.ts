@@ -99,27 +99,93 @@ export function emptyConfig(): ProjectConfig {
 // ── Connection handling ───────────────────────────────────────────────────────
 let db: Database | null = null
 let currentUrl: string | null = null
+let currentPath: string | null = null
+/** Serialises open/persist so a mid-save pool close cannot race. */
+let dbChain: Promise<unknown> = Promise.resolve()
 
 function toUrl(dbAbsPath: string): string {
   return 'sqlite:' + dbAbsPath.replace(/\\/g, '/')
 }
 
-/** Opens (and caches) a project database, initialising its schema. */
+function withDbLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = dbChain.then(fn, fn)
+  // Keep the chain alive even if `fn` rejects.
+  dbChain = next.then(() => undefined, () => undefined)
+  return next
+}
+
+/**
+ * Opens (and caches) a project database, initialising its schema.
+ *
+ * Important: do NOT call `Database.close()` without a path — that shuts down
+ * *every* SQL pool (including app-config.db). We also avoid closing when
+ * switching projects: tauri-plugin-sql can leave a closed pool in its map and
+ * hand it back on the next load ("attempted to acquire a connection on a closed pool").
+ */
 export async function openDb(dbAbsPath: string): Promise<Database> {
+  return withDbLock(async () => openDbUnlocked(dbAbsPath))
+}
+
+async function openDbUnlocked(dbAbsPath: string): Promise<Database> {
   const url = toUrl(dbAbsPath)
   if (db && currentUrl === url) return db
-  if (db) {
-    try { await db.close() } catch { /* ignore */ }
-    db = null
-  }
+
   db = await Database.load(url)
   currentUrl = url
+  currentPath = dbAbsPath
   await initSchema(db)
   return db
 }
 
+async function reopenDbUnlocked(dbAbsPath: string): Promise<Database> {
+  const url = toUrl(dbAbsPath)
+  // Close only this pool (pass the connection string). Never call close() bare —
+  // bare close() shuts down *all* pools in the plugin.
+  if (db && currentUrl) {
+    try { await db.close(currentUrl) } catch { /* ignore */ }
+  }
+  db = null
+  currentUrl = null
+  currentPath = null
+
+  db = await Database.load(url)
+  currentUrl = url
+  currentPath = dbAbsPath
+  await initSchema(db)
+  return db
+}
+
+/** Drops the local cache and reloads the pool for `dbAbsPath`. */
+export async function reopenDb(dbAbsPath: string): Promise<Database> {
+  return withDbLock(async () => reopenDbUnlocked(dbAbsPath))
+}
+
 export function getDb(): Database | null {
   return db
+}
+
+export function getDbPath(): string | null {
+  return currentPath
+}
+
+/**
+ * Opens the project DB (reloading once on closed-pool errors) and runs `fn`
+ * under the connection lock so saves cannot race project switches.
+ */
+export async function withProjectDb<T>(
+  dbAbsPath: string,
+  fn: (d: Database) => Promise<T>,
+): Promise<T> {
+  return withDbLock(async () => {
+    let d = await openDbUnlocked(dbAbsPath)
+    try {
+      return await fn(d)
+    } catch (e) {
+      if (!/closed pool/i.test(String(e))) throw e
+      d = await reopenDbUnlocked(dbAbsPath)
+      return await fn(d)
+    }
+  })
 }
 
 async function initSchema(d: Database): Promise<void> {
@@ -269,15 +335,15 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     await d.execute('DELETE FROM separators')
 
     const s = config.settings
+    // Note: outputSource / outputHost / outputVolume / ASIO channels are app-wide
+    // (app-config.db) and must not be written into the project file.
     const settingsRows: [string, string][] = [
       ['theme', s.theme ?? 'dark-cyan'],
       ['customCss', s.customCss ?? ''],
-      ['outputSource', s.outputSource ?? 'default'],
       ['stopOnRetrigger', String(s.stopOnRetrigger ?? true)],
       ['overlapSounds', String(s.overlapSounds ?? false)],
       ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
       ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
-      ['outputVolume', String(s.outputVolume ?? 1)],
       ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
       ['allowReorder', String(s.allowReorder ?? true)],
       ['themeMode', s.themeMode ?? 'dark'],
@@ -288,9 +354,6 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       ['btnDark', s.btnDark ?? '#363f4d'],
       ['textLight', s.textLight ?? '#eeeeee'],
       ['textDark', s.textDark ?? '#222831'],
-      ['outputHost', s.outputHost ?? 'WASAPI'],
-      ...(s.asioLeftChannel != null ? [['asioLeftChannel', String(s.asioLeftChannel)] as [string, string]] : []),
-      ...(s.asioRightChannel != null ? [['asioRightChannel', String(s.asioRightChannel)] as [string, string]] : []),
     ]
     await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 

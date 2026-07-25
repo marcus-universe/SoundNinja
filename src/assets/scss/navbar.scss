@@ -39,9 +39,9 @@
       }
     }
 
-    .searchButton {
+    .searchButton,
+    .multiSelectButton {
       position: absolute;
-      top: 0;
       z-index: 2;
       background: var(--color-bg, #{$color-bg});
       padding: 2rem $padding_1;
@@ -53,6 +53,14 @@
       }
     }
 
+    .searchButton {
+      top: 0;
+    }
+
+    .multiSelectButton {
+      bottom: 0;
+    }
+
     .active {
       fill: $white;
       cursor: pointer;
@@ -60,16 +68,26 @@
 
     .searchBar {
       position: fixed;
-      top: calc(var(--topbar_height, 0px) + 2rem);
+      top: var(--topbar_height, 0px);
       left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
       right: $padding_1;
       height: var(--icon_size);
       background: var(--color-bg, #{$color-bg});
       z-index: 3;
 
+      &__field {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+      }
+
       input {
         width: 100%;
+        height: 100%;
         padding: $padding_1;
+        padding-right: calc(var(--icon_size) + 0.4rem);
         background: var(--color-bg, #{$color-bg});
         color: var(--primary_color);
         border: 0.32rem solid var(--primary_color);
@@ -84,13 +102,50 @@
           outline: none;
         }
       }
+
+      &__clear {
+        all: unset;
+        position: absolute;
+        right: 0.6rem;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: calc(var(--icon_size) - 0.8rem);
+        height: calc(var(--icon_size) - 0.8rem);
+        cursor: pointer;
+        border-radius: 0.4rem;
+        transition: background 0.15s;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.08);
+          transform: translateY(-50%);
+        }
+      }
+
+      &__clear-icon {
+        width: 2rem !important;
+        height: 2rem !important;
+        min-width: 2rem !important;
+        min-height: 2rem !important;
+        fill: var(--primary_color);
+        pointer-events: none;
+        transition: fill 0.15s;
+      }
+
+      &__clear:hover .searchBar__clear-icon {
+        fill: $white;
+        transform: none;
+      }
     }
   }
 }
 
 // ── Right-side navbar: mirror the search elements to the opposite edge ──────────
 .navbar-right {
-  .searchButton {
+  .searchButton,
+  .multiSelectButton {
     left: auto;
     right: 0;
   }

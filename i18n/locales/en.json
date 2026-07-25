@@ -24,7 +24,9 @@
     "unsavedMessage": "You have unsaved changes. What would you like to do?",
     "save": "Save",
     "discard": "Discard",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "errorTitle": "Error",
+    "ok": "OK"
   },
   "settings": {
     "title": "Settings",
@@ -71,6 +73,14 @@
       "uniformButtonHeightHint": "Force every button to the height of the tallest one",
       "allowReorder": "Allow drag reordering",
       "allowReorderHint": "Enable drag-and-drop reordering of sounds and separators",
+      "systemTitlebar": "Use system title bar and menu",
+      "systemTitlebarHint": "Uses the standard window frame and menu bar of your operating system instead of the app's own design.",
+      "hideTitlebar": "Hide titlebar",
+      "hideTitlebarHint": "Frees up space at the top. Use the icons on the side to open Settings.",
+      "hideTitlebarWarnTitle": "Hide the title bar?",
+      "hideTitlebarWarnText": "When the title bar is hidden, you can no longer move, minimize, maximize, or close the window with the mouse. Close the app with Alt+F4 (Windows) or your system shortcut. Settings stay reachable from the side icon bar.",
+      "hideTitlebarWarnConfirm": "Hide title bar",
+      "hideTitlebarDontRemind": "Don't remind me again",
       "recentLimit": "Recent projects limit",
       "recentLimitHint": "How many recent projects to remember",
       "language": "Language",
@@ -206,7 +216,8 @@
     "confirm": "Confirm"
   },
   "navbar": {
-    "search": "Search"
+    "search": "Search",
+    "clearSearch": "Clear search"
   },
   "about": {
     "title": "About",

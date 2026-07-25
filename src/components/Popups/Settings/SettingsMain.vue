@@ -106,6 +106,37 @@
       <UICheckbox :modelValue="allowReorder" @update:modelValue="onAllowReorder" />
     </div>
 
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.hideTitlebar') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.hideTitlebarHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="hideTitlebar" @update:modelValue="onHideTitlebarToggle" />
+    </div>
+
+    <div v-if="!hideTitlebar" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.systemTitlebar') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.systemTitlebarHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="systemTitlebar" @update:modelValue="onSystemTitlebar" />
+    </div>
+
+    <DialogField
+      v-if="hideTitlebarWarnOpen"
+      :title="$t('settings.main.hideTitlebarWarnTitle')"
+      @close="cancelHideTitlebar"
+    >
+      <p class="dialog-text">{{ $t('settings.main.hideTitlebarWarnText') }}</p>
+      <UICheckbox v-model="hideTitlebarDontRemind" class="hide-titlebar-dont-remind">
+        {{ $t('settings.main.hideTitlebarDontRemind') }}
+      </UICheckbox>
+      <div class="flex_c_h gap1 dialog-actions">
+        <UIButton @click="confirmHideTitlebar">{{ $t('settings.main.hideTitlebarWarnConfirm') }}</UIButton>
+        <UIButton @click="cancelHideTitlebar">{{ $t('dialog.cancel') }}</UIButton>
+      </div>
+    </DialogField>
+
     <div class="settings-group">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.recentLimit') }}</span>
@@ -221,6 +252,10 @@ const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
+const systemTitlebar = ref(false)
+const hideTitlebar = ref(false)
+const hideTitlebarWarnOpen = ref(false)
+const hideTitlebarDontRemind = ref(false)
 const themeMode = ref<'dark' | 'light'>('dark')
 const recentLimit = ref(30)
 const currentLanguage = ref(locale.value)
@@ -414,6 +449,42 @@ function onAllowReorder(val: boolean) {
   jsonStore.setAllowReorder(val)
 }
 
+async function onSystemTitlebar(val: boolean) {
+  systemTitlebar.value = val
+  await appSettings.setTitlebarMode(val ? 'system' : 'styled')
+}
+
+async function onHideTitlebarToggle(val: boolean) {
+  if (val) {
+    // Skip warn if user chose "don't remind me again".
+    if (appSettings.hideTitlebarSkipWarn) {
+      hideTitlebar.value = true
+      await appSettings.setHideTitlebar(true)
+      return
+    }
+    hideTitlebarDontRemind.value = false
+    hideTitlebarWarnOpen.value = true
+    return
+  }
+  hideTitlebar.value = false
+  await appSettings.setHideTitlebar(false)
+}
+
+async function confirmHideTitlebar() {
+  hideTitlebarWarnOpen.value = false
+  if (hideTitlebarDontRemind.value) {
+    await appSettings.setHideTitlebarSkipWarn(true)
+  }
+  hideTitlebar.value = true
+  await appSettings.setHideTitlebar(true)
+}
+
+function cancelHideTitlebar() {
+  hideTitlebarWarnOpen.value = false
+  hideTitlebarDontRemind.value = false
+  hideTitlebar.value = false
+}
+
 function onThemeMode() {
   jsonStore.setThemeMode(themeMode.value)
   applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
@@ -471,6 +542,8 @@ async function syncFromStore() {
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
+  systemTitlebar.value = appSettings.titlebarMode === 'system'
+  hideTitlebar.value = !!appSettings.hideTitlebar
   themeMode.value = jsonStore.configFile?.settings?.themeMode ?? 'dark'
   applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
   recentLimit.value = appSettings.recentLimit ?? 30

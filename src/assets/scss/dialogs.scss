@@ -3,7 +3,8 @@
 .dialog-box {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  // Above settings (100), context menu (1000), and titlebar (9999).
+  z-index: 11000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,6 +78,8 @@
   font-size: var(--font-size-sm);
   margin: 0;
   text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .dialog-actions {
