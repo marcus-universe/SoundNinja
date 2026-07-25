@@ -51,6 +51,8 @@
         @triggered="IconClicked"
       />
     </div>
+
+    <ImportChooser @choose="onImportChoice" />
   </div>
 </template>
 
@@ -153,13 +155,24 @@ function activateSearch() {
   focusSearchInput()
 }
 
+async function onImportChoice(mode) {
+  await nextTick()
+  if (mode === 'audio') {
+    await uploadFiles()
+  } else if (mode === 'folders') {
+    appStore.setImportFoldersActive(true)
+  }
+}
+
 function IconClicked(icon) {
-  if (icon === 'upload') {
-    uploadFiles()
+  if (icon === 'add' || icon === 'upload') {
+    appStore.setImportChooserActive(true)
   } else if (icon === 'search') {
     OpenSearch()
-  } else if (icon === 'folder') {
+  } else if (icon === 'project') {
     appStore.setSelectProjectActive(true)
+  } else if (icon === 'folder') {
+    appStore.setImportFoldersActive(true)
   } else if (icon === 'settings') {
     appStore.setActiveOverlay(appStore.activeOverlay === 'settings' ? null : 'settings')
   } else if (icon === 'about') {

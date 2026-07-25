@@ -8,7 +8,7 @@
         </div>
 
         <div class="project-dialog__body">
-          <div v-if="projects.length === 0" class="project-dialog__empty">{{ $t('project.noProjects') }}</div>
+          <div v-if="projects.length === 0" class="project-dialog__empty">{{ $t('project.noRecent') }}</div>
           <ul v-else class="project-list">
             <li
               v-for="proj in projects"
@@ -21,8 +21,8 @@
               <span v-if="jsonStore.currentProjectPath === proj.dbPath" class="project-list__check">✓</span>
               <button
                 class="project-list__remove"
-                :title="$t('project.removeProject')"
-                @click.stop="removeProject(proj)"
+                :title="$t('project.removeRecent')"
+                @click.stop="removeFromRecent(proj)"
               >
                 <Icons icon="exit" custom-class="dialog-close project-list__remove-icon" />
               </button>
@@ -64,9 +64,8 @@ import { invoke } from '@tauri-apps/api/core'
 import {
   PROJECT_FILE_FILTER,
   createProjectFolder,
-  listProjects,
+  projectDbPath,
   projectNameFromDbPath,
-  safeProjectName,
   type ProjectInfo,
 } from '~/utils/projects'
 
@@ -77,8 +76,9 @@ const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
 
 const newProjectName = ref('')
-const projects = ref<ProjectInfo[]>([])
 const errorMessage = ref('')
+
+const projects = computed(() => appSettings.recentProjects ?? [])
 
 function closeDialog() {
   errorMessage.value = ''
@@ -86,17 +86,12 @@ function closeDialog() {
   appStore.setSelectProjectActive(false)
 }
 
-function parentDir(path: string) {
-  const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return i >= 0 ? path.slice(0, i) : path
-}
-
-async function loadProjects() {
+async function refreshList() {
   try {
-    projects.value = await listProjects(appSettings.projectsPath)
+    await appSettings.refreshRecents()
     errorMessage.value = ''
   } catch (e) {
-    console.error('Failed to load projects', e)
+    console.error('Failed to load recent projects', e)
     errorMessage.value = String(e)
   }
 }
@@ -106,7 +101,6 @@ async function selectProject(proj: ProjectInfo) {
     const stillExists = await invoke('path_exists_abs', { path: proj.dbPath })
     if (!stillExists) {
       await appSettings.removeRecentProject(proj.dbPath)
-      await loadProjects()
       return
     }
     await jsonStore.openProject(proj.dbPath)
@@ -118,19 +112,12 @@ async function selectProject(proj: ProjectInfo) {
   }
 }
 
-async function removeProject(proj: ProjectInfo) {
-  if (jsonStore.currentProjectPath === proj.dbPath) {
-    errorMessage.value = t('project.deleteCurrentError')
-    return
-  }
-  if (!window.confirm(t('project.deleteConfirm', { name: proj.name }))) return
+async function removeFromRecent(proj: ProjectInfo) {
   try {
-    await deleteProjectFolder(proj.dbPath)
     await appSettings.removeRecentProject(proj.dbPath)
     errorMessage.value = ''
-    await loadProjects()
   } catch (e) {
-    console.error('Failed to delete project', e)
+    console.error('Failed to remove recent project', e)
     errorMessage.value = String(e)
   }
 }
@@ -145,7 +132,6 @@ async function openExisting() {
   try {
     await jsonStore.openProject(selected)
     await appSettings.touchRecent(selected, projectNameFromDbPath(selected))
-    await loadProjects()
     closeDialog()
   } catch (e) {
     console.error('Failed to open project', e)
@@ -157,16 +143,15 @@ async function createProject() {
   const name = newProjectName.value.trim()
   if (!name) return
   try {
-    const safeName = safeProjectName(name)
-    const existing = projects.value.some((p) => safeProjectName(p.name).toLowerCase() === safeName.toLowerCase())
-    if (existing) {
+    const dbPath = projectDbPath(appSettings.projectsPath, name)
+    const alreadyExists = await invoke<boolean>('path_exists_abs', { path: dbPath })
+    if (alreadyExists) {
       errorMessage.value = t('project.duplicateNameError')
       return
     }
-    const dbPath = await createProjectFolder(appSettings.projectsPath, name)
-    await jsonStore.openProject(dbPath)
-    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
-    await loadProjects()
+    const createdPath = await createProjectFolder(appSettings.projectsPath, name)
+    await jsonStore.openProject(createdPath)
+    await appSettings.touchRecent(createdPath, projectNameFromDbPath(createdPath))
     errorMessage.value = ''
     newProjectName.value = ''
     closeDialog()
@@ -176,15 +161,10 @@ async function createProject() {
   }
 }
 
-async function deleteProjectFolder(dbPath: string) {
-  await invoke('delete_file_abs', { path: dbPath })
-  await invoke('delete_dir_abs', { path: parentDir(dbPath) })
-}
-
 watch(
   () => appStore.selectProjectActive,
   (active) => {
-    if (active) loadProjects()
+    if (active) refreshList()
   },
   { immediate: true }
 )

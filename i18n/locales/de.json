@@ -28,6 +28,12 @@
     "errorTitle": "Fehler",
     "ok": "OK"
   },
+  "importChooser": {
+    "title": "Importieren",
+    "message": "Was möchtest du importieren?",
+    "audioFiles": "Audiodateien",
+    "folders": "Ordner"
+  },
   "settings": {
     "title": "Einstellungen",
     "close": "Schließen",

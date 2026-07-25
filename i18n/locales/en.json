@@ -28,6 +28,12 @@
     "errorTitle": "Error",
     "ok": "OK"
   },
+  "importChooser": {
+    "title": "Import",
+    "message": "What would you like to import?",
+    "audioFiles": "Audio Files",
+    "folders": "Folders"
+  },
   "settings": {
     "title": "Settings",
     "close": "Close",
