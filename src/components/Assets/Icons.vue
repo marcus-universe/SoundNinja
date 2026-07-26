@@ -116,9 +116,47 @@
   <path class="cls-1" d="M20 2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2V4a2 2 0 0 1 2-2zM6 9H4v11h11v-2H8a2 2 0 0 1-2-2zm14-5H8v12h12zm-2.11 3.233a1 1 0 0 1 0 1.414l-4.173 4.172a1.1 1.1 0 0 1-1.556 0l-2.05-2.05a1 1 0 0 1 1.414-1.415l1.414 1.414l3.536-3.535a1 1 0 0 1 1.414 0Z"/>
 </svg>
 
+<!-- Add / Import (icon-park-solid:add) -->
+<svg v-if="icon === 'add'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" :class="[customClass]" @click="$emit('triggered', icon)">
+  <defs>
+    <mask id="sn-icon-park-add">
+      <g fill="none" stroke-linejoin="round" stroke-width="4">
+        <rect width="36" height="36" x="6" y="6" fill="#fff" stroke="#fff" rx="3"/>
+        <path stroke="#000" stroke-linecap="round" d="M24 16v16m-8-8h16"/>
+      </g>
+    </mask>
+  </defs>
+  <path class="cls-1" d="M0 0h48v48H0z" mask="url(#sn-icon-park-add)"/>
+</svg>
+
+<!-- Project (material-symbols:dashboard-rounded) -->
+<svg v-if="icon === 'project'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M14 9q-.425 0-.712-.288T13 8V4q0-.425.288-.712T14 3h6q.425 0 .713.288T21 4v4q0 .425-.288.713T20 9zM4 13q-.425 0-.712-.288T3 12V4q0-.425.288-.712T4 3h6q.425 0 .713.288T11 4v8q0 .425-.288.713T10 13zm10 8q-.425 0-.712-.288T13 20v-8q0-.425.288-.712T14 11h6q.425 0 .713.288T21 12v8q0 .425-.288.713T20 21zM4 21q-.425 0-.712-.288T3 20v-4q0-.425.288-.712T4 15h6q.425 0 .713.288T11 16v4q0 .425-.288.713T10 21z"/>
+</svg>
+
 <!-- Question / Info (pajamas:question) -->
 <svg v-if="icon === 'question'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" :class="[customClass]" @click="$emit('triggered', icon)">
   <path class="cls-1" fill-rule="evenodd" d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16M4.927 4.99Q4.5 5.634 4.5 6.26q0 .305.27.566t.661.26q.665 0 .903-.746q.252-.713.616-1.08q.364-.366 1.134-.366q.658 0 1.075.363q.416.364.416.892a.97.97 0 0 1-.136.502a2 2 0 0 1-.336.419a14 14 0 0 1-.648.558q-.51.423-.812.73q-.3.308-.483.713c-.322 1.245 1.35 1.345 1.736.456q.07-.128.213-.284q.144-.155.382-.36a41 41 0 0 0 1.194-1.034q.332-.306.573-.73a1.95 1.95 0 0 0 .242-.984q0-.712-.424-1.32q-.423-.609-1.2-.962T8.084 3.5q-1.092 0-1.911.423T4.927 4.989Zm2.14 7.08a1 1 0 1 0 2 0a1 1 0 0 0-2 0" clip-rule="evenodd"/>
+</svg>
+
+<!-- Delete / Trash (material-symbols:delete) -->
+<svg v-if="icon === 'delete'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zm2-4h2V8H9zm4 0h2V8h-2z"/>
+</svg>
+
+<!-- Rename (mdi:rename) -->
+<svg v-if="icon === 'rename'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="m15 16l-4 4h10v-4zm-2.94-8.81L3 16.25V20h3.75l9.06-9.06zm6.65.85c.39-.39.39-1.04 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83l3.75 3.75z"/>
+</svg>
+
+<!-- Tab / Move to Tab (material-symbols:tab) -->
+<svg v-if="icon === 'tab'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M4 20q-.825 0-1.412-.587T2 18V6q0-.825.588-1.412T4 4h16q.825 0 1.413.588T22 6v12q0 .825-.587 1.413T20 20zm9-10h7V6h-7z"/>
+</svg>
+
+<!-- Page Separator (ri:page-separator) -->
+<svg v-if="icon === 'page-separator'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M17 21v-4H7v4H5v-5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5zM7 3v4h10V3h2v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3zM2 9l4 3l-4 3zm20 0v6l-4-3z"/>
 </svg>
 
 </template>

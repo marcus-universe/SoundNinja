@@ -43,6 +43,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { defaultSettings } from '~/utils/db'
+import {
+  createProjectFolder,
+  ensureSaveProjectPath,
+  listProjects,
+  PROJECT_FILE_FILTER,
+  PROJECT_SAVE_FILTER,
+  projectNameFromDbPath,
+  safeProjectName,
+} from '~/utils/projects'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
@@ -170,45 +179,55 @@ async function handleMenuNewProject() {
     await openProjectPath(dbPath)
   } catch (e) {
     console.error('Failed to create project', e)
-    appStore.setErrorActive('Failed to create project.')
+    appStore.setErrorActive(`Failed to create project.\n\n${formatError(e)}`)
   }
+}
+
+function formatError(e) {
+  if (e == null) return 'Unknown error'
+  if (typeof e === 'string') return e
+  if (e instanceof Error) return e.message || String(e)
+  try { return JSON.stringify(e) } catch { return String(e) }
 }
 
 async function handleMenuOpenProject() {
   const selected = await openDialog({
     title: 'Open Project',
-    filters: [{ name: 'Sound Ninja Project', extensions: ['db'] }],
+    filters: [PROJECT_FILE_FILTER],
     multiple: false,
   })
   if (!selected || Array.isArray(selected)) return
   try {
     await openProjectPath(selected)
-  } catch {
-    appStore.setErrorActive('Failed to open project database.')
+  } catch (e) {
+    console.error('Failed to open project', e)
+    appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
   }
 }
 
 async function handleMenuSave() {
   try {
     await jsonStore.persistNow()
-  } catch {
-    appStore.setErrorActive('Failed to save project.')
+  } catch (e) {
+    console.error('Failed to save project', e)
+    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
   }
 }
 
 async function handleMenuSaveAs() {
   const path = await saveDialog({
     title: 'Save Project As',
-    filters: [{ name: 'Sound Ninja Project', extensions: ['db'] }],
-    defaultPath: 'project.db',
+    filters: [PROJECT_SAVE_FILTER],
+    defaultPath: `project.${PROJECT_SAVE_FILTER.extensions[0]}`,
   })
   if (!path) return
   try {
-    const dbPath = path.endsWith('.db') ? path : path + '.db'
-    await jsonStore.importConfig(jsonStore.configFile, dbPath)
+    const dbPath = ensureSaveProjectPath(path)
+    await jsonStore.saveAs(dbPath)
     await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
-  } catch {
-    appStore.setErrorActive('Failed to save project.')
+  } catch (e) {
+    console.error('Failed to save project as', e)
+    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
   }
 }
 
@@ -311,6 +330,8 @@ onMounted(async () => {
   // Register any uploaded custom fonts so themed fonts render everywhere.
   loadCustomFonts(appSettings.fontsPath).catch(() => {})
   await bootstrapProject()
+  // One-time: pull audio device/volume prefs out of the project into app-config.db.
+  await appSettings.migrateAudioFromProject(jsonStore.configFile?.settings)
   await applyPersistedTheme(jsonStore.configFile)
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
@@ -332,8 +353,9 @@ onMounted(async () => {
     try {
       await openProjectPath(path)
       await applyPersistedTheme(jsonStore.configFile)
-    } catch {
-      appStore.setErrorActive('Failed to open project database.')
+    } catch (err) {
+      console.error('Failed to open project', err)
+      appStore.setErrorActive(`Failed to open project.\n\n${formatError(err)}`)
     }
   })
   listen('menu_save', handleMenuSave)

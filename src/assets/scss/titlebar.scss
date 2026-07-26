@@ -93,7 +93,8 @@
     position: absolute;
     top: 100%;
     left: 0;
-    min-width: 22rem;
+    width: max-content;
+    min-width: 0;
     background: var(--color-bg, #{$color-bg});
     border: 0.12rem solid var(--primary_color);
     border-radius: 0.48rem;
@@ -148,7 +149,7 @@
   &__arrow {
     font-size: 0.96rem;
     opacity: 0.5;
-    margin-left: 1.2rem;
+    margin-left: 0.8rem;
   }
 
   &__sep {

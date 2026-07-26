@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import {
-  openDb, getDb, loadConfig, saveConfig, emptyConfig,
+  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
 } from '~/utils/db'
 
@@ -8,6 +8,11 @@ import {
  *  deep-clones and strips Vue reactive Proxies (which structuredClone rejects). */
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
+}
+
+/** Lowercase + strip spaces/punctuation so "alf" matches "A L F". */
+function compactSearch(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/gi, '')
 }
 
 export const useJsonHandelingStore = defineStore('JsonHandeling', {
@@ -85,7 +90,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     writeConfig() {
       this.dirty = true
       if (this._persistTimer) clearTimeout(this._persistTimer)
-      this._persistTimer = setTimeout(() => { this.persistNow() }, 200)
+      this._persistTimer = setTimeout(() => {
+        this.persistNow().catch((e) => console.error('Failed to persist project', e))
+      }, 200)
     },
 
     /** Flushes any pending changes to the project DB immediately. */
@@ -94,17 +101,45 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         clearTimeout(this._persistTimer)
         this._persistTimer = null
       }
-      const d = getDb()
-      if (!d) return
+      if (!this.currentProjectPath) {
+        throw new Error('No project database is open.')
+      }
+      const path = this.currentProjectPath
       this.saving = true
       try {
-        await saveConfig(d, this.configFile)
+        await withProjectDb(path, async (d) => {
+          await saveConfig(d, this.configFile)
+        })
         this.openingSnapshot = clone(this.configFile)
         this.dirty = false
       } catch (e) {
         console.error('Failed to persist project', e)
+        throw e
       } finally {
         this.saving = false
+      }
+    },
+
+    /**
+     * Saves the current in-memory project to a new file path (Save As).
+     * Handles empty Save-dialog placeholders that break SQLite open.
+     */
+    async saveAs(dbAbsPath: string) {
+      const { ensureProjectParentDir, removeInvalidProjectPlaceholder } = await import('~/utils/projects')
+      await ensureProjectParentDir(dbAbsPath)
+      await removeInvalidProjectPlaceholder(dbAbsPath)
+      const config = clone(this.configFile)
+      try {
+        await this.importConfig(config, dbAbsPath)
+      } catch (e) {
+        // Retry once after deleting a non-SQLite placeholder the dialog may have created.
+        const msg = String(e)
+        if (/not a database|unable to open|file is encrypted|disk image/i.test(msg)) {
+          try { await (await import('@tauri-apps/api/core')).invoke('delete_file_abs', { path: dbAbsPath }) } catch { /* ignore */ }
+          await this.importConfig(config, dbAbsPath)
+          return
+        }
+        throw e
       }
     },
 
@@ -381,13 +416,35 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     filterSounds(searchTerm: string) {
-      if (!searchTerm) {
+      const q = (searchTerm ?? '').trim()
+      if (!q) {
         this.filteredFiles = this.configFile.files
-      } else {
-        this.filteredFiles = this.configFile.files.filter((file) =>
-          file.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        return
       }
+      const qLower = q.toLowerCase()
+      const qCompact = compactSearch(q)
+      // Only use tokens with 2+ chars for AND matching. Single letters like
+      // "A L F" would otherwise match any name containing a, l, and f.
+      const tokens = qLower.split(/\s+/).filter((t) => t.length >= 2)
+
+      this.filteredFiles = this.configFile.files.filter((file) => {
+        const nameLower = (file.name ?? '').toLowerCase()
+        const nameCompact = compactSearch(file.name ?? '')
+
+        // 1) Exact-ish substring (case-insensitive)
+        if (nameLower.includes(qLower)) return true
+        // 2) Compact: strip spaces/punct so "A L F" ↔ "alf" both ways
+        if (qCompact.length > 0 && nameCompact.includes(qCompact)) return true
+        // 3) Multi-word queries ("hypnose cat"): every real token must appear
+        if (tokens.length > 1) {
+          return tokens.every((t) => {
+            const tCompact = compactSearch(t)
+            return nameLower.includes(t)
+              || (tCompact.length > 0 && nameCompact.includes(tCompact))
+          })
+        }
+        return false
+      })
     },
   },
 })

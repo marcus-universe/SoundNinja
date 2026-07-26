@@ -2,20 +2,25 @@
   <Teleport to="body">
     <div
       v-if="appStore.contextMenu.visible"
+      ref="menuEl"
       class="context-menu"
       :style="{ top: menuY + 'px', left: menuX + 'px' }"
       @click.stop
     >
       <ul class="context-menu__list">
         <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item" @click="openRename" @mouseenter="hoveredItem = 'rename'" @mouseleave="hoveredItem = null">
-          <span class="context-menu__icon">✏️</span>
+          <span class="context-menu__icon">
+            <Icons icon="rename" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.rename') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'rename'" class="context-menu__desc">{{ $t('contextMenu.renameDesc') }}</span>
           </Transition>
         </li>
         <li class="context-menu__item context-menu__item--danger" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
-          <span class="context-menu__icon">🗑️</span>
+          <span class="context-menu__icon">
+            <Icons icon="delete" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.remove') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'remove'" class="context-menu__desc">{{ $t('contextMenu.removeDesc') }}</span>
@@ -28,7 +33,9 @@
           @mouseenter="hoveredItem = 'moveToTab'"
           @mouseleave="hoveredItem = null"
         >
-          <span class="context-menu__icon">📂</span>
+          <span class="context-menu__icon">
+            <Icons icon="tab" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.moveToTab') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'moveToTab'" class="context-menu__desc">{{ $t('contextMenu.moveToTabDesc') }}</span>
@@ -53,7 +60,9 @@
           @mouseenter="hoveredItem = 'separator'"
           @mouseleave="hoveredItem = null"
         >
-          <span class="context-menu__icon">➖</span>
+          <span class="context-menu__icon">
+            <Icons icon="page-separator" custom-class="context-menu__icon-svg" />
+          </span>
           <span class="context-menu__label">{{ $t('contextMenu.addSeparator') }}</span>
           <Transition name="desc-fade">
             <span v-if="hoveredItem === 'separator'" class="context-menu__desc">{{ $t('contextMenu.addSeparatorDesc') }}</span>
@@ -99,6 +108,8 @@ const jsonStore = useJsonHandelingStore()
 const colorPickerOpen = ref(false)
 const moveToTabOpen = ref(false)
 const hoveredItem = ref(null)
+const menuEl = ref(null)
+const menuSize = ref({ w: 220, h: 180 })
 
 const allTabs = computed(() => jsonStore.configFile.tabList)
 const soundTabs = computed(() => {
@@ -136,16 +147,38 @@ function toggleSoundTab(tabName) {
   jsonStore.setSoundTabs(targetIndex, tabs)
 }
 
-// Keep menu inside viewport
+async function measureMenu() {
+  await nextTick()
+  const el = menuEl.value
+  if (!el || typeof window === 'undefined') return
+  const rect = el.getBoundingClientRect()
+  menuSize.value = { w: rect.width || 220, h: rect.height || 180 }
+}
+
+watch(
+  () => [
+    appStore.contextMenu.visible,
+    appStore.contextMenu.x,
+    appStore.contextMenu.y,
+    colorPickerOpen.value,
+    moveToTabOpen.value,
+  ],
+  ([visible]) => {
+    if (visible) measureMenu()
+  },
+  { flush: 'post' },
+)
+
+// Keep menu inside viewport using measured size
 const menuX = computed(() => {
   const x = appStore.contextMenu.x
   if (typeof window === 'undefined') return x
-  return Math.min(x, window.innerWidth - 200)
+  return Math.min(x, Math.max(4, window.innerWidth - menuSize.value.w - 8))
 })
 const menuY = computed(() => {
   const y = appStore.contextMenu.y
   if (typeof window === 'undefined') return y
-  return Math.min(y, window.innerHeight - 160)
+  return Math.min(y, Math.max(4, window.innerHeight - menuSize.value.h - 8))
 })
 
 const currentColor = computed(() => {

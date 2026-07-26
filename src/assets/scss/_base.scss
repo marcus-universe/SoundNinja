@@ -42,6 +42,9 @@ body {
   --font-size-md: 1.92rem;
   --font-size-btn: var(--font-size-md);
   --font-size-tab: var(--font-size-sm);
+  /* Context / app menus: readable across resolutions */
+  --font-size-menu: clamp(1.6rem, 0.35vw + 1.35rem, 2.2rem);
+  --font-size-menu-desc: clamp(1.35rem, 0.25vw + 1.2rem, 1.8rem);
 
   --tab_width: 8rem;
   --btn_width: 17.6rem;

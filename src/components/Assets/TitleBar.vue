@@ -9,8 +9,18 @@
             <rect x="1" y="5.5" width="10" height="1" rx="0.5" fill="currentColor"/>
           </svg>
         </button>
-        <button class="titlebar__btn titlebar__btn--max" @click="toggleMaximize" aria-label="Maximize">
-          <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <button
+          class="titlebar__btn titlebar__btn--max"
+          @click="toggleMaximize"
+          :aria-label="isMaximized ? 'Restore' : 'Maximize'"
+        >
+          <!-- Restore (two overlapping squares) when maximized -->
+          <svg v-if="isMaximized" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3.5" y="1.5" width="7" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            <rect x="1.5" y="3.5" width="7" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="var(--color-bg, #222831)"/>
+          </svg>
+          <!-- Maximize (single square) when windowed -->
+          <svg v-else viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="1.5" y="1.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
         </button>
@@ -75,8 +85,24 @@ import { emit } from '@tauri-apps/api/event'
 
 const appSettings = useAppSettingsStore()
 
-const showCustomBar = ref(false)
+const isDesktopChrome = ref(false)
 const openMenu = ref<string | null>(null)
+const isMaximized = ref(false)
+
+const showCustomBar = computed(() =>
+  isDesktopChrome.value
+  && appSettings.titlebarMode === 'styled'
+  && !appSettings.hideTitlebar,
+)
+
+// Keep layout offset in sync when the styled bar appears (store also sets this
+// via applyWindowChrome; this covers the brief window before settings load).
+watch(showCustomBar, (visible) => {
+  if (typeof document === 'undefined') return
+  if (visible) {
+    document.documentElement.style.setProperty('--topbar_height', '5.6rem')
+  }
+}, { immediate: true })
 
 const recentProjects = computed(() => appSettings.recentProjects ?? [])
 
@@ -156,27 +182,45 @@ function closeMenu() {
 
 async function emitEvent(event: string, payload?: unknown) {
   if (event === 'menu_quit') {
-    const win = getCurrentWindow()
-    await win.close()
+    const w = getCurrentWindow()
+    await w.close()
     return
   }
   await emit(event, payload)
 }
 
+const win = getCurrentWindow()
+let unlistenResized: (() => void) | null = null
+
+async function refreshMaximized() {
+  try {
+    isMaximized.value = await win.isMaximized()
+  } catch {
+    isMaximized.value = false
+  }
+}
+
+function minimize() { win.minimize() }
+async function toggleMaximize() {
+  await win.toggleMaximize()
+  await refreshMaximized()
+}
+function closeWindow() { win.close() }
+
 onMounted(async () => {
   try {
     const p = await platform()
-    showCustomBar.value = p === 'windows' || p === 'linux'
-    if (showCustomBar.value) {
-      document.documentElement.style.setProperty('--topbar_height', '5.6rem')
-    }
+    isDesktopChrome.value = p === 'windows' || p === 'linux'
   } catch {
-    showCustomBar.value = false
+    isDesktopChrome.value = false
   }
+  await refreshMaximized()
+  try {
+    unlistenResized = await win.onResized(() => { refreshMaximized() })
+  } catch { /* non-tauri */ }
 })
 
-const win = getCurrentWindow()
-function minimize() { win.minimize() }
-function toggleMaximize() { win.toggleMaximize() }
-function closeWindow() { win.close() }
+onUnmounted(() => {
+  if (unlistenResized) unlistenResized()
+})
 </script>

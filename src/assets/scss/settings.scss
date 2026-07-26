@@ -6,9 +6,11 @@
   inset: 0;
   z-index: 100;
   display: flex;
-  align-items: flex-start;
-  
+  align-items: stretch;
   justify-content: center;
+  box-sizing: border-box;
+  // 2rem below titlebar (or window top when hidden) + 2rem above window bottom
+  padding: calc(var(--topbar_height) + 2rem) 0 2rem;
   backdrop-filter: blur(0.4rem);
   background: rgba($color-bg, 0.5);
 }
@@ -17,9 +19,9 @@
 .settings-panel {
   display: flex;
   width: 90dvw;
-  min-height: 90dvh;
   max-width: 96rem;
-  max-height: 90dvh;
+  height: 100%;
+  min-height: 0;
   background: $color-bg;
   border: 0.24rem solid var(--primary_color);
   border-radius: 1.2rem;
@@ -27,7 +29,6 @@
   z-index: 3;
   box-shadow: 0 0.8rem 4rem rgba(0, 0, 0, 0.6);
   position: relative;
-  margin-top: calc(var(--topbar_height) + 2rem);
   .dialog-close-btn{
     position: absolute;
     top: 1.36rem;
@@ -228,6 +229,13 @@
   flex-direction: column;
   gap: 0;
   min-width: 0;
+  container-type: inline-size;
+  container-name: settings-content;
+  // Shared select / square-icon-button size
+  --settings-control-h: calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2);
+  // Label column shrinks with panel width (was stuck at 16rem / 160px)
+  --settings-label-w: clamp(6.5rem, 28cqi, 16rem);
+  --settings-group-gap: clamp(0.6rem, 2.5cqi, 1.6rem);
 
   section {
     display: flex;
@@ -261,9 +269,17 @@
 .settings-group {
   display: flex;
   align-items: center;
-  gap: 1.6rem;
-  padding: 1.2rem 0 0 4rem;
+  gap: var(--settings-group-gap, 1.6rem);
+  padding: 1.2rem 0 1.2rem 4rem;
+  min-width: 0;
   border-bottom: 0.08rem solid rgba(255, 255, 255, 0.05);
+
+  > .settings-row,
+  > .settings-select,
+  > .settings-input {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 
   &--stacked {
     flex-direction: column;
@@ -287,7 +303,10 @@
   gap: 0.24rem;
 
   .settings-label {
-    min-width: unset;
+    flex: none;
+    width: auto;
+    max-width: none;
+    min-width: 0;
   }
 }
 
@@ -295,8 +314,12 @@
   font-family: $fontRegular;
   font-size: 1.52rem;
   color: $white;
-  flex-shrink: 0;
-  min-width: 16rem;
+  flex: 0 0 var(--settings-label-w, 16rem);
+  width: var(--settings-label-w, 16rem);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-hint {
@@ -314,19 +337,25 @@
   text-transform: uppercase;
   color: rgba(238, 238, 238, 0.4);
   margin: 2rem 0 0.4rem;
+  padding-left: 4rem;
 }
 
 // ── Form controls ─────────────────────────────────────────────────────────────
 .settings-select,
 .settings-input {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: var(--settings-control-h);
   background: rgba(255, 255, 255, 0.05);
   border: 0.16rem solid rgba(255, 255, 255, 0.15);
   border-radius: 0.64rem;
   color: $white;
   font-family: $fontRegular;
   font-size: 1.44rem;
-  padding: 0.72rem 1.2rem;
+  line-height: 1.2;
+  padding: 0 1.2rem;
   transition: border-color 0.15s;
   outline: none;
 
@@ -340,14 +369,22 @@
   }
 }
 
+.settings-select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-row {
   display: flex;
   gap: 1.2rem;
   width: 100%;
+  min-width: 0;
   align-items: center;
 
   .settings-select {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
@@ -413,21 +450,25 @@
     pointer-events: none;
   }
 
+  // Square icon buttons: same size as select on both axes.
+  &--icon,
+  &--icon-only {
+    flex: 0 0 var(--settings-control-h);
+    width: var(--settings-control-h);
+    height: var(--settings-control-h);
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+  }
+
   &--icon {
-    flex: 0;
-    padding: 0.72rem 1.2rem;
     font-size: 1.76rem;
   }
 
   &--icon-only {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.56rem;
-    width: 4rem;
-    height: 4rem;
-
     .settings-btn-icon {
       width: 2rem;
       height: 2rem;
@@ -857,8 +898,15 @@
   display: flex;
   align-items: center;
   gap: 0.64rem;
-  min-width: 16rem;
-  flex-shrink: 0;
+  flex: 0 0 var(--settings-label-w, 16rem);
+  width: var(--settings-label-w, 16rem);
+  min-width: 0;
+
+  .settings-label {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
 }
 
 // ── Info icon with CSS tooltip ────────────────────────────────────────────────

@@ -34,12 +34,13 @@
 import { invoke } from '@tauri-apps/api/core'
 
 const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
 
 const OutputDevices = ref([])
 const outputSelected = ref('')
 
 const hueState = computed(() => jsonStore.configFile?.settings?.hue)
-const OutputState = computed(() => jsonStore.configFile?.settings?.outputSource)
+const OutputState = computed(() => appSettings.outputSource)
 
 const hue = ref(hueState.value ?? 189)
 
@@ -68,6 +69,6 @@ getOutputDevices()
 
 const selectOutputDevice = (event) => {
   const selectedDevice = event.target.value
-  jsonStore.setOutSource(selectedDevice)
+  appSettings.setOutputSource(selectedDevice)
 }
 </script>

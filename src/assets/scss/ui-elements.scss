@@ -41,35 +41,40 @@
 
   &__box {
     flex-shrink: 0;
-    width: 2.2rem;
-    height: 2.2rem;
-    border-radius: 0.48rem;
-    border: 0.2rem solid var(--primary_color);
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 0.4rem;
+    border: 0.16rem solid var(--primary_color);
     background: var(--color-bg, #{$color-bg});
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    transition: background 0.15s, border-color 0.15s, filter 0.15s;
   }
 
   &__check {
-    width: 1.2rem;
-    height: 1.2rem;
+    width: 1rem;
+    height: 1rem;
     color: transparent;
     transition: color 0.1s;
   }
 
   &__input:checked + &__box {
     background: var(--primary_color);
-    box-shadow: 0 0 0.6rem var(--primary_color);
 
     .ui-checkbox__check {
       color: var(--color-bg, #{$color-bg});
     }
   }
 
-  &:hover .ui-checkbox__box {
+  // Hover must not wipe the checked fill (same specificity as checked rule).
+  &:hover &__input:not(:checked) + &__box {
     background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:hover &__input:checked + &__box {
+    background: var(--primary_color);
+    filter: brightness(1.15);
   }
 }
 

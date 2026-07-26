@@ -1,11 +1,13 @@
 ﻿@use 'variables' as *;
 
 .main {
+  box-sizing: border-box;
   width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
   height: calc(100dvh - var(--topbar_height));
   background-color: var(--color-bg, #{$color-bg});
   margin-top: var(--topbar_height);
   padding-top: $padding_1;
+  padding-bottom: $padding_2;
 
   // Shift the main content away from whichever side the navbar sits on.
   // Default is left; .navbar-right on <html> flips it (see rule below).
@@ -109,7 +111,7 @@
       min-height: 0;
       overflow-y: auto;
       scroll-behavior: smooth;
-      padding-bottom: $padding_2;
+      padding-bottom: calc(#{$padding_1} * 3);
     }
 
     .SoundTab {
@@ -247,7 +249,7 @@
 .bulk-bar {
   width: fit-content;
   max-width: 100%;
-  margin: $padding_2 auto 0;
+  margin: $padding_2 auto $padding_2;
   flex-shrink: 0;
   padding: $padding_2;
   background-color: var(--color-btn, #{$color-btn});
@@ -255,8 +257,12 @@
   border-radius: 0.8rem;
   box-shadow: 0 -0.4rem 1.2rem rgba(0, 0, 0, 0.35);
   flex-wrap: wrap;
+  font-size: var(--font-size-menu);
+  font-family: $fontBold;
+  color: $white;
 
   .bulk-bar__count {
+    font-family: $fontBold;
     font-weight: bold;
     color: $white;
   }
@@ -264,12 +270,12 @@
   .bulk-bar__color {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.4em;
     color: $white;
 
     input[type='color'] {
-      width: 2.4rem;
-      height: 2.4rem;
+      width: 1.4em;
+      height: 1.4em;
       border: none;
       background: none;
       cursor: pointer;
@@ -277,20 +283,24 @@
   }
 
   .bulk-bar__select {
-    padding: 0.4rem 0.8rem;
-    border-radius: 0.6rem;
-    border: 0.16rem solid var(--primary_color);
+    padding: 0.35em 0.7em;
+    border-radius: 0.4em;
+    border: 0.1em solid var(--primary_color);
     background-color: var(--color-bg, #{$color-bg});
     color: $white;
+    font-size: 1em;
+    font-family: $fontBold;
   }
 
   .bulk-bar__btn {
-    padding: 0.5rem 1.2rem;
-    border-radius: 0.6rem;
-    border: 0.16rem solid var(--primary_color);
+    padding: 0.35em 0.9em;
+    border-radius: 0.4em;
+    border: 0.1em solid var(--primary_color);
     background-color: var(--color-bg, #{$color-bg});
     color: $white;
     cursor: pointer;
+    font-size: 1em;
+    font-family: $fontBold;
 
     &:hover {
       background-color: var(--primary_color);
@@ -341,69 +351,14 @@
   margin-right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
 }
 
+// Push tabs under open searchbar + 2rem gap.
 .searchMove {
-  margin-top: calc(var(--icon_size) + $padding_1 + $padding_1 + 0.8rem);
+  margin-top: calc(var(--icon_size) - #{$padding_1} + 2rem);
 }
 
 // ########################################
-// Popups
+// Popups — DialogField styles live in dialogs.scss
 // ########################################
-
-// ---- DialogField (shared modal shell) ----
-.dialog-box {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(0.4rem);
-  background: rgba($color-bg, 0.5);
-}
-
-.dialog-panel {
-  position: relative;
-  z-index: 11;
-  background-color: $color-bg;
-  margin-top: calc(var(--topbar_height) + $padding_1);
-  border: 0.32rem solid var(--primary_color);
-  border-radius: 1.2rem;
-  padding: calc($padding_1 * 1.5);
-  width: min(68rem, calc(100dvw - 4rem));
-  max-height: calc(90dvh - var(--topbar_height));
-  overflow-y: auto;
-  box-sizing: border-box;
-}
-
-.dialog-header {
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.dialog-title {
-  margin: 0;
-  color: $white;
-  font-family: $fontBold;
-}
-
-.dialog-error {
-  color: $warn;
-  font-family: $fontRegular;
-  font-size: var(--font-size-sm);
-  margin: 0;
-}
-
-.dialog-text {
-  color: $white;
-  font-family: $fontRegular;
-  font-size: var(--font-size-sm);
-  margin: 0;
-  text-align: center;
-}
-
-.dialog-actions {
-  margin-top: $padding_1;
-}
 
 // ---- Reusable UI components ----
 .ui-btn {
@@ -423,30 +378,6 @@
 
   &.ui-btn--full {
     width: 100%;
-  }
-}
-
-.ui-checkbox {
-  color: var(--primary_color);
-  background: rgba($color-bg, 0.1);
-  border: 0.32rem solid var(--primary_color);
-  border-radius: 0.8rem;
-  padding: 0;
-  font-family: $fontRegular;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  input[type='checkbox'] {
-    width: 2rem;
-    height: 2rem;
-    accent-color: var(--primary_color);
-    cursor: pointer;
-    padding: 0;
-    margin: 0;
-
   }
 }
 
@@ -499,28 +430,6 @@
   height: 1.6rem !important;
   min-width: unset !important;
   min-height: unset !important;
-}
-
-// ---- ErrorAlert ----
-.ErrorAlert {
-  position: fixed;
-
-  .ErrorMessageBox {
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    border-radius: 0.8rem;
-    width: 30%;
-    min-width: 50rem;
-    max-width: 70rem;
-    padding: $padding_1;
-    min-height: 20%;
-    background: $color-bg;
-    border: 0.32rem solid var(--primary_color);
-    z-index: 3;
-    text-align: center;
-  }
 }
 
 // ########################################

@@ -12,7 +12,7 @@ interface ContextMenuState {
 
 export const useAppStore = defineStore('app', {
   state: () => ({
-    navbar: ['upload', 'folder', 'settings', 'about'] as string[],
+    navbar: ['add', 'project', 'settings', 'about'] as string[],
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
     pendingSettingsTab: null as string | null,
@@ -25,6 +25,7 @@ export const useAppStore = defineStore('app', {
       SearchbarContent: '',
     },
     importFoldersActive: false,
+    importChooserActive: false,
     selectProjectActive: false,
     multiSelectActive: false,
     selectedSoundPaths: [] as string[],
@@ -110,6 +111,10 @@ export const useAppStore = defineStore('app', {
 
     setImportFoldersActive(val: boolean) {
       this.importFoldersActive = val
+    },
+
+    setImportChooserActive(val: boolean) {
+      this.importChooserActive = val
     },
 
     setMultiSelectActive(val: boolean) {
