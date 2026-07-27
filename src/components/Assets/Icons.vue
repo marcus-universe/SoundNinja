@@ -100,6 +100,16 @@
   </g>
 </svg>
 
+<!-- Zoom in (mdi:magnify-plus-outline) -->
+<svg v-if="icon === 'zoom-in'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14m2.5-4h-2v2H9v-2H7V9h2V7h1v2h2z"/>
+</svg>
+
+<!-- Zoom out (mdi:magnify-minus-outline) -->
+<svg v-if="icon === 'zoom-out'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14M7 9h5v1H7z"/>
+</svg>
+
 <svg v-if="icon === 'palette'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" :class="[customClass]" @click="$emit('triggered', icon)">
   <g id="Palette">
     <path class="cls-1" d="M100,20A80,80,0,0,0,20,100c0,44.18,35.82,76,80,76a20,20,0,0,0,20-20,19.7,19.7,0,0,0-4.6-12.72,4,4,0,0,1-.9-2.48,4,4,0,0,1,4-4H136a44,44,0,0,0,44-44C180,50.14,144.18,20,100,20ZM54,116a14,14,0,1,1,14-14A14,14,0,0,1,54,116ZM74,68A14,14,0,1,1,88,54,14,14,0,0,1,74,68Zm52,0a14,14,0,1,1,14-14A14,14,0,0,1,126,68Zm32,48a14,14,0,1,1,14-14A14,14,0,0,1,158,116Z"/>
@@ -157,6 +167,52 @@
 <!-- Page Separator (ri:page-separator) -->
 <svg v-if="icon === 'page-separator'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
   <path class="cls-1" d="M17 21v-4H7v4H5v-5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5zM7 3v4h10V3h2v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3zM2 9l4 3l-4 3zm20 0v6l-4-3z"/>
+</svg>
+
+<!-- Play (line-md:play-filled) -->
+<svg v-if="icon === 'play'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" fill-opacity="0" stroke="currentColor" stroke-dasharray="38" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6l10 6l-10 6Z">
+    <animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="38;0"/>
+    <animate fill="freeze" attributeName="fill-opacity" begin="0.5s" dur="0.4s" to="1"/>
+  </path>
+</svg>
+
+<!-- Pause (material-symbols-light:pause-rounded) -->
+<svg v-if="icon === 'pause'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M15 18q-.402 0-.701-.299T14 17V7q0-.402.299-.701T15 6h1.5q.402 0 .701.299T17.5 7v10q0 .402-.299.701T16.5 18zm-7.5 0q-.402 0-.701-.299T6.5 17V7q0-.402.299-.701T7.5 6H9q.402 0 .701.299T10 7v10q0 .402-.299.701T9 18z"/>
+</svg>
+
+<!-- Stems / Timeline (material-symbols:view-timeline-rounded) -->
+<svg v-if="icon === 'stems'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M5 21q-.825 0-1.412-.587T3 19V5q0-.825.588-1.412T5 3h14q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zM7 17h4q.425 0 .713-.288T12 16t-.288-.712T11 15H7q-.425 0-.712.288T6 16t.288.713T7 17m3-4h4q.425 0 .713-.288T15 12t-.288-.712T14 11h-4q-.425 0-.712.288T9 12t.288.713T10 13m3-4h4q.425 0 .713-.288T18 8t-.288-.712T17 7h-4q-.425 0-.712.288T12 8t.288.713T13 9"/>
+</svg>
+
+<!-- Record (proicons:record) -->
+<svg v-if="icon === 'record'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <g fill="none">
+    <circle class="cls-1" cx="12" cy="12" r="9.25" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" fill="none"/>
+    <circle class="cls-1" cx="12" cy="12" r="5"/>
+  </g>
+</svg>
+
+<!-- Loop / repeat -->
+<svg v-if="icon === 'loop'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M7 7h10v3l4-4l-4-4v3H5v6h2zm10 10H7v-3l-4 4l4 4v-3h12v-6h-2z"/>
+</svg>
+
+<!-- Noise Cancelation (boxicons:noise-filled) -->
+<svg v-if="icon === 'noise-cancel'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2M6 17H5v-1h1zm0-4H5v-1h1zm0-4H5V8h1zm2 10H7v-1h1zm0-4H7v-1h1zm0-4H7v-1h1zm0-4H7V6h1zm2 10H9v-1h1zm0-4H9v-1h1zm0-4H9V8h1zm2 10h-1v-1h1zm0-4h-1v-1h1zm0-4h-1v-1h1zm0-4h-1V6h1zm2 10h-1v-1h1zm0-4h-1v-1h1zm0-4h-1V8h1zm2 10h-1v-1h1zm0-4h-1v-1h1zm0-4h-1v-1h1zm0-4h-1V6h1zm2 10h-1v-1h1zm0-4h-1v-1h1zm0-4h-1V8h1z"/>
+</svg>
+
+<!-- Playlist (ph:playlist-fill) -->
+<svg v-if="icon === 'playlist'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M208 32H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M64 72h128a8 8 0 0 1 0 16H64a8 8 0 0 1 0-16m0 48h72a8 8 0 0 1 0 16H64a8 8 0 0 1 0-16m40 64H64a8 8 0 0 1 0-16h40a8 8 0 0 1 0 16m103.59-53.47a8 8 0 0 1-10.12 5.06L184 131.1V176a24 24 0 1 1-16-22.62V120a8 8 0 0 1 10.53-7.59l24 8a8 8 0 0 1 5.06 10.12"/>
+</svg>
+
+<!-- Normalize / Waveform (ph:waveform-fill) -->
+<svg v-if="icon === 'normalize'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" :class="[customClass]" @click="$emit('triggered', icon)">
+  <path class="cls-1" d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16M72 152a8 8 0 0 1-16 0v-48a8 8 0 0 1 16 0Zm32 32a8 8 0 0 1-16 0V72a8 8 0 0 1 16 0Zm32-16a8 8 0 0 1-16 0V88a8 8 0 0 1 16 0Zm32-16a8 8 0 0 1-16 0v-48a8 8 0 0 1 16 0Zm32 8a8 8 0 0 1-16 0V96a8 8 0 0 1 16 0Z"/>
 </svg>
 
 </template>

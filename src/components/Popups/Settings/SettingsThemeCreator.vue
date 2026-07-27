@@ -128,7 +128,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeBtn" />
+          <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeBtn" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('fontSizeBtn')" />
         </div>
 
         <div class="settings-section-divider">{{ $t('settings.themeCreator.tabTypography') }}</div>
@@ -163,7 +163,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeTab" />
+          <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeTab" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('fontSizeTab')" />
         </div>
 
         <div class="settings-section-divider">{{ $t('settings.themeCreator.layout') }}</div>
@@ -176,7 +176,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="5" max="30" step="0.5" v-model.number="themeCreator.btnWidth" />
+          <input type="range" class="settings-slider" min="5" max="30" step="0.5" v-model.number="themeCreator.btnWidth" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnWidth')" />
         </div>
         <div class="settings-group settings-group--stacked">
           <div class="settings-slider-header">
@@ -186,7 +186,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0" max="4" step="0.05" v-model.number="themeCreator.borderRadius" />
+          <input type="range" class="settings-slider" min="0" max="4" step="0.05" v-model.number="themeCreator.borderRadius" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('borderRadius')" />
         </div>
         <div class="settings-group settings-group--stacked">
           <div class="settings-slider-header">
@@ -196,7 +196,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0" max="2" step="0.02" v-model.number="themeCreator.borderWidth" />
+          <input type="range" class="settings-slider" min="0" max="2" step="0.02" v-model.number="themeCreator.borderWidth" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('borderWidth')" />
         </div>
         <div class="settings-group settings-group--stacked">
           <div class="settings-slider-header">
@@ -206,7 +206,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0" max="6" step="0.05" v-model.number="themeCreator.buttonGap" />
+          <input type="range" class="settings-slider" min="0" max="6" step="0.05" v-model.number="themeCreator.buttonGap" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('buttonGap')" />
         </div>
         <div class="settings-group settings-group--stacked">
           <div class="settings-slider-header">
@@ -216,7 +216,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0.25" max="5" step="0.05" v-model.number="themeCreator.btnPaddingX" />
+          <input type="range" class="settings-slider" min="0.25" max="5" step="0.05" v-model.number="themeCreator.btnPaddingX" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnPaddingX')" />
         </div>
         <div class="settings-group settings-group--stacked">
           <div class="settings-slider-header">
@@ -226,7 +226,7 @@
               <span class="settings-unit-label">rem</span>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0.1" max="4" step="0.05" v-model.number="themeCreator.btnPaddingY" />
+          <input type="range" class="settings-slider" min="0.1" max="4" step="0.05" v-model.number="themeCreator.btnPaddingY" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnPaddingY')" />
         </div>
 
         <p v-if="importError" class="settings-error" style="margin-top:0.5rem">{{ importError }}</p>
@@ -273,19 +273,6 @@ const THEME_DEFAULTS = {
   textDark: '#222831',
   btnFontFamily: 'Nunito-Bold',
   tabFontFamily: 'Nunito-Bold',
-}
-
-const themeCreator = reactive({
-  name: 'My Theme',
-  primaryColor: '#00d4ff',
-  bgLight: '#eeeeee',
-  bgDark: '#222831',
-  btnLight: '#7184a2',
-  btnDark: '#363f4d',
-  textLight: '#eeeeee',
-  textDark: '#222831',
-  btnFontFamily: 'Nunito-Bold',
-  tabFontFamily: 'Nunito-Bold',
   fontSizeBtn: 1.0,
   fontSizeTab: 1.0,
   fontSizeMd: 1.2,
@@ -295,6 +282,21 @@ const themeCreator = reactive({
   buttonGap: 1.0,
   btnPaddingX: 0.75,
   btnPaddingY: 0.5,
+} as const
+
+type ThemeSliderKey =
+  | 'fontSizeBtn'
+  | 'fontSizeTab'
+  | 'btnWidth'
+  | 'borderRadius'
+  | 'borderWidth'
+  | 'buttonGap'
+  | 'btnPaddingX'
+  | 'btnPaddingY'
+
+const themeCreator = reactive({
+  name: 'My Theme',
+  ...THEME_DEFAULTS,
 })
 
 // Preview mode (preview-only; does not persist the project's themeMode).
@@ -307,6 +309,11 @@ function onPreviewModeChange() {
 // Restores all color + font fields to the documented defaults.
 function resetToDefaults() {
   Object.assign(themeCreator, THEME_DEFAULTS)
+  emitPreview()
+}
+
+function resetSlider(key: ThemeSliderKey) {
+  themeCreator[key] = THEME_DEFAULTS[key]
   emitPreview()
 }
 
@@ -437,11 +444,19 @@ onBeforeUnmount(() => {
 
 // ── Close prompt (Save theme before closing the window) ────────────────────
 const closePrompt = ref(false)
-let allowClose = false
+
+async function hideThemeWindow() {
+  closePrompt.value = false
+  try {
+    await getCurrentWindow().hide()
+  } catch (e) {
+    console.warn('hide theme-creator failed', e)
+  }
+}
 
 onMounted(() => {
   getCurrentWindow().onCloseRequested((event) => {
-    if (allowClose) return
+    // Keep webview alive (hide) so reopen skips full Nuxt boot.
     event.preventDefault()
     closePrompt.value = true
   }).catch(() => {})
@@ -449,15 +464,12 @@ onMounted(() => {
 
 async function saveAndClose() {
   closePrompt.value = false
-  allowClose = true
   await saveThemeToFolder()
 }
 
 async function discardAndClose() {
-  closePrompt.value = false
-  allowClose = true
   await emit('theme_saved').catch(() => {})
-  await getCurrentWindow().destroy()
+  await hideThemeWindow()
 }
 
 function cancelClose() {
@@ -469,8 +481,24 @@ const btnFontOpen = ref(false)
 const tabFontOpen = ref(false)
 const btnFontDropdownRef = ref<HTMLElement | null>(null)
 const tabFontDropdownRef = ref<HTMLElement | null>(null)
-onClickOutside(btnFontDropdownRef, () => { btnFontOpen.value = false })
-onClickOutside(tabFontDropdownRef, () => { tabFontOpen.value = false })
+
+function onFontDropdownPointerDown(e: PointerEvent) {
+  const t = e.target
+  if (!(t instanceof Node)) return
+  if (btnFontOpen.value && btnFontDropdownRef.value && !btnFontDropdownRef.value.contains(t)) {
+    btnFontOpen.value = false
+  }
+  if (tabFontOpen.value && tabFontDropdownRef.value && !tabFontDropdownRef.value.contains(t)) {
+    tabFontOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onFontDropdownPointerDown, true)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onFontDropdownPointerDown, true)
+})
 
 const btnFontSearch = ref('')
 const tabFontSearch = ref('')
@@ -669,10 +697,9 @@ async function saveThemeToFolder() {
       path: joinPath(appSettings.themesPath, `${safeName}.css`),
       contents: css,
     })
-    // Tell the main window to select + persist this theme, then close.
+    // Tell the main window to select + persist this theme, then hide (keep warm).
     await emit('theme_apply', { theme: `file:${safeName}.css` })
-    allowClose = true
-    await getCurrentWindow().destroy()
+    await hideThemeWindow()
   } catch (e) {
     console.error('Save to themes folder failed', e)
   }

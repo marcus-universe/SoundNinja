@@ -1,5 +1,8 @@
 <template>
-    <div class="SoundContainer">
+    <div
+        class="SoundContainer"
+        :class="{ 'SoundContainer--player-large': showPlayer && playerLarge }"
+    >
         <div class="SoundContainer__scroll">
         <div
             class="SoundTab flex_c_h flex_start button-gaps flex_wrap"
@@ -44,6 +47,8 @@
                 <button class="bulk-bar__btn" @click="appStore.setMultiSelectActive(false)">{{ $t('bulk.done') }}</button>
             </div>
         </Transition>
+
+        <PlayerBar v-if="showPlayer" />
     </div>
 </template>
 
@@ -58,6 +63,9 @@ const appSettings = useAppSettingsStore()
 
 const soundListRef = ref(null)
 let sortable = null
+
+const showPlayer = computed(() => jsonStore.configFile?.settings?.showPlayer !== false)
+const playerLarge = computed(() => jsonStore.configFile?.settings?.playerLarge === true)
 
 // P5: sounds currently resolving their duration / starting playback.
 const loadingPaths = reactive(new Set())
@@ -230,32 +238,50 @@ function openSoundMenu(event, sound) {
 }
 
 // ---- Progress bar state ----
-// Map<soundFileIndex, { duration, startTime, percent }> — tracks every playing sound.
+// Map<soundFileIndex, { duration, startTime, percent, paused, elapsedMs }>
 const playingSounds = reactive(new Map())
 let rafId = null
 
+function anyProgressRunning() {
+  for (const info of playingSounds.values()) {
+    if (!info.paused) return true
+  }
+  return false
+}
+
 function tickProgress() {
-  if (playingSounds.size === 0) {
+  if (!anyProgressRunning()) {
     rafId = null
     return
   }
   const now = Date.now()
   for (const info of playingSounds.values()) {
+    if (info.paused) continue
     info.percent = Math.min(100, ((now - info.startTime) / 1000 / info.duration) * 100)
   }
   rafId = requestAnimationFrame(tickProgress)
 }
 
-function startProgress(soundFileIndex, duration) {
-  playingSounds.set(soundFileIndex, { duration, startTime: Date.now(), percent: 0 })
-  if (rafId === null) {
+function ensureProgressLoop() {
+  if (rafId === null && anyProgressRunning()) {
     rafId = requestAnimationFrame(tickProgress)
   }
 }
 
+function startProgress(soundFileIndex, duration) {
+  playingSounds.set(soundFileIndex, {
+    duration,
+    startTime: Date.now(),
+    percent: 0,
+    paused: false,
+    elapsedMs: 0,
+  })
+  ensureProgressLoop()
+}
+
 function stopProgress(soundFileIndex) {
   playingSounds.delete(soundFileIndex)
-  if (playingSounds.size === 0 && rafId !== null) {
+  if (!anyProgressRunning() && rafId !== null) {
     cancelAnimationFrame(rafId)
     rafId = null
   }
@@ -269,8 +295,48 @@ function stopAllProgress() {
   }
 }
 
+/** Freeze / unfreeze button progress when backend pause/resume/seek changes. */
+function syncProgressPauseState(list) {
+  const files = jsonStore.configFile?.files || []
+  const byPath = new Map((list || []).map((p) => [p.path, p]))
+
+  for (const [fileIndex, info] of playingSounds) {
+    const file = files.find((f) => f.index === fileIndex)
+    if (!file || !byPath.has(file.path)) continue
+    const snap = byPath.get(file.path)
+    const shouldPause = !!snap.paused
+    const posSec = Number(snap.positionSecs)
+    if (Number.isFinite(posSec) && info.duration > 0) {
+      info.elapsedMs = Math.max(0, posSec * 1000)
+      info.percent = Math.min(100, (info.elapsedMs / 1000 / info.duration) * 100)
+      info.startTime = Date.now() - info.elapsedMs
+    }
+
+    if (shouldPause && !info.paused) {
+      if (!Number.isFinite(posSec)) {
+        info.elapsedMs = Math.max(0, Date.now() - info.startTime)
+        info.percent = Math.min(100, (info.elapsedMs / 1000 / info.duration) * 100)
+      }
+      info.paused = true
+    } else if (!shouldPause && info.paused) {
+      info.startTime = Date.now() - (info.elapsedMs || 0)
+      info.paused = false
+    } else if (!shouldPause) {
+      info.paused = false
+    }
+  }
+
+  if (!anyProgressRunning() && rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  } else {
+    ensureProgressLoop()
+  }
+}
+
 // ---- Tauri event listeners ----
 let unlistenFinished = null
+let unlistenPlaying = null
 
 onMounted(async () => {
   unlistenFinished = await listen('sound_finished', (event) => {
@@ -286,11 +352,15 @@ onMounted(async () => {
       jsonStore.ReturnStatusAll()
     }
   })
+  unlistenPlaying = await listen('playing_changed', (event) => {
+    syncProgressPauseState(event.payload ?? [])
+  })
 })
 
 onUnmounted(() => {
   stopAllProgress()
   if (unlistenFinished) unlistenFinished()
+  if (unlistenPlaying) unlistenPlaying()
 })
 
 // ---- Drag & drop ----

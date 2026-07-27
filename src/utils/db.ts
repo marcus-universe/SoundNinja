@@ -60,6 +60,10 @@ export interface Settings {
   asioRightChannel?: number
   /** Enable GPU-accelerated DSP (experimental; only shown when discrete GPU detected). */
   gpuAudioEnabled?: boolean
+  /** Show the floating player on the soundboard. */
+  showPlayer?: boolean
+  /** Enlarge floating player controls / waveform. */
+  playerLarge?: boolean
 }
 
 export interface ProjectConfig {
@@ -89,6 +93,8 @@ export function defaultSettings(): Settings {
     outputHost: 'WASAPI',
     asioLeftChannel: undefined,
     asioRightChannel: undefined,
+    showPlayer: true,
+    playerLarge: false,
   }
 }
 
@@ -231,6 +237,8 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'outputSource': settings.outputSource = value; break
       case 'stopOnRetrigger': settings.stopOnRetrigger = value === 'true'; break
       case 'overlapSounds': settings.overlapSounds = value === 'true'; break
+      case 'showPlayer': settings.showPlayer = value === 'true'; break
+      case 'playerLarge': settings.playerLarge = value === 'true'; break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -342,6 +350,8 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       ['customCss', s.customCss ?? ''],
       ['stopOnRetrigger', String(s.stopOnRetrigger ?? true)],
       ['overlapSounds', String(s.overlapSounds ?? false)],
+      ['showPlayer', String(s.showPlayer ?? true)],
+      ['playerLarge', String(s.playerLarge ?? false)],
       ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
       ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
       ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],

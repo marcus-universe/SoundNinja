@@ -40,6 +40,13 @@ export const useAppSettingsStore = defineStore('appSettings', {
     outputVolume: 1,
     asioLeftChannel: null as number | null,
     asioRightChannel: null as number | null,
+    /** Capture device for the Record Editor (mic or PC-audio loopback). */
+    inputSource: 'default',
+    inputHost: 'WASAPI',
+    /** Capture gain for recording (0–2, default 1). Applied in Rust while capturing. */
+    inputVolume: 1,
+    /** True when the selected inputSource is a WASAPI loopback (PC Audio) device. */
+    inputLoopback: false,
     /** True once audio keys exist in app-config.db (or after one-time project migrate). */
     audioMigrated: false,
     loaded: false,
@@ -77,6 +84,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.hideTitlebarSkipWarn = s.hideTitlebarSkipWarn === '1' || s.hideTitlebarSkipWarn === 'true'
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
+        || s.inputSource != null || s.inputHost != null
       if (this.audioMigrated) {
         this.outputSource = s.outputSource || 'default'
         this.outputHost = s.outputHost || 'WASAPI'
@@ -88,6 +96,11 @@ export const useAppSettingsStore = defineStore('appSettings', {
           ? Number(s.asioRightChannel) : null
         if (this.asioLeftChannel != null && !Number.isFinite(this.asioLeftChannel)) this.asioLeftChannel = null
         if (this.asioRightChannel != null && !Number.isFinite(this.asioRightChannel)) this.asioRightChannel = null
+        this.inputSource = s.inputSource || 'default'
+        this.inputHost = s.inputHost || 'WASAPI'
+        const inVol = s.inputVolume != null ? Number(s.inputVolume) : 1
+        this.inputVolume = Number.isFinite(inVol) ? Math.max(0, Math.min(2, inVol)) : 1
+        this.inputLoopback = s.inputLoopback === '1' || s.inputLoopback === 'true'
       }
 
       await this.refreshRecents()
@@ -95,6 +108,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.applyNavbarSide()
       await this.applyWindowChrome()
       await this.applyAudioVolume()
+      await this.applyInputVolume()
       return s
     },
 
@@ -211,9 +225,19 @@ export const useAppSettingsStore = defineStore('appSettings', {
         console.error('set_window_chrome failed', e)
       }
       if (typeof document === 'undefined') return
-      // Styled custom bar is 3rem title + 2.6rem menubar ≈ 5.6rem; system/hidden = 0.
+      // Main styled bar: 3rem title + 2.6rem menubar ≈ 5.6rem.
+      // Secondary styled bar: title row only ≈ 3rem. System/hidden = 0.
       const showStyled = !hidden && this.titlebarMode === 'styled'
-      document.documentElement.style.setProperty('--topbar_height', showStyled ? '5.6rem' : '0px')
+      let topbar = '0px'
+      if (showStyled) {
+        let isMain = true
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window')
+          isMain = getCurrentWindow().label === 'main'
+        } catch { /* non-tauri */ }
+        topbar = isMain ? '5.6rem' : '3rem'
+      }
+      document.documentElement.style.setProperty('--topbar_height', topbar)
     },
 
     /** Pushes master volume into the Rust audio engine. */
@@ -222,6 +246,14 @@ export const useAppSettingsStore = defineStore('appSettings', {
         await invoke('set_output_volume', { volume: this.outputVolume })
       } catch (e) {
         console.error('set_output_volume failed', e)
+      }
+    },
+
+    async applyInputVolume() {
+      try {
+        await invoke('set_input_volume', { volume: this.inputVolume })
+      } catch (e) {
+        console.error('set_input_volume failed', e)
       }
     },
 
@@ -261,6 +293,10 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await saveSetting(d, 'outputVolume', String(this.outputVolume))
       await saveSetting(d, 'asioLeftChannel', this.asioLeftChannel != null ? String(this.asioLeftChannel) : '')
       await saveSetting(d, 'asioRightChannel', this.asioRightChannel != null ? String(this.asioRightChannel) : '')
+      await saveSetting(d, 'inputSource', this.inputSource || 'default')
+      await saveSetting(d, 'inputHost', this.inputHost || 'WASAPI')
+      await saveSetting(d, 'inputVolume', String(this.inputVolume))
+      await saveSetting(d, 'inputLoopback', this.inputLoopback ? '1' : '0')
       await saveSetting(d, 'audioMigrated', '1')
       this.audioMigrated = true
     },
@@ -283,6 +319,40 @@ export const useAppSettingsStore = defineStore('appSettings', {
         await saveSetting(d, 'audioMigrated', '1')
         this.audioMigrated = true
       }
+    },
+
+    async setInputSource(source: string, loopback = false) {
+      this.inputSource = source || 'default'
+      this.inputLoopback = !!loopback
+      const d = await this._db()
+      await saveSetting(d, 'inputSource', this.inputSource)
+      await saveSetting(d, 'inputLoopback', this.inputLoopback ? '1' : '0')
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+    },
+
+    async setInputHost(host: string) {
+      this.inputHost = host || 'WASAPI'
+      const d = await this._db()
+      await saveSetting(d, 'inputHost', this.inputHost)
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+    },
+
+    async setInputVolume(volume: number) {
+      const vol = Number.isFinite(volume) ? Math.max(0, Math.min(2, volume)) : 1
+      this.inputVolume = vol
+      const d = await this._db()
+      await saveSetting(d, 'inputVolume', String(vol))
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+      await this.applyInputVolume()
     },
 
     async setOutputVolume(volume: number) {

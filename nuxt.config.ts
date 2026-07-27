@@ -57,6 +57,7 @@ export default defineNuxtConfig({
     '~/assets/scss/import-folders.scss',
     '~/assets/scss/pages.scss',
     '~/assets/scss/settings-audio.scss',
+    '~/assets/scss/player.scss',
   ],
 
   // Nuxt 4.4.x plugins often transform without emitting maps; keep them off for Tauri builds.

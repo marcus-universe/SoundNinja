@@ -103,6 +103,12 @@ bun run tauri:serve
 # or: npm run tauri:serve / pnpm tauri:serve / deno task tauri:serve
 ```
 
+Stem separation (HTDemucs model) needs an extra build flag and a one-time model download. See [docs/stems-model.md](./docs/stems-model.md).
+
+```bash
+npm run tauri:serve:stems
+```
+
 ### Compiles and minifies for production
 
 ```bash

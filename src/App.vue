@@ -1,7 +1,11 @@
 <template>
-  <div class="soundninja flex_c_h flex_space_between">
+  <div
+    class="soundninja"
+    :class="isMain ? 'flex_c_h flex_space_between' : 'soundninja--tool'"
+  >
+    <!-- Styled chrome for main + secondary (Record Editor / Theme Creator). -->
+    <TitleBar />
     <template v-if="isMain">
-      <TitleBar />
       <NavBar />
       <ErrorAlert />
       <SettingsOverlay />
@@ -26,11 +30,18 @@
         </div>
       </Transition>
     </template>
-    <NuxtPage v-slot="{ Component }">
+    <NuxtPage v-if="isMain" v-slot="{ Component }">
       <transition name="fade" mode="out-in">
         <component :is="Component" />
       </transition>
     </NuxtPage>
+    <div v-else class="soundninja__tool-page">
+      <NuxtPage v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </NuxtPage>
+    </div>
   </div>
 </template>
 
@@ -317,10 +328,11 @@ async function applyPersistedTheme(config) {
 onMounted(async () => {
   await appSettings.load()
   if (!isMain.value) {
-    // Theme Creator (or any secondary window): apply the current locale/theme so
-    // it matches the main window, but skip project + menu ownership.
+    // Theme Creator / Record Editor: apply locale + chrome, skip project/menu ownership.
+    // Tab list for Record Editor comes via `record_context` events from main.
     if (appSettings.locale) setLocale(appSettings.locale)
     appSettings.applyNavbarSide()
+    await appSettings.applyWindowChrome()
     return
   }
   if (appSettings.locale) {
@@ -430,6 +442,46 @@ onMounted(async () => {
     jsonStore.setTheme(theme)
     document.getElementById('sn-custom-theme')?.remove()
     await applyPersistedTheme(jsonStore.configFile)
+  })
+
+  // Record Editor: share current tab list / selection with the secondary window.
+  listen('record_request_context', () => {
+    emit('record_context', {
+      currentTab: appStore.currentTab,
+      tabList: (jsonStore.configFile?.tabList || []).map((t) => t.name),
+    }).catch(() => {})
+  })
+
+  // Warm secondary windows in background so first open is not a full SPA boot.
+  setTimeout(() => {
+    import('~/utils/secondaryWindows')
+      .then((m) => m.prewarmSecondaryWindows())
+      .catch(() => {})
+  }, 1500)
+
+  listen('record_import_sound', (e) => {
+    const path = e?.payload?.path
+    const tabs = Array.isArray(e?.payload?.tabs) ? e.payload.tabs : ['All']
+    if (!path || typeof path !== 'string') return
+    const indexLength = jsonStore.configFile.files.length
+    const rawName = typeof e?.payload?.name === 'string' && e.payload.name.trim()
+      ? e.payload.name.trim()
+      : path
+          .replace(/^.*[\\/]/, '')
+          .replace(/\.(wav|mp3|ogg|flac)$/i, '')
+          .replaceAll('_', ' ')
+          .replace(/([A-Z])/g, ' $1')
+          .trim()
+    const name = rawName || `Recording ${indexLength + 1}`
+    jsonStore.addFiles([{
+      name,
+      path,
+      volume: 0.4,
+      tabs,
+      active: false,
+      index: indexLength,
+      tabIndexes: {},
+    }])
   })
 })
 </script>

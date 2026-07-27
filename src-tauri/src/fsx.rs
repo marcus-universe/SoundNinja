@@ -75,6 +75,18 @@ pub fn list_dir_files_abs(dir: String, exts: Vec<String>) -> Result<Vec<String>,
     Ok(out)
 }
 
+/// Copies `src` to an exact destination path (creates parent dirs).
+#[tauri::command]
+pub fn copy_file_to_abs(src: String, dst: String) -> Result<String, String> {
+    let src_path = PathBuf::from(&src);
+    let dst_path = PathBuf::from(&dst);
+    if let Some(parent) = dst_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::copy(&src_path, &dst_path).map_err(|e| e.to_string())?;
+    Ok(dst_path.to_string_lossy().to_string())
+}
+
 /// Copies `src` into `dst_dir`, keeping the original file name.
 /// Returns the destination absolute path.
 #[tauri::command]

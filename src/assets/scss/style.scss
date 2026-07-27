@@ -3,7 +3,7 @@
 .main {
   box-sizing: border-box;
   width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
-  height: calc(100dvh - var(--topbar_height));
+  height: calc(100vh - var(--topbar_height));
   background-color: var(--color-bg, #{$color-bg});
   margin-top: var(--topbar_height);
   padding-top: $padding_1;
@@ -14,9 +14,9 @@
   margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
   margin-right: 0;
 
-  // Only animate the navbar-side margin shift — height/width changes from window
-  // resizing must be snappy (no transition), otherwise the bottom edge animates in.
-  transition: margin 0.2s ease;
+  // Only animate horizontal navbar offset — never margin-top/height (avoids
+  // window-open focus jitter when the viewport briefly shifts).
+  transition: margin-left 0.2s ease, margin-right 0.2s ease;
   overflow: hidden;
 
   .TabContainer {
@@ -100,6 +100,7 @@
   }
 
   .SoundContainer {
+    position: relative;
     flex: 1;
     min-height: 0;
     display: flex;
@@ -111,7 +112,12 @@
       min-height: 0;
       overflow-y: auto;
       scroll-behavior: smooth;
-      padding-bottom: calc(#{$padding_1} * 3);
+      // Room for floating player chip above the bottom edge.
+      padding-bottom: 5rem;
+    }
+
+    &--player-large &__scroll {
+      padding-bottom: 7.5rem;
     }
 
     .SoundTab {

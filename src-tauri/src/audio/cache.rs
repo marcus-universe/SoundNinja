@@ -83,6 +83,14 @@ impl SoundCache {
         self.total_size = 0;
     }
 
+    /// Drop one path so the next `load_bytes` re-reads from disk.
+    pub fn invalidate(&mut self, path: &str) {
+        if let Some(evicted) = self.entries.remove(path) {
+            self.total_size = self.total_size.saturating_sub(evicted.len());
+            self.order.retain(|p| p != path);
+        }
+    }
+
     pub fn set_limits(&mut self, max_size: usize, max_entry: usize) {
         self.max_size = max_size;
         self.max_entry = max_entry;
@@ -115,6 +123,13 @@ pub fn sound_cache() -> &'static Mutex<SoundCache> {
 ///
 /// On the first access the file is read from disk and stored in the LRU cache.
 /// Subsequent accesses return a cheap `Arc` clone — zero disk I/O.
+/// Evict a single cached path (e.g. rewritten preview WAV).
+pub fn invalidate_path(path: &str) {
+    if let Ok(mut cache) = sound_cache().lock() {
+        cache.invalidate(path);
+    }
+}
+
 pub fn load_bytes(path: &str) -> Result<Arc<[u8]>, String> {
     // Fast path: cache hit.
     {

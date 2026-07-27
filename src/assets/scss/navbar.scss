@@ -1,7 +1,7 @@
 ﻿@use 'variables' as *;
 
 .navbar {
-  height: calc(100dvh - var(--topbar_height, 0px));
+  height: calc(100vh - var(--topbar_height, 0px));
   padding: 0 $padding_1;
   width: var(--icon_size);
   position: fixed;

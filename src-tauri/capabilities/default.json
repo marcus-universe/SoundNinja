@@ -3,13 +3,17 @@
     "description": "Default capability for Sound Ninja",
     "windows": [
         "main",
-        "theme-creator"
+        "theme-creator",
+        "record-editor",
+        "playing-list"
     ],
     "permissions": [
         "core:webview:allow-create-webview-window",
         "core:window:allow-close",
         "core:window:allow-destroy",
         "core:window:allow-set-focus",
+        "core:window:allow-show",
+        "core:window:allow-hide",
         "fs:allow-read-dir",
         "fs:allow-mkdir",
         "dialog:allow-save",
@@ -28,6 +32,7 @@
         },
         "dialog:default",
         "shell:allow-open",
+        "opener:default",
         "sql:default",
         "sql:allow-load",
         "sql:allow-execute",

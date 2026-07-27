@@ -88,6 +88,22 @@
       <UICheckbox :modelValue="overlapSounds" @update:modelValue="onOverlapSounds" />
     </div>
 
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.showPlayer') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.showPlayerHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="showPlayer" @update:modelValue="onShowPlayer" />
+    </div>
+
+    <div v-if="showPlayer" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.playerLarge') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.playerLargeHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="playerLarge" @update:modelValue="onPlayerLarge" />
+    </div>
+
     <div class="settings-section-divider">{{ $t('settings.main.behavior') }}</div>
 
     <div class="settings-group settings-group--toggle">
@@ -198,7 +214,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { openSecondaryWindow, THEME_CREATOR } from '~/utils/secondaryWindows'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
@@ -213,21 +229,7 @@ function joinPath(base: string, ...parts: string[]) {
 // ── Theme Creator window ──────────────────────────────────────────────────────
 async function openThemeCreator() {
   try {
-    const existing = await WebviewWindow.getByLabel('theme-creator')
-    if (existing) {
-      await existing.setFocus()
-    } else {
-      const win = new WebviewWindow('theme-creator', {
-        url: '#/theme-creator',
-        title: 'Theme Creator',
-        width: 940,
-        height: 720,
-        minWidth: 720,
-        minHeight: 560,
-        resizable: true,
-      })
-      win.once('tauri://error', (e) => console.error('Theme Creator window error', e))
-    }
+    await openSecondaryWindow(THEME_CREATOR)
   } catch (e) {
     console.error('Failed to open Theme Creator window', e)
   }
@@ -250,6 +252,8 @@ const importError = ref('')
 const importSuccess = ref('')
 const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
+const showPlayer = ref(true)
+const playerLarge = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
 const systemTitlebar = ref(false)
@@ -438,6 +442,16 @@ function onOverlapSounds(val: boolean) {
   jsonStore.setOverlapSounds(val)
 }
 
+function onShowPlayer(val: boolean) {
+  showPlayer.value = val
+  jsonStore.setSetting('showPlayer', val)
+}
+
+function onPlayerLarge(val: boolean) {
+  playerLarge.value = val
+  jsonStore.setSetting('playerLarge', val)
+}
+
 // ── Behavior (P8/P9) ──────────────────────────────────────────────────────────
 function onUniformButtonHeight(val: boolean) {
   uniformButtonHeight.value = val
@@ -540,6 +554,8 @@ async function syncFromStore() {
   selectedTheme.value = jsonStore.configFile?.settings?.theme ?? 'dark-cyan'
   stopOnRetrigger.value = jsonStore.configFile?.settings?.stopOnRetrigger ?? true
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
+  showPlayer.value = jsonStore.configFile?.settings?.showPlayer !== false
+  playerLarge.value = jsonStore.configFile?.settings?.playerLarge === true
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
   systemTitlebar.value = appSettings.titlebarMode === 'system'

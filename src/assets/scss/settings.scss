@@ -276,7 +276,8 @@
 
   > .settings-row,
   > .settings-select,
-  > .settings-input {
+  > .settings-input,
+  > .capture-dropdown {
     flex: 1 1 0;
     min-width: 0;
   }
@@ -382,7 +383,8 @@
   min-width: 0;
   align-items: center;
 
-  .settings-select {
+  .settings-select,
+  .capture-dropdown {
     flex: 1 1 0;
     min-width: 0;
   }

@@ -61,6 +61,8 @@ fn apply_menu_from_state(app: &tauri::AppHandle) -> Result<(), String> {
             let _ = app.hide_menu();
             let _ = app.remove_menu();
         }
+        // Tool windows never show the main File/Edit/Help bar.
+        strip_secondary_window_menus(app);
         Ok(())
     }
 }
@@ -295,6 +297,9 @@ pub fn set_recent_projects(
 /// - `native_chrome`: use the OS title bar and native app menu
 /// - `hidden`: hide title bar entirely (no decorations, no menu on Win/Linux)
 ///
+/// Applied to every window (main + secondary). Secondary windows keep an empty
+/// explicit menu so File/Edit/Help from the app menu do not appear there.
+///
 /// macOS always keeps its menu bar (platform convention).
 #[tauri::command]
 pub fn set_window_chrome(
@@ -304,14 +309,17 @@ pub fn set_window_chrome(
 ) -> Result<(), String> {
     let use_native = native_chrome && !hidden;
 
-    if let Some(win) = app.get_webview_window("main") {
-        // macOS keeps traffic-light decorations; elsewhere follow the setting.
-        #[cfg(target_os = "macos")]
-        {
+    // macOS keeps traffic-light decorations; elsewhere follow the setting.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = use_native;
+        for (_label, win) in app.webview_windows() {
             let _ = win.set_decorations(true);
         }
-        #[cfg(not(target_os = "macos"))]
-        {
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        for (_label, win) in app.webview_windows() {
             win.set_decorations(use_native).map_err(|e| e.to_string())?;
         }
     }
@@ -330,4 +338,47 @@ pub fn set_window_chrome(
     }
 
     apply_menu_from_state(&app)
+}
+
+const SECONDARY_WINDOW_LABELS: &[&str] = &["record-editor", "theme-creator", "playing-list"];
+
+fn strip_secondary_window_menus(app: &tauri::AppHandle) {
+    for label in SECONDARY_WINDOW_LABELS {
+        if let Some(win) = app.get_webview_window(label) {
+            let _ = strip_menu_on(app, &win);
+        }
+    }
+}
+
+/// Give this window an empty menu so File/Edit/Help from the app menu do not show.
+#[tauri::command]
+pub fn strip_window_menu(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    strip_menu_on(&app, &window)
+}
+
+/// Strip menu on a window by label (call before show to avoid layout jitter).
+#[tauri::command]
+pub fn strip_window_menu_for(app: tauri::AppHandle, label: String) -> Result<(), String> {
+    use tauri::Manager;
+    let window = app
+        .get_webview_window(&label)
+        .ok_or_else(|| format!("Window '{label}' not found"))?;
+    strip_menu_on(&app, &window)
+}
+
+fn strip_menu_on(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Important: assign an *explicit* empty menu. `remove_menu` alone leaves the
+        // window eligible for the app-wide File/Edit/Help menu on the next
+        // `app.set_menu` / `show_menu`, which is why secondary windows kept
+        // showing the main menu after open.
+        let empty = Menu::new(app).map_err(|e| e.to_string())?;
+        window.set_menu(empty).map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (app, window);
+    }
+    Ok(())
 }

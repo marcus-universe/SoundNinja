@@ -1,5 +1,6 @@
 use cpal::traits::DeviceTrait;
 use rodio::{self, cpal, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
+use serde::Serialize;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
@@ -70,6 +71,41 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
     Ok(decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0))
 }
 
+// --- Playing list snapshot (shared with frontend) ---
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayingInfo {
+    pub path: String,
+    pub paused: bool,
+    pub position_secs: f64,
+    pub looping: bool,
+}
+
+static PLAYING_LIST: OnceLock<Mutex<Vec<PlayingInfo>>> = OnceLock::new();
+
+fn playing_list() -> &'static Mutex<Vec<PlayingInfo>> {
+    PLAYING_LIST.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn sync_playing_list(app: &tauri::AppHandle, playing: &[PlayingSound]) {
+    let snapshot: Vec<PlayingInfo> = playing
+        .iter()
+        .map(|s| PlayingInfo {
+            path: s.path.clone(),
+            paused: s.player.is_paused(),
+            // get_pos() is relative to the current Source. After skip_duration
+            // seek rebuilds, that starts at 0 — add origin for absolute time.
+            position_secs: s.position_origin_secs + s.player.get_pos().as_secs_f64(),
+            looping: s.looping,
+        })
+        .collect();
+    if let Ok(mut guard) = playing_list().lock() {
+        *guard = snapshot.clone();
+    }
+    let _ = app.emit("playing_changed", snapshot);
+}
+
 // --- Audio thread message ---
 
 pub enum AudioMsg {
@@ -87,6 +123,24 @@ pub enum AudioMsg {
     },
     /// Stop every playing sound.
     Stop,
+    PauseOne {
+        path: String,
+    },
+    ResumeOne {
+        path: String,
+    },
+    PauseAll,
+    ResumeAll,
+    /// Seek the first matching (or only) playing sound.
+    Seek {
+        path: Option<String>,
+        position_secs: f64,
+    },
+    /// Enable/disable seamless restart when the current sound ends.
+    SetLoop {
+        path: Option<String>,
+        looping: bool,
+    },
 }
 
 // --- Global audio sender ---
@@ -95,6 +149,12 @@ static AUDIO_SENDER: OnceLock<Mutex<Option<Sender<AudioMsg>>>> = OnceLock::new()
 
 fn audio_sender() -> &'static Mutex<Option<Sender<AudioMsg>>> {
     AUDIO_SENDER.get_or_init(|| Mutex::new(None))
+}
+
+fn send_msg(msg: AudioMsg) -> Result<(), String> {
+    let guard = audio_sender().lock().map_err(|e| e.to_string())?;
+    let tx = (*guard).clone().ok_or("Audio thread not initialized")?;
+    tx.send(msg).map_err(|e| e.to_string())
 }
 
 // --- Audio stream wrapper ---
@@ -144,6 +204,11 @@ struct PlayingSound {
     /// Original file path — sent back in the `sound_finished` event so the
     /// frontend can deactivate exactly the sound that finished.
     path: String,
+    looping: bool,
+    /// Known duration used to clamp seeks away from EOF (avoids empty source).
+    duration_secs: f64,
+    /// Absolute file offset corresponding to player position 0 (set on seek).
+    position_origin_secs: f64,
 }
 
 // --- Helpers ---
@@ -201,14 +266,40 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 
         loop {
             // Drain naturally-finished sounds and notify frontend.
+            let mut finished_any = false;
             let mut i = 0;
             while i < playing.len() {
                 if playing[i].player.empty() {
-                    let finished = playing.remove(i);
-                    let _ = app_handle.emit("sound_finished", finished.path);
+                    if playing[i].looping {
+                        let path = playing[i].path.clone();
+                        let was_paused = playing[i].player.is_paused();
+                        match load_source(&path) {
+                            Ok(source) => {
+                                playing[i].position_origin_secs = 0.0;
+                                playing[i].player.append(source.amplify(current_volume()));
+                                if was_paused {
+                                    playing[i].player.pause();
+                                }
+                                finished_any = true; // refresh position → 0
+                                i += 1;
+                            }
+                            Err(_) => {
+                                let finished = playing.remove(i);
+                                let _ = app_handle.emit("sound_finished", finished.path);
+                                finished_any = true;
+                            }
+                        }
+                    } else {
+                        let finished = playing.remove(i);
+                        let _ = app_handle.emit("sound_finished", finished.path);
+                        finished_any = true;
+                    }
                 } else {
                     i += 1;
                 }
+            }
+            if finished_any {
+                sync_playing_list(&app_handle, &playing);
             }
 
             // Use timeout-based recv while sounds are active so we keep draining.
@@ -226,6 +317,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         s.player.stop();
                         let _ = app_handle.emit("sound_finished", s.path);
                     }
+                    sync_playing_list(&app_handle, &playing);
                 }
 
                 AudioMsg::StopOne { path } => {
@@ -233,7 +325,36 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         let s = playing.remove(pos);
                         s.player.stop();
                         let _ = app_handle.emit("sound_finished", s.path);
+                        sync_playing_list(&app_handle, &playing);
                     }
+                }
+
+                AudioMsg::PauseOne { path } => {
+                    if let Some(s) = playing.iter().find(|s| s.path == path) {
+                        s.player.pause();
+                        sync_playing_list(&app_handle, &playing);
+                    }
+                }
+
+                AudioMsg::ResumeOne { path } => {
+                    if let Some(s) = playing.iter().find(|s| s.path == path) {
+                        s.player.play();
+                        sync_playing_list(&app_handle, &playing);
+                    }
+                }
+
+                AudioMsg::PauseAll => {
+                    for s in &playing {
+                        s.player.pause();
+                    }
+                    sync_playing_list(&app_handle, &playing);
+                }
+
+                AudioMsg::ResumeAll => {
+                    for s in &playing {
+                        s.player.play();
+                    }
+                    sync_playing_list(&app_handle, &playing);
                 }
 
                 AudioMsg::Play { path, device_name, host_name, overlap } => {
@@ -259,8 +380,19 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 
                     match load_source(&path) {
                         Ok(source) => {
+                            let duration_secs = source
+                                .total_duration()
+                                .map(|d| d.as_secs_f64())
+                                .unwrap_or(0.0);
                             new_player.append(source.amplify(current_volume()));
-                            playing.push(PlayingSound { player: new_player, path });
+                            playing.push(PlayingSound {
+                                player: new_player,
+                                path,
+                                looping: false,
+                                duration_secs,
+                                position_origin_secs: 0.0,
+                            });
+                            sync_playing_list(&app_handle, &playing);
                         }
                         Err(e) => {
                             eprintln!("Failed to decode audio: {}", e);
@@ -268,12 +400,88 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         }
                     }
                 }
+
+                AudioMsg::Seek {
+                    path,
+                    position_secs,
+                } => {
+                    let idx = match path.as_deref() {
+                        Some(p) => playing.iter().position(|s| s.path == p),
+                        None => (!playing.is_empty()).then_some(0),
+                    };
+                    if let (Some(i), Some(st)) = (idx, stream.as_ref()) {
+                        // Always rebuild from offset. try_seek is flaky on many
+                        // decoders and seeking to/past EOF empties the player
+                        // (frontend sees a sudden stop).
+                        let was_paused = playing[i].player.is_paused();
+                        let file_path = playing[i].path.clone();
+                        let looping = playing[i].looping;
+                        let mut duration_secs = playing[i].duration_secs;
+
+                        match load_source(&file_path) {
+                            Ok(source) => {
+                                if duration_secs <= 0.0 {
+                                    duration_secs = source
+                                        .total_duration()
+                                        .map(|d| d.as_secs_f64())
+                                        .unwrap_or(0.0);
+                                }
+                                // Keep a small tail so skip_duration never exhausts the source.
+                                let max_pos = if duration_secs > 0.08 {
+                                    duration_secs - 0.05
+                                } else {
+                                    0.0
+                                };
+                                let clamped = position_secs.clamp(0.0, max_pos.max(0.0));
+                                let new_player = Player::connect_new(st.device_sink.mixer());
+                                new_player.append(
+                                    source
+                                        .skip_duration(Duration::from_secs_f64(clamped))
+                                        .amplify(current_volume()),
+                                );
+                                if was_paused {
+                                    new_player.pause();
+                                }
+                                let old = std::mem::replace(
+                                    &mut playing[i],
+                                    PlayingSound {
+                                        player: new_player,
+                                        path: file_path,
+                                        looping,
+                                        duration_secs,
+                                        // New source's get_pos() starts at 0 after skip.
+                                        position_origin_secs: clamped,
+                                    },
+                                );
+                                old.player.stop();
+                                sync_playing_list(&app_handle, &playing);
+                            }
+                            Err(e) => eprintln!("Seek reload failed: {e}"),
+                        }
+                    }
+                }
+
+                AudioMsg::SetLoop { path, looping } => {
+                    let targets: Vec<usize> = match path.as_deref() {
+                        Some(p) => playing
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, s)| s.path == p)
+                            .map(|(i, _)| i)
+                            .collect(),
+                        None => (0..playing.len()).collect(),
+                    };
+                    for i in targets {
+                        playing[i].looping = looping;
+                    }
+                    sync_playing_list(&app_handle, &playing);
+                }
             }
         }
     });
 }
 
-// --- Tauri command ---
+// --- Tauri commands ---
 
 #[tauri::command]
 pub fn play_sound(
@@ -283,15 +491,65 @@ pub fn play_sound(
     active: bool,
     overlap: bool,
 ) -> Result<String, String> {
-    let guard = audio_sender().lock().map_err(|e| e.to_string())?;
-    let tx = (*guard).clone().ok_or("Audio thread not initialized")?;
-
     if active {
-        tx.send(AudioMsg::StopOne { path: sound_path }).map_err(|e| e.to_string())?;
+        send_msg(AudioMsg::StopOne { path: sound_path })?;
         Ok("stopped".to_string())
     } else {
-        tx.send(AudioMsg::Play { path: sound_path, device_name, host_name, overlap })
-            .map_err(|e| e.to_string())?;
+        send_msg(AudioMsg::Play {
+            path: sound_path,
+            device_name,
+            host_name,
+            overlap,
+        })?;
         Ok("playing".to_string())
     }
+}
+
+#[tauri::command]
+pub fn pause_sound(sound_path: String) -> Result<(), String> {
+    send_msg(AudioMsg::PauseOne { path: sound_path })
+}
+
+#[tauri::command]
+pub fn resume_sound(sound_path: String) -> Result<(), String> {
+    send_msg(AudioMsg::ResumeOne { path: sound_path })
+}
+
+#[tauri::command]
+pub fn pause_all() -> Result<(), String> {
+    send_msg(AudioMsg::PauseAll)
+}
+
+#[tauri::command]
+pub fn resume_all() -> Result<(), String> {
+    send_msg(AudioMsg::ResumeAll)
+}
+
+#[tauri::command]
+pub fn stop_all() -> Result<(), String> {
+    send_msg(AudioMsg::Stop)
+}
+
+#[tauri::command]
+pub fn get_playing_sounds() -> Vec<PlayingInfo> {
+    playing_list()
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn seek_playing(position_secs: f64, sound_path: Option<String>) -> Result<(), String> {
+    send_msg(AudioMsg::Seek {
+        path: sound_path,
+        position_secs,
+    })
+}
+
+#[tauri::command]
+pub fn set_playing_loop(looping: bool, sound_path: Option<String>) -> Result<(), String> {
+    send_msg(AudioMsg::SetLoop {
+        path: sound_path,
+        looping,
+    })
 }

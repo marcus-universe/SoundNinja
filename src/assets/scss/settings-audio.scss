@@ -1,3 +1,123 @@
+@use 'variables' as *;
+
+// Custom capture-device picker (native optgroup can't style separators).
+.capture-dropdown {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.capture-dropdown__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  height: var(--settings-control-h, calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2));
+  box-sizing: border-box;
+  padding: 0 1.2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.64rem;
+  color: $white;
+  font-family: $fontRegular;
+  font-size: 1.44rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: left;
+
+  &:hover,
+  &:focus {
+    border-color: var(--primary_color);
+    outline: none;
+  }
+
+  span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+}
+
+.capture-dropdown__arrow {
+  flex-shrink: 0;
+  opacity: 0.5;
+  font-style: normal;
+}
+
+.capture-dropdown__list {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  z-index: 300;
+  max-height: 24rem;
+  overflow-y: auto;
+  background: var(--color-bg, #{$color-bg});
+  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.64rem;
+  box-shadow: 0 0.8rem 2.4rem rgba(0, 0, 0, 0.5);
+
+  &::-webkit-scrollbar { width: 0.6rem; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.3rem;
+  }
+}
+
+.capture-dropdown__sep {
+  // Same panel BG as options — readable via padding + sound-button accent line.
+  padding: 0.85rem 1.2rem 0.55rem;
+  margin: 0;
+  background: var(--color-bg, #{$color-bg});
+  color: rgba(238, 238, 238, 0.9);
+  font-family: $fontRegular;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-bottom: 0.16rem solid var(--btn-accent, var(--primary_color));
+  pointer-events: none;
+  user-select: none;
+}
+
+.capture-dropdown__group + .capture-dropdown__group .capture-dropdown__sep {
+  margin-top: 0.35rem;
+  padding-top: 1rem;
+  border-top: 0.16rem solid var(--btn-accent, var(--primary_color));
+}
+
+.capture-dropdown__option {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.72rem 1.2rem;
+  border: none;
+  background: var(--color-bg, #{$color-bg});
+  color: rgba(238, 238, 238, 0.75);
+  font-family: $fontRegular;
+  font-size: 1.44rem;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.1s, color 0.1s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $white;
+  }
+
+  &.active {
+    background: var(--primary_color);
+    color: var(--color-bg, #{$color-bg});
+  }
+}
+
 .asio-matrix {
   width: 100%;
   border-collapse: collapse;
@@ -15,5 +135,140 @@
 
   tr:nth-child(even) {
     background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.settings-audio-compact {
+  // Same tokens as .settings-content — without these, select/btn height vars are invalid.
+  --settings-control-h: calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2);
+  --settings-label-w: auto;
+  --settings-group-gap: 0.5rem;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem 1.2rem;
+  // Match record-editor body horizontal padding; tight vertical.
+  padding: 0.6rem $padding_1;
+  margin-bottom: 2rem;
+  border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.12);
+
+  // Override full Settings layout (4rem indent + 16rem label column).
+  .settings-group {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+    gap: 0.5rem;
+    flex: 1 1 26rem;
+    min-width: 20rem;
+    align-items: center;
+  }
+
+  .settings-group--stacked {
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .settings-group--compact {
+    gap: 0.5rem;
+  }
+
+  .settings-label-info,
+  .settings-label {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    font-size: 1.2rem;
+  }
+
+  .settings-row {
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-width: 12rem;
+    width: auto;
+  }
+
+  .settings-select,
+  .capture-dropdown {
+    flex: 1 1 auto;
+    min-width: 12rem;
+    max-width: none;
+    width: 100%;
+  }
+
+  .settings-select {
+    height: var(--settings-control-h);
+  }
+
+  // Square reload btn: same box as select (needs --settings-control-h above).
+  .settings-btn--icon {
+    flex: 0 0 var(--settings-control-h);
+    width: var(--settings-control-h);
+    height: var(--settings-control-h);
+    min-width: var(--settings-control-h);
+    min-height: var(--settings-control-h);
+    box-sizing: border-box;
+    border-radius: 0.64rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.76rem;
+    line-height: 1;
+  }
+
+  .settings-slider-header {
+    width: 100%;
+
+    .settings-label-info,
+    .settings-label {
+      flex: 1 1 auto;
+      width: auto;
+    }
+  }
+
+  // Wide enough for 3 digits + %; hide spin buttons that steal width.
+  .settings-unit-input .settings-input {
+    width: 7.2rem;
+    max-width: 7.2rem;
+    min-width: 7.2rem;
+    flex: 0 0 7.2rem;
+    box-sizing: border-box;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+    text-align: right;
+
+    appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+}
+
+.settings-audio-volumes--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  flex: 1.2 1 20rem;
+  min-width: 16rem;
+
+  .settings-group {
+    flex: 1 1 10rem;
+    min-width: 9.5rem;
+  }
+
+  // Record Editor: Input Volume first, then Output.
+  .settings-group:nth-child(1) {
+    order: 2;
+  }
+
+  .settings-group:nth-child(2) {
+    order: 1;
   }
 }
