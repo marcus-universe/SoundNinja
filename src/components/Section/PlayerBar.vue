@@ -43,8 +43,15 @@
       </template>
 
       <QuickInfo :text="$t('player.record')">
-        <button class="player-float__btn player-float__btn--record" type="button" @click="openRecordEditor">
-          <Icons icon="record" />
+        <button
+          class="player-float__btn player-float__btn--record"
+          type="button"
+          :aria-label="$t('player.record')"
+          @click="openRecordEditor"
+        >
+          <div class="player-float__rec" aria-hidden="true">
+            <div class="player-float__rec-dot" />
+          </div>
         </button>
       </QuickInfo>
 
@@ -216,10 +223,16 @@ function startWaveClock() {
   if (waveRaf != null) return
   const tick = () => {
     if (!scrubbing.value && !progressPaused && durationSec.value > 0) {
-      playheadSec.value = Math.min(
-        durationSec.value,
-        (Date.now() - progressAnchorMs) / 1000,
-      )
+      let sec = (Date.now() - progressAnchorMs) / 1000
+      // When looping, wrap locally until backend snapshot confirms restart.
+      if (loopOn.value && sec >= durationSec.value) {
+        sec = sec % durationSec.value
+        progressElapsedMs = sec * 1000
+        progressAnchorMs = Date.now() - progressElapsedMs
+      } else {
+        sec = Math.min(durationSec.value, sec)
+      }
+      playheadSec.value = sec
       drawWave()
     }
     waveRaf = requestAnimationFrame(tick)

@@ -168,7 +168,14 @@ function ensureClock() {
       const anchor = anchorByPath.get(item.path)
       const dur = durationByPath.get(item.path) || 0
       if (!anchor || dur <= 0) continue
-      const sec = Math.min(dur, (now - anchor.originMs) / 1000)
+      let sec = (now - anchor.originMs) / 1000
+      if (item.looping && sec >= dur) {
+        sec = sec % dur
+        anchor.originMs = now - sec * 1000
+        anchor.elapsedMs = sec * 1000
+      } else {
+        sec = Math.min(dur, sec)
+      }
       playheadByPath.set(item.path, sec)
       drawWave(item.path)
     }

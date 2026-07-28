@@ -256,8 +256,11 @@ function tickProgress() {
   }
   const now = Date.now()
   for (const info of playingSounds.values()) {
-    if (info.paused) continue
-    info.percent = Math.min(100, ((now - info.startTime) / 1000 / info.duration) * 100)
+    if (info.paused || !(info.duration > 0)) continue
+    info.percent = Math.min(
+      100,
+      ((now - info.startTime) / 1000 / info.duration) * 100,
+    )
   }
   rafId = requestAnimationFrame(tickProgress)
 }
@@ -295,7 +298,7 @@ function stopAllProgress() {
   }
 }
 
-/** Freeze / unfreeze button progress when backend pause/resume/seek changes. */
+/** Freeze / unfreeze button progress when backend pause/resume/seek/loop changes. */
 function syncProgressPauseState(list) {
   const files = jsonStore.configFile?.files || []
   const byPath = new Map((list || []).map((p) => [p.path, p]))

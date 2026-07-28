@@ -84,6 +84,17 @@
         width: 2.6rem;
         height: 2.6rem;
       }
+
+      .player-float__rec {
+        width: 2.6rem;
+        height: 2.6rem;
+        border-width: 0.26rem;
+      }
+
+      .player-float__rec-dot {
+        width: 1.7rem;
+        height: 1.7rem;
+      }
     }
 
     .player-float__canvas {
@@ -143,11 +154,12 @@
     }
 
     &--record {
-      color: #ff4d4d;
-
       &:hover:not(:disabled) {
-        color: #ff6b6b;
         background: rgba(255, 77, 77, 0.12);
+
+        .player-float__rec {
+          border-color: #ff1744;
+        }
       }
     }
 
@@ -157,6 +169,32 @@
       height: 1.8rem;
       fill: currentColor;
     }
+  }
+
+  // CSS-only record icon — match sibling SVG icon size; true circle via fixed rem.
+  &__rec {
+    position: relative;
+    display: block;
+    width: 1.8rem;
+    height: 1.8rem;
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    border: 0.2rem solid #b71c1c;
+    border-radius: 50%;
+  }
+
+  &__rec-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    border-radius: 50%;
+    background: #e53935;
+    transform: translate(-50%, -50%);
+    aspect-ratio: 1 / 1;
   }
 }
 

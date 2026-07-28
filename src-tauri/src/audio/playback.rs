@@ -275,7 +275,12 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         let was_paused = playing[i].player.is_paused();
                         match load_source(&path) {
                             Ok(source) => {
-                                playing[i].position_origin_secs = 0.0;
+                                // Sink::get_pos is cumulative across appended
+                                // sources. Offset origin so absolute position
+                                // restarts at 0 and the UI playhead/progress
+                                // can loop with the audio.
+                                let sink_pos = playing[i].player.get_pos().as_secs_f64();
+                                playing[i].position_origin_secs = -sink_pos;
                                 playing[i].player.append(source.amplify(current_volume()));
                                 if was_paused {
                                     playing[i].player.pause();
