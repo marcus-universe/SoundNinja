@@ -36,14 +36,6 @@
     </Transition>
 
     <div class="settings-group">
-      <label class="settings-label">{{ $t('settings.main.themeMode') }}</label>
-      <select v-model="themeMode" @change="onThemeMode" class="settings-select">
-        <option value="dark">{{ $t('settings.main.themeModeDark') }}</option>
-        <option value="light">{{ $t('settings.main.themeModeLight') }}</option>
-      </select>
-    </div>
-
-    <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.navbarSide') }}</label>
       <select v-model="navbarSide" @change="onNavbarSide" class="settings-select">
         <option value="left">{{ $t('settings.main.navbarLeft') }}</option>
@@ -215,6 +207,15 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openSecondaryWindow, THEME_CREATOR } from '~/utils/secondaryWindows'
+import { THEME_PRESETS, DEFAULT_THEME_ID, normalizeThemeId } from '~/utils/themePresets'
+import {
+  THEME_INLINE_VARS,
+  applyThemeTokens,
+  parseThemeCss,
+  buildThemeCss,
+  parseThemeName,
+  THEME_TOKEN_DEFAULTS,
+} from '~/utils/themeTokens'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
@@ -238,15 +239,9 @@ async function openThemeCreator() {
 
 
 
-const builtinThemes = [
-  { id: 'dark-cyan',   label: 'Dark Cyan',   colors: { primaryColor: '#00d4ff', bgDark: '#222831' } },
-  { id: 'dark-purple', label: 'Dark Purple', colors: { primaryColor: '#a855f7', bgDark: '#1e1b2e' } },
-  { id: 'dark-orange', label: 'Dark Orange', colors: { primaryColor: '#ff8a29', bgDark: '#231c15' } },
-  { id: 'dark-green',  label: 'Dark Green',  colors: { primaryColor: '#22e06a', bgDark: '#162218' } },
-  { id: 'dark-pink',   label: 'Dark Pink',   colors: { primaryColor: '#f062a6', bgDark: '#231520' } },
-]
+const builtinThemes = THEME_PRESETS
 
-const selectedTheme = ref('dark-cyan')
+const selectedTheme = ref(DEFAULT_THEME_ID)
 const savedThemes = ref<string[]>([])
 const importError = ref('')
 const importSuccess = ref('')
@@ -260,7 +255,6 @@ const systemTitlebar = ref(false)
 const hideTitlebar = ref(false)
 const hideTitlebarWarnOpen = ref(false)
 const hideTitlebarDontRemind = ref(false)
-const themeMode = ref<'dark' | 'light'>('dark')
 const recentLimit = ref(30)
 const currentLanguage = ref(locale.value)
 const navbarSide = ref<'left' | 'right'>('left')
@@ -314,9 +308,8 @@ function applyTheme() {
   removeCustomCssTag()
   const theme = builtinThemes.find((t) => t.id === id)
   if (!theme) return
-  // Builtin themes are presets for the per-project color model.
-  jsonStore.setThemeColors(theme.colors)
-  applyThemeColors(jsonStore.configFile?.settings)
+  jsonStore.setThemeColors(theme.tokens)
+  applyThemeTokens(jsonStore.configFile?.settings as unknown as Record<string, unknown>)
 }
 
 // Removes every theme variable a builtin/model theme may have set inline on
@@ -324,11 +317,7 @@ function applyTheme() {
 // cleared before a file/custom theme can take effect.
 function clearInlineThemeVars() {
   const root = document.documentElement
-  ;[
-    '--primary_color', '--color-bg', '--color-btn', '--sound-text',
-    '--color-bg-light', '--color-bg-dark', '--color-btn-light', '--color-btn-dark',
-    '--text-light', '--text-dark',
-  ].forEach((k) => root.style.removeProperty(k))
+  THEME_INLINE_VARS.forEach((k) => root.style.removeProperty(k))
 }
 
 function removeCustomCssTag() {
@@ -342,7 +331,21 @@ function injectCustomCss(css: string) {
     tag.id = 'sn-custom-theme'
     document.head.appendChild(tag)
   }
-  tag.textContent = css
+  const parsed = parseThemeCss(css)
+  if (parsed.primaryColor || parsed.bg || parsed.btnBg) {
+    const tokens = { ...THEME_TOKEN_DEFAULTS, ...parsed }
+    const name = parseThemeName(css) || 'theme'
+    const flat = buildThemeCss(name, tokens)
+    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding)\s*:\s*([^;]+);/g
+    const extras: string[] = []
+    let m: RegExpExecArray | null
+    while ((m = layoutRe.exec(css)) !== null) extras.push(`  ${m[1]}: ${m[2]};`)
+    tag.textContent = extras.length
+      ? flat.replace(/\n}\s*$/, `\n${extras.join('\n')}\n}`)
+      : flat
+  } else {
+    tag.textContent = css
+  }
 }
 
 async function loadSavedThemes() {
@@ -390,10 +393,7 @@ async function importCustomCssFile() {
 }
 
 // Reads the `/* SoundNinja Theme: NAME */` comment from a theme CSS file.
-function parseThemeName(css: string): string {
-  const m = css.match(/\/\*\s*SoundNinja Theme:\s*(.+?)\s*\*\//i)
-  return m?.[1]?.trim() ?? ''
-}
+// (parseThemeName imported from ~/utils/themeTokens)
 
 async function saveImportedTheme(css: string, name: string) {
   const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
@@ -499,11 +499,6 @@ function cancelHideTitlebar() {
   hideTitlebar.value = false
 }
 
-function onThemeMode() {
-  jsonStore.setThemeMode(themeMode.value)
-  applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
-}
-
 async function onRecentLimit() {
   const n = Math.max(1, Math.min(100, Number(recentLimit.value) || 30))
   recentLimit.value = n
@@ -551,7 +546,7 @@ async function syncFromStore() {
   // Load the saved-theme options first so the dropdown always has a matching
   // <option> for a persisted `file:` theme — otherwise v-model can't select it.
   await loadSavedThemes()
-  selectedTheme.value = jsonStore.configFile?.settings?.theme ?? 'dark-cyan'
+  selectedTheme.value = normalizeThemeId(jsonStore.configFile?.settings?.theme)
   stopOnRetrigger.value = jsonStore.configFile?.settings?.stopOnRetrigger ?? true
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
   showPlayer.value = jsonStore.configFile?.settings?.showPlayer !== false
@@ -560,8 +555,6 @@ async function syncFromStore() {
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
-  themeMode.value = jsonStore.configFile?.settings?.themeMode ?? 'dark'
-  applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
   recentLimit.value = appSettings.recentLimit ?? 30
   cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
   cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 50

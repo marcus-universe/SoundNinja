@@ -137,8 +137,19 @@ export async function openSecondaryWindow(spec: SecondaryWindowSpec): Promise<We
   const chrome = chromeOptions()
   await applyChromeToAll(chrome.nativeChrome, chrome.hidden)
   await stripMenu(spec.label)
+  try {
+    if (await win.isMinimized()) await win.unminimize()
+  } catch { /* permission / platform may lack unminimize */ }
   await win.show()
   await win.setFocus()
+  // Windows/Linux: force raise when caller still holds focus.
+  try {
+    if (!(await win.isFocused())) {
+      await win.setAlwaysOnTop(true)
+      await win.setFocus()
+      await win.setAlwaysOnTop(false)
+    }
+  } catch { /* best-effort */ }
   return win
 }
 

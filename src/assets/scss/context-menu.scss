@@ -153,6 +153,126 @@
       color: $color-bg;
     }
   }
+
+  &__color-panel {
+    padding: 0.4rem 0.6rem 0.6rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-top: 0.1rem solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+// ── ColorGroupPicker ──────────────────────────────────────────────────────────
+.color-group-picker {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+
+  &__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.25em 0.5em;
+    border-radius: 0.4em;
+    border: 0.1em solid var(--primary_color);
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-family: $fontBold;
+    font-size: 1em;
+  }
+
+  &__swatch {
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 0.25em;
+    border: 0.1rem solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+  }
+
+  &__label {
+    white-space: nowrap;
+  }
+
+  &__chevron {
+    font-size: 0.75em;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 22rem;
+  }
+
+  &__panel--floating {
+    background: $color-bg;
+    border: 0.15rem solid var(--primary_color);
+    border-radius: 0.5rem;
+    padding: 0.6rem;
+    box-shadow: 0 0.4rem 2rem rgba(0, 0, 0, 0.5);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__row-label {
+    flex: 1;
+    font-family: $fontRegular;
+    font-size: 0.95em;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+  }
+
+  &__wheel {
+    width: 2rem;
+    height: 1.6rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  &__row-reset {
+    background: transparent;
+    border: 0.1rem solid var(--primary_color);
+    color: var(--primary_color);
+    border-radius: 0.3rem;
+    padding: 0.05rem 0.35rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+
+    &:hover {
+      background: var(--primary_color);
+      color: $color-bg;
+    }
+  }
+
+  &__footer {
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+    border-top: 0.1rem solid rgba(255, 255, 255, 0.1);
+  }
+
+  &__reset-all {
+    width: 100%;
+    background: transparent;
+    border: 0.1rem solid var(--primary_color);
+    color: var(--primary_color);
+    border-radius: 0.3rem;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    font-family: $fontBold;
+    font-size: 0.9em;
+
+    &:hover {
+      background: var(--primary_color);
+      color: $color-bg;
+    }
+  }
 }
 
 .desc-fade-enter-active,

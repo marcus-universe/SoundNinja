@@ -79,7 +79,7 @@
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  border-bottom: 0.16rem solid var(--btn-accent, var(--primary_color));
+  border-bottom: 0.16rem solid var(--btn-border, var(--primary_color));
   pointer-events: none;
   user-select: none;
 }
@@ -87,7 +87,7 @@
 .capture-dropdown__group + .capture-dropdown__group .capture-dropdown__sep {
   margin-top: 0.35rem;
   padding-top: 1rem;
-  border-top: 0.16rem solid var(--btn-accent, var(--primary_color));
+  border-top: 0.16rem solid var(--btn-border, var(--primary_color));
 }
 
 .capture-dropdown__option {

@@ -232,10 +232,6 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.configFile.settings.allowReorder = val
       this.writeConfig()
     },
-    setThemeMode(val: 'dark' | 'light') {
-      this.configFile.settings.themeMode = val
-      this.writeConfig()
-    },
     // Generic single-setting update — avoids a dedicated action per field.
     setSetting(key: keyof Settings, val: unknown) {
       (this.configFile.settings as Record<string, unknown>)[key] = val

@@ -12,7 +12,8 @@
 </template>
 
 <script setup>
-import { readableTextColor } from '~/utils/contrast'
+import { parseOverride } from '~/utils/colorOverride'
+import { withAlpha } from '~/utils/themeTokens'
 
 const props = defineProps({
   tabName: { type: String, required: true },
@@ -21,21 +22,28 @@ const props = defineProps({
 })
 defineEmits(['select', 'contextmenu'])
 
-const jsonStore = useJsonHandelingStore()
-
-// Resolve the tab's accent + a readable text color for its solid (active) state.
+// Resolve per-tab override → --tab-* CSS vars (falls back to theme tokens).
 const tabStyle = computed(() => {
-  let accent = props.tabColor
-  if (!accent && typeof document !== 'undefined') {
-    accent = getComputedStyle(document.documentElement).getPropertyValue('--primary_color').trim()
+  const o = parseOverride(props.tabColor)
+  const style = {}
+  // Legacy single-hex override: treat as accent → bg tint + border.
+  if (o.border && !o.bg && !o.text) {
+    style['--tab-bg'] = withAlpha(o.border, 0.2)
+    style['--tab-bg-hover'] = withAlpha(o.border, 0.4)
+    style['--tab-border'] = o.border
+    style['--tab-border-hover'] = o.border
+    style['--tab-text-active'] = '#eeeeee'
+  } else {
+    if (o.bg) style['--tab-bg'] = o.bg
+    if (o.bgHover) style['--tab-bg-hover'] = o.bgHover
+    if (o.text) {
+      style['--tab-text'] = o.text
+      style['--tab-text-active'] = o.text
+    }
+    if (o.textHover) style['--tab-text-hover'] = o.textHover
+    if (o.border) style['--tab-border'] = o.border
+    if (o.borderHover) style['--tab-border-hover'] = o.borderHover
   }
-  accent = accent || '#00d4ff'
-  const s = jsonStore.configFile?.settings
-  const tl = s?.textLight || '#eeeeee'
-  const td = s?.textDark || '#222831'
-  return {
-    '--tab-accent': accent,
-    '--tab-text-active': readableTextColor(accent, tl, td),
-  }
+  return style
 })
 </script>

@@ -73,20 +73,18 @@
             class="context-menu__swatch"
             :style="swatchStyle"
           />
-          <span class="context-menu__label">{{ $t('contextMenu.color') }}</span>
+          <span class="context-menu__label">{{ $t('contextMenu.colors') }}</span>
           <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'color'" class="context-menu__desc">{{ $t('contextMenu.colorDesc') }}</span>
+            <span v-if="hoveredItem === 'color'" class="context-menu__desc">{{ $t('contextMenu.colorsDesc') }}</span>
           </Transition>
           <span class="context-menu__chevron">{{ colorPickerOpen ? '▲' : '▼' }}</span>
         </li>
-        <li v-if="colorPickerOpen" class="context-menu__color-row">
-          <input
-            type="color"
-            class="context-menu__colorpicker"
-            :value="currentColor"
-            @input="onColorInput"
+        <li v-if="colorPickerOpen" class="context-menu__color-panel" @click.stop>
+          <ColorGroupPicker
+            :model-value="currentOverride"
+            inline
+            @change="onOverrideChange"
           />
-          <button class="context-menu__reset-color" @click="resetColor" :title="$t('contextMenu.resetColor')">↺</button>
         </li>
       </ul>
     </div>
@@ -101,6 +99,12 @@
 </template>
 
 <script setup>
+import {
+  parseOverride,
+  serializeOverride,
+  overrideSwatch,
+} from '~/utils/colorOverride'
+
 const { t: $t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -169,7 +173,6 @@ watch(
   { flush: 'post' },
 )
 
-// Keep menu inside viewport using measured size
 const menuX = computed(() => {
   const x = appStore.contextMenu.x
   if (typeof window === 'undefined') return x
@@ -181,42 +184,35 @@ const menuY = computed(() => {
   return Math.min(y, Math.max(4, window.innerHeight - menuSize.value.h - 8))
 })
 
-const currentColor = computed(() => {
+const rawColor = computed(() => {
   const { type, targetName, targetIndex } = appStore.contextMenu
   if (type === 'tab') {
     const tab = jsonStore.configFile.tabList.find((t) => t.name === targetName)
-      return (tab?.color ?? getComputedStyle(document.documentElement).getPropertyValue('--primary_color').trim()) || '#00e5ff'
+    return tab?.color ?? ''
   }
   if (type === 'sound') {
-    return jsonStore.configFile.files[targetIndex]?.color ?? '#00e5ff'
+    return jsonStore.configFile.files[targetIndex]?.color ?? ''
   }
-  return '#00e5ff'
+  return ''
 })
 
+const currentOverride = computed(() => parseOverride(rawColor.value))
+
 const swatchStyle = computed(() => ({
-  background: currentColor.value,
+  background: overrideSwatch(currentOverride.value),
 }))
 
 function toggleColorPicker() {
   colorPickerOpen.value = !colorPickerOpen.value
 }
 
-function onColorInput(e) {
-  const color = e.target.value
+function onOverrideChange(override) {
+  const serialized = serializeOverride(override)
   const { type, targetName, targetIndex } = appStore.contextMenu
   if (type === 'tab') {
-    jsonStore.setTabColor(targetName, color)
+    jsonStore.setTabColor(targetName, serialized)
   } else if (type === 'sound') {
-    jsonStore.setSoundColor(targetIndex, color)
-  }
-}
-
-function resetColor() {
-  const { type, targetName, targetIndex } = appStore.contextMenu
-  if (type === 'tab') {
-    jsonStore.setTabColor(targetName, '')
-  } else if (type === 'sound') {
-    jsonStore.setSoundColor(targetIndex, '')
+    jsonStore.setSoundColor(targetIndex, serialized)
   }
 }
 
@@ -255,7 +251,6 @@ function close() {
   moveToTabOpen.value = false
 }
 
-// Also close on Escape
 onMounted(() => {
   const handler = (e) => { if (e.key === 'Escape') close() }
   window.addEventListener('keydown', handler)

@@ -54,6 +54,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { defaultSettings } from '~/utils/db'
+import { normalizeThemeId } from '~/utils/themePresets'
+import {
+  applyThemeTokens,
+  THEME_INLINE_VARS,
+  parseThemeCss,
+  buildThemeCss,
+  parseThemeName,
+  THEME_TOKEN_DEFAULTS,
+} from '~/utils/themeTokens'
 import {
   createProjectFolder,
   ensureSaveProjectPath,
@@ -87,7 +96,7 @@ function migrateConfig(obj) {
     obj.tabList = obj.tabList.map((name) => ({ name }))
   }
   if (obj.settings && typeof obj.settings.hue === 'number' && !obj.settings.theme) {
-    obj.settings.theme = 'dark-cyan'
+    obj.settings.theme = 'soundninja'
     delete obj.settings.hue
   }
   return obj
@@ -272,41 +281,41 @@ async function handleMenuImportAudio() {
 }
 
 // ── Theme application ─────────────────────────────────────────────────────────
-const builtinThemes = {
-  'dark-cyan':   { '--primary_color': 'hsl(189, 100%, 58%)', '--color-bg': '#222831' },
-  'dark-purple': { '--primary_color': 'hsl(270, 80%, 65%)',  '--color-bg': '#1e1b2e' },
-  'dark-orange': { '--primary_color': 'hsl(28, 100%, 58%)',  '--color-bg': '#231c15' },
-  'dark-green':  { '--primary_color': 'hsl(145, 80%, 50%)',  '--color-bg': '#162218' },
-  'dark-pink':   { '--primary_color': 'hsl(330, 80%, 65%)',  '--color-bg': '#231520' },
-}
-
 function injectThemeCss(css) {
   let tag = document.getElementById('sn-custom-theme')
   if (!tag) { tag = document.createElement('style'); tag.id = 'sn-custom-theme'; document.head.appendChild(tag) }
-  tag.textContent = css
+  // Normalize legacy light/dark pair themes into flat :root tokens.
+  const parsed = parseThemeCss(css)
+  if (parsed.primaryColor || parsed.bg || parsed.btnBg) {
+    const tokens = { ...THEME_TOKEN_DEFAULTS, ...parsed }
+    const name = parseThemeName(css) || 'theme'
+    // Keep layout extras from the original file by appending after flat rebuild.
+    const flat = buildThemeCss(name, tokens)
+    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding)\s*:\s*([^;]+);/g
+    const extras = []
+    let m
+    while ((m = layoutRe.exec(css)) !== null) extras.push(`  ${m[1]}: ${m[2]};`)
+    tag.textContent = extras.length
+      ? flat.replace(/\n}\s*$/, `\n${extras.join('\n')}\n}`)
+      : flat
+  } else {
+    tag.textContent = css
+  }
 }
 
 // Removes any inline theme CSS variables so an injected <style> theme (custom /
 // file) can take effect (inline styles otherwise outrank :root rules).
 function clearInlineThemeVars() {
   const root = document.documentElement
-  ;[
-    '--primary_color', '--color-bg', '--color-btn', '--sound-text',
-    '--color-bg-light', '--color-bg-dark', '--color-btn-light', '--color-btn-dark',
-    '--text-light', '--text-dark',
-  ].forEach((v) => root.style.removeProperty(v))
+  THEME_INLINE_VARS.forEach((v) => root.style.removeProperty(v))
 }
 
 async function applyPersistedTheme(config) {
   const s = config?.settings
-  const theme = s?.theme ?? 'dark-cyan'
+  const theme = normalizeThemeId(s?.theme)
   if (theme === 'custom' || theme.startsWith('file:')) {
-    // Injected-CSS themes define their own vars; clear inline overrides + just
-    // toggle the light/dark root class.
+    // Injected-CSS themes define their own vars; clear inline overrides.
     clearInlineThemeVars()
-    const root = document.documentElement
-    root.classList.toggle('theme-light', s?.themeMode === 'light')
-    root.classList.toggle('theme-dark', s?.themeMode !== 'light')
     if (theme === 'custom') {
       if (s?.customCss) injectThemeCss(s.customCss)
     } else {
@@ -322,7 +331,7 @@ async function applyPersistedTheme(config) {
   }
   // Builtin / default: the per-project color model is authoritative.
   document.getElementById('sn-custom-theme')?.remove()
-  applyThemeColors(s)
+  applyThemeTokens(s)
 }
 
 onMounted(async () => {
@@ -399,41 +408,22 @@ onMounted(async () => {
     clearInlineThemeVars()
     injectThemeCss(e.payload)
   })
-  // Preview-only mode switch from the Theme Creator (does not persist themeMode).
-  listen('theme_preview_mode', (e) => {
-    const mode = e?.payload === 'light' ? 'light' : 'dark'
-    document.documentElement.classList.toggle('theme-light', mode === 'light')
-    document.documentElement.classList.toggle('theme-dark', mode === 'dark')
-  })
   listen('theme_saved', () => applyPersistedTheme(jsonStore.configFile))
   // Theme Creator asks for the currently applied theme so it can open showing
   // exactly what is on screen. Reply with the computed CSS variables.
   listen('theme_request_current', () => {
     const cs = getComputedStyle(document.documentElement)
     const get = (n) => cs.getPropertyValue(n).trim()
-    const mode = document.documentElement.classList.contains('theme-light') ? 'light' : 'dark'
-    emit('theme_current', {
-      '--primary_color': get('--primary_color'),
-      '--color-bg': get('--color-bg'),
-      '--color-btn': get('--color-btn'),
-      '--color-bg-light': get('--color-bg-light'),
-      '--color-bg-dark': get('--color-bg-dark'),
-      '--color-btn-light': get('--color-btn-light'),
-      '--color-btn-dark': get('--color-btn-dark'),
-      '--text-light': get('--text-light'),
-      '--text-dark': get('--text-dark'),
-      '--font-btn': get('--font-btn'),
-      '--font-tab': get('--font-tab'),
-      '--font-size-btn': get('--font-size-btn'),
-      '--font-size-tab': get('--font-size-tab'),
-      '--font-size-md': get('--font-size-md'),
-      '--btn_width': get('--btn_width'),
-      '--border-radius': get('--border-radius'),
-      '--btn-border-width': get('--btn-border-width'),
-      '--button-gap': get('--button-gap'),
-      '--btn_padding': get('--btn_padding'),
-      __mode: mode,
-    }).catch(() => {})
+    const payload = {}
+    for (const cssVar of THEME_INLINE_VARS) {
+      payload[cssVar] = get(cssVar)
+    }
+    // Layout extras used by Theme Creator draft.
+    ;[
+      '--font-btn', '--font-tab', '--font-size-btn', '--font-size-tab', '--font-size-md',
+      '--btn_width', '--border-radius', '--btn-border-width', '--tab-border-width', '--button-gap', '--btn_padding',
+    ].forEach((n) => { payload[n] = get(n) })
+    emit('theme_current', payload).catch(() => {})
   })
   // Theme Creator "Save & Apply": persist the selected theme, then apply it.
   listen('theme_apply', async (e) => {

@@ -156,13 +156,5 @@
   }
 }
 
-// ── Light mode: dark text on hover so icons stay visible on light backgrounds ──
-.theme-light .navbar .iconContainer {
-  svg:hover {
-    fill: var(--text-dark, #222831);
-  }
 
-  .active {
-    fill: var(--text-dark, #222831);
-  }
-}
+

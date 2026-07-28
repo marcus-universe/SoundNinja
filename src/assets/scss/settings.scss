@@ -285,7 +285,30 @@
   &--stacked {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.8rem;
+    gap: 0.48rem;
+
+    // Label flex-basis is 16rem for row layout — in a column that becomes
+    // height and creates a huge gap above the control. Reset it.
+    > .settings-label,
+    > .settings-label-info {
+      flex: none;
+      width: auto;
+      max-width: none;
+      min-height: 0;
+    }
+
+    .font-dropdown {
+      width: 100%;
+    }
+
+    > .settings-select,
+    > .settings-input {
+      width: 100%;
+    }
+
+    .settings-slider {
+      width: 100%;
+    }
   }
 
   &--inline {
@@ -557,6 +580,51 @@
   width: 100%;
   max-width: 72rem;
   padding-bottom: 2.4rem;
+  // Theme Creator is not in the settings panel container — don't clamp labels to 16rem.
+  --settings-label-w: auto;
+
+  .settings-group--inline {
+    > .settings-label-info {
+      flex: 1 1 auto;
+      width: auto;
+      max-width: none;
+      min-width: 0;
+    }
+  }
+
+  .settings-label {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: nowrap;
+    line-height: 1.35;
+  }
+
+  .settings-label-info {
+    overflow: visible;
+
+    .settings-label {
+      flex: 0 1 auto;
+      width: auto;
+      max-width: none;
+      overflow: visible;
+      text-overflow: unset;
+    }
+  }
+
+  // Match native selects / text fields to font-dropdown__trigger sizing.
+  .settings-group--stacked {
+    > .settings-select,
+    > .settings-input {
+      width: 100%;
+      flex: none;
+      height: auto;
+      min-height: 0;
+      padding: 0.72rem 1.2rem;
+      font-size: 1.44rem;
+      line-height: 1.2;
+      border-radius: 0.64rem;
+    }
+  }
 }
 
 // ── Font dropdown ─────────────────────────────────────────────────────────────
@@ -909,6 +977,12 @@
     width: auto;
     min-width: 0;
   }
+
+  &--fluid {
+    flex: none;
+    width: auto;
+    max-width: 100%;
+  }
 }
 
 // ── Info icon with CSS tooltip ────────────────────────────────────────────────
@@ -987,7 +1061,8 @@
   width: 100%;
   margin-bottom: 0.48rem;
 
-  .settings-label {
+  .settings-label,
+  .settings-label-info {
     min-width: unset;
     margin-bottom: 0;
   }
@@ -1033,26 +1108,90 @@
 .theme-creator-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 0 1.2rem;
+  gap: 1.2rem;
+  // Equal inset from titlebar line and bottom border.
+  padding: 1.2rem 0;
   border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 2.4rem;
+  margin-bottom: 1.2rem;
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--color-bg, #{$color-bg});
+  box-sizing: border-box;
 
   &__title {
     font-family: $fontBold;
     font-size: 2.24rem;
+    line-height: 1;
     color: $white;
     margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  &__theme {
+    flex: 1 1 auto;
+    min-width: 12rem;
+    max-width: 32rem;
+    height: 3.6rem;
+    box-sizing: border-box;
+    padding: 0 1.2rem;
+    font-size: 1.44rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
   }
 
   &__actions {
     display: flex;
     align-items: center;
     gap: 0.64rem;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+}
+
+.theme-creator-tabs {
+  display: flex;
+  gap: 0.48rem;
+  margin-bottom: 1.6rem;
+  padding-bottom: 0.2rem;
+  flex-wrap: wrap;
+
+  &__item {
+    all: unset;
+    cursor: pointer;
+    padding: 0.64rem 1.4rem;
+    border-radius: 0.56rem;
+    font-family: $fontRegular;
+    font-size: 1.44rem;
+    color: rgba(238, 238, 238, 0.65);
+    border: 0.16rem solid rgba(255, 255, 255, 0.12);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: $white;
+    }
+
+    &.active {
+      background: var(--primary_color);
+      border-color: var(--primary_color);
+      color: $color-bg;
+      font-family: $fontBold;
+    }
+  }
+}
+
+.theme-creator-font-upload {
+  margin: 0.4rem 0 1rem 4rem;
+  align-items: center;
+  gap: 1rem;
+
+  &__tip {
+    flex-shrink: 0;
   }
 }
 

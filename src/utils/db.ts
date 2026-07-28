@@ -1,4 +1,6 @@
 import Database from '@tauri-apps/plugin-sql'
+import { normalizeThemeId } from '~/utils/themePresets'
+import { resolveThemeTokens } from '~/utils/themeTokens'
 
 // ── Types (mirrors the shape the components already consume) ───────────────────
 export interface SoundFile {
@@ -36,21 +38,32 @@ export interface Settings {
   uniformButtonHeight?: boolean
   /** Allow drag-and-drop reordering of sounds/tabs (default on). */
   allowReorder?: boolean
-  /** Active theme mode for this project. */
-  themeMode?: 'dark' | 'light'
-  /** Accent color (single, shared by both modes). */
+  /** Accent / primary color. */
   primaryColor?: string
-  /** Background color for light mode. */
+  primaryHover?: string
+  /** Page background. */
+  bg?: string
+  /** Sound button colors. */
+  btnBg?: string
+  btnBgHover?: string
+  btnText?: string
+  btnTextHover?: string
+  btnBorder?: string
+  btnBorderHover?: string
+  /** Tab colors. */
+  tabBg?: string
+  tabBgHover?: string
+  tabText?: string
+  tabTextHover?: string
+  tabBorder?: string
+  tabBorderHover?: string
+  /** @deprecated Legacy light/dark pairs — read-migrated, never written. */
+  themeMode?: 'dark' | 'light'
   bgLight?: string
-  /** Background color for dark mode. */
   bgDark?: string
-  /** Button background for light mode. */
   btnLight?: string
-  /** Button background for dark mode. */
   btnDark?: string
-  /** Text color used on light-mode surfaces. */
   textLight?: string
-  /** Text color used on dark-mode surfaces. */
   textDark?: string
   /** Audio driver/host name (e.g. 'WASAPI', 'ASIO'). */
   outputHost?: string
@@ -75,21 +88,28 @@ export interface ProjectConfig {
 
 export function defaultSettings(): Settings {
   return {
-    theme: 'dark-cyan',
+    theme: 'soundninja',
     customCss: '',
     outputSource: 'default',
     stopOnRetrigger: true,
     overlapSounds: false,
     uniformButtonHeight: false,
     allowReorder: true,
-    themeMode: 'dark',
     primaryColor: '#00d4ff',
-    bgLight: '#eeeeee',
-    bgDark: '#222831',
-    btnLight: '#7184a2',
-    btnDark: '#363f4d',
-    textLight: '#eeeeee',
-    textDark: '#222831',
+    primaryHover: '#33ddff',
+    bg: '#222831',
+    btnBg: '#363f4d',
+    btnBgHover: '#434e5f',
+    btnText: '#eeeeee',
+    btnTextHover: '#00d4ff',
+    btnBorder: '#00d4ff',
+    btnBorderHover: '#33ddff',
+    tabBg: '#00d4ff33',
+    tabBgHover: '#00d4ff66',
+    tabText: '#eeeeee',
+    tabTextHover: '#eeeeee',
+    tabBorder: '#00d4ff',
+    tabBorderHover: '#33ddff',
     outputHost: 'WASAPI',
     asioLeftChannel: undefined,
     asioRightChannel: undefined,
@@ -244,8 +264,24 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'outputVolume': settings.outputVolume = Number(value); break
       case 'uniformButtonHeight': settings.uniformButtonHeight = value === 'true'; break
       case 'allowReorder': settings.allowReorder = value === 'true'; break
-      case 'themeMode': settings.themeMode = value === 'light' ? 'light' : 'dark'; break
+      // Flat theme tokens
       case 'primaryColor': settings.primaryColor = value; break
+      case 'primaryHover': settings.primaryHover = value; break
+      case 'bg': settings.bg = value; break
+      case 'btnBg': settings.btnBg = value; break
+      case 'btnBgHover': settings.btnBgHover = value; break
+      case 'btnText': settings.btnText = value; break
+      case 'btnTextHover': settings.btnTextHover = value; break
+      case 'btnBorder': settings.btnBorder = value; break
+      case 'btnBorderHover': settings.btnBorderHover = value; break
+      case 'tabBg': settings.tabBg = value; break
+      case 'tabBgHover': settings.tabBgHover = value; break
+      case 'tabText': settings.tabText = value; break
+      case 'tabTextHover': settings.tabTextHover = value; break
+      case 'tabBorder': settings.tabBorder = value; break
+      case 'tabBorderHover': settings.tabBorderHover = value; break
+      // Legacy pairs (kept in memory for resolveThemeTokens migration)
+      case 'themeMode': settings.themeMode = value === 'light' ? 'light' : 'dark'; break
       case 'bgLight': settings.bgLight = value; break
       case 'bgDark': settings.bgDark = value; break
       case 'btnLight': settings.btnLight = value; break
@@ -256,6 +292,13 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'asioLeftChannel': settings.asioLeftChannel = Number(value); break
       case 'asioRightChannel': settings.asioRightChannel = Number(value); break
     }
+  }
+
+  // Migrate legacy dark-* theme ids and pair fields → flat tokens.
+  settings.theme = normalizeThemeId(settings.theme)
+  if (!settings.bg && !settings.btnBg) {
+    const flat = resolveThemeTokens(settings as unknown as Record<string, unknown>)
+    Object.assign(settings, flat)
   }
 
   const tabRows = await d.select<{ name: string; color: string | null; position: number }[]>(
@@ -346,7 +389,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     // Note: outputSource / outputHost / outputVolume / ASIO channels are app-wide
     // (app-config.db) and must not be written into the project file.
     const settingsRows: [string, string][] = [
-      ['theme', s.theme ?? 'dark-cyan'],
+      ['theme', s.theme ?? 'soundninja'],
       ['customCss', s.customCss ?? ''],
       ['stopOnRetrigger', String(s.stopOnRetrigger ?? true)],
       ['overlapSounds', String(s.overlapSounds ?? false)],
@@ -356,14 +399,21 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
       ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
       ['allowReorder', String(s.allowReorder ?? true)],
-      ['themeMode', s.themeMode ?? 'dark'],
       ['primaryColor', s.primaryColor ?? '#00d4ff'],
-      ['bgLight', s.bgLight ?? '#eeeeee'],
-      ['bgDark', s.bgDark ?? '#222831'],
-      ['btnLight', s.btnLight ?? '#7184a2'],
-      ['btnDark', s.btnDark ?? '#363f4d'],
-      ['textLight', s.textLight ?? '#eeeeee'],
-      ['textDark', s.textDark ?? '#222831'],
+      ['primaryHover', s.primaryHover ?? '#33ddff'],
+      ['bg', s.bg ?? '#222831'],
+      ['btnBg', s.btnBg ?? '#363f4d'],
+      ['btnBgHover', s.btnBgHover ?? '#434e5f'],
+      ['btnText', s.btnText ?? '#eeeeee'],
+      ['btnTextHover', s.btnTextHover ?? '#00d4ff'],
+      ['btnBorder', s.btnBorder ?? '#00d4ff'],
+      ['btnBorderHover', s.btnBorderHover ?? '#33ddff'],
+      ['tabBg', s.tabBg ?? '#00d4ff33'],
+      ['tabBgHover', s.tabBgHover ?? '#00d4ff66'],
+      ['tabText', s.tabText ?? '#eeeeee'],
+      ['tabTextHover', s.tabTextHover ?? '#eeeeee'],
+      ['tabBorder', s.tabBorder ?? '#00d4ff'],
+      ['tabBorderHover', s.tabBorderHover ?? '#33ddff'],
     ]
     await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 

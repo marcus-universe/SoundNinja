@@ -33,10 +33,13 @@
         <Transition name="fade">
             <div v-if="appStore.multiSelectActive" class="bulk-bar flex_c_h align_c gap1">
                 <span class="bulk-bar__count">{{ $t('bulk.selected', { count: appStore.selectedSoundPaths.length }) }}</span>
-                <label class="bulk-bar__color">
-                    {{ $t('bulk.color') }}
-                    <input type="color" v-model="bulkColor" @change="applyBulkColor" />
-                </label>
+                <div class="bulk-bar__color">
+                    <ColorGroupPicker
+                        :model-value="bulkOverride"
+                        :title="$t('bulk.color')"
+                        @change="onBulkOverride"
+                    />
+                </div>
                 <select class="bulk-bar__select" v-model="bulkTab" @change="applyBulkTab">
                     <option value="">{{ $t('bulk.moveToTab') }}</option>
                     <option v-for="t in tabOptions" :key="t" :value="t">{{ t }}</option>
@@ -56,6 +59,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
+import { parseOverride, serializeOverride } from '~/utils/colorOverride'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -72,7 +76,7 @@ const loadingPaths = reactive(new Set())
 // P8: enforced uniform button height (0 = natural height).
 const uniformHeight = ref(0)
 // P7: multi-select bulk-edit controls.
-const bulkColor = ref('#7184a2')
+const bulkOverride = ref({})
 const bulkTab = ref('')
 
 onMounted(() => {
@@ -219,9 +223,13 @@ function getBtnStyle(sound) {
   if (sound.active && info) {
     style['--sound-progress'] = info.percent + '%'
   }
-  if (sound.color) {
-    style['--btn-accent'] = sound.color
-  }
+  const o = parseOverride(sound.color)
+  if (o.bg) style['--color-btn'] = o.bg
+  if (o.bgHover) style['--btn-bg-hover'] = o.bgHover
+  if (o.text) style['--sound-text'] = o.text
+  if (o.textHover) style['--btn-text-hover'] = o.textHover
+  if (o.border) style['--btn-border'] = o.border
+  if (o.borderHover) style['--btn-border-hover'] = o.borderHover
   return style
 }
 
@@ -380,9 +388,10 @@ function onSoundClick(sound) {
 }
 
 // ---- P7 bulk actions ----
-function applyBulkColor() {
+function onBulkOverride(override) {
+  bulkOverride.value = override
   const paths = appStore.selectedSoundPaths
-  if (paths.length) jsonStore.setSoundColorMany(paths, bulkColor.value)
+  if (paths.length) jsonStore.setSoundColorMany(paths, serializeOverride(override))
 }
 
 function applyBulkTab() {

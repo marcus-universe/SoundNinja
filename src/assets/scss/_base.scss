@@ -18,14 +18,18 @@ body {
   /* ── Theme colors (overridable by themes) ────── */
   --color-bg: #{$color-bg};
   --color-btn: #{$color-btn};
-
-  /* ── Light/dark color pairs (P9, set at runtime) ── */
-  --color-bg-light: #eeeeee;
-  --color-bg-dark: #{$color-bg};
-  --color-btn-light: #7184a2;
-  --color-btn-dark: #{$color-btn};
-  --text-light: #eeeeee;
-  --text-dark: #222831;
+  --primary-hover: #33ddff;
+  --btn-bg-hover: #{$color-btn-hover};
+  --btn-text-hover: #{$color-btn};
+  --btn-border: var(--primary_color);
+  --btn-border-hover: #33ddff;
+  --tab-bg: color-mix(in srgb, var(--primary_color) 20%, transparent);
+  --tab-bg-hover: color-mix(in srgb, var(--primary_color) 40%, transparent);
+  --tab-text: #{$white};
+  --tab-text-hover: #{$white};
+  --tab-border: var(--primary_color);
+  --tab-border-hover: #33ddff;
+  --tab-border-width: 0.3rem;
 
   /* ── Font families ───────────────────────────── */
   --font-regular: #{$fontRegular};
@@ -58,7 +62,7 @@ body {
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
 
-  /* ── Theme mode text color (P9) ──────────────── */
+  /* ── Theme text color ────────────────────────── */
   --sound-text: #{$white};
 }
 
@@ -151,6 +155,9 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  // Fixed TitleBar overlays content — same offset as .main
+  box-sizing: border-box;
+  padding-top: var(--topbar_height, 0px);
 }
 
 .soundninja__tool-page {

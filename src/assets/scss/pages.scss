@@ -34,9 +34,11 @@
 
 .theme-creator-window {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
-  padding: 1.25rem 1.25rem 3rem;
+  // Top clearance comes from .soundninja--tool (titlebar). Toolbar owns equal inset.
+  padding: 0 1.6rem 3rem;
+  box-sizing: border-box;
   background: var(--color-bg, #{$color-bg});
   color: #eee;
 }
