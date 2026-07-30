@@ -34,6 +34,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
     hideTitlebar: false,
     /** Skip the "hide title bar" warning dialog on future toggles. */
     hideTitlebarSkipWarn: false,
+    /** Show slide-in tooltips next to sidebar (navbar) buttons. Default on. */
+    navbarTooltips: true,
     /** App-wide audio prefs (not stored in project files). */
     outputSource: 'default',
     outputHost: 'WASAPI',
@@ -82,6 +84,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.titlebarMode = s.titlebarMode === 'system' ? 'system' : 'styled'
       this.hideTitlebar = s.hideTitlebar === '1' || s.hideTitlebar === 'true'
       this.hideTitlebarSkipWarn = s.hideTitlebarSkipWarn === '1' || s.hideTitlebarSkipWarn === 'true'
+      // Default enabled when unset (first launch / older configs).
+      this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
         || s.inputSource != null || s.inputHost != null
@@ -213,6 +217,12 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.hideTitlebarSkipWarn = !!skip
       const d = await this._db()
       await saveSetting(d, 'hideTitlebarSkipWarn', this.hideTitlebarSkipWarn ? '1' : '0')
+    },
+
+    async setNavbarTooltips(enabled: boolean) {
+      this.navbarTooltips = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'navbarTooltips', this.navbarTooltips ? '1' : '0')
     },
 
     /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */

@@ -347,6 +347,7 @@ const generalColorRows: { key: ThemeTokenKey; labelKey: string }[] = [
   { key: 'primaryColor', labelKey: 'settings.themeCreator.primaryAccent' },
   { key: 'primaryHover', labelKey: 'settings.themeCreator.primaryHover' },
   { key: 'bg', labelKey: 'settings.themeCreator.background' },
+  { key: 'bg2', labelKey: 'settings.themeCreator.background2' },
 ]
 
 const buttonColorRows: { key: ThemeTokenKey; labelKey: string }[] = [

@@ -17,7 +17,9 @@ body {
 
   /* ── Theme colors (overridable by themes) ────── */
   --color-bg: #{$color-bg};
+  --color-bg-2: #1a1e25;
   --color-btn: #{$color-btn};
+  --color-text: #{$white};
   --primary-hover: #33ddff;
   --btn-bg-hover: #{$color-btn-hover};
   --btn-text-hover: #{$color-btn};
@@ -158,6 +160,7 @@ body {
   // Fixed TitleBar overlays content — same offset as .main
   box-sizing: border-box;
   padding-top: var(--topbar_height, 0px);
+  background: var(--color-bg-2, var(--color-bg, #{$color-bg}));
 }
 
 .soundninja__tool-page {

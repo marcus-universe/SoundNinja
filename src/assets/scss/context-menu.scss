@@ -155,9 +155,9 @@
   }
 
   &__color-panel {
-    padding: 0.4rem 0.6rem 0.6rem;
-    background: rgba(255, 255, 255, 0.04);
-    border-top: 0.1rem solid rgba(255, 255, 255, 0.08);
+    padding: 1rem 1.2rem 1.2rem;
+    background: color-mix(in srgb, var(--color-text, #{$white}) 4%, transparent);
+    border-top: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
   }
 }
 
@@ -173,9 +173,9 @@
     gap: 0.4em;
     padding: 0.25em 0.5em;
     border-radius: 0.4em;
-    border: 0.1em solid var(--primary_color);
-    background: transparent;
-    color: #fff;
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
+    background: var(--color-bg, #{$color-bg});
+    color: var(--color-text, #{$white});
     cursor: pointer;
     font-family: $fontBold;
     font-size: 1em;
@@ -184,8 +184,8 @@
   &__swatch {
     width: 1.1em;
     height: 1.1em;
-    border-radius: 0.25em;
-    border: 0.1rem solid rgba(255, 255, 255, 0.3);
+    border-radius: 0.35em;
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
     flex-shrink: 0;
   }
 
@@ -195,82 +195,124 @@
 
   &__chevron {
     font-size: 0.75em;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 50%, transparent);
   }
 
   &__panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    min-width: 22rem;
+    display: grid;
+    // Col 1 sizes to widest label ("Border Hover"); swatches + resets share columns.
+    grid-template-columns: max-content 2.4rem 2.4rem;
+    column-gap: 0.55rem;
+    row-gap: 0.7rem;
+    width: max-content;
+    min-width: 0;
+    align-items: center;
   }
 
   &__panel--floating {
-    background: $color-bg;
-    border: 0.15rem solid var(--primary_color);
-    border-radius: 0.5rem;
-    padding: 0.6rem;
-    box-shadow: 0 0.4rem 2rem rgba(0, 0, 0, 0.5);
+    background: var(--color-bg-2, var(--color-bg, #{$color-bg}));
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 0.4rem 2rem color-mix(in srgb, var(--color-bg, #000) 55%, transparent);
+    z-index: 70;
   }
 
   &__row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    display: contents;
   }
 
   &__row-label {
-    flex: 1;
+    padding: 0.2rem 0.15rem 0.2rem 0.15rem;
     font-family: $fontRegular;
     font-size: 0.95em;
-    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.35;
+    color: color-mix(in srgb, var(--color-text, #{$white}) 90%, transparent);
     white-space: nowrap;
   }
 
-  &__wheel {
-    width: 2rem;
-    height: 1.6rem;
-    border: none;
-    background: none;
-    cursor: pointer;
-    padding: 0;
+  &__footer {
+    grid-column: 1 / -1;
+    margin-top: 0.35rem;
+    padding-top: 0.75rem;
+    border-top: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 10%, transparent);
   }
 
-  &__row-reset {
+  &__wheel {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex-shrink: 0;
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
+    border-radius: 0 ;
     background: transparent;
-    border: 0.1rem solid var(--primary_color);
-    color: var(--primary_color);
-    border-radius: 0.3rem;
-    padding: 0.05rem 0.35rem;
     cursor: pointer;
-    font-size: 0.9rem;
+    padding: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
 
     &:hover {
-      background: var(--primary_color);
-      color: $color-bg;
+      border-color: var(--tab-border-hover, var(--primary-hover, var(--primary_color)));
+    }
+
+    &::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    // Inner color fill stays square; only the outer input border is rounded.
+    &::-webkit-color-swatch {
+      border: none;
+      border-radius: 0;
+    }
+
+    &::-moz-color-swatch {
+      border: none;
+      border-radius: 0;
     }
   }
 
-  &__footer {
-    margin-top: 0.3rem;
-    padding-top: 0.3rem;
-    border-top: 0.1rem solid rgba(255, 255, 255, 0.1);
+  &__row-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex-shrink: 0;
+    background: transparent;
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
+    color: var(--primary_color);
+    border-radius: 0.55rem;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    box-sizing: border-box;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+    &:hover {
+      background: var(--primary_color);
+      color: var(--color-bg, #{$color-bg});
+      border-color: var(--primary_color);
+    }
   }
 
   &__reset-all {
     width: 100%;
     background: transparent;
-    border: 0.1rem solid var(--primary_color);
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
     color: var(--primary_color);
-    border-radius: 0.3rem;
-    padding: 0.3rem 0.5rem;
+    border-radius: 0.55rem;
+    padding: 0.55rem 0.8rem;
     cursor: pointer;
     font-family: $fontBold;
     font-size: 0.9em;
+    transition: background 0.15s, color 0.15s;
 
     &:hover {
       background: var(--primary_color);
-      color: $color-bg;
+      color: var(--color-bg, #{$color-bg});
     }
   }
 }

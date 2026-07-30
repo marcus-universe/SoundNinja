@@ -38,6 +38,7 @@
           @pointermove="(e) => onWavePointerMove(item, e)"
           @pointerup="(e) => onWavePointerUp(item, e)"
           @pointercancel="(e) => onWavePointerUp(item, e)"
+          @pointerleave="() => onWavePointerLeave(item.path)"
         />
         <QuickInfo :text="item.looping ? $t('player.loopOn') : $t('player.loopOff')">
           <button
@@ -81,13 +82,29 @@ const playerLarge = computed(() => jsonStore.configFile?.settings?.playerLarge =
 const peaksByPath = reactive(new Map<string, number[]>())
 const durationByPath = reactive(new Map<string, number>())
 const playheadByPath = reactive(new Map<string, number>())
+/** Hover preview seek position per path. */
+const hoverByPath = reactive(new Map<string, number>())
 const canvasByPath = new Map<string, HTMLCanvasElement>()
 
 const scrubPath = ref<string | null>(null)
 const seekInFlight = ref<string | null>(null)
 
 let rafId: number | null = null
+/** Coalesce scrub pointermove redraws to one paint per animation frame. */
+let scrubDrawRaf: number | null = null
+let scrubDrawPath: string | null = null
 const anchorByPath = new Map<string, { originMs: number; elapsedMs: number; paused: boolean }>()
+
+function scheduleScrubDraw(path: string) {
+  scrubDrawPath = path
+  if (scrubDrawRaf != null) return
+  scrubDrawRaf = requestAnimationFrame(() => {
+    scrubDrawRaf = null
+    const p = scrubDrawPath
+    scrubDrawPath = null
+    if (p) drawWave(p)
+  })
+}
 
 function displayName(path: string) {
   return path.replace(/^.*[\\/]/, '').replace(/\.(wav|mp3|ogg|flac)$/i, '')
@@ -129,6 +146,7 @@ function syncFromItems() {
       peaksByPath.delete(key)
       durationByPath.delete(key)
       playheadByPath.delete(key)
+      hoverByPath.delete(key)
       anchorByPath.delete(key)
       canvasByPath.delete(key)
     }
@@ -139,7 +157,12 @@ function syncFromItems() {
     if (scrubPath.value === item.path || seekInFlight.value === item.path) {
       continue
     }
-    const pos = Math.max(0, item.positionSecs ?? 0)
+    const backendPos = Math.max(0, item.positionSecs ?? 0)
+    const local = playheadByPath.get(item.path) ?? 0
+    // Paused seek can briefly report 0 — keep local playhead if it was mid-file.
+    const pos = (item.paused && local > 0.05 && backendPos < 0.05)
+      ? local
+      : backendPos
     playheadByPath.set(item.path, pos)
     anchorByPath.set(item.path, {
       originMs: Date.now() - pos * 1000,
@@ -228,6 +251,18 @@ function drawWave(path: string) {
   const dur = durationByPath.get(path) || 0
   const head = playheadByPath.get(path) || 0
   if (dur > 0) {
+    const hover = hoverByPath.get(path)
+    if (hover != null && scrubPath.value !== path) {
+      const hx = (hover / dur) * cssW
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo(hx, 0)
+      ctx.lineTo(hx, cssH)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
     const x = (head / dur) * cssW
     ctx.strokeStyle = accent
     ctx.lineWidth = 2
@@ -275,23 +310,40 @@ async function seekItem(path: string, sec: number) {
 
 function onWavePointerDown(item: PlayingInfo, e: PointerEvent) {
   scrubPath.value = item.path
+  hoverByPath.delete(item.path)
   ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
   const sec = secFromPointer(item.path, e)
   playheadByPath.set(item.path, sec)
-  drawWave(item.path)
+  scheduleScrubDraw(item.path)
 }
 
 function onWavePointerMove(item: PlayingInfo, e: PointerEvent) {
-  if (scrubPath.value !== item.path) return
   const sec = secFromPointer(item.path, e)
-  playheadByPath.set(item.path, sec)
-  drawWave(item.path)
+  if (scrubPath.value === item.path) {
+    playheadByPath.set(item.path, sec)
+  } else if (scrubPath.value == null) {
+    hoverByPath.set(item.path, sec)
+  } else {
+    return
+  }
+  scheduleScrubDraw(item.path)
 }
 
 function onWavePointerUp(item: PlayingInfo, e: PointerEvent) {
   if (scrubPath.value !== item.path) return
   scrubPath.value = null
+  if (scrubDrawRaf != null) {
+    cancelAnimationFrame(scrubDrawRaf)
+    scrubDrawRaf = null
+    scrubDrawPath = null
+  }
   void seekItem(item.path, secFromPointer(item.path, e))
+}
+
+function onWavePointerLeave(path: string) {
+  if (scrubPath.value === path) return
+  hoverByPath.delete(path)
+  scheduleScrubDraw(path)
 }
 
 async function toggleLoop(item: PlayingInfo) {

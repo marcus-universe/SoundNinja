@@ -344,18 +344,186 @@ pub fn get_waveform_peaks(
     })
 }
 
+/// Cache of streamed waveform peaks: (path, mtime_secs, buckets) → min/max pairs.
+static PEAKS_CACHE: OnceLock<Mutex<HashMap<(String, u64, usize), Vec<f32>>>> = OnceLock::new();
+
+fn peaks_cache() -> &'static Mutex<HashMap<(String, u64, usize), Vec<f32>>> {
+    PEAKS_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn file_mtime_secs(path: &str) -> u64 {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Fold interleaved samples into fixed bucket min/max peaks without retaining PCM.
+fn fold_peaks_from_iter<I>(mut samples: I, channels: u16, total_frames: usize, buckets: usize) -> Vec<f32>
+where
+    I: Iterator<Item = f32>,
+{
+    let buckets = buckets.max(1);
+    let ch = channels.max(1) as usize;
+    if total_frames == 0 {
+        return vec![0.0; buckets * 2];
+    }
+    let mut mins = vec![0.0f32; buckets];
+    let mut maxs = vec![0.0f32; buckets];
+    let mut frame = 0usize;
+    while frame < total_frames {
+        let mut frame_peak = 0.0f32;
+        for _ in 0..ch {
+            let s = samples.next().unwrap_or(0.0).abs();
+            if s > frame_peak {
+                frame_peak = s;
+            }
+        }
+        let b = ((frame as u64 * buckets as u64) / total_frames as u64).min((buckets - 1) as u64)
+            as usize;
+        mins[b] = mins[b].min(-frame_peak);
+        maxs[b] = maxs[b].max(frame_peak);
+        frame += 1;
+    }
+    let mut peaks = Vec::with_capacity(buckets * 2);
+    for b in 0..buckets {
+        peaks.push(mins[b]);
+        peaks.push(maxs[b]);
+    }
+    peaks
+}
+
+fn peaks_from_wav_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
+    let mut reader = hound::WavReader::open(path).map_err(|e| e.to_string())?;
+    let spec = reader.spec();
+    let channels = spec.channels;
+    let total_frames = reader.duration() as usize;
+    if total_frames == 0 {
+        return Ok(vec![0.0; buckets.max(1) * 2]);
+    }
+    match spec.sample_format {
+        hound::SampleFormat::Float => {
+            let iter = reader.samples::<f32>().map(|r| r.unwrap_or(0.0));
+            Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
+        }
+        hound::SampleFormat::Int => match spec.bits_per_sample {
+            24 | 32 => {
+                let iter = reader
+                    .samples::<i32>()
+                    .map(|r| r.map(|s| s as f32 / i32::MAX as f32).unwrap_or(0.0));
+                Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
+            }
+            _ => {
+                let iter = reader
+                    .samples::<i16>()
+                    .map(|r| r.map(|s| s as f32 / i16::MAX as f32).unwrap_or(0.0));
+                Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
+            }
+        },
+    }
+}
+
+/// Probe frame count via symphonia (no full PCM decode).
+fn probe_total_frames(path: &str) -> Option<usize> {
+    use std::io::Cursor;
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::formats::probe::Hint;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+
+    let bytes = super::cache::load_bytes(path).ok()?;
+    let mss = MediaSourceStream::new(Box::new(Cursor::new(bytes.clone())), Default::default());
+    let mut hint = Hint::new();
+    if let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+    let format = symphonia::default::get_probe()
+        .probe(
+            &hint,
+            mss,
+            FormatOptions::default(),
+            MetadataOptions::default(),
+        )
+        .ok()?;
+    for track in format.tracks() {
+        if let Some(n_frames) = track.num_frames {
+            if n_frames > 0 {
+                return Some(n_frames as usize);
+            }
+        }
+    }
+    None
+}
+
+fn peaks_from_rodio_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
+    let open = || {
+        let file = File::open(path).map_err(|e| e.to_string())?;
+        rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())
+    };
+
+    let decoder = open()?;
+    let sample_rate: u32 = decoder.sample_rate().into();
+    let channels: u16 = decoder.channels().into();
+
+    let total_frames = if let Some(frames) = probe_total_frames(path) {
+        frames
+    } else if let Some(dur) = decoder.total_duration() {
+        (dur.as_secs_f64() * sample_rate as f64).round().max(1.0) as usize
+    } else {
+        // Unknown length: count frames in a streaming pass (O(1) memory), then fold.
+        let ch = channels.max(1) as usize;
+        let mut n = 0usize;
+        for _ in decoder {
+            n += 1;
+        }
+        let frames = (n / ch).max(1);
+        let decoder = open()?;
+        return Ok(fold_peaks_from_iter(decoder, channels, frames, buckets));
+    };
+
+    let decoder = open()?;
+    Ok(fold_peaks_from_iter(decoder, channels, total_frames, buckets))
+}
+
+fn peaks_from_file_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
+    let buckets = buckets.max(1);
+    if path.to_lowercase().ends_with(".wav") {
+        if let Ok(peaks) = peaks_from_wav_streaming(path, buckets) {
+            return Ok(peaks);
+        }
+    }
+    peaks_from_rodio_streaming(path, buckets)
+}
+
 /// Waveform peaks for an on-disk sound file (player scrubber).
+/// Streams decode into buckets (O(buckets) memory) on a blocking pool thread.
 #[tauri::command]
-pub fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec<f32>, String> {
-    let (samples, sample_rate, channels) = decode_file(&path)?;
-    Ok(peaks_from_samples(
-        &samples,
-        sample_rate,
-        channels,
-        buckets,
-        None,
-        None,
-    ))
+pub async fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec<f32>, String> {
+    let buckets = buckets.max(1);
+    let mtime = file_mtime_secs(&path);
+    let key = (path.clone(), mtime, buckets);
+    if let Ok(cache) = peaks_cache().lock() {
+        if let Some(hit) = cache.get(&key) {
+            return Ok(hit.clone());
+        }
+    }
+
+    let path_for_worker = path.clone();
+    let peaks = tauri::async_runtime::spawn_blocking(move || {
+        peaks_from_file_streaming(&path_for_worker, buckets)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    if let Ok(mut cache) = peaks_cache().lock() {
+        if cache.len() >= 32 {
+            cache.clear();
+        }
+        cache.insert(key, peaks.clone());
+    }
+    Ok(peaks)
 }
 
 #[tauri::command]

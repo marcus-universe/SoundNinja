@@ -3,6 +3,7 @@
 import {
   THEME_TOKEN_DEFAULTS,
   lightenHex,
+  darkenHex,
   withAlpha,
   type ThemeTokens,
 } from '~/utils/themeTokens'
@@ -21,11 +22,13 @@ function preset(
   const primary = partial.primaryColor
   const btnBg = partial.btnBg
   const btnText = partial.btnText ?? '#eeeeee'
+  const bg = partial.bg
   const tokens: ThemeTokens = {
     ...THEME_TOKEN_DEFAULTS,
     primaryColor: primary,
     primaryHover: partial.primaryHover ?? lightenHex(primary),
-    bg: partial.bg,
+    bg,
+    bg2: partial.bg2 ?? darkenHex(bg),
     btnBg,
     btnBgHover: partial.btnBgHover ?? lightenHex(btnBg),
     btnText,
@@ -46,6 +49,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('soundninja', 'SoundNinja', {
     primaryColor: '#00d4ff',
     bg: '#222831',
+    bg2: '#1a1e25',
     btnBg: '#363f4d',
     btnBgHover: '#434e5f',
     btnText: '#eeeeee',
@@ -53,6 +57,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('soundninja-light', 'SoundNinja-Light', {
     primaryColor: '#0088aa',
     bg: '#eeeeee',
+    bg2: '#d4d4d4',
     btnBg: '#7184a2',
     btnBgHover: '#8294b0',
     btnText: '#ffffff',
@@ -62,6 +67,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('solarized', 'Solarized', {
     primaryColor: '#268bd2',
     bg: '#002b36',
+    bg2: '#001f28',
     btnBg: '#073642',
     btnBgHover: '#0a4a5a',
     btnText: '#93a1a1',
@@ -70,6 +76,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('monokai', 'Monokai', {
     primaryColor: '#a6e22e',
     bg: '#272822',
+    bg2: '#1d1e19',
     btnBg: '#3e3d32',
     btnBgHover: '#49483e',
     btnText: '#f8f8f2',
@@ -78,6 +85,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('dracula', 'Dracula', {
     primaryColor: '#bd93f9',
     bg: '#282a36',
+    bg2: '#1e2029',
     btnBg: '#44475a',
     btnBgHover: '#565a73',
     btnText: '#f8f8f2',
@@ -86,6 +94,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('nord', 'Nord', {
     primaryColor: '#88c0d0',
     bg: '#2e3440',
+    bg2: '#22272f',
     btnBg: '#3b4252',
     btnBgHover: '#434c5e',
     btnText: '#eceff4',
@@ -94,6 +103,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('gruvbox', 'Gruvbox', {
     primaryColor: '#fabd2f',
     bg: '#282828',
+    bg2: '#1e1e1e',
     btnBg: '#3c3836',
     btnBgHover: '#504945',
     btnText: '#ebdbb2',
@@ -102,6 +112,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   preset('cobalt', 'Cobalt', {
     primaryColor: '#ff9d00',
     bg: '#193549',
+    bg2: '#132837',
     btnBg: '#1f4662',
     btnBgHover: '#29587a',
     btnText: '#ffffff',

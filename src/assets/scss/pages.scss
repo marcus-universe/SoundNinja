@@ -39,6 +39,6 @@
   // Top clearance comes from .soundninja--tool (titlebar). Toolbar owns equal inset.
   padding: 0 1.6rem 3rem;
   box-sizing: border-box;
-  background: var(--color-bg, #{$color-bg});
+  background: var(--color-bg-2, var(--color-bg, #{$color-bg}));
   color: #eee;
 }

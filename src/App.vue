@@ -90,6 +90,40 @@ function joinPath(base, ...parts) {
   return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
 }
 
+/** True when native text undo should win over soundboard undo. */
+function isEditableTarget(el) {
+  if (!el || typeof el !== 'object') return false
+  const tag = el.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+  if (el.isContentEditable) return true
+  return typeof el.closest === 'function' && !!el.closest('[contenteditable="true"]')
+}
+
+/** Coalesce menu-accelerator + window keydown double-fires. */
+let lastHistoryActionAt = 0
+function runHistoryAction(fn) {
+  const now = Date.now()
+  if (now - lastHistoryActionAt < 80) return
+  lastHistoryActionAt = now
+  fn()
+}
+
+function onUndoRedoKeydown(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+  if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
+  const key = e.key.toLowerCase()
+  if (key === 'z' && e.shiftKey) {
+    e.preventDefault()
+    runHistoryAction(() => jsonStore.redo())
+  } else if (key === 'z') {
+    e.preventDefault()
+    runHistoryAction(() => jsonStore.undo())
+  } else if (key === 'y' && !e.shiftKey) {
+    e.preventDefault()
+    runHistoryAction(() => jsonStore.redo())
+  }
+}
+
 /** Migrate old JSON config shape to the current schema. */
 function migrateConfig(obj) {
   if (Array.isArray(obj.tabList) && obj.tabList.length > 0 && typeof obj.tabList[0] === 'string') {
@@ -350,13 +384,20 @@ onMounted(async () => {
   }
   // Register any uploaded custom fonts so themed fonts render everywhere.
   loadCustomFonts(appSettings.fontsPath).catch(() => {})
-  await bootstrapProject()
+  try {
+    await bootstrapProject()
+  } catch (e) {
+    console.error('Failed to bootstrap project', e)
+    appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
+  }
   // One-time: pull audio device/volume prefs out of the project into app-config.db.
   await appSettings.migrateAudioFromProject(jsonStore.configFile?.settings)
   await applyPersistedTheme(jsonStore.configFile)
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
+  listen('menu_undo', () => runHistoryAction(() => jsonStore.undo()))
+  listen('menu_redo', () => runHistoryAction(() => jsonStore.redo()))
   listen('menu_new_project', handleMenuNewProject)
   listen('menu_open_project', handleMenuOpenProject)
   listen('menu_open_recent', async (e) => {
@@ -386,6 +427,8 @@ onMounted(async () => {
   listen('menu_select_project', () => appStore.setSelectProjectActive(true))
   listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
   listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
+
+  window.addEventListener('keydown', onUndoRedoKeydown)
 
   // Prompt to save unsaved changes before the window closes.
   const mainWindow = getCurrentWindow()
@@ -473,6 +516,12 @@ onMounted(async () => {
       tabIndexes: {},
     }])
   })
+})
+
+onUnmounted(() => {
+  if (isMain.value) {
+    window.removeEventListener('keydown', onUndoRedoKeydown)
+  }
 })
 </script>
 

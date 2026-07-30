@@ -1,7 +1,23 @@
 <template>
   <div class="navbar flex_c_v">
     <div class="iconContainer flex_c_v flex_space_evenly gap1">
+      <QuickInfo
+        v-if="tooltipsOn"
+        class="nav-tip nav-tip--search"
+        :text="$t('navbar.search')"
+        :side="tipSide"
+      >
+        <Icons
+          :icon="'search'"
+          :customClass="[
+            'icon searchButton',
+            { active: appStore.Searchbar.SearchbarActive },
+          ]"
+          @triggered="IconClicked"
+        />
+      </QuickInfo>
       <Icons
+        v-else
         :icon="'search'"
         :customClass="[
           'icon searchButton',
@@ -9,6 +25,7 @@
         ]"
         @triggered="IconClicked"
       />
+
       <transition name="slideIn">
         <div
           v-if="appStore.Searchbar.SearchbarActive"
@@ -35,14 +52,42 @@
         </div>
       </transition>
 
-      <Icons
-        v-for="(navelm, index) in appStore.navbar"
-        :key="navelm"
-        :icon="appStore.navbar[index]"
-        @triggered="IconClicked"
-      />
+      <template v-for="(navelm, index) in appStore.navbar" :key="navelm">
+        <QuickInfo
+          v-if="tooltipsOn"
+          class="nav-tip"
+          :text="tipLabel(navelm)"
+          :side="tipSide"
+        >
+          <Icons
+            :icon="appStore.navbar[index]"
+            @triggered="IconClicked"
+          />
+        </QuickInfo>
+        <Icons
+          v-else
+          :icon="appStore.navbar[index]"
+          @triggered="IconClicked"
+        />
+      </template>
 
+      <QuickInfo
+        v-if="tooltipsOn"
+        class="nav-tip nav-tip--multiselect"
+        :text="$t('navbar.multiSelect')"
+        :side="tipSide"
+      >
+        <Icons
+          :icon="appStore.multiSelectActive ? 'multiselect-active' : 'multiselect-inactive'"
+          :customClass="[
+            'icon multiSelectButton',
+            { active: appStore.multiSelectActive },
+          ]"
+          @triggered="IconClicked"
+        />
+      </QuickInfo>
       <Icons
+        v-else
         :icon="appStore.multiSelectActive ? 'multiselect-active' : 'multiselect-inactive'"
         :customClass="[
           'icon multiSelectButton',
@@ -62,7 +107,24 @@ import { open } from '@tauri-apps/plugin-dialog'
 const { t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
 const searchInput = ref(null)
+
+const tooltipsOn = computed(() => appSettings.navbarTooltips !== false)
+/** Tip opens toward the content area, opposite the sidebar edge. */
+const tipSide = computed(() => (appSettings.navbarSide === 'right' ? 'left' : 'right'))
+
+function tipLabel(icon) {
+  const map = {
+    add: 'navbar.import',
+    upload: 'navbar.import',
+    project: 'navbar.selectProject',
+    settings: 'navbar.settings',
+    about: 'navbar.about',
+    folder: 'navbar.importFolders',
+  }
+  return t(map[icon] || 'navbar.search')
+}
 
 async function focusSearchInput() {
   await nextTick()
@@ -85,25 +147,6 @@ async function uploadFiles() {
   })
 
   if (Array.isArray(selected)) {
-        //   const tabs = ["All"];
-        //   if (self.currentTab !== "All") {
-        //     tabs.push(self.currentTab);
-        //   }
-        //   soundlist.push({
-        //     name: file
-        //       .replace(/^.*[\\]/, "")
-        //       .replace(".wav", "")
-        //       .replace(".mp3", "")
-        //       .replace(".ogg", "")
-        //       .replaceAll("_", " ")
-        //       .replace(/([A-Z])/g, " $1")
-        //       .trim(),
-        //     path: file,
-        //     volume: 0.4,
-        //     tabs: tabs,
-        //     active: false,
-        //   });
-        // });
     const indexLength = jsonStore.configFile.files.length
     const soundlist = selected.map((file, index) => {
       const tabs = ['All']

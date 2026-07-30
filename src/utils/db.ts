@@ -43,6 +43,8 @@ export interface Settings {
   primaryHover?: string
   /** Page background. */
   bg?: string
+  /** Secondary surfaces (settings sidebar, tool windows). */
+  bg2?: string
   /** Sound button colors. */
   btnBg?: string
   btnBgHover?: string
@@ -98,6 +100,7 @@ export function defaultSettings(): Settings {
     primaryColor: '#00d4ff',
     primaryHover: '#33ddff',
     bg: '#222831',
+    bg2: '#1a1e25',
     btnBg: '#363f4d',
     btnBgHover: '#434e5f',
     btnText: '#eeeeee',
@@ -268,6 +271,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'primaryColor': settings.primaryColor = value; break
       case 'primaryHover': settings.primaryHover = value; break
       case 'bg': settings.bg = value; break
+      case 'bg2': settings.bg2 = value; break
       case 'btnBg': settings.btnBg = value; break
       case 'btnBgHover': settings.btnBgHover = value; break
       case 'btnText': settings.btnText = value; break
@@ -299,6 +303,8 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
   if (!settings.bg && !settings.btnBg) {
     const flat = resolveThemeTokens(settings as unknown as Record<string, unknown>)
     Object.assign(settings, flat)
+  } else if (!settings.bg2) {
+    settings.bg2 = resolveThemeTokens(settings as unknown as Record<string, unknown>).bg2
   }
 
   const tabRows = await d.select<{ name: string; color: string | null; position: number }[]>(
@@ -402,6 +408,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       ['primaryColor', s.primaryColor ?? '#00d4ff'],
       ['primaryHover', s.primaryHover ?? '#33ddff'],
       ['bg', s.bg ?? '#222831'],
+      ['bg2', s.bg2 ?? '#1a1e25'],
       ['btnBg', s.btnBg ?? '#363f4d'],
       ['btnBgHover', s.btnBgHover ?? '#434e5f'],
       ['btnText', s.btnText ?? '#eeeeee'],

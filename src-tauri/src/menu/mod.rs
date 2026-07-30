@@ -80,6 +80,8 @@ struct MenuLabels {
     import_folders: &'static str,
     quit: &'static str,
     edit: &'static str,
+    undo: &'static str,
+    redo: &'static str,
     settings: &'static str,
     open_themes_folder: &'static str,
     open_projects_folder: &'static str,
@@ -102,6 +104,8 @@ fn labels_for(lang: &str) -> MenuLabels {
             import_folders: "Ordner importieren",
             quit: "Beenden",
             edit: "Bearbeiten",
+            undo: "Rückgängig",
+            redo: "Wiederholen",
             settings: "Einstellungen",
             open_themes_folder: "Themes-Ordner öffnen",
             open_projects_folder: "Projekte-Ordner öffnen",
@@ -121,6 +125,8 @@ fn labels_for(lang: &str) -> MenuLabels {
             import_folders: "Import Folders",
             quit: "Quit",
             edit: "Edit",
+            undo: "Undo",
+            redo: "Redo",
             settings: "Settings",
             open_themes_folder: "Open Themes Folder",
             open_projects_folder: "Open Projects Folder",
@@ -166,6 +172,17 @@ fn build_menu(
         .build()?;
 
     let settings_menu = SubmenuBuilder::new(app, l.edit)
+        .item(
+            &MenuItemBuilder::with_id("undo", l.undo)
+                .accelerator("CmdOrCtrl+Z")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("redo", l.redo)
+                .accelerator("CmdOrCtrl+Shift+Z")
+                .build(app)?,
+        )
+        .separator()
         .item(&MenuItemBuilder::with_id("open_settings", l.settings).build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("open_themes_folder", l.open_themes_folder).build(app)?)
@@ -234,6 +251,12 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
             }
             "import_folders" => {
                 app.emit("menu_import_folders", ()).unwrap_or_default();
+            }
+            "undo" => {
+                app.emit("menu_undo", ()).unwrap_or_default();
+            }
+            "redo" => {
+                app.emit("menu_redo", ()).unwrap_or_default();
             }
             "open_settings" => {
                 app.emit("menu_open_settings", ()).unwrap_or_default();

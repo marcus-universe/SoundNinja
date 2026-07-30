@@ -13,6 +13,8 @@
     "importAudio": "Audiodateien importieren",
     "importFolders": "Ordner importieren",
     "quit": "Beenden",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen",
     "settings": "Einstellungen",
     "openConfig": "Konfigurationsdatei öffnen",
     "openThemesFolder": "Themes-Ordner öffnen",
@@ -80,6 +82,8 @@
       "uniformButtonHeightHint": "Alle Buttons auf die Höhe des höchsten setzen",
       "allowReorder": "Ziehen zum Sortieren",
       "allowReorderHint": "Drag-and-drop-Sortierung von Sounds und Trennern aktivieren",
+      "navbarTooltips": "Seitenleisten-Tooltips",
+      "navbarTooltipsHint": "Beim Hover eine Beschriftung neben jedem Seitenleisten-Button zeigen",
       "systemTitlebar": "System-Titelleiste und Menü verwenden",
       "systemTitlebarHint": "Nutzt den normalen Fensterrahmen und die Menüleiste deines Betriebssystems statt des eigenen App-Designs.",
       "hideTitlebar": "Titelleiste ausblenden",
@@ -145,6 +149,8 @@
       "primaryHoverHint": "Akzentfarbe beim Hover über interaktive Primärelemente.",
       "background": "Hintergrund",
       "backgroundHint": "Hintergrundfarbe des Hauptfensters / Soundboards.",
+      "background2": "Hintergrund 2",
+      "background2Hint": "Sekundäre Flächen: Settings-Sidebar, Theme Creator, Record Editor und andere Tool-Fenster.",
       "buttonBg": "Button-Hintergrund",
       "buttonBgHint": "Standard-Hintergrundfüllung der Sound-Buttons.",
       "buttonBgHover": "Button-Hintergrund Hover",
@@ -287,7 +293,13 @@
   },
   "navbar": {
     "search": "Suchen",
-    "clearSearch": "Suche leeren"
+    "clearSearch": "Suche leeren",
+    "import": "Importieren",
+    "importFolders": "Ordner importieren",
+    "selectProject": "Projekt auswählen",
+    "settings": "Einstellungen",
+    "about": "Über",
+    "multiSelect": "Mehrfachauswahl"
   },
   "about": {
     "title": "Über SoundNinja",

@@ -116,6 +116,14 @@
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.navbarTooltips') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.navbarTooltipsHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="navbarTooltips" @update:modelValue="onNavbarTooltips" />
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.hideTitlebar') }}</span>
         <span class="settings-hint">{{ $t('settings.main.hideTitlebarHint') }}</span>
       </div>
@@ -251,6 +259,7 @@ const showPlayer = ref(true)
 const playerLarge = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
+const navbarTooltips = ref(true)
 const systemTitlebar = ref(false)
 const hideTitlebar = ref(false)
 const hideTitlebarWarnOpen = ref(false)
@@ -463,6 +472,11 @@ function onAllowReorder(val: boolean) {
   jsonStore.setAllowReorder(val)
 }
 
+async function onNavbarTooltips(val: boolean) {
+  navbarTooltips.value = val
+  await appSettings.setNavbarTooltips(val)
+}
+
 async function onSystemTitlebar(val: boolean) {
   systemTitlebar.value = val
   await appSettings.setTitlebarMode(val ? 'system' : 'styled')
@@ -553,6 +567,7 @@ async function syncFromStore() {
   playerLarge.value = jsonStore.configFile?.settings?.playerLarge === true
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
+  navbarTooltips.value = appSettings.navbarTooltips !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
   recentLimit.value = appSettings.recentLimit ?? 30

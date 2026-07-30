@@ -254,6 +254,132 @@ fn recv_msg(rx: &Receiver<AudioMsg>, is_playing: bool) -> Result<Option<AudioMsg
     }
 }
 
+/// Drop obsolete Seek messages so Stop/Play are not stuck behind a scrub flood.
+/// Keeps message order; for each seek path key, only the latest Seek remains.
+fn coalesce_seeks(batch: &mut Vec<AudioMsg>) {
+    if batch.len() < 2 {
+        return;
+    }
+    let mut drop_idx = vec![false; batch.len()];
+    for i in 0..batch.len() {
+        let key_i = match &batch[i] {
+            AudioMsg::Seek { path, .. } => Some(path.clone()),
+            _ => None,
+        };
+        let Some(key_i) = key_i else { continue };
+        for j in (i + 1)..batch.len() {
+            if let AudioMsg::Seek { path, .. } = &batch[j] {
+                if *path == key_i {
+                    drop_idx[i] = true;
+                    break;
+                }
+            }
+        }
+    }
+    let mut kept = Vec::with_capacity(batch.len());
+    for (i, msg) in batch.drain(..).enumerate() {
+        if !drop_idx[i] {
+            kept.push(msg);
+        }
+    }
+    *batch = kept;
+}
+
+/// Clamp seek away from EOF so the source is not exhausted.
+fn clamp_seek_pos(position_secs: f64, duration_secs: f64) -> f64 {
+    let max_pos = if duration_secs > 0.08 {
+        duration_secs - 0.05
+    } else {
+        0.0
+    };
+    position_secs.clamp(0.0, max_pos.max(0.0))
+}
+
+/// Seek playing slot: prefer in-place demuxer seek; rebuild only on failure.
+fn seek_playing_slot(
+    playing: &mut [PlayingSound],
+    i: usize,
+    stream: &AudioStream,
+    position_secs: f64,
+) {
+    let was_paused = playing[i].player.is_paused();
+    let mut duration_secs = playing[i].duration_secs;
+    let clamped = clamp_seek_pos(position_secs, duration_secs);
+    let target = Duration::from_secs_f64(clamped);
+
+    // 1) In-place seek while playing (typically 0–5 ms when supported).
+    //    Skip when paused: rodio applies seek via periodic_access which needs
+    //    sample pulls, and briefly unpausing would click. Rebuild instead.
+    if !was_paused {
+        let in_place_ok = playing[i].player.try_seek(target).is_ok()
+            && (playing[i].player.get_pos().as_secs_f64() - clamped).abs() <= 0.35;
+        if in_place_ok {
+            // Player::try_seek sets absolute get_pos — no origin offset needed.
+            playing[i].position_origin_secs = 0.0;
+            return;
+        }
+    }
+
+    // 2) Rebuild decoder and demuxer-seek before append (no eager skip_duration).
+    //    New Player get_pos starts at 0, so origin must equal the seek offset.
+    let file_path = playing[i].path.clone();
+    let looping = playing[i].looping;
+    let Ok(mut source) = load_source(&file_path) else {
+        eprintln!("Seek reload failed for '{file_path}'");
+        return;
+    };
+    if duration_secs <= 0.0 {
+        duration_secs = source
+            .total_duration()
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
+    }
+    let clamped = clamp_seek_pos(position_secs, duration_secs);
+    let target = Duration::from_secs_f64(clamped);
+
+    let new_player = Player::connect_new(stream.device_sink.mixer());
+    let origin = match source.try_seek(target) {
+        Ok(()) => {
+            new_player.append(source.amplify(current_volume()));
+            // Decoder already advanced; player clock starts at 0.
+            clamped
+        }
+        Err(_) if clamped < 2.0 => {
+            // try_seek may leave the decoder dirty — reload before short skip.
+            let Ok(fresh) = load_source(&file_path) else {
+                eprintln!("Seek reload failed for '{file_path}'");
+                return;
+            };
+            new_player.append(
+                fresh
+                    .skip_duration(Duration::from_secs_f64(clamped))
+                    .amplify(current_volume()),
+            );
+            clamped
+        }
+        Err(e) => {
+            eprintln!("Seek unsupported at {clamped:.2}s for '{file_path}': {e}");
+            return;
+        }
+    };
+
+    // Pause before swap so the new source never audibly starts if we were paused.
+    if was_paused {
+        new_player.pause();
+    }
+    let old = std::mem::replace(
+        &mut playing[i],
+        PlayingSound {
+            player: new_player,
+            path: file_path,
+            looping,
+            duration_secs,
+            position_origin_secs: origin,
+        },
+    );
+    old.player.stop();
+}
+
 // --- Audio thread ---
 
 pub fn init_audio_thread(app_handle: tauri::AppHandle) {
@@ -310,12 +436,18 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
             // Use timeout-based recv while sounds are active so we keep draining.
             let is_playing = !playing.is_empty();
 
-            let msg = match recv_msg(&rx, is_playing) {
+            let first = match recv_msg(&rx, is_playing) {
                 Ok(Some(msg)) => msg,
                 Ok(None) => continue, // timeout — loop back to drain check
                 Err(()) => break,      // channel closed
             };
+            let mut batch = vec![first];
+            while let Ok(m) = rx.try_recv() {
+                batch.push(m);
+            }
+            coalesce_seeks(&mut batch);
 
+            for msg in batch {
             match msg {
                 AudioMsg::Stop => {
                     for s in playing.drain(..) {
@@ -415,54 +547,8 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         None => (!playing.is_empty()).then_some(0),
                     };
                     if let (Some(i), Some(st)) = (idx, stream.as_ref()) {
-                        // Always rebuild from offset. try_seek is flaky on many
-                        // decoders and seeking to/past EOF empties the player
-                        // (frontend sees a sudden stop).
-                        let was_paused = playing[i].player.is_paused();
-                        let file_path = playing[i].path.clone();
-                        let looping = playing[i].looping;
-                        let mut duration_secs = playing[i].duration_secs;
-
-                        match load_source(&file_path) {
-                            Ok(source) => {
-                                if duration_secs <= 0.0 {
-                                    duration_secs = source
-                                        .total_duration()
-                                        .map(|d| d.as_secs_f64())
-                                        .unwrap_or(0.0);
-                                }
-                                // Keep a small tail so skip_duration never exhausts the source.
-                                let max_pos = if duration_secs > 0.08 {
-                                    duration_secs - 0.05
-                                } else {
-                                    0.0
-                                };
-                                let clamped = position_secs.clamp(0.0, max_pos.max(0.0));
-                                let new_player = Player::connect_new(st.device_sink.mixer());
-                                new_player.append(
-                                    source
-                                        .skip_duration(Duration::from_secs_f64(clamped))
-                                        .amplify(current_volume()),
-                                );
-                                if was_paused {
-                                    new_player.pause();
-                                }
-                                let old = std::mem::replace(
-                                    &mut playing[i],
-                                    PlayingSound {
-                                        player: new_player,
-                                        path: file_path,
-                                        looping,
-                                        duration_secs,
-                                        // New source's get_pos() starts at 0 after skip.
-                                        position_origin_secs: clamped,
-                                    },
-                                );
-                                old.player.stop();
-                                sync_playing_list(&app_handle, &playing);
-                            }
-                            Err(e) => eprintln!("Seek reload failed: {e}"),
-                        }
+                        seek_playing_slot(&mut playing, i, st, position_secs);
+                        sync_playing_list(&app_handle, &playing);
                     }
                 }
 
@@ -482,6 +568,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     sync_playing_list(&app_handle, &playing);
                 }
             }
+            } // for msg in batch
         }
     });
 }

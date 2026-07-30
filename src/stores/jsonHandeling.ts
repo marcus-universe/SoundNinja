@@ -10,6 +10,9 @@ function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
 }
 
+/** Cap undo/redo stacks so memory stays bounded for large projects. */
+const MAX_HISTORY = 50
+
 /** Lowercase + strip spaces/punctuation so "alf" matches "A L F". */
 function compactSearch(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/gi, '')
@@ -25,14 +28,61 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     dirty: false,
     saving: false,
     _persistTimer: null as ReturnType<typeof setTimeout> | null,
+    /** Stepwise undo history for soundboard mutations (sounds/tabs/separators). */
+    undoStack: [] as ProjectConfig[],
+    redoStack: [] as ProjectConfig[],
+    /** When true, mutations skip pushBeforeChange (undo/redo restore path). */
+    _historySuspended: false,
   }),
 
   getters: {
     getConfig: (state) => state.configFile,
     separators: (state) => state.configFile.separators ?? [],
+    canUndo: (state) => state.undoStack.length > 0,
+    canRedo: (state) => state.redoStack.length > 0,
   },
 
   actions: {
+    // ── Undo / redo ───────────────────────────────────────────────────────────
+    /** Snapshot current config before a tracked mutation. Clears redo. */
+    pushBeforeChange() {
+      if (this._historySuspended) return
+      this.undoStack.push(clone(this.configFile))
+      if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift()
+      this.redoStack = []
+    },
+
+    clearHistory() {
+      this.undoStack = []
+      this.redoStack = []
+    },
+
+    applySnapshot(snap: ProjectConfig) {
+      this._historySuspended = true
+      try {
+        this.configFile = clone(snap)
+        this.normalizeIndexes()
+        this.filteredFiles = this.configFile.files
+        this.writeConfig()
+      } finally {
+        this._historySuspended = false
+      }
+    },
+
+    undo() {
+      if (!this.undoStack.length) return false
+      this.redoStack.push(clone(this.configFile))
+      this.applySnapshot(this.undoStack.pop()!)
+      return true
+    },
+
+    redo() {
+      if (!this.redoStack.length) return false
+      this.undoStack.push(clone(this.configFile))
+      this.applySnapshot(this.redoStack.pop()!)
+      return true
+    },
+
     // ── Project lifecycle ─────────────────────────────────────────────────────
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
@@ -44,6 +94,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.currentProjectPath = dbAbsPath
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
+      this.clearHistory()
     },
 
     /** Loads config into an already-open project DB (used by JSON import/migration). */
@@ -62,6 +113,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.filteredFiles = this.configFile.files
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
+      this.clearHistory()
       await this.persistNow()
     },
 
@@ -74,6 +126,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.dirty = false
+      this.clearHistory()
     },
 
     setCurrentProjectPath(p: string | null) {
@@ -131,6 +184,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       const config = clone(this.configFile)
       try {
         await this.importConfig(config, dbAbsPath)
+        // importConfig already clears history
       } catch (e) {
         // Retry once after deleting a non-SQLite placeholder the dialog may have created.
         const msg = String(e)
@@ -144,6 +198,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     updateConfigFile(contents: ProjectConfig) {
+      this.pushBeforeChange()
       this.configFile = {
         settings: contents.settings,
         tabList: contents.tabList ?? [],
@@ -245,6 +300,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
+      this.pushBeforeChange()
       this.configFile.files = [...this.configFile.files, ...files]
       this.normalizeIndexes()
       this.writeConfig()
@@ -256,22 +312,26 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     renameSound(soundindex: number, newName: string) {
+      this.pushBeforeChange()
       this.configFile.files[soundindex].name = newName
       this.writeConfig()
     },
 
     removeSound(soundindex: number) {
+      this.pushBeforeChange()
       this.configFile.files.splice(soundindex, 1)
       this.normalizeIndexes()
       this.writeConfig()
     },
 
     setSoundColor(soundindex: number, color: string) {
+      this.pushBeforeChange()
       this.configFile.files[soundindex].color = color
       this.writeConfig()
     },
 
     setSoundTabs(soundFileIndex: number, tabs: string[]) {
+      this.pushBeforeChange()
       this.configFile.files[soundFileIndex].tabs = tabs
       this.normalizeIndexes()
       this.writeConfig()
@@ -279,6 +339,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Bulk (multi-select) actions, keyed by sound path ──────────────────────
     setSoundColorMany(paths: string[], color: string) {
+      this.pushBeforeChange()
       const set = new Set(paths)
       for (const f of this.configFile.files) {
         if (set.has(f.path)) f.color = color
@@ -287,6 +348,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     setSoundTabsMany(paths: string[], tab: string) {
+      this.pushBeforeChange()
       const set = new Set(paths)
       for (const f of this.configFile.files) {
         if (set.has(f.path) && !f.tabs.includes(tab)) f.tabs = [...f.tabs, tab]
@@ -296,6 +358,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     removeSoundsMany(paths: string[]) {
+      this.pushBeforeChange()
       const set = new Set(paths)
       this.configFile.files = this.configFile.files.filter((f) => !set.has(f.path))
       this.normalizeIndexes()
@@ -309,6 +372,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const from = sorted.findIndex((f) => f.index === draggedIdx)
         const to = sorted.findIndex((f) => f.index === targetIdx)
         if (from === -1 || to === -1 || from === to) return
+        this.pushBeforeChange()
         const [item] = sorted.splice(from, 1)
         sorted.splice(to, 0, item)
         sorted.forEach((f, i) => { f.index = i })
@@ -319,6 +383,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const from = inTab.findIndex((f) => f.index === draggedIdx)
         const to = inTab.findIndex((f) => f.index === targetIdx)
         if (from === -1 || to === -1 || from === to) return
+        this.pushBeforeChange()
         const [item] = inTab.splice(from, 1)
         inTab.splice(to, 0, item)
         inTab.forEach((f, i) => {
@@ -331,11 +396,13 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Tabs ──────────────────────────────────────────────────────────────────
     addTab(name: string) {
+      this.pushBeforeChange()
       this.configFile.tabList.push({ name })
       this.writeConfig()
     },
 
     removeTab(name: string) {
+      this.pushBeforeChange()
       this.configFile.tabList = this.configFile.tabList.filter((t) => t.name !== name)
       this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.tab !== name)
       this.writeConfig()
@@ -344,6 +411,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     renameTab(oldName: string, newName: string) {
       const tab = this.configFile.tabList.find((t) => t.name === oldName)
       if (!tab) return
+      this.pushBeforeChange()
       tab.name = newName
       this.configFile.files.forEach((f) => {
         const idx = f.tabs.indexOf(oldName)
@@ -362,6 +430,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setTabColor(name: string, color: string) {
       const tab = this.configFile.tabList.find((t) => t.name === name)
       if (tab) {
+        this.pushBeforeChange()
         tab.color = color
         this.writeConfig()
       }
@@ -372,6 +441,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       const from = list.findIndex((t) => t.name === draggedName)
       const to = list.findIndex((t) => t.name === targetName)
       if (from === -1 || to === -1 || from === to) return
+      this.pushBeforeChange()
       const [item] = list.splice(from, 1)
       list.splice(to, 0, item)
       this.writeConfig()
@@ -379,6 +449,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Separators ────────────────────────────────────────────────────────────
     addSeparator(tab: string, position: number) {
+      this.pushBeforeChange()
       if (!this.configFile.separators) this.configFile.separators = []
       const id = `sep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       this.configFile.separators.push({ id, tab, position })
@@ -386,6 +457,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     removeSeparator(id: string) {
+      this.pushBeforeChange()
       this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.id !== id)
       this.writeConfig()
     },
@@ -393,6 +465,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setSeparatorPosition(id: string, position: number) {
       const sep = (this.configFile.separators ?? []).find((s) => s.id === id)
       if (sep) {
+        this.pushBeforeChange()
         sep.position = position
         this.writeConfig()
       }
@@ -400,6 +473,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Bulk / misc ───────────────────────────────────────────────────────────
     resetAll() {
+      this.pushBeforeChange()
       this.configFile = emptyConfig()
       this.normalizeIndexes()
       this.filteredFiles = []

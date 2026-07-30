@@ -1,11 +1,19 @@
-﻿@use 'variables' as *;
+@use 'variables' as *;
+
+// Space reserved for the fixed navbar strip (icons + horizontal padding + border).
+html {
+  --navbar-offset: calc(var(--icon_size) + #{$padding_1} * 2 + 0.32rem);
+}
 
 .navbar {
   height: calc(100vh - var(--topbar_height, 0px));
+  box-sizing: border-box;
   padding: 0 $padding_1;
-  width: var(--icon_size);
+  width: var(--navbar-offset);
   position: fixed;
   top: var(--topbar_height, 0px);
+  // Above soundboard / player so side tooltips paint over buttons.
+  z-index: 60;
 
   // Default side is left; the navbar-left / navbar-right classes on <html>
   // (set at runtime from the app settings) drive the actual side.
@@ -23,53 +31,79 @@
 
 .navbar {
   .iconContainer {
-    padding: $padding_1 $padding_1 $padding_1 0;
-    width: var(--icon_size);
+    box-sizing: border-box;
+    padding: $padding_1 0;
+    width: 100%;
+    max-width: 100%;
 
     svg {
       width: var(--icon_size);
       height: var(--icon_size);
       fill: var(--primary_color);
-      transition: fill 0.2s ease, transform 0.2s ease;
+      border-radius: 0.56rem;
+      transition: fill 0.2s ease, transform 0.2s ease, background 0.2s ease;
 
       &:hover {
-        fill: $white;
+        fill: var(--color-bg, #{$color-bg});
+        background: var(--primary_color);
         transform: scale(1.1);
         cursor: pointer;
       }
     }
 
-    .searchButton,
-    .multiSelectButton {
+    // Pin search / multiselect to the ends, horizontally centered like other icons.
+    .nav-tip--search,
+    .nav-tip--multiselect {
       position: absolute;
       z-index: 2;
-      background: var(--color-bg, #{$color-bg});
-      padding: 2rem $padding_1;
-      left: 0;
-
-      &:hover {
-        cursor: pointer;
-        transform: scale(1);
-      }
+      left: 50%;
+      transform: translateX(-50%);
     }
 
-    .searchButton {
-      top: 0;
+    // Above .searchBar (z-index: 3) so the side tip is not covered when search is open.
+    .nav-tip--search {
+      top: 2rem;
+      z-index: 4;
     }
 
-    .multiSelectButton {
-      bottom: 0;
+    .nav-tip--multiselect {
+      bottom: 2rem;
+    }
+
+    // When tooltips are off, icons keep the absolute pin (centered).
+    > .searchButton,
+    > .multiSelectButton {
+      position: absolute;
+      z-index: 2;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    > .searchButton {
+      top: 2rem;
+    }
+
+    > .multiSelectButton {
+      bottom: 2rem;
+    }
+
+    // Preserve centering when the shared svg hover applies scale(1.1).
+    > .searchButton:hover,
+    > .multiSelectButton:hover {
+      transform: translateX(-50%) scale(1.1);
     }
 
     .active {
-      fill: $white;
+      fill: var(--color-bg, #{$color-bg});
+      background: var(--primary_color);
       cursor: pointer;
     }
 
     .searchBar {
       position: fixed;
-      top: var(--topbar_height, 0px);
-      left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+      top: calc(var(--topbar_height, 0px) + 1rem);
+      // Equal gutters inside the content area (navbar strip excluded).
+      left: calc(var(--navbar-offset) + #{$padding_1});
       right: $padding_1;
       height: var(--icon_size);
       background: var(--color-bg, #{$color-bg});
@@ -98,7 +132,7 @@
         box-sizing: border-box;
 
         &:focus {
-          background: rgba($white, 0.1);
+          background: color-mix(in srgb, var(--color-text, #{$white}) 6%, var(--color-bg, #{$color-bg}));
           outline: none;
         }
       }
@@ -119,7 +153,7 @@
         transition: background 0.15s;
 
         &:hover {
-          background: rgba(255, 255, 255, 0.08);
+          background: color-mix(in srgb, var(--primary_color) 18%, transparent);
           transform: translateY(-50%);
         }
       }
@@ -135,25 +169,18 @@
       }
 
       &__clear:hover .searchBar__clear-icon {
-        fill: $white;
+        fill: var(--primary-hover, var(--primary_color));
         transform: none;
       }
     }
   }
 }
 
-// ── Right-side navbar: mirror the search elements to the opposite edge ──────────
-.navbar-right {
-  .searchButton,
-  .multiSelectButton {
-    left: auto;
-    right: 0;
-  }
-
-  .searchBar {
-    left: $padding_1;
-    right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
-  }
+// ── Right-side navbar: mirror the search bar to the opposite edge ───────────────
+// Must beat `.navbar .iconContainer .searchBar` specificity.
+.navbar-right .navbar .iconContainer .searchBar {
+  left: $padding_1;
+  right: calc(var(--navbar-offset) + #{$padding_1});
 }
 
 

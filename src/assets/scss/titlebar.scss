@@ -11,6 +11,11 @@
   user-select: none;
 }
 
+// Tool windows (Theme Creator, Record Editor, …) use Background 2 chrome.
+.soundninja--tool .titlebar-wrapper {
+  background: var(--color-bg-2, var(--color-bg, #{$color-bg}));
+}
+
 .titlebar {
   height: 3rem;
   display: flex;
@@ -41,7 +46,7 @@
     width: 2.8rem;
     height: 2.4rem;
     border-radius: 0.4rem;
-    color: rgba(238, 238, 238, 0.55);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
     transition: background 0.12s, color 0.12s;
 
     svg {
@@ -50,13 +55,13 @@
     }
 
     &:hover {
-      color: $white;
-      background: rgba(255, 255, 255, 0.08);
+      color: var(--color-text, #{$white});
+      background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
     }
 
     &--close:hover {
       background: #c0392b;
-      color: $white;
+      color: #{$white};
     }
   }
 }
@@ -66,7 +71,7 @@
   display: flex;
   align-items: center;
   padding: 0 0.4rem;
-  border-top: 0.08rem solid rgba(255, 255, 255, 0.06);
+  border-top: 0.08rem solid color-mix(in srgb, var(--color-text, #{$white}) 6%, transparent);
 
   &__item {
     position: relative;
@@ -76,15 +81,15 @@
     padding: 0 1.2rem;
     font-family: $fontRegular;
     font-size: 1.28rem;
-    color: rgba(238, 238, 238, 0.7);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 70%, transparent);
     cursor: pointer;
     border-radius: 0.32rem;
     transition: background 0.1s, color 0.1s;
 
     &:hover,
     &.active {
-      background: rgba(255, 255, 255, 0.08);
-      color: $white;
+      background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+      color: var(--color-text, #{$white});
     }
   }
 
@@ -116,7 +121,7 @@
     padding: 0.72rem 1.6rem;
     font-family: $fontRegular;
     font-size: 1.36rem;
-    color: rgba(238, 238, 238, 0.8);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 80%, transparent);
     cursor: pointer;
     position: relative;
     white-space: nowrap;
@@ -137,7 +142,7 @@
 
       &:hover {
         background: transparent;
-        color: rgba(238, 238, 238, 0.35);
+        color: color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
       }
     }
 
@@ -154,7 +159,7 @@
 
   &__sep {
     height: 0.08rem;
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
     margin: 0.32rem 0.8rem;
   }
 }

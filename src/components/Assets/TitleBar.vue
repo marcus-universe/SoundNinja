@@ -157,6 +157,9 @@ const menus: MenuGroup[] = [
     id: 'edit',
     labelKey: 'menu.edit',
     items: [
+      { id: 'undo',                 labelKey: 'menu.undo',               event: 'menu_undo' },
+      { id: 'redo',                 labelKey: 'menu.redo',               event: 'menu_redo' },
+      { id: 'sep_undo', sep: true },
       { id: 'open_settings',        labelKey: 'menu.settings',           event: 'menu_open_settings' },
       { id: 'sep4', sep: true },
       { id: 'open_themes_folder',   labelKey: 'menu.openThemesFolder',   event: 'menu_open_themes_folder' },

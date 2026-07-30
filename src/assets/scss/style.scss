@@ -2,7 +2,7 @@
 
 .main {
   box-sizing: border-box;
-  width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
+  width: calc(100% - var(--navbar-offset));
   height: calc(100vh - var(--topbar_height));
   background-color: var(--color-bg, #{$color-bg});
   margin-top: var(--topbar_height);
@@ -11,13 +11,21 @@
 
   // Shift the main content away from whichever side the navbar sits on.
   // Default is left; .navbar-right on <html> flips it (see rule below).
-  margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+  margin-left: var(--navbar-offset);
   margin-right: 0;
 
   // Only animate horizontal navbar offset — never margin-top/height (avoids
   // window-open focus jitter when the viewport briefly shifts).
   transition: margin-left 0.2s ease, margin-right 0.2s ease;
   overflow: hidden;
+
+  // Gap between tabs and soundboard. Collapses when multi-select bar
+  // hangs flush under tabs (scroll padding restores button spacing).
+  gap: 1rem;
+
+  &--bulk {
+    gap: 0;
+  }
 
   .TabContainer {
     flex-shrink: 0;
@@ -79,11 +87,13 @@
     .addTab {
       fill: var(--primary_color);
       width: calc(var(--icon_size) - 1.6rem);
-      transition: fill 0.2s ease, transform 0.2s ease;
+      border-radius: 0.48rem;
+      transition: fill 0.2s ease, transform 0.2s ease, background 0.2s ease;
 
       &:hover {
         cursor: pointer;
-        fill: $white;
+        fill: var(--color-bg, #{$color-bg});
+        background: var(--primary_color);
         transform: scale(1.1);
       }
     }
@@ -117,8 +127,15 @@
       padding-bottom: 5rem;
     }
 
-    &--player-large &__scroll {
+    // Parent is `.main .SoundContainer` — use `> .SoundContainer__scroll`
+    // so the selector stays valid (avoid `&--x &__scroll` double-& bug).
+    &--player-large > .SoundContainer__scroll {
       padding-bottom: 7.5rem;
+    }
+
+    // Multi-select bar height + 1rem between bar/tabs and sound buttons.
+    &--bulk > .SoundContainer__scroll {
+      padding-top: calc(4.2rem + 1rem);
     }
 
     .SoundTab {
@@ -251,33 +268,43 @@
   }
 }
 
-// P7: bulk-edit action bar (shown while multi-select is active).
+// P7: multi-select chip — hangs under tabs (bottom radius only).
 .bulk-bar {
-  width: fit-content;
-  max-width: 100%;
-  margin: $padding_2 auto $padding_2;
-  flex-shrink: 0;
-  padding: $padding_2;
-  background-color: var(--color-btn, #{$color-btn});
-  border: 0.24rem solid var(--primary_color);
-  border-radius: 0.8rem;
-  box-shadow: 0 -0.4rem 1.2rem rgba(0, 0, 0, 0.35);
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  z-index: 45;
+  width: max-content;
+  max-width: calc(100% - 1.2rem);
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  background-color: var(--color-bg-2, var(--color-bg, #{$color-bg}));
+  border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
+  border-top: none;
+  border-radius: 0 0 1rem 1rem;
+  box-shadow: 0 0.35rem 1.2rem color-mix(in srgb, var(--color-bg, #000) 55%, transparent);
+  backdrop-filter: blur(6px);
   flex-wrap: wrap;
+  gap: 0.45rem;
   font-size: var(--font-size-menu);
   font-family: $fontBold;
-  color: $white;
+  color: var(--color-text, #{$white});
+  box-sizing: border-box;
 
   .bulk-bar__count {
     font-family: $fontBold;
     font-weight: bold;
-    color: $white;
+    color: var(--color-text, #{$white});
+    padding: 0 0.25rem;
+    white-space: nowrap;
   }
 
   .bulk-bar__color {
     display: inline-flex;
     align-items: center;
-    gap: 0.4em;
-    color: $white;
+    gap: 0.35em;
+    color: var(--color-text, #{$white});
 
     input[type='color'] {
       width: 1.4em;
@@ -289,27 +316,29 @@
   }
 
   .bulk-bar__select {
-    padding: 0.35em 0.7em;
-    border-radius: 0.4em;
-    border: 0.1em solid var(--primary_color);
+    padding: 0.3em 0.65em;
+    border-radius: 0.5em;
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
     background-color: var(--color-bg, #{$color-bg});
-    color: $white;
-    font-size: 1em;
+    color: var(--color-text, #{$white});
+    font-size: 0.95em;
     font-family: $fontBold;
   }
 
   .bulk-bar__btn {
-    padding: 0.35em 0.9em;
-    border-radius: 0.4em;
-    border: 0.1em solid var(--primary_color);
+    padding: 0.3em 0.8em;
+    border-radius: 0.5em;
+    border: var(--tab-border-width, 0.3rem) solid var(--tab-border, var(--primary_color));
     background-color: var(--color-bg, #{$color-bg});
-    color: $white;
+    color: var(--color-text, #{$white});
     cursor: pointer;
-    font-size: 1em;
+    font-size: 0.95em;
     font-family: $fontBold;
+    transition: background 0.15s, color 0.15s;
 
     &:hover {
       background-color: var(--primary_color);
+      color: var(--color-bg, #{$color-bg});
     }
 
     &:disabled {
@@ -322,6 +351,7 @@
 
       &:hover {
         background-color: #e05555;
+        color: #{$white};
       }
     }
   }
@@ -354,10 +384,10 @@
 // Right-side navbar: content shifts to the left instead.
 .navbar-right .main {
   margin-left: 0;
-  margin-right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+  margin-right: var(--navbar-offset);
 }
 
-// Push tabs under open searchbar + 2rem gap.
+// Push tabs under open searchbar (+1rem top offset) + 1rem gap.
 .searchMove {
   margin-top: calc(var(--icon_size) - #{$padding_1} + 2rem);
 }
@@ -459,10 +489,12 @@
   position: absolute;
   right: 1.6rem;
   top: 1.6rem;
+  border-radius: 0.48rem;
   transition: all 0.2s ease;
 
   &:hover {
-    fill: $white;
+    fill: var(--color-bg, #{$color-bg});
+    background: var(--primary_color);
     transform: scale(1.1);
     cursor: pointer;
   }
@@ -474,9 +506,12 @@
   max-height: var(--icon_size);
   min-width: var(--icon_min_size);
   min-height: var(--icon_min_size);
+  border-radius: 0.48rem;
+  transition: fill 0.2s ease, background 0.2s ease;
 
   &:hover {
-    fill: $white;
+    fill: var(--color-bg, #{$color-bg});
+    background: var(--primary_color);
     cursor: pointer;
   }
 }

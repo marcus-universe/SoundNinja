@@ -13,6 +13,8 @@
     "importAudio": "Import Audio Files",
     "importFolders": "Import Folders",
     "quit": "Quit",
+    "undo": "Undo",
+    "redo": "Redo",
     "settings": "Settings",
     "openConfig": "Open Config File",
     "openThemesFolder": "Open Themes Folder",
@@ -80,6 +82,8 @@
       "uniformButtonHeightHint": "Force every button to the height of the tallest one",
       "allowReorder": "Allow drag reordering",
       "allowReorderHint": "Enable drag-and-drop reordering of sounds and separators",
+      "navbarTooltips": "Sidebar tooltips",
+      "navbarTooltipsHint": "Show a label next to each sidebar button on hover",
       "systemTitlebar": "Use system title bar and menu",
       "systemTitlebarHint": "Uses the standard window frame and menu bar of your operating system instead of the app's own design.",
       "hideTitlebar": "Hide titlebar",
@@ -145,6 +149,8 @@
       "primaryHoverHint": "Accent color shown when hovering interactive primary elements.",
       "background": "Background",
       "backgroundHint": "Main window / soundboard background color.",
+      "background2": "Background 2",
+      "background2Hint": "Secondary surfaces: settings sidebar, Theme Creator, Record Editor, and other tool windows.",
       "buttonBg": "Button BG",
       "buttonBgHint": "Default background fill of sound buttons.",
       "buttonBgHover": "Button BG Hover",
@@ -287,7 +293,13 @@
   },
   "navbar": {
     "search": "Search",
-    "clearSearch": "Clear search"
+    "clearSearch": "Clear search",
+    "import": "Import",
+    "importFolders": "Import Folders",
+    "selectProject": "Select Project",
+    "settings": "Settings",
+    "about": "About",
+    "multiSelect": "Multi-select"
   },
   "about": {
     "title": "About",

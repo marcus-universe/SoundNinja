@@ -7,6 +7,8 @@ export const THEME_TOKEN_DEFAULTS = {
   primaryColor: '#00d4ff',
   primaryHover: '#33ddff',
   bg: '#222831',
+  /** Secondary surfaces (settings sidebar, tool windows). Matches former rgba(0,0,0,0.25) over bg. */
+  bg2: '#1a1e25',
   btnBg: '#363f4d',
   btnBgHover: '#434e5f',
   btnText: '#eeeeee',
@@ -29,6 +31,7 @@ export const TOKEN_CSS_VARS: Record<ThemeTokenKey, string> = {
   primaryColor: '--primary_color',
   primaryHover: '--primary-hover',
   bg: '--color-bg',
+  bg2: '--color-bg-2',
   btnBg: '--color-btn',
   btnBgHover: '--btn-bg-hover',
   btnText: '--sound-text',
@@ -44,7 +47,10 @@ export const TOKEN_CSS_VARS: Record<ThemeTokenKey, string> = {
 }
 
 /** All CSS vars that may be set inline by the theme system (cleared before file themes). */
-export const THEME_INLINE_VARS = Object.values(TOKEN_CSS_VARS)
+export const THEME_INLINE_VARS = [
+  ...Object.values(TOKEN_CSS_VARS),
+  '--color-text',
+]
 
 /** Lighten a #rrggbb hex by `amount` (0–1). Falls back to input on parse fail. */
 export function lightenHex(hex: string, amount = 0.12): string {
@@ -54,6 +60,20 @@ export function lightenHex(hex: string, amount = 0.12): string {
     return (
       '#' +
       [lift(r), lift(g), lift(b)].map((x) => x.toString(16).padStart(2, '0')).join('')
+    )
+  } catch {
+    return hex
+  }
+}
+
+/** Darken hex by mixing toward black (`amount` 0–1). 0.25 ≈ former settings sidebar tint. */
+export function darkenHex(hex: string, amount = 0.25): string {
+  try {
+    const [r, g, b] = hexToRgb(hex)
+    const sink = (c: number) => Math.max(0, Math.round(c * (1 - amount)))
+    return (
+      '#' +
+      [sink(r), sink(g), sink(b)].map((x) => x.toString(16).padStart(2, '0')).join('')
     )
   } catch {
     return hex
@@ -86,10 +106,12 @@ export function resolveThemeTokens(
   const hasFlat = !!(s.bg || s.btnBg || s.btnBorder)
 
   if (hasFlat) {
+    const bg = g(s.bg, THEME_TOKEN_DEFAULTS.bg)
     return {
       primaryColor: primary,
       primaryHover: g(s.primaryHover, lightenHex(primary)),
-      bg: g(s.bg, THEME_TOKEN_DEFAULTS.bg),
+      bg,
+      bg2: g(s.bg2, darkenHex(bg)),
       btnBg: g(s.btnBg, THEME_TOKEN_DEFAULTS.btnBg),
       btnBgHover: g(s.btnBgHover, lightenHex(g(s.btnBg, THEME_TOKEN_DEFAULTS.btnBg))),
       btnText: g(s.btnText, THEME_TOKEN_DEFAULTS.btnText),
@@ -116,6 +138,7 @@ export function resolveThemeTokens(
     primaryColor: primary,
     primaryHover: lightenHex(primary),
     bg,
+    bg2: darkenHex(bg),
     btnBg,
     btnBgHover: lightenHex(btnBg),
     btnText,
@@ -141,6 +164,11 @@ export function applyThemeTokens(
   for (const key of Object.keys(TOKEN_CSS_VARS) as ThemeTokenKey[]) {
     root.style.setProperty(TOKEN_CSS_VARS[key], tokens[key])
   }
+  // UI chrome text (settings, dialogs) — contrast against page bg.
+  root.style.setProperty(
+    '--color-text',
+    readableTextColor(tokens.bg, '#eeeeee', '#222831')
+  )
 }
 
 /** Build a SoundNinja theme CSS file from flat tokens (+ optional layout extras). */
@@ -151,6 +179,9 @@ export function buildThemeCss(
 ): string {
   const lines = Object.entries(TOKEN_CSS_VARS).map(
     ([key, cssVar]) => `  ${cssVar}: ${tokens[key as ThemeTokenKey]};`
+  )
+  lines.push(
+    `  --color-text: ${readableTextColor(tokens.bg, '#eeeeee', '#222831')};`
   )
   for (const [cssVar, value] of Object.entries(extras)) {
     lines.push(`  ${cssVar}: ${value};`)
@@ -229,6 +260,7 @@ export function parseThemeCss(css: string): Partial<ThemeTokens> {
   setFrom('primaryColor', '--primary_color')
   setFrom('primaryHover', '--primary-hover')
   setFrom('bg', '--color-bg', '--color-bg-dark')
+  setFrom('bg2', '--color-bg-2')
   setFrom('btnBg', '--color-btn', '--color-btn-dark')
   setFrom('btnBgHover', '--btn-bg-hover')
   setFrom('btnText', '--sound-text', '--text-light')
@@ -245,6 +277,7 @@ export function parseThemeCss(css: string): Partial<ThemeTokens> {
   // Fill derived defaults when only primary + bg/btn present (legacy files).
   const primary = out.primaryColor || THEME_TOKEN_DEFAULTS.primaryColor
   if (!out.primaryHover) out.primaryHover = lightenHex(primary)
+  if (!out.bg2 && out.bg) out.bg2 = darkenHex(out.bg)
   if (!out.btnBgHover && out.btnBg) out.btnBgHover = lightenHex(out.btnBg)
   if (!out.btnTextHover) out.btnTextHover = primary
   if (!out.btnBorder) out.btnBorder = primary

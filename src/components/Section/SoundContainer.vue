@@ -1,7 +1,10 @@
 <template>
     <div
         class="SoundContainer"
-        :class="{ 'SoundContainer--player-large': showPlayer && playerLarge }"
+        :class="{
+          'SoundContainer--player-large': showPlayer && playerLarge,
+          'SoundContainer--bulk': appStore.multiSelectActive,
+        }"
     >
         <div class="SoundContainer__scroll">
         <div
@@ -36,7 +39,9 @@
                 <div class="bulk-bar__color">
                     <ColorGroupPicker
                         :model-value="bulkOverride"
+                        :base-colors="bulkBaseColors"
                         :title="$t('bulk.color')"
+                        placement="bottom-right"
                         @change="onBulkOverride"
                     />
                 </div>
@@ -59,7 +64,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
-import { parseOverride, serializeOverride } from '~/utils/colorOverride'
+import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/utils/colorOverride'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -78,6 +83,15 @@ const uniformHeight = ref(0)
 // P7: multi-select bulk-edit controls.
 const bulkOverride = ref({})
 const bulkTab = ref('')
+const bulkBaseColors = computed(() => {
+  void appStore.multiSelectActive
+  const s = jsonStore.configFile?.settings
+  void s?.theme
+  void s?.btnBg
+  void s?.btnBorder
+  void s?.primaryColor
+  return resolveEffectiveColors(bulkOverride.value || {}, 'button')
+})
 
 onMounted(() => {
   sortable = Sortable.create(soundListRef.value, {
@@ -420,23 +434,8 @@ async function setActiveSound(sound) {
     }
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: true })
 
-    let duration = 0
     loadingPaths.add(sound.path)
-    try {
-      duration = await invoke('get_sound_duration', { soundPath: sound.path })
-    } catch (e) {
-      console.error('Could not get sound duration', e)
-    }
-
-    if (!sound.active) {
-      loadingPaths.delete(sound.path)
-      return
-    }
-
-    if (duration > 0) {
-      startProgress(sound.index, duration)
-    }
-
+    // Start audio immediately — do not wait on duration probe (slow on long files).
     invoke('play_sound', {
       soundPath: sound.path,
       deviceName: appSettings.outputSource,
@@ -446,6 +445,15 @@ async function setActiveSound(sound) {
     })
       .catch((e) => console.error('Sound playback error', e))
       .finally(() => loadingPaths.delete(sound.path))
+
+    invoke('get_sound_duration', { soundPath: sound.path })
+      .then((duration) => {
+        if (!sound.active) return
+        if (typeof duration === 'number' && duration > 0) {
+          startProgress(sound.index, duration)
+        }
+      })
+      .catch((e) => console.error('Could not get sound duration', e))
   } else {
     if (!stopOnRetrigger) return
     stopProgress(sound.index)

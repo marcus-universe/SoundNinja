@@ -29,6 +29,7 @@
           @pointermove="onWavePointerMove"
           @pointerup="onWavePointerUp"
           @pointercancel="onWavePointerUp"
+          @pointerleave="onWavePointerLeave"
         />
         <QuickInfo :text="loopOn ? $t('player.loopOn') : $t('player.loopOff')">
           <button
@@ -81,6 +82,8 @@ const loopOn = ref(false)
 const peaks = ref<number[]>([])
 const durationSec = ref(0)
 const playheadSec = ref(0)
+/** Hover preview position (null = not hovering). */
+const hoverSec = ref<number | null>(null)
 const waveCanvas = ref<HTMLCanvasElement | null>(null)
 const scrubbing = ref(false)
 
@@ -91,6 +94,16 @@ let progressAnchorMs = 0
 let progressElapsedMs = 0
 let progressPaused = true
 let seekInFlight = false
+/** Coalesce scrub pointermove redraws to one paint per animation frame. */
+let scrubDrawRaf: number | null = null
+
+function scheduleScrubDraw() {
+  if (scrubDrawRaf != null) return
+  scrubDrawRaf = requestAnimationFrame(() => {
+    scrubDrawRaf = null
+    drawWave()
+  })
+}
 
 const overlapSounds = computed(() => jsonStore.configFile.settings.overlapSounds ?? false)
 const playerLarge = computed(() => jsonStore.configFile.settings.playerLarge === true)
@@ -184,11 +197,12 @@ function applyPlayingSnapshot(list: PlayingInfo[]) {
   loopOn.value = !!first.looping
   progressPaused = !!first.paused
   const backendPos = Math.max(0, first.positionSecs ?? 0)
-  // Right after seek, prefer the larger of local/backend so a stale 0 cannot
-  // yank the playhead back to the start while audio is mid-file.
-  const posSec = seekInFlight
-    ? Math.max(playheadSec.value, backendPos)
-    : backendPos
+  // Right after seek (esp. while paused), prefer local playhead so a stale
+  // backend 0 cannot yank the cursor back to the start.
+  let posSec = backendPos
+  if (seekInFlight || (progressPaused && playheadSec.value > 0.05 && backendPos < 0.05)) {
+    posSec = Math.max(playheadSec.value, backendPos)
+  }
   progressElapsedMs = posSec * 1000
   progressAnchorMs = Date.now() - progressElapsedMs
   playheadSec.value = posSec
@@ -290,6 +304,18 @@ function drawWave() {
   }
 
   if (durationSec.value > 0) {
+    // Hover preview (where a click would seek) — drawn under the real playhead.
+    if (hoverSec.value != null && !scrubbing.value) {
+      const hx = (hoverSec.value / durationSec.value) * cssW
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo(hx, 0)
+      ctx.lineTo(hx, cssH)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
     const x = (playheadSec.value / durationSec.value) * cssW
     ctx.strokeStyle = accent
     ctx.lineWidth = 2
@@ -332,21 +358,36 @@ async function seekTo(sec: number) {
 
 function onWavePointerDown(e: PointerEvent) {
   scrubbing.value = true
+  hoverSec.value = null
   ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
   playheadSec.value = secFromPointer(e)
-  drawWave()
+  scheduleScrubDraw()
 }
 
 function onWavePointerMove(e: PointerEvent) {
-  if (!scrubbing.value) return
-  playheadSec.value = secFromPointer(e)
-  drawWave()
+  const sec = secFromPointer(e)
+  if (scrubbing.value) {
+    playheadSec.value = sec
+  } else {
+    hoverSec.value = sec
+  }
+  scheduleScrubDraw()
 }
 
 function onWavePointerUp(e: PointerEvent) {
   if (!scrubbing.value) return
   scrubbing.value = false
+  if (scrubDrawRaf != null) {
+    cancelAnimationFrame(scrubDrawRaf)
+    scrubDrawRaf = null
+  }
   void seekTo(secFromPointer(e))
+}
+
+function onWavePointerLeave() {
+  if (scrubbing.value) return
+  hoverSec.value = null
+  scheduleScrubDraw()
 }
 
 onMounted(async () => {

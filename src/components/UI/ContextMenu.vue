@@ -82,6 +82,7 @@
         <li v-if="colorPickerOpen" class="context-menu__color-panel" @click.stop>
           <ColorGroupPicker
             :model-value="currentOverride"
+            :base-colors="baseColors"
             inline
             @change="onOverrideChange"
           />
@@ -103,6 +104,7 @@ import {
   parseOverride,
   serializeOverride,
   overrideSwatch,
+  resolveEffectiveColors,
 } from '~/utils/colorOverride'
 
 const { t: $t } = useI18n()
@@ -198,8 +200,37 @@ const rawColor = computed(() => {
 
 const currentOverride = computed(() => parseOverride(rawColor.value))
 
+const baseColors = computed(() => {
+  // Recompute when menu target / visibility / stored color / theme changes.
+  void appStore.contextMenu.visible
+  void appStore.contextMenu.type
+  void appStore.contextMenu.targetName
+  void appStore.contextMenu.targetIndex
+  void rawColor.value
+  const s = jsonStore.configFile?.settings
+  void s?.theme
+  void s?.btnBg
+  void s?.tabBg
+  void s?.primaryColor
+
+  const { type, targetName, targetIndex } = appStore.contextMenu
+  let el = null
+  if (typeof document !== 'undefined') {
+    if (type === 'tab' && targetName) {
+      el = document.querySelector(`.tab[data-tab-name="${CSS.escape(targetName)}"]`)
+    } else if (type === 'sound' && targetIndex != null) {
+      const path = jsonStore.configFile.files[targetIndex]?.path
+      if (path) {
+        el = document.querySelector(`[data-sound-path="${CSS.escape(path)}"]`)
+      }
+    }
+  }
+  const kind = type === 'tab' ? 'tab' : 'button'
+  return resolveEffectiveColors(currentOverride.value, kind, el)
+})
+
 const swatchStyle = computed(() => ({
-  background: overrideSwatch(currentOverride.value),
+  background: overrideSwatch(currentOverride.value, baseColors.value.border),
 }))
 
 function toggleColorPicker() {
