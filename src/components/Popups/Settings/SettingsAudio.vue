@@ -255,10 +255,11 @@ function loopbackLabel(name: string) {
 
 /** Match saved host labels (WASAPI / Wasapi / asio) to cpal's real host id name. */
 function resolveHostName(saved: string | null | undefined, hosts: string[]): string {
+  const fallback = hosts[0] ?? 'Wasapi'
   if (!hosts.length) return saved || 'Wasapi'
-  if (!saved) return hosts[0]
+  if (!saved) return fallback
   const hit = hosts.find((h) => h.toLowerCase() === saved.toLowerCase())
-  return hit || hosts[0]
+  return hit ?? fallback
 }
 
 function isAsioHost(name: string) {
@@ -315,13 +316,15 @@ async function onHostChange() {
   await loadOutputDevices()
   await loadInputDevices()
   // Reset to first device on host switch.
-  if (outputDevices.value.length > 0) {
-    outputSelected.value = outputDevices.value[0]
-    await appSettings.setOutputSource(outputSelected.value)
+  const firstOut = outputDevices.value[0]
+  if (firstOut) {
+    outputSelected.value = firstOut
+    await appSettings.setOutputSource(firstOut)
   }
-  if (inputDevices.value.length > 0) {
-    inputSelected.value = inputDevices.value[0].name
-    await appSettings.setInputSource(inputSelected.value, inputDevices.value[0].loopback)
+  const firstIn = inputDevices.value[0]
+  if (firstIn) {
+    inputSelected.value = firstIn.name
+    await appSettings.setInputSource(firstIn.name, firstIn.loopback)
   }
   await loadAsioChannels()
 }
@@ -379,21 +382,23 @@ async function syncFromStore() {
   await loadOutputDevices()
   await loadInputDevices()
   const saved = appSettings.outputSource
+  const firstOut = outputDevices.value[0]
   if (saved && saved !== 'default' && outputDevices.value.includes(saved)) {
     outputSelected.value = saved
-  } else if (outputDevices.value.length > 0) {
-    outputSelected.value = outputDevices.value[0]
-    if (saved !== outputDevices.value[0]) {
-      await appSettings.setOutputSource(outputDevices.value[0])
+  } else if (firstOut) {
+    outputSelected.value = firstOut
+    if (saved !== firstOut) {
+      await appSettings.setOutputSource(firstOut)
     }
   }
   const savedIn = appSettings.inputSource
+  const firstIn = inputDevices.value[0]
   if (savedIn && savedIn !== 'default' && inputDevices.value.some((d) => d.name === savedIn)) {
     inputSelected.value = savedIn
-  } else if (inputDevices.value.length > 0) {
-    inputSelected.value = inputDevices.value[0].name
-    if (savedIn !== inputDevices.value[0].name) {
-      await appSettings.setInputSource(inputDevices.value[0].name, inputDevices.value[0].loopback)
+  } else if (firstIn) {
+    inputSelected.value = firstIn.name
+    if (savedIn !== firstIn.name) {
+      await appSettings.setInputSource(firstIn.name, firstIn.loopback)
     }
   }
   asioLeft.value = appSettings.asioLeftChannel

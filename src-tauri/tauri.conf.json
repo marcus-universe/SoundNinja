@@ -1,6 +1,6 @@
 {
   "productName": "soundninja",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",

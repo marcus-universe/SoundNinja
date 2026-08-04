@@ -2,6 +2,10 @@
 //!
 //! WASAPI loopback: call `build_input_stream` on an *output* device — cpal sets
 //! `AUDCLNT_STREAMFLAGS_LOOPBACK` automatically.
+//!
+//! Capture callback never locks the sample buffer (live peak UI used to block it
+//! after ~8s → pops/crackles). Chunks go through an mpsc channel; a collector
+//! thread owns the `Vec<f32>`.
 
 use cpal::traits::{DeviceTrait, StreamTrait};
 use hound::{WavSpec, WavWriter};
@@ -9,7 +13,7 @@ use rodio::cpal;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -28,8 +32,10 @@ struct ActiveRecording {
     samples: Arc<Mutex<Vec<f32>>>,
     sample_rate: u32,
     channels: u16,
-    /// Kept alive for the stream lifetime.
-    _join: Option<thread::JoinHandle<()>>,
+    /// Stream thread (owns cpal stream + chunk sender).
+    _stream_join: Option<thread::JoinHandle<()>>,
+    /// Appends channel chunks into `samples`.
+    _collector_join: Option<thread::JoinHandle<()>>,
 }
 
 static ACTIVE: OnceLock<Mutex<Option<ActiveRecording>>> = OnceLock::new();
@@ -49,28 +55,51 @@ fn write_level(peak: f32) {
     LEVEL.store(peak.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
 }
 
-fn push_samples(buf: &Arc<Mutex<Vec<f32>>>, data: &[f32]) {
+/// Apply gain, update level meter, enqueue chunk. Never touches the sample `Mutex`.
+fn enqueue_f32(tx: &SyncSender<Vec<f32>>, data: &[f32]) {
     let gain = current_input_volume();
     let mut peak = 0.0f32;
-    if let Ok(mut g) = buf.lock() {
-        g.reserve(data.len());
-        for &s in data {
-            let v = (s * gain).clamp(-1.0, 1.0);
-            let a = v.abs();
-            if a > peak {
-                peak = a;
-            }
-            g.push(v);
+    let mut chunk = Vec::with_capacity(data.len());
+    for &s in data {
+        let v = (s * gain).clamp(-1.0, 1.0);
+        let a = v.abs();
+        if a > peak {
+            peak = a;
         }
-    } else {
-        for &s in data {
-            let a = (s * gain).abs();
-            if a > peak {
-                peak = a;
-            }
-        }
+        chunk.push(v);
     }
     write_level(peak);
+    match tx.try_send(chunk) {
+        Ok(()) => {}
+        // Bound full: block briefly so we prefer latency over silent drops.
+        Err(TrySendError::Full(chunk)) => {
+            let _ = tx.send(chunk);
+        }
+        Err(TrySendError::Disconnected(_)) => {}
+    }
+}
+
+fn enqueue_i16(tx: &SyncSender<Vec<f32>>, data: &[i16]) {
+    let gain = current_input_volume();
+    let scale = gain / i16::MAX as f32;
+    let mut peak = 0.0f32;
+    let mut chunk = Vec::with_capacity(data.len());
+    for &s in data {
+        let v = (s as f32 * scale).clamp(-1.0, 1.0);
+        let a = v.abs();
+        if a > peak {
+            peak = a;
+        }
+        chunk.push(v);
+    }
+    write_level(peak);
+    match tx.try_send(chunk) {
+        Ok(()) => {}
+        Err(TrySendError::Full(chunk)) => {
+            let _ = tx.send(chunk);
+        }
+        Err(TrySendError::Disconnected(_)) => {}
+    }
 }
 
 #[tauri::command]
@@ -87,7 +116,7 @@ pub fn get_input_volume() -> f32 {
 fn build_stream_f32(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    samples: Arc<Mutex<Vec<f32>>>,
+    tx: SyncSender<Vec<f32>>,
     stop: Arc<AtomicBool>,
 ) -> Result<cpal::Stream, String> {
     let err_fn = |e| eprintln!("record stream error: {e}");
@@ -98,7 +127,7 @@ fn build_stream_f32(
                 if stop.load(Ordering::Relaxed) {
                     return;
                 }
-                push_samples(&samples, data);
+                enqueue_f32(&tx, data);
             },
             err_fn,
             None,
@@ -109,7 +138,7 @@ fn build_stream_f32(
 fn build_stream_i16(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    samples: Arc<Mutex<Vec<f32>>>,
+    tx: SyncSender<Vec<f32>>,
     stop: Arc<AtomicBool>,
 ) -> Result<cpal::Stream, String> {
     let err_fn = |e| eprintln!("record stream error: {e}");
@@ -120,13 +149,29 @@ fn build_stream_i16(
                 if stop.load(Ordering::Relaxed) {
                     return;
                 }
-                let converted: Vec<f32> = data.iter().map(|&s| s as f32 / i16::MAX as f32).collect();
-                push_samples(&samples, &converted);
+                enqueue_i16(&tx, data);
             },
             err_fn,
             None,
         )
         .map_err(|e| e.to_string())
+}
+
+fn spawn_collector(
+    rx: Receiver<Vec<f32>>,
+    samples: Arc<Mutex<Vec<f32>>>,
+    pre_reserve: usize,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        if let Ok(mut g) = samples.lock() {
+            g.reserve(pre_reserve);
+        }
+        while let Ok(chunk) = rx.recv() {
+            if let Ok(mut g) = samples.lock() {
+                g.extend_from_slice(&chunk);
+            }
+        }
+    })
 }
 
 fn temp_record_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -173,20 +218,30 @@ pub fn start_recording(
     let sample_format = supported.sample_format();
     let config: cpal::StreamConfig = supported.clone().into();
     let sample_rate: u32 = config.sample_rate;
-    let channels = config.channels;
+    let channels: u16 = config.channels;
 
     let samples = Arc::new(Mutex::new(Vec::<f32>::new()));
     let stop_flag = Arc::new(AtomicBool::new(false));
     write_level(0.0);
 
-    let samples_c = samples.clone();
+    // ~2s of chunks before producer blocks — absorbs peak-UI lock spikes.
+    let (chunk_tx, chunk_rx) = std::sync::mpsc::sync_channel::<Vec<f32>>(64);
+    let pre_reserve = (sample_rate as usize)
+        .saturating_mul(channels as usize)
+        .saturating_mul(120); // ~2 min headroom
+    let collector_join = spawn_collector(chunk_rx, samples.clone(), pre_reserve);
+
     let stop_c = stop_flag.clone();
     let (ready_tx, ready_rx): (Sender<Result<(), String>>, _) = channel();
 
-    let join = thread::spawn(move || {
+    let stream_join = thread::spawn(move || {
         let stream = match sample_format {
-            cpal::SampleFormat::F32 => build_stream_f32(&device, &config, samples_c, stop_c.clone()),
-            cpal::SampleFormat::I16 => build_stream_i16(&device, &config, samples_c, stop_c.clone()),
+            cpal::SampleFormat::F32 => {
+                build_stream_f32(&device, &config, chunk_tx, stop_c.clone())
+            }
+            cpal::SampleFormat::I16 => {
+                build_stream_i16(&device, &config, chunk_tx, stop_c.clone())
+            }
             other => Err(format!("Unsupported sample format: {other:?}")),
         };
 
@@ -197,7 +252,7 @@ pub fn start_recording(
                     return;
                 }
                 let _ = ready_tx.send(Ok(()));
-                // Keep stream alive until stop.
+                // Keep stream alive until stop (dropping sender closes collector).
                 while !stop_c.load(Ordering::Relaxed) {
                     thread::sleep(std::time::Duration::from_millis(50));
                 }
@@ -231,7 +286,8 @@ pub fn start_recording(
         samples,
         sample_rate,
         channels,
-        _join: Some(join),
+        _stream_join: Some(stream_join),
+        _collector_join: Some(collector_join),
     });
 
     Ok(RecordStartInfo {
@@ -245,8 +301,11 @@ pub fn stop_recording(app: AppHandle) -> Result<String, String> {
     let mut guard = active().lock().map_err(|e| e.to_string())?;
     let rec = guard.take().ok_or("Not recording")?;
     rec.stop_flag.store(true, Ordering::Relaxed);
-    // Let the stream thread wind down.
-    if let Some(j) = rec._join {
+    // Stream drop closes chunk sender → collector drains + exits.
+    if let Some(j) = rec._stream_join {
+        let _ = j.join();
+    }
+    if let Some(j) = rec._collector_join {
         let _ = j.join();
     }
     write_level(0.0);
@@ -293,6 +352,7 @@ pub fn get_live_record_peaks(
     let Some(rec) = guard.as_ref() else {
         return Ok((0.0, vec![0.0; buckets * 2]));
     };
+    // Safe to block here: capture callback no longer shares this mutex.
     let samples = rec.samples.lock().map_err(|e| e.to_string())?;
     let ch = rec.channels.max(1) as usize;
     let frames = samples.len() / ch;
