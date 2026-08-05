@@ -39,6 +39,8 @@
         "sql:allow-select",
         "sql:allow-close",
         "os:default",
+        "updater:default",
+        "process:default",
         "core:window:allow-start-dragging",
         "core:window:allow-toggle-maximize",
         "core:window:allow-minimize",

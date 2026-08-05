@@ -19,6 +19,7 @@
     "openConfig": "Konfigurationsdatei öffnen",
     "openThemesFolder": "Themes-Ordner öffnen",
     "openProjectsFolder": "Projekte-Ordner öffnen",
+    "checkUpdates": "Nach Updates suchen",
     "about": "Über SoundNinja"
   },
   "dialog": {
@@ -84,6 +85,8 @@
       "allowReorderHint": "Drag-and-drop-Sortierung von Sounds und Trennern aktivieren",
       "navbarTooltips": "Seitenleisten-Tooltips",
       "navbarTooltipsHint": "Beim Hover eine Beschriftung neben jedem Seitenleisten-Button zeigen",
+      "checkUpdatesOnStart": "Beim Start nach Updates suchen",
+      "checkUpdatesOnStartHint": "Beim App-Start auf GitHub nach einer neueren Version suchen. Popup nur bei verfügbarem Update.",
       "systemTitlebar": "System-Titelleiste und Menü verwenden",
       "systemTitlebarHint": "Nutzt den normalen Fensterrahmen und die Menüleiste deines Betriebssystems statt des eigenen App-Designs.",
       "hideTitlebar": "Titelleiste ausblenden",
@@ -304,6 +307,21 @@
   "about": {
     "title": "Über SoundNinja",
     "by": "von"
+  },
+  "updater": {
+    "titleChecking": "Nach Updates suchen",
+    "titleAvailable": "Update verfügbar",
+    "titleUpToDate": "Aktuell",
+    "titleDownloading": "Aktualisieren",
+    "titleError": "Update-Fehler",
+    "checking": "Prüfe GitHub Releases auf eine neuere Version…",
+    "available": "Version {latest} ist verfügbar (installiert: {current}).",
+    "upToDate": "Du hast die neueste Version ({version}).",
+    "downloading": "Update wird heruntergeladen und installiert…",
+    "updateNow": "Jetzt aktualisieren",
+    "later": "Später",
+    "manualHint": "In-App-Installation ist für dieses Release noch nicht bereit. Öffne die GitHub-Release-Seite zum Download.",
+    "openReleases": "Releases öffnen"
   },
   "player": {
     "play": "Play",

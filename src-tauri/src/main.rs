@@ -91,6 +91,8 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // On macOS keep native decorations (traffic lights) — the custom
             // HTML title bar in TitleBar.vue only renders on Windows/Linux.

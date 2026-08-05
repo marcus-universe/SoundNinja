@@ -11,6 +11,7 @@
       <SettingsOverlay />
       <ImportFolders v-if="appStore.importFoldersActive" />
       <ContextMenu />
+      <UpdateDialog ref="updateDialogRef" />
       <DialogField
         v-if="unsavedPrompt"
         :title="$t('dialog.unsavedTitle')"
@@ -77,6 +78,8 @@ const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
 const appSettings = useAppSettingsStore()
 const { setLocale } = useI18n()
+
+const updateDialogRef = ref(null)
 
 // Secondary windows (e.g. the Theme Creator) reuse the same SPA bundle. Only the
 // main window owns the project/menu lifecycle; others just render their page.
@@ -396,6 +399,9 @@ onMounted(async () => {
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
+  listen('menu_check_updates', () => {
+    updateDialogRef.value?.checkManual?.()
+  })
   listen('menu_undo', () => runHistoryAction(() => jsonStore.undo()))
   listen('menu_redo', () => runHistoryAction(() => jsonStore.redo()))
   listen('menu_new_project', handleMenuNewProject)
@@ -491,6 +497,13 @@ onMounted(async () => {
       .then((m) => m.prewarmSecondaryWindows())
       .catch(() => {})
   }, 1500)
+
+  // Optional silent update check after startup settles (popup only if update exists).
+  if (appSettings.checkUpdatesOnStart !== false) {
+    setTimeout(() => {
+      updateDialogRef.value?.checkOnStart?.()
+    }, 2500)
+  }
 
   listen('record_import_sound', (e) => {
     const path = e?.payload?.path

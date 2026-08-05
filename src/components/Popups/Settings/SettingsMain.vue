@@ -100,6 +100,14 @@
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.checkUpdatesOnStart') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.checkUpdatesOnStartHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="checkUpdatesOnStart" @update:modelValue="onCheckUpdatesOnStart" />
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.uniformButtonHeight') }}</span>
         <span class="settings-hint">{{ $t('settings.main.uniformButtonHeightHint') }}</span>
       </div>
@@ -121,6 +129,8 @@
       </div>
       <UICheckbox :modelValue="navbarTooltips" @update:modelValue="onNavbarTooltips" />
     </div>
+
+
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
@@ -260,6 +270,7 @@ const playerLarge = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
 const navbarTooltips = ref(true)
+const checkUpdatesOnStart = ref(true)
 const systemTitlebar = ref(false)
 const hideTitlebar = ref(false)
 const hideTitlebarWarnOpen = ref(false)
@@ -477,6 +488,11 @@ async function onNavbarTooltips(val: boolean) {
   await appSettings.setNavbarTooltips(val)
 }
 
+async function onCheckUpdatesOnStart(val: boolean) {
+  checkUpdatesOnStart.value = val
+  await appSettings.setCheckUpdatesOnStart(val)
+}
+
 async function onSystemTitlebar(val: boolean) {
   systemTitlebar.value = val
   await appSettings.setTitlebarMode(val ? 'system' : 'styled')
@@ -568,6 +584,7 @@ async function syncFromStore() {
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
   navbarTooltips.value = appSettings.navbarTooltips !== false
+  checkUpdatesOnStart.value = appSettings.checkUpdatesOnStart !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
   recentLimit.value = appSettings.recentLimit ?? 30

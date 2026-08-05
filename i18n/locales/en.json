@@ -19,6 +19,7 @@
     "openConfig": "Open Config File",
     "openThemesFolder": "Open Themes Folder",
     "openProjectsFolder": "Open Projects Folder",
+    "checkUpdates": "Check for Updates",
     "about": "About"
   },
   "dialog": {
@@ -84,6 +85,8 @@
       "allowReorderHint": "Enable drag-and-drop reordering of sounds and separators",
       "navbarTooltips": "Sidebar tooltips",
       "navbarTooltipsHint": "Show a label next to each sidebar button on hover",
+      "checkUpdatesOnStart": "Check for updates on start",
+      "checkUpdatesOnStartHint": "Look for a newer version on GitHub when the app launches. A popup appears only if an update is available.",
       "systemTitlebar": "Use system title bar and menu",
       "systemTitlebarHint": "Uses the standard window frame and menu bar of your operating system instead of the app's own design.",
       "hideTitlebar": "Hide titlebar",
@@ -304,6 +307,21 @@
   "about": {
     "title": "About",
     "by": "by"
+  },
+  "updater": {
+    "titleChecking": "Checking for Updates",
+    "titleAvailable": "Update Available",
+    "titleUpToDate": "Up to Date",
+    "titleDownloading": "Updating",
+    "titleError": "Update Error",
+    "checking": "Checking GitHub Releases for a newer version…",
+    "available": "Version {latest} is available (you have {current}).",
+    "upToDate": "You are on the latest version ({version}).",
+    "downloading": "Downloading and installing the update…",
+    "updateNow": "Update now",
+    "later": "Later",
+    "manualHint": "In-app install is not ready for this release yet. Open the GitHub release page to download.",
+    "openReleases": "Open releases"
   },
   "player": {
     "play": "Play",

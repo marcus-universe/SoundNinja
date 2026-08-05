@@ -170,6 +170,7 @@ const menus: MenuGroup[] = [
     id: 'help',
     labelKey: 'menu.help',
     items: [
+      { id: 'check_updates', labelKey: 'menu.checkUpdates', event: 'menu_check_updates' },
       { id: 'about', labelKey: 'menu.about', event: 'menu_open_about' },
     ],
   },

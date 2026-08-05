@@ -22,7 +22,9 @@
   border: 0.32rem solid var(--primary_color);
   border-radius: 1.2rem;
   padding: calc($padding_1 * 1.5);
-  width: min(68rem, calc(100dvw - 4rem));
+  width: fit-content;
+  min-width: min(28rem, calc(100dvw - 4rem));
+  max-width: min(68rem, calc(100dvw - 4rem));
 //   max-height: calc(100dvh - var(--topbar_height));
   overflow: hidden;
   box-sizing: border-box;
@@ -33,12 +35,28 @@
 .dialog-header {
   align-items: center;
   flex-shrink: 0;
+  gap: 0.8rem;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dialog-title {
   margin: 0;
+  padding: 0;
   color: var(--color-text, #{$white});
   font-family: $fontBold;
+  font-size: var(--font-size-md, 1.6rem);
+  font-weight: normal;
+  line-height: 1.3;
+  background: transparent;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+
+  &::selection {
+    background: transparent;
+    color: inherit;
+  }
 }
 
 .dialog-error {

@@ -34,7 +34,7 @@
         </div>
 
         <Transition name="fade">
-            <div v-if="appStore.multiSelectActive" class="bulk-bar flex_c_h align_c gap1">
+            <div v-if="appStore.multiSelectActive" class="bulk-bar flex_c_h align_c">
                 <span class="bulk-bar__count">{{ $t('bulk.selected', { count: appStore.selectedSoundPaths.length }) }}</span>
                 <div class="bulk-bar__color">
                     <ColorGroupPicker
@@ -52,7 +52,7 @@
                 <button class="bulk-bar__btn bulk-bar__btn--danger" :disabled="appStore.selectedSoundPaths.length === 0" @click="applyBulkDelete">
                     {{ $t('bulk.delete') }}
                 </button>
-                <button class="bulk-bar__btn" @click="appStore.setMultiSelectActive(false)">{{ $t('bulk.done') }}</button>
+                <button class="bulk-bar__btn bulk-bar__btn--primary" @click="appStore.setMultiSelectActive(false)">{{ $t('bulk.done') }}</button>
             </div>
         </Transition>
 

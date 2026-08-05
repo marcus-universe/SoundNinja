@@ -86,6 +86,7 @@ struct MenuLabels {
     open_themes_folder: &'static str,
     open_projects_folder: &'static str,
     help: &'static str,
+    check_updates: &'static str,
     about: &'static str,
 }
 
@@ -110,6 +111,7 @@ fn labels_for(lang: &str) -> MenuLabels {
             open_themes_folder: "Themes-Ordner öffnen",
             open_projects_folder: "Projekte-Ordner öffnen",
             help: "Hilfe",
+            check_updates: "Nach Updates suchen",
             about: "Über SoundNinja",
         },
         _ => MenuLabels {
@@ -131,6 +133,7 @@ fn labels_for(lang: &str) -> MenuLabels {
             open_themes_folder: "Open Themes Folder",
             open_projects_folder: "Open Projects Folder",
             help: "Help",
+            check_updates: "Check for Updates",
             about: "About",
         },
     }
@@ -190,6 +193,7 @@ fn build_menu(
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, l.help)
+        .item(&MenuItemBuilder::with_id("check_updates", l.check_updates).build(app)?)
         .item(&MenuItemBuilder::with_id("about", l.about).build(app)?)
         .build()?;
 
@@ -281,6 +285,9 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
             }
             "about" => {
                 app.emit("menu_open_about", ()).unwrap_or_default();
+            }
+            "check_updates" => {
+                app.emit("menu_check_updates", ()).unwrap_or_default();
             }
             _ => {}
         }
