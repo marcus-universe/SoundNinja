@@ -30,15 +30,25 @@ export interface GifBlobRow {
   byteLen: number
 }
 
+export type ButtonAlign = 'left' | 'center' | 'right'
+
 export interface TabEntry {
   name: string
   color?: string
+  /** Default button alignment for this tab. Groups may override. */
+  buttonAlign?: ButtonAlign
 }
 
 export interface Separator {
   id: string
   tab: string
   position: number
+  /** Display name. Empty/missing → untitled Group (legacy seps). */
+  name?: string
+  borderColor?: string
+  nameColor?: string
+  /** Undefined = inherit Tab.buttonAlign */
+  buttonAlign?: ButtonAlign
 }
 
 export interface Settings {
@@ -275,6 +285,11 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'sounds', 'gif_id', 'TEXT')
   await addColumnIfMissing(d, 'sounds', 'gif_pos_x', 'REAL')
   await addColumnIfMissing(d, 'sounds', 'gif_pos_y', 'REAL')
+  await addColumnIfMissing(d, 'separators', 'name', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'border_color', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'name_color', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
+  await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
 }
 
 async function addColumnIfMissing(
@@ -351,12 +366,15 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     settings.bg2 = resolveThemeTokens(settings as unknown as Record<string, unknown>).bg2
   }
 
-  const tabRows = await d.select<{ name: string; color: string | null; position: number }[]>(
-    'SELECT name, color, position FROM tabs ORDER BY position ASC'
-  )
+  const tabRows = await d.select<
+    { name: string; color: string | null; position: number; button_align: string | null }[]
+  >('SELECT name, color, position, button_align FROM tabs ORDER BY position ASC')
   const tabList: TabEntry[] = tabRows.map((t) => ({
     name: t.name,
     ...(t.color ? { color: t.color } : {}),
+    ...(t.button_align === 'left' || t.button_align === 'center' || t.button_align === 'right'
+      ? { buttonAlign: t.button_align }
+      : {}),
   }))
 
   const soundRows = await d.select<
@@ -405,10 +423,30 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
   })
 
-  const sepRows = await d.select<{ id: string; tab: string; position: number }[]>(
-    'SELECT id, tab, position FROM separators ORDER BY position ASC'
+  const sepRows = await d.select<
+    {
+      id: string
+      tab: string
+      position: number
+      name: string | null
+      border_color: string | null
+      name_color: string | null
+      button_align: string | null
+    }[]
+  >(
+    'SELECT id, tab, position, name, border_color, name_color, button_align FROM separators ORDER BY position ASC',
   )
-  const separators: Separator[] = sepRows.map((r) => ({ id: r.id, tab: r.tab, position: r.position }))
+  const separators: Separator[] = sepRows.map((r) => ({
+    id: r.id,
+    tab: r.tab,
+    position: r.position,
+    ...(r.name ? { name: r.name } : {}),
+    ...(r.border_color ? { borderColor: r.border_color } : {}),
+    ...(r.name_color ? { nameColor: r.name_color } : {}),
+    ...(r.button_align === 'left' || r.button_align === 'center' || r.button_align === 'right'
+      ? { buttonAlign: r.button_align }
+      : {}),
+  }))
 
   return { settings, tabList, files, separators }
 }
@@ -482,8 +520,13 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ]
     await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
-    const tabRows = config.tabList.map((t, i) => [t.name, t.color ?? null, i])
-    await batchInsert(d, 'tabs', ['name', 'color', 'position'], tabRows)
+    const tabRows = config.tabList.map((t, i) => [
+      t.name,
+      t.color ?? null,
+      i,
+      t.buttonAlign ?? null,
+    ])
+    await batchInsert(d, 'tabs', ['name', 'color', 'position', 'button_align'], tabRows)
 
     const soundRows: unknown[][] = []
     const soundTabRows: unknown[][] = []
@@ -512,8 +555,21 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     )
     await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
 
-    const sepRows = (config.separators ?? []).map((sep) => [sep.id, sep.tab, sep.position])
-    await batchInsert(d, 'separators', ['id', 'tab', 'position'], sepRows)
+    const sepRows = (config.separators ?? []).map((sep) => [
+      sep.id,
+      sep.tab,
+      sep.position,
+      sep.name ?? null,
+      sep.borderColor ?? null,
+      sep.nameColor ?? null,
+      sep.buttonAlign ?? null,
+    ])
+    await batchInsert(
+      d,
+      'separators',
+      ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'button_align'],
+      sepRows,
+    )
 
     await d.execute('COMMIT')
   } catch (e) {

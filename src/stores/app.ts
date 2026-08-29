@@ -50,24 +50,28 @@ export const useAppStore = defineStore('app', {
     },
 
     setRenameContent({ name }: { name: string }) {
-      if (name === '') {
+      const jsonStore = useJsonHandelingStore()
+      // Groups may clear the name (empty → untitled placeholder).
+      if (name === '' && this.PopupActive.type !== 'renameGroup') {
         this.ErrorMessage = 'Field is empty'
-      } else {
-        this.RenameContent = name
-        this.ErrorMessage = ''
-        const jsonStore = useJsonHandelingStore()
-        if (this.PopupActive.type === 'addTab') {
-          jsonStore.addTab(name)
-        } else if (this.PopupActive.type === 'renameTab') {
-          jsonStore.renameTab(this.contextMenu.targetName, name)
-          if (this.currentTab === this.contextMenu.targetName) {
-            this.currentTab = name
-          }
-        } else if (this.PopupActive.type === 'renameSound') {
-          jsonStore.renameSound(this.contextMenu.targetIndex, name)
-        }
-        jsonStore.writeConfig()
+        return
       }
+      this.RenameContent = name
+      this.ErrorMessage = ''
+      if (this.PopupActive.type === 'addTab') {
+        jsonStore.addTab(name)
+      } else if (this.PopupActive.type === 'renameTab') {
+        jsonStore.renameTab(this.contextMenu.targetName, name)
+        if (this.currentTab === this.contextMenu.targetName) {
+          this.currentTab = name
+        }
+      } else if (this.PopupActive.type === 'renameSound') {
+        jsonStore.renameSound(this.contextMenu.targetIndex, name)
+      } else if (this.PopupActive.type === 'renameGroup') {
+        jsonStore.updateSeparator(this.contextMenu.targetName, { name })
+        return
+      }
+      jsonStore.writeConfig()
     },
 
     setErrorActive(val: string | boolean) {
@@ -148,7 +152,7 @@ export const useAppStore = defineStore('app', {
 
     openContextMenu({
       x, y, type, targetName, targetIndex,
-    }: { x: number; y: number; type: 'tab' | 'sound'; targetName: string; targetIndex: number }) {
+    }: { x: number; y: number; type: 'tab' | 'sound' | 'separator'; targetName: string; targetIndex: number }) {
       this.contextMenu = { visible: true, x, y, type, targetName, targetIndex }
     },
 

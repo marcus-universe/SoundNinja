@@ -3,6 +3,7 @@ import {
   openDb, withProjectDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
   loadGifBlobsByIds, upsertGifBlob,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
+  type ButtonAlign,
 } from '~/utils/db'
 import { revokeAllGifUrls } from '~/utils/gifCache'
 
@@ -487,12 +488,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    // ── Separators ────────────────────────────────────────────────────────────
-    addSeparator(tab: string, position: number) {
+    // ── Separators / Groups ───────────────────────────────────────────────────
+    addSeparator(tab: string, position: number, name?: string) {
       this.pushBeforeChange()
       if (!this.configFile.separators) this.configFile.separators = []
       const id = `sep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      this.configFile.separators.push({ id, tab, position })
+      this.configFile.separators.push({
+        id,
+        tab,
+        position,
+        ...(name ? { name } : {}),
+      })
       this.writeConfig()
     },
 
@@ -509,6 +515,145 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         sep.position = position
         this.writeConfig()
       }
+    },
+
+    updateSeparator(id: string, patch: Partial<Omit<Separator, 'id'>>) {
+      const sep = (this.configFile.separators ?? []).find((s) => s.id === id)
+      if (!sep) return
+      this.pushBeforeChange()
+      if ('name' in patch) {
+        const n = patch.name?.trim()
+        if (n) sep.name = n
+        else delete sep.name
+      }
+      if ('borderColor' in patch) {
+        if (patch.borderColor) sep.borderColor = patch.borderColor
+        else delete sep.borderColor
+      }
+      if ('nameColor' in patch) {
+        if (patch.nameColor) sep.nameColor = patch.nameColor
+        else delete sep.nameColor
+      }
+      if ('buttonAlign' in patch) {
+        if (patch.buttonAlign) sep.buttonAlign = patch.buttonAlign
+        else delete sep.buttonAlign
+      }
+      if ('position' in patch && typeof patch.position === 'number') {
+        sep.position = patch.position
+      }
+      if ('tab' in patch && patch.tab) sep.tab = patch.tab
+      this.writeConfig()
+    },
+
+    setTabButtonAlign(tabName: string, align: ButtonAlign | undefined) {
+      const tab = this.configFile.tabList.find((t) => t.name === tabName)
+      if (!tab) return
+      this.pushBeforeChange()
+      if (align) tab.buttonAlign = align
+      else delete tab.buttonAlign
+      this.writeConfig()
+    },
+
+    /** Tab order key for a sound (global index on "All"). */
+    soundOrderOnTab(sound: SoundFile, tab: string): number {
+      if (tab === 'All') return sound.index ?? 0
+      return sound.tabIndexes?.[tab] ?? 0
+    },
+
+    setSoundOrderOnTab(sound: SoundFile, tab: string, order: number) {
+      if (tab === 'All') {
+        sound.index = order
+        return
+      }
+      if (!sound.tabIndexes) sound.tabIndexes = {}
+      sound.tabIndexes[tab] = order
+    },
+
+    /**
+     * Rewrite dense interleaved order for a tab: orphan sounds, then each
+     * group marker + its members. Keeps relative membership from `layout`.
+     */
+    applyBoardLayout(
+      tab: string,
+      layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
+    ) {
+      this.pushBeforeChange()
+      const byPath = new Map(this.configFile.files.map((f) => [f.path, f]))
+      let seq = 0
+      for (const path of layout.orphans) {
+        const f = byPath.get(path)
+        if (f) this.setSoundOrderOnTab(f, tab, seq++)
+      }
+      for (const g of layout.groups) {
+        const sep = (this.configFile.separators ?? []).find((s) => s.id === g.id)
+        if (sep) sep.position = seq++
+        for (const path of g.paths) {
+          const f = byPath.get(path)
+          if (f) this.setSoundOrderOnTab(f, tab, seq++)
+        }
+      }
+      this.writeConfig()
+    },
+
+    /**
+     * Rebuild board layout from current positional membership, then densify.
+     * Call after cross-group drops so float anchors never drift.
+     */
+    normalizeBoardOrder(tab: string) {
+      const layout = this.captureBoardLayout(tab)
+      this.applyBoardLayout(tab, layout)
+    },
+
+    /** Snapshot orphans + groups with member paths from current positions. */
+    captureBoardLayout(tab: string): { orphans: string[]; groups: { id: string; paths: string[] }[] } {
+      const sounds = this.configFile.files
+        .filter((f) => f.tabs.includes(tab))
+        .sort((a, b) => this.soundOrderOnTab(a, tab) - this.soundOrderOnTab(b, tab))
+      const seps = (this.configFile.separators ?? [])
+        .filter((s) => s.tab === tab)
+        .slice()
+        .sort((a, b) => a.position - b.position)
+
+      if (seps.length === 0) {
+        return { orphans: sounds.map((s) => s.path), groups: [] }
+      }
+
+      const orphans: string[] = []
+      const groups: { id: string; paths: string[] }[] = seps.map((s) => ({ id: s.id, paths: [] }))
+
+      for (const sound of sounds) {
+        const order = this.soundOrderOnTab(sound, tab)
+        let placed = false
+        for (let i = 0; i < seps.length; i++) {
+          const start = seps[i].position
+          const end = i + 1 < seps.length ? seps[i + 1].position : Number.POSITIVE_INFINITY
+          if (order >= start && order < end) {
+            groups[i].paths.push(sound.path)
+            placed = true
+            break
+          }
+        }
+        if (!placed && order < seps[0].position) orphans.push(sound.path)
+        else if (!placed) orphans.push(sound.path)
+      }
+      return { orphans, groups }
+    },
+
+    /**
+     * Reorder groups on a tab (orphans stay first). Member sounds move with
+     * their group. `orderedSepIds` is the new group order.
+     */
+    moveGroupWithMembers(tab: string, orderedSepIds: string[]) {
+      const layout = this.captureBoardLayout(tab)
+      const byId = new Map(layout.groups.map((g) => [g.id, g]))
+      const groups = orderedSepIds
+        .map((id) => byId.get(id))
+        .filter((g): g is { id: string; paths: string[] } => !!g)
+      // Keep any groups missing from orderedSepIds at the end (safety).
+      for (const g of layout.groups) {
+        if (!orderedSepIds.includes(g.id)) groups.push(g)
+      }
+      this.applyBoardLayout(tab, { orphans: layout.orphans, groups })
     },
 
     // ── Bulk / misc ───────────────────────────────────────────────────────────

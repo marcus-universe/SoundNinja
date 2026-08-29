@@ -8,33 +8,72 @@
     >
         <div class="SoundContainer__scroll">
         <div
-            class="SoundTab flex_c_h flex_start button-gaps flex_wrap"
-            ref="soundListRef"
+            class="SoundTab flex_c_v flex_start button-gaps"
+            ref="boardRef"
             :style="uniformHeight ? { '--btn-min-height': uniformHeight + 'px' } : {}"
         >
-            <template v-for="item in displayItems" :key="item.domKey">
-                <div
-                    v-if="item.kind === 'sep'"
-                    class="tab-separator"
-                    :data-sep-id="item.sep.id"
-                    @contextmenu.prevent="(e) => openSeparatorMenu(e, item.sep)"
-                />
+            <!-- Orphan strip: sounds before first group -->
+            <div
+                class="sound-orphans sound-section-body flex_c_h flex_start button-gaps flex_wrap"
+                :class="orphanAlignClass"
+                data-section-id="orphans"
+                ref="orphansRef"
+            >
                 <SoundButton
-                    v-else
-                    :sound="item.sound"
-                    :btnStyle="getBtnStyle(item.sound)"
-                    :loading="loadingPaths.has(item.sound.path)"
-                    :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(item.sound.path)"
-                    :gifSrc="gifSrcFor(item.sound)"
-                    :gifPosX="item.sound.gifPosX ?? 50"
-                    :gifPosY="item.sound.gifPosY ?? 50"
-                    :hasGif="!!item.sound.gifId"
-                    :data-sound-path="item.sound.path"
-                    @play="onSoundClick(item.sound)"
-                    @contextmenu="(e) => openSoundMenu(e, item.sound)"
-                    @gifhover="(on) => onGifHover(item.sound, on)"
+                    v-for="sound in orphanSounds"
+                    :key="'s:' + sound.path"
+                    :sound="sound"
+                    :btnStyle="getBtnStyle(sound)"
+                    :loading="loadingPaths.has(sound.path)"
+                    :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
+                    :gifSrc="gifSrcFor(sound)"
+                    :gifPosX="sound.gifPosX ?? 50"
+                    :gifPosY="sound.gifPosY ?? 50"
+                    :hasGif="!!sound.gifId"
+                    :data-sound-path="sound.path"
+                    @play="onSoundClick(sound)"
+                    @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
+                    @gifhover="(on) => onGifHover(sound, on)"
                 />
-            </template>
+            </div>
+
+            <!-- Group cards -->
+            <div class="sound-groups-outer flex_c_v flex_start button-gaps" ref="groupsOuterRef">
+                <div
+                    v-for="sec in groupSections"
+                    :key="'g:' + sec.sep.id"
+                    class="sound-group tab-separator"
+                    :data-sep-id="sec.sep.id"
+                    :style="groupCardStyle(sec.sep)"
+                    @contextmenu.prevent="(e) => openSeparatorMenu(e, sec.sep)"
+                >
+                    <div class="sound-group__name" :style="groupNameStyle(sec.sep)">
+                        {{ sec.sep.name?.trim() || $t('contextMenu.untitledGroup') }}
+                    </div>
+                    <div
+                        class="sound-group__body sound-section-body flex_c_h flex_start button-gaps flex_wrap"
+                        :class="alignClassFor(sec.sep)"
+                        :data-section-id="sec.sep.id"
+                    >
+                        <SoundButton
+                            v-for="sound in sec.sounds"
+                            :key="'s:' + sound.path"
+                            :sound="sound"
+                            :btnStyle="getBtnStyle(sound)"
+                            :loading="loadingPaths.has(sound.path)"
+                            :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
+                            :gifSrc="gifSrcFor(sound)"
+                            :gifPosX="sound.gifPosX ?? 50"
+                            :gifPosY="sound.gifPosY ?? 50"
+                            :hasGif="!!sound.gifId"
+                            :data-sound-path="sound.path"
+                            @play="onSoundClick(sound)"
+                            @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
+                            @gifhover="(on) => onGifHover(sound, on)"
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
         </div>
 
@@ -79,17 +118,18 @@ const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
 
-const soundListRef = ref(null)
-let sortable = null
+const boardRef = ref(null)
+const orphansRef = ref(null)
+const groupsOuterRef = ref(null)
+let outerSortable = null
+/** @type {import('sortablejs').default[]} */
+const innerSortables = []
 
 const showPlayer = computed(() => jsonStore.configFile?.settings?.showPlayer !== false)
 const playerLarge = computed(() => jsonStore.configFile?.settings?.playerLarge === true)
 
-// P5: sounds currently resolving their duration / starting playback.
 const loadingPaths = reactive(new Set())
-// P8: enforced uniform button height (0 = natural height).
 const uniformHeight = ref(0)
-// P7: multi-select bulk-edit controls.
 const bulkOverride = ref({})
 const bulkTab = ref('')
 const bulkBaseColors = computed(() => {
@@ -100,60 +140,6 @@ const bulkBaseColors = computed(() => {
   void s?.btnBorder
   void s?.primaryColor
   return resolveEffectiveColors(bulkOverride.value || {}, 'button')
-})
-
-onMounted(() => {
-  sortable = Sortable.create(soundListRef.value, {
-    animation: 180,
-    disabled: jsonStore.configFile?.settings?.allowReorder === false,
-    draggable: '.Soundbtn, .tab-separator',
-    ghostClass: 'drag-over',
-    onEnd(evt) {
-      const { oldIndex, newIndex, item, from } = evt
-      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
-      // Undo SortableJS's DOM mutation so Vue stays the single source of truth.
-      from.removeChild(item)
-      from.insertBefore(item, from.children[oldIndex] ?? null)
-
-      const items = displayItems.value
-      const moved = items[oldIndex]
-      if (!moved) return
-
-      // Rebuild the intended order to read the moved item's new neighbors.
-      const arr = items.slice()
-      arr.splice(oldIndex, 1)
-      arr.splice(newIndex, 0, moved)
-      const prev = arr[newIndex - 1]
-      const next = arr[newIndex + 1]
-
-      if (moved.kind === 'sep') {
-        // Reposition the separator between its new neighbors.
-        let pos
-        if (prev && next) pos = (orderOf(prev) + orderOf(next)) / 2
-        else if (prev) pos = orderOf(prev) + 0.5
-        else if (next) pos = orderOf(next) - 0.5
-        else pos = 0
-        jsonStore.setSeparatorPosition(moved.sep.id, pos)
-      } else {
-        // Sound moved: reorder relative to the nearest sound neighbor so the
-        // existing per-tab reorder logic (and drag/drop) is unaffected.
-        const neighbor =
-          (next && next.kind === 'sound' && next) ||
-          (prev && prev.kind === 'sound' && prev) ||
-          null
-        if (neighbor && neighbor.sound !== moved.sound) {
-          jsonStore.reorderSounds(moved.sound.index, neighbor.sound.index, currentTab.value)
-        }
-      }
-    },
-  })
-})
-
-onUnmounted(() => {
-  sortable?.destroy()
-  sortable = null
-  gifObserver?.disconnect()
-  gifObserver = null
 })
 
 const currentTab = computed(() => appStore.currentTab)
@@ -175,6 +161,184 @@ const JSONFile = computed(() => {
 
 const Settings = computed(() => jsonStore.configFile?.settings)
 
+const tabEntry = computed(() =>
+  (jsonStore.configFile?.tabList ?? []).find((t) => t.name === currentTab.value),
+)
+
+const tabButtonAlign = computed(() => tabEntry.value?.buttonAlign ?? 'left')
+
+function resolveAlign(sep) {
+  return sep?.buttonAlign ?? tabButtonAlign.value
+}
+
+function alignClassFor(sep) {
+  const a = resolveAlign(sep)
+  return {
+    'sound-align--left': a === 'left',
+    'sound-align--center': a === 'center',
+    'sound-align--right': a === 'right',
+  }
+}
+
+const orphanAlignClass = computed(() => alignClassFor(null))
+
+function groupCardStyle(sep) {
+  const style = {}
+  if (sep.borderColor) style['--group-border'] = sep.borderColor
+  return style
+}
+
+function groupNameStyle(sep) {
+  if (sep.nameColor) return { color: sep.nameColor }
+  return {}
+}
+
+function tabOrder(sound) {
+  return currentTab.value === 'All' ? sound.index : (sound.tabIndexes?.[currentTab.value] ?? 0)
+}
+
+/** Orphans + group sections for the current tab, positional membership. */
+const displaySections = computed(() => {
+  const sounds = JSONFile.value ?? []
+  const seps = (jsonStore.separators ?? [])
+    .filter((s) => s.tab === currentTab.value)
+    .slice()
+    .sort((a, b) => a.position - b.position)
+
+  if (seps.length === 0) {
+    return [{ kind: 'orphans', sounds }]
+  }
+
+  const orphans = []
+  const groups = seps.map((sep) => ({ kind: 'group', sep, sounds: [] }))
+
+  for (const sound of sounds) {
+    const order = tabOrder(sound)
+    let placed = false
+    for (let i = 0; i < seps.length; i++) {
+      const start = seps[i].position
+      const end = i + 1 < seps.length ? seps[i + 1].position : Number.POSITIVE_INFINITY
+      if (order >= start && order < end) {
+        groups[i].sounds.push(sound)
+        placed = true
+        break
+      }
+    }
+    if (!placed) orphans.push(sound)
+  }
+
+  return [{ kind: 'orphans', sounds: orphans }, ...groups]
+})
+
+const orphanSounds = computed(() => displaySections.value.find((s) => s.kind === 'orphans')?.sounds ?? [])
+const groupSections = computed(() => displaySections.value.filter((s) => s.kind === 'group'))
+
+const allDisplaySounds = computed(() => {
+  const out = []
+  for (const sec of displaySections.value) {
+    for (const s of sec.sounds) out.push(s)
+  }
+  return out
+})
+
+function reorderDisabled() {
+  return jsonStore.configFile?.settings?.allowReorder === false
+}
+
+function destroySortables() {
+  outerSortable?.destroy()
+  outerSortable = null
+  while (innerSortables.length) {
+    innerSortables.pop()?.destroy()
+  }
+}
+
+function revertDom(evt) {
+  const { oldIndex, item, from } = evt
+  if (oldIndex == null) return
+  from.removeChild(item)
+  from.insertBefore(item, from.children[oldIndex] ?? null)
+}
+
+function layoutFromDom() {
+  const orphans = [...(orphansRef.value?.querySelectorAll('[data-sound-path]') ?? [])]
+    .map((el) => el.getAttribute('data-sound-path'))
+    .filter(Boolean)
+  const groups = []
+  for (const card of groupsOuterRef.value?.children ?? []) {
+    const id = card.getAttribute('data-sep-id')
+    if (!id) continue
+    const body = card.querySelector('.sound-group__body')
+    const paths = [...(body?.querySelectorAll('[data-sound-path]') ?? [])]
+      .map((el) => el.getAttribute('data-sound-path'))
+      .filter(Boolean)
+    groups.push({ id, paths })
+  }
+  return { orphans, groups }
+}
+
+function onOuterEnd(evt) {
+  const { oldIndex, newIndex } = evt
+  if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+  revertDom(evt)
+  const ids = groupSections.value.map((s) => s.sep.id)
+  const arr = ids.slice()
+  const [moved] = arr.splice(oldIndex, 1)
+  arr.splice(newIndex, 0, moved)
+  jsonStore.moveGroupWithMembers(currentTab.value, arr)
+}
+
+function onInnerEnd(evt) {
+  const { oldIndex, newIndex, from, to } = evt
+  if (from === to && (oldIndex === newIndex || oldIndex == null || newIndex == null)) return
+  // Read target layout from DOM *before* revert (Sortable already moved the node).
+  const layout = layoutFromDom()
+  revertDom(evt)
+  jsonStore.applyBoardLayout(currentTab.value, layout)
+}
+
+function bindInnerSortable(el) {
+  if (!el) return
+  const s = Sortable.create(el, {
+    group: { name: 'sounds', pull: true, put: true },
+    animation: 180,
+    disabled: reorderDisabled(),
+    draggable: '.Soundbtn',
+    ghostClass: 'drag-over',
+    onEnd: onInnerEnd,
+  })
+  innerSortables.push(s)
+}
+
+function setupSortables() {
+  destroySortables()
+  if (!groupsOuterRef.value || !orphansRef.value) return
+
+  outerSortable = Sortable.create(groupsOuterRef.value, {
+    animation: 180,
+    disabled: reorderDisabled(),
+    draggable: '.sound-group',
+    handle: '.sound-group__name',
+    ghostClass: 'drag-over',
+    onEnd: onOuterEnd,
+  })
+
+  bindInnerSortable(orphansRef.value)
+  groupsOuterRef.value.querySelectorAll('.sound-group__body').forEach((el) => {
+    bindInnerSortable(el)
+  })
+}
+
+onMounted(() => {
+  nextTick(() => setupSortables())
+})
+
+onUnmounted(() => {
+  destroySortables()
+  gifObserver?.disconnect()
+  gifObserver = null
+})
+
 const gifPlayOnHover = computed(() => Settings.value?.gifPlayOnHover !== false)
 const visibleByPath = reactive({})
 const hoveredPath = ref(null)
@@ -195,10 +359,9 @@ function shouldAnimate(sound) {
 
 const animatingPaths = computed(() => {
   const paths = []
-  for (const item of displayItems.value) {
-    if (item.kind !== 'sound') continue
-    if (!shouldAnimate(item.sound)) continue
-    paths.push(item.sound.path)
+  for (const sound of allDisplaySounds.value) {
+    if (!shouldAnimate(sound)) continue
+    paths.push(sound.path)
     if (paths.length >= MAX_ANIM_GIFS) break
   }
   return new Set(paths)
@@ -215,13 +378,13 @@ function gifSrcFor(sound) {
 async function loadVisibleGifs() {
   const d = getDb()
   if (!d) return
-  for (const item of displayItems.value) {
-    if (item.kind !== 'sound' || !item.sound.gifId) continue
-    if (!visibleByPath[item.sound.path]) continue
-    if (gifUrls[item.sound.gifId]) continue
+  for (const sound of allDisplaySounds.value) {
+    if (!sound.gifId) continue
+    if (!visibleByPath[sound.path]) continue
+    if (gifUrls[sound.gifId]) continue
     try {
-      const urls = await ensureGifUrls(d, item.sound.gifId)
-      if (urls) gifUrls[item.sound.gifId] = urls
+      const urls = await ensureGifUrls(d, sound.gifId)
+      if (urls) gifUrls[sound.gifId] = urls
     } catch (e) {
       console.error('Failed to load GIF blob', e)
     }
@@ -230,7 +393,7 @@ async function loadVisibleGifs() {
 
 function setupGifObserver() {
   gifObserver?.disconnect()
-  const root = soundListRef.value?.closest('.SoundContainer__scroll') || null
+  const root = boardRef.value?.closest('.SoundContainer__scroll') || null
   gifObserver = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
@@ -244,17 +407,19 @@ function setupGifObserver() {
     { root, rootMargin: '80px', threshold: 0.01 },
   )
   nextTick(() => {
-    soundListRef.value?.querySelectorAll('.Soundbtn').forEach((el) => gifObserver.observe(el))
+    boardRef.value?.querySelectorAll('.Soundbtn').forEach((el) => gifObserver.observe(el))
   })
 }
 
-// P8: enable/disable drag reordering based on the per-project setting.
 watch(
   () => Settings.value?.allowReorder,
-  (v) => sortable?.option('disabled', v === false),
+  (v) => {
+    const disabled = v === false
+    outerSortable?.option('disabled', disabled)
+    for (const s of innerSortables) s.option('disabled', disabled)
+  },
 )
 
-// P8: measure the tallest button and enforce a uniform height when enabled.
 function updateUniformHeight() {
   if (!Settings.value?.uniformButtonHeight) {
     uniformHeight.value = 0
@@ -262,7 +427,7 @@ function updateUniformHeight() {
   }
   uniformHeight.value = 0
   nextTick(() => {
-    const el = soundListRef.value
+    const el = boardRef.value
     if (!el) return
     let max = 0
     el.querySelectorAll('.Soundbtn').forEach((b) => {
@@ -272,34 +437,23 @@ function updateUniformHeight() {
   })
 }
 
-// P7: available tab names for the "move to tab" bulk action.
 const tabOptions = computed(() => (jsonStore.configFile?.tabList ?? []).map((t) => t.name).filter(Boolean))
 
-// ---- Separators ----
-// Per-tab order key for a sound (global index in "All", per-tab index elsewhere).
-function tabOrder(sound) {
-  return currentTab.value === 'All' ? sound.index : (sound.tabIndexes?.[currentTab.value] ?? 0)
-}
-
-function orderOf(item) {
-  return item.kind === 'sep' ? item.sep.position : tabOrder(item.sound)
-}
-
-// Sounds + separators for the current tab, interleaved by their order key.
-const displayItems = computed(() => {
-  const sounds = JSONFile.value ?? []
-  const seps = (jsonStore.separators ?? []).filter((s) => s.tab === currentTab.value)
-  const items = [
-    ...sounds.map((sound) => ({ kind: 'sound', sound, domKey: 's:' + sound.path })),
-    ...seps.map((sep) => ({ kind: 'sep', sep, domKey: 'sep:' + sep.id })),
-  ]
-  items.sort((a, b) => orderOf(a) - orderOf(b))
-  return items
+const boardSignature = computed(() => {
+  const parts = []
+  for (const sec of displaySections.value) {
+    if (sec.kind === 'orphans') {
+      parts.push('o:' + sec.sounds.map((s) => s.path).join(','))
+    } else {
+      parts.push('g:' + sec.sep.id + ':' + sec.sounds.map((s) => s.path).join(','))
+    }
+  }
+  return parts.join('|')
 })
 
 watch(
   [
-    () => displayItems.value.map((i) => i.domKey).join('|'),
+    boardSignature,
     () => jsonStore.configFile.files.map((f) => f.gifId || '').join('|'),
   ],
   () => {
@@ -308,15 +462,17 @@ watch(
       const urls = peekGifUrls(f.gifId)
       if (urls) gifUrls[f.gifId] = urls
     }
-    setupGifObserver()
-    loadVisibleGifs()
+    nextTick(() => {
+      setupSortables()
+      setupGifObserver()
+      loadVisibleGifs()
+    })
   },
   { flush: 'post' },
 )
 
-// P8: re-measure uniform button height when the setting or the item list changes.
 watch(
-  [() => Settings.value?.uniformButtonHeight, () => displayItems.value.length],
+  [() => Settings.value?.uniformButtonHeight, () => allDisplaySounds.value.length],
   () => updateUniformHeight(),
   { flush: 'post' },
 )
@@ -331,7 +487,6 @@ function openSeparatorMenu(event, sep) {
   })
 }
 
-// ---- Styling helper ----
 function getBtnStyle(sound) {
   const style = {}
   const info = playingSounds.get(sound.index)
@@ -348,7 +503,6 @@ function getBtnStyle(sound) {
   return style
 }
 
-// ---- Context menu ----
 function openSoundMenu(event, sound) {
   const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
   appStore.openContextMenu({
@@ -360,8 +514,6 @@ function openSoundMenu(event, sound) {
   })
 }
 
-// ---- Progress bar state ----
-// Map<soundFileIndex, { duration, startTime, percent, paused, elapsedMs }>
 const playingSounds = reactive(new Map())
 let rafId = null
 
@@ -421,7 +573,6 @@ function stopAllProgress() {
   }
 }
 
-/** Freeze / unfreeze button progress when backend pause/resume/seek/loop changes. */
 function syncProgressPauseState(list) {
   const files = jsonStore.configFile?.files || []
   const byPath = new Map((list || []).map((p) => [p.path, p]))
@@ -460,7 +611,6 @@ function syncProgressPauseState(list) {
   }
 }
 
-// ---- Tauri event listeners ----
 let unlistenFinished = null
 let unlistenPlaying = null
 
@@ -474,7 +624,6 @@ onMounted(async () => {
       stopProgress(fileIndex)
       jsonStore.setActiveSound({ soundindex: idx, status: false })
     } else {
-      // Fallback: path not matched, clear all active state
       stopAllProgress()
       jsonStore.ReturnStatusAll()
     }
@@ -490,11 +639,6 @@ onUnmounted(() => {
   if (unlistenPlaying) unlistenPlaying()
 })
 
-// ---- Drag & drop ----
-// (Handled per-button in SoundButton.vue)
-
-// ---- Sound playback ----
-// P7: in multi-select mode a click toggles selection instead of playing.
 function onSoundClick(sound) {
   if (appStore.multiSelectActive) {
     appStore.toggleSoundSelection(sound.path)
@@ -503,7 +647,6 @@ function onSoundClick(sound) {
   setActiveSound(sound)
 }
 
-// ---- P7 bulk actions ----
 function onBulkOverride(override) {
   bulkOverride.value = override
   const paths = appStore.selectedSoundPaths
@@ -537,7 +680,6 @@ async function setActiveSound(sound) {
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: true })
 
     loadingPaths.add(sound.path)
-    // Start audio immediately — do not wait on duration probe (slow on long files).
     invoke('play_sound', {
       soundPath: sound.path,
       deviceName: appSettings.outputSource,

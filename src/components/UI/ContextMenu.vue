@@ -8,7 +8,13 @@
       @click.stop
     >
       <ul class="context-menu__list">
-        <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item" @click="openRename" @mouseenter="hoveredItem = 'rename'" @mouseleave="hoveredItem = null">
+        <li
+          v-if="appStore.contextMenu.type !== 'separator'"
+          class="context-menu__item"
+          @click="openRename"
+          @mouseenter="hoveredItem = 'rename'"
+          @mouseleave="hoveredItem = null"
+        >
           <span class="context-menu__icon">
             <Icons icon="rename" custom-class="context-menu__icon-svg" />
           </span>
@@ -17,13 +23,32 @@
             <span v-if="hoveredItem === 'rename'" class="context-menu__desc">{{ $t('contextMenu.renameDesc') }}</span>
           </Transition>
         </li>
+        <li
+          v-if="appStore.contextMenu.type === 'separator'"
+          class="context-menu__item"
+          @click="openRenameGroup"
+          @mouseenter="hoveredItem = 'renameGroup'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="rename" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.renameGroup') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'renameGroup'" class="context-menu__desc">{{ $t('contextMenu.renameGroupDesc') }}</span>
+          </Transition>
+        </li>
         <li class="context-menu__item context-menu__item--danger" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
           <span class="context-menu__icon">
             <Icons icon="delete" custom-class="context-menu__icon-svg" />
           </span>
-          <span class="context-menu__label">{{ $t('contextMenu.remove') }}</span>
+          <span class="context-menu__label">{{
+            appStore.contextMenu.type === 'separator' ? $t('contextMenu.removeGroup') : $t('contextMenu.remove')
+          }}</span>
           <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'remove'" class="context-menu__desc">{{ $t('contextMenu.removeDesc') }}</span>
+            <span v-if="hoveredItem === 'remove'" class="context-menu__desc">{{
+              appStore.contextMenu.type === 'separator' ? $t('contextMenu.removeGroupDesc') : $t('contextMenu.removeDesc')
+            }}</span>
           </Transition>
         </li>
         <li
@@ -56,18 +81,105 @@
         <li
           v-if="appStore.contextMenu.type === 'sound'"
           class="context-menu__item"
-          @click="addSeparator"
-          @mouseenter="hoveredItem = 'separator'"
+          @click="addGroup"
+          @mouseenter="hoveredItem = 'group'"
           @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="page-separator" custom-class="context-menu__icon-svg" />
           </span>
-          <span class="context-menu__label">{{ $t('contextMenu.addSeparator') }}</span>
+          <span class="context-menu__label">{{ $t('contextMenu.addGroup') }}</span>
           <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'separator'" class="context-menu__desc">{{ $t('contextMenu.addSeparatorDesc') }}</span>
+            <span v-if="hoveredItem === 'group'" class="context-menu__desc">{{ $t('contextMenu.addGroupDesc') }}</span>
           </Transition>
         </li>
+
+        <!-- Tab button alignment -->
+        <li
+          v-if="appStore.contextMenu.type === 'tab'"
+          class="context-menu__item"
+          @click="toggleTabAlign"
+          @mouseenter="hoveredItem = 'tabAlign'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="tab" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.tabButtonAlign') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'tabAlign'" class="context-menu__desc">{{ $t('contextMenu.tabButtonAlignDesc') }}</span>
+          </Transition>
+          <span class="context-menu__chevron">{{ tabAlignOpen ? '▲' : '▼' }}</span>
+        </li>
+        <template v-if="tabAlignOpen && appStore.contextMenu.type === 'tab'">
+          <li
+            v-for="opt in alignOptions"
+            :key="'tab-' + opt.value"
+            class="context-menu__item context-menu__tab-row"
+            @click.stop="setTabAlign(opt.value)"
+          >
+            <span class="context-menu__check">{{ currentTabAlign === opt.value ? '☑' : '☐' }}</span>
+            {{ opt.label }}
+          </li>
+        </template>
+
+        <!-- Group alignment + colors -->
+        <li
+          v-if="appStore.contextMenu.type === 'separator'"
+          class="context-menu__item"
+          @click="toggleGroupAlign"
+          @mouseenter="hoveredItem = 'groupAlign'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="tab" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.groupAlign') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'groupAlign'" class="context-menu__desc">{{ $t('contextMenu.groupAlignDesc') }}</span>
+          </Transition>
+          <span class="context-menu__chevron">{{ groupAlignOpen ? '▲' : '▼' }}</span>
+        </li>
+        <template v-if="groupAlignOpen && appStore.contextMenu.type === 'separator'">
+          <li
+            v-for="opt in groupAlignOptions"
+            :key="'g-' + String(opt.value)"
+            class="context-menu__item context-menu__tab-row"
+            @click.stop="setGroupAlign(opt.value)"
+          >
+            <span class="context-menu__check">{{ currentGroupAlign === opt.value ? '☑' : '☐' }}</span>
+            {{ opt.label }}
+          </li>
+        </template>
+
+        <li
+          v-if="appStore.contextMenu.type === 'separator'"
+          class="context-menu__item context-menu__item--color"
+          @click="toggleGroupColors"
+          @mouseenter="hoveredItem = 'groupColors'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__swatch" :style="{ background: activeGroup?.borderColor || 'var(--primary_color)' }" />
+          <span class="context-menu__label">{{ $t('contextMenu.groupColors') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'groupColors'" class="context-menu__desc">{{ $t('contextMenu.groupColorsDesc') }}</span>
+          </Transition>
+          <span class="context-menu__chevron">{{ groupColorsOpen ? '▲' : '▼' }}</span>
+        </li>
+        <li v-if="groupColorsOpen && appStore.contextMenu.type === 'separator'" class="context-menu__color-panel" @click.stop>
+          <label class="context-menu__color-row">
+            <span>{{ $t('contextMenu.groupBorderColor') }}</span>
+            <input type="color" :value="activeGroup?.borderColor || '#888888'" @input="onGroupBorderColor" />
+          </label>
+          <label class="context-menu__color-row">
+            <span>{{ $t('contextMenu.groupNameColor') }}</span>
+            <input type="color" :value="activeGroup?.nameColor || '#ffffff'" @input="onGroupNameColor" />
+          </label>
+          <button type="button" class="context-menu__reset-colors" @click="resetGroupColors">
+            {{ $t('contextMenu.resetColor') }}
+          </button>
+        </li>
+
         <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item context-menu__item--color" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
           <span
             class="context-menu__swatch"
@@ -128,6 +240,9 @@ const jsonStore = useJsonHandelingStore()
 
 const colorPickerOpen = ref(false)
 const moveToTabOpen = ref(false)
+const tabAlignOpen = ref(false)
+const groupAlignOpen = ref(false)
+const groupColorsOpen = ref(false)
 const hoveredItem = ref(null)
 const menuEl = ref(null)
 const menuSize = ref({ w: 220, h: 180 })
@@ -138,16 +253,74 @@ const soundTabs = computed(() => {
   return jsonStore.configFile.files[targetIndex]?.tabs ?? []
 })
 
+const activeGroup = computed(() => {
+  if (appStore.contextMenu.type !== 'separator') return null
+  return (jsonStore.configFile.separators ?? []).find((s) => s.id === appStore.contextMenu.targetName) ?? null
+})
+
+const alignOptions = computed(() => [
+  { value: 'left', label: $t('contextMenu.alignLeft') },
+  { value: 'center', label: $t('contextMenu.alignCenter') },
+  { value: 'right', label: $t('contextMenu.alignRight') },
+])
+
+const groupAlignOptions = computed(() => [
+  { value: undefined, label: $t('contextMenu.alignInherit') },
+  ...alignOptions.value,
+])
+
+const currentTabAlign = computed(() => {
+  const tab = jsonStore.configFile.tabList.find((t) => t.name === appStore.contextMenu.targetName)
+  return tab?.buttonAlign ?? 'left'
+})
+
+const currentGroupAlign = computed(() => activeGroup.value?.buttonAlign)
+
 function toggleMoveToTab() {
   moveToTabOpen.value = !moveToTabOpen.value
 }
 
-function addSeparator() {
+function toggleTabAlign() {
+  tabAlignOpen.value = !tabAlignOpen.value
+}
+
+function toggleGroupAlign() {
+  groupAlignOpen.value = !groupAlignOpen.value
+}
+
+function toggleGroupColors() {
+  groupColorsOpen.value = !groupColorsOpen.value
+}
+
+function setTabAlign(align) {
+  jsonStore.setTabButtonAlign(appStore.contextMenu.targetName, align)
+}
+
+function setGroupAlign(align) {
+  const id = appStore.contextMenu.targetName
+  jsonStore.updateSeparator(id, { buttonAlign: align })
+}
+
+function onGroupBorderColor(e) {
+  const id = appStore.contextMenu.targetName
+  jsonStore.updateSeparator(id, { borderColor: e.target.value })
+}
+
+function onGroupNameColor(e) {
+  const id = appStore.contextMenu.targetName
+  jsonStore.updateSeparator(id, { nameColor: e.target.value })
+}
+
+function resetGroupColors() {
+  const id = appStore.contextMenu.targetName
+  jsonStore.updateSeparator(id, { borderColor: undefined, nameColor: undefined })
+}
+
+function addGroup() {
   const { targetIndex } = appStore.contextMenu
   const sound = jsonStore.configFile.files[targetIndex]
   appStore.closeContextMenu()
-  colorPickerOpen.value = false
-  moveToTabOpen.value = false
+  resetPanels()
   if (!sound) return
   const tab = appStore.currentTab
   const order = tab === 'All' ? (sound.index ?? 0) : (sound.tabIndexes?.[tab] ?? 0)
@@ -183,6 +356,9 @@ watch(
     appStore.contextMenu.y,
     colorPickerOpen.value,
     moveToTabOpen.value,
+    tabAlignOpen.value,
+    groupAlignOpen.value,
+    groupColorsOpen.value,
   ],
   ([visible]) => {
     if (visible) measureMenu()
@@ -216,7 +392,6 @@ const rawColor = computed(() => {
 const currentOverride = computed(() => parseOverride(rawColor.value))
 
 const baseColors = computed(() => {
-  // Recompute when menu target / visibility / stored color / theme changes.
   void appStore.contextMenu.visible
   void appStore.contextMenu.type
   void appStore.contextMenu.targetName
@@ -263,10 +438,9 @@ function onOverrideChange(override) {
 }
 
 function openRename() {
-  const { type, targetName, targetIndex } = appStore.contextMenu
+  const { type } = appStore.contextMenu
   appStore.closeContextMenu()
-  colorPickerOpen.value = false
-  moveToTabOpen.value = false
+  resetPanels()
   if (type === 'tab') {
     appStore.setPopupActive({ active: true, type: 'renameTab' })
   } else if (type === 'sound') {
@@ -274,11 +448,17 @@ function openRename() {
   }
 }
 
+function openRenameGroup() {
+  // targetName stays as group id (closeContextMenu only hides the menu).
+  appStore.closeContextMenu()
+  resetPanels()
+  appStore.setPopupActive({ active: true, type: 'renameGroup' })
+}
+
 function remove() {
   const { type, targetName, targetIndex } = appStore.contextMenu
   appStore.closeContextMenu()
-  colorPickerOpen.value = false
-  moveToTabOpen.value = false
+  resetPanels()
   if (type === 'tab') {
     jsonStore.removeTab(targetName)
     if (appStore.currentTab === targetName) {
@@ -291,10 +471,17 @@ function remove() {
   }
 }
 
-function close() {
-  appStore.closeContextMenu()
+function resetPanels() {
   colorPickerOpen.value = false
   moveToTabOpen.value = false
+  tabAlignOpen.value = false
+  groupAlignOpen.value = false
+  groupColorsOpen.value = false
+}
+
+function close() {
+  appStore.closeContextMenu()
+  resetPanels()
 }
 
 function openGifPicker() {

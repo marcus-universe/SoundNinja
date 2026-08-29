@@ -141,9 +141,63 @@
     .SoundTab {
       min-height: 10rem;
 
-      // Full-width horizontal separator between sound buttons. Forces a line
-      // break in the flex-wrap row so following buttons start on a new line.
-      .tab-separator {
+      // Group card (legacy `.tab-separator` kept as alias class).
+      .sound-group,
+      .tab-separator.sound-group {
+        flex: 0 0 100%;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0.4rem 0;
+        padding: 0.6rem 0.8rem 0.8rem;
+        border: 0.32rem solid var(--group-border, var(--btn-border, var(--primary_color)));
+        border-radius: 0.6rem;
+        background: transparent;
+        cursor: grab;
+
+        &:hover {
+          filter: brightness(1.05);
+        }
+
+        &.drag-over {
+          outline: 0.24rem dashed var(--group-border, var(--primary_color));
+          outline-offset: 0.15rem;
+        }
+      }
+
+      .sound-group__name {
+        font-family: var(--font-btn, #{$fontBold});
+        font-size: var(--font-size-sm, 1.2rem);
+        color: var(--sound-text, #{$white});
+        opacity: 0.85;
+        margin-bottom: 0.5rem;
+        user-select: none;
+        cursor: grab;
+      }
+
+      .sound-group__body,
+      .sound-orphans {
+        width: 100%;
+        min-height: 2.4rem;
+      }
+
+      .sound-align--left {
+        justify-content: flex-start;
+      }
+
+      .sound-align--center {
+        justify-content: center;
+      }
+
+      .sound-align--right {
+        justify-content: flex-end;
+      }
+
+      .sound-groups-outer {
+        width: 100%;
+      }
+
+      // Legacy bare separator line (no longer used for new groups).
+      .tab-separator:not(.sound-group) {
         flex: 0 0 100%;
         width: 100%;
         height: 0;

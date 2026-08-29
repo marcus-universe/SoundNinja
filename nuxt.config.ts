@@ -72,6 +72,24 @@ export default defineNuxtConfig({
       strictPort: true,
     },
     envPrefix: ['VITE_', 'TAURI_'],
+    optimizeDeps: {
+      // Pre-bundle Tauri + Sortable so first load does not restart the esbuild service.
+      include: [
+        '@tauri-apps/api/app',
+        '@tauri-apps/api/core',
+        '@tauri-apps/api/event',
+        '@tauri-apps/api/webviewWindow',
+        '@tauri-apps/api/window',
+        '@tauri-apps/plugin-dialog',
+        '@tauri-apps/plugin-fs',
+        '@tauri-apps/plugin-opener',
+        '@tauri-apps/plugin-os',
+        '@tauri-apps/plugin-process',
+        '@tauri-apps/plugin-sql',
+        '@tauri-apps/plugin-updater',
+        'sortablejs',
+      ],
+    },
     build: {
       sourcemap: false,
       rollupOptions: {

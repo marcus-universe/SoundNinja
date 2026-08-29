@@ -14,14 +14,22 @@ const dialogTitle = computed(() => {
   switch (appStore.PopupActive.type) {
     case 'renameTab': return t('rename.renameTab')
     case 'renameSound': return t('rename.renameSound')
+    case 'renameGroup': return t('rename.renameGroup')
     default: return t('rename.addTab')
   }
 })
+
+const jsonStore = useJsonHandelingStore()
 
 // Pre-fill with current name when renaming
 watch(() => appStore.PopupActive, ({ active, type }) => {
   if (active && (type === 'renameTab' || type === 'renameSound')) {
     typedName.value = appStore.contextMenu.targetName
+  } else if (active && type === 'renameGroup') {
+    const sep = (jsonStore.configFile.separators ?? []).find(
+      (s) => s.id === appStore.contextMenu.targetName,
+    )
+    typedName.value = sep?.name ?? ''
   } else {
     typedName.value = ''
   }
