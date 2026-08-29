@@ -11,18 +11,20 @@
   overflow-y: auto;
   padding: calc(var(--topbar_height) + #{$padding_1}) 2rem 2rem;
   backdrop-filter: blur(0.4rem);
-  background: rgba($color-bg, 0.5);
+  background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
 }
 
 .dialog-panel {
   position: relative;
   z-index: 11;
-  background-color: $color-bg;
+  background-color: var(--color-bg, #{$color-bg});
   margin-top: 0;
   border: 0.32rem solid var(--primary_color);
   border-radius: 1.2rem;
   padding: calc($padding_1 * 1.5);
-  width: min(68rem, calc(100dvw - 4rem));
+  width: fit-content;
+  min-width: min(28rem, calc(100dvw - 4rem));
+  max-width: min(68rem, calc(100dvw - 4rem));
 //   max-height: calc(100dvh - var(--topbar_height));
   overflow: hidden;
   box-sizing: border-box;
@@ -33,12 +35,28 @@
 .dialog-header {
   align-items: center;
   flex-shrink: 0;
+  gap: 0.8rem;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dialog-title {
   margin: 0;
-  color: $white;
+  padding: 0;
+  color: var(--color-text, #{$white});
   font-family: $fontBold;
+  font-size: var(--font-size-md, 1.6rem);
+  font-weight: normal;
+  line-height: 1.3;
+  background: transparent;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+
+  &::selection {
+    background: transparent;
+    color: inherit;
+  }
 }
 
 .dialog-error {
@@ -86,6 +104,58 @@
   margin-top: $padding_1;
 }
 
+.import-chooser-actions {
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  // Room for hover scale so dialog-content never needs a scrollbar.
+  padding: 1.1rem;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.import-chooser-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  width: 11.5rem;
+  height: 11.5rem;
+  flex: 0 0 11.5rem;
+  aspect-ratio: 1 / 1;
+  padding: calc($padding_1 * 1.5);
+  border-radius: 1rem;
+  border: 0.32rem solid var(--primary_color);
+  background: transparent;
+  color: var(--primary_color);
+  font-family: $fontBold;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.18s ease;
+  box-sizing: border-box;
+  transform-origin: center center;
+
+  &:hover {
+    background: rgba($white, 0.1);
+    transform: scale(1.12);
+  }
+
+  &__icon {
+    fill: var(--primary_color);
+    width: 3.6rem;
+    height: 3.6rem;
+    min-width: 3.6rem;
+    min-height: 3.6rem;
+    pointer-events: none;
+  }
+
+  &__label {
+    text-align: center;
+    line-height: 1.2;
+  }
+}
+
 .dialog-close {
   fill: var(--primary_color);
   width: 1.9rem;
@@ -98,9 +168,112 @@
   transition: color 0.15s, background 0.15s, transform 0.15s;
 
   &:hover {
-    fill: $white;
-    background: rgba(255, 255, 255, 0.08);
+    fill: var(--color-bg, #{$color-bg});
+    background: var(--primary_color);
     transform: scale(1.06);
     cursor: pointer;
   }
+}
+
+.dialog-panel:has(.gif-picker__toolbar),
+.dialog-panel:has(.gif-picker__preview) {
+  width: min(56rem, calc(100dvw - 4rem));
+  min-width: min(36rem, calc(100dvw - 4rem));
+}
+
+.gif-picker__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.gif-picker__search {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+}
+
+.gif-picker__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.gif-picker__info-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.gif-picker__hint {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 70%, transparent);
+  font-size: var(--font-size-sm, 1.3rem);
+}
+
+.gif-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.8rem, 1fr));
+  gap: 0.5rem;
+  max-height: min(42vh, 36rem);
+  overflow-y: auto;
+  margin-top: 0.4rem;
+}
+
+.gif-picker__cell {
+  all: unset;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  cursor: pointer;
+  border: 0.16rem solid transparent;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--primary_color);
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.gif-picker__attr {
+  all: unset;
+  display: inline-block;
+  margin-top: 0.6rem;
+  color: var(--primary_color);
+  font-size: var(--font-size-sm, 1.3rem);
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.gif-picker__preview {
+  width: var(--btn_width, 17.6rem);
+  height: 7.2rem;
+  border-radius: var(--border-radius, 0.8rem);
+  border: var(--btn-border-width, 0.32rem) solid var(--btn-border, var(--primary_color));
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  align-self: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.gif-picker__preview-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }

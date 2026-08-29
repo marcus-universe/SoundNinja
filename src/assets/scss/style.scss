@@ -2,8 +2,8 @@
 
 .main {
   box-sizing: border-box;
-  width: calc(100% - var(--icon_size) - $padding_1 - $padding_1 - $padding_1);
-  height: calc(100dvh - var(--topbar_height));
+  width: calc(100% - var(--navbar-offset));
+  height: calc(100vh - var(--topbar_height));
   background-color: var(--color-bg, #{$color-bg});
   margin-top: var(--topbar_height);
   padding-top: $padding_1;
@@ -11,13 +11,21 @@
 
   // Shift the main content away from whichever side the navbar sits on.
   // Default is left; .navbar-right on <html> flips it (see rule below).
-  margin-left: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+  margin-left: var(--navbar-offset);
   margin-right: 0;
 
-  // Only animate the navbar-side margin shift — height/width changes from window
-  // resizing must be snappy (no transition), otherwise the bottom edge animates in.
-  transition: margin 0.2s ease;
+  // Only animate horizontal navbar offset — never margin-top/height (avoids
+  // window-open focus jitter when the viewport briefly shifts).
+  transition: margin-left 0.2s ease, margin-right 0.2s ease;
   overflow: hidden;
+
+  // Gap between tabs and soundboard. Collapses when multi-select bar
+  // hangs flush under tabs (scroll padding restores button spacing).
+  gap: 1rem;
+
+  &--bulk {
+    gap: 0;
+  }
 
   .TabContainer {
     flex-shrink: 0;
@@ -44,28 +52,29 @@
       flex-shrink: 0;
       font-family: var(--font-tab, #{$fontBold});
       font-size: var(--font-size-tab, var(--font-size-sm));
-      color: var(--sound-text);
-      // Unselected tabs show their accent as a subtle 20% tint (not a dimmed
-      // whole element) so the label stays readable.
-      background-color: color-mix(in srgb, var(--tab-accent, var(--primary_color)) 20%, transparent);
+      color: var(--tab-text, var(--sound-text));
+      background-color: var(--tab-bg, color-mix(in srgb, var(--primary_color) 20%, transparent));
+      border: var(--tab-border-width, 0.3rem) solid var(--tab-border, transparent);
+      border-bottom: none;
       min-width: var(--tab_width);
       text-align: center;
       margin: 0 0.32rem 0 0.32rem;
       padding: $padding_2;
       filter: brightness(1);
-      border: none;
       border-radius: 0.8rem 0.8rem 0 0;
-      transition: background-color 0.1s ease, color 0.1s ease, border 0.1s ease, opacity 0.3s ease;
+      transition: background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease, opacity 0.3s ease;
 
       &:hover {
         cursor: pointer;
-        background-color: color-mix(in srgb, var(--tab-accent, var(--primary_color)) 40%, transparent);
+        background-color: var(--tab-bg-hover, color-mix(in srgb, var(--primary_color) 40%, transparent));
+        color: var(--tab-text-hover, var(--tab-text, var(--sound-text)));
+        border-color: var(--tab-border-hover, var(--tab-border, transparent));
       }
 
       &.active {
-        // Selected tab uses the solid accent with an auto-contrasted text color.
-        background-color: var(--tab-accent, var(--primary_color));
-        color: var(--tab-text-active, var(--sound-text));
+        background-color: var(--tab-border, var(--primary_color));
+        color: var(--tab-text-active, var(--tab-text, var(--sound-text)));
+        border-color: var(--tab-border, var(--primary_color));
       }
 
       &.drag-over {
@@ -78,11 +87,13 @@
     .addTab {
       fill: var(--primary_color);
       width: calc(var(--icon_size) - 1.6rem);
-      transition: fill 0.2s ease, transform 0.2s ease;
+      border-radius: 0.48rem;
+      transition: fill 0.2s ease, transform 0.2s ease, background 0.2s ease;
 
       &:hover {
         cursor: pointer;
-        fill: $white;
+        fill: var(--color-bg, #{$color-bg});
+        background: var(--primary_color);
         transform: scale(1.1);
       }
     }
@@ -100,6 +111,7 @@
   }
 
   .SoundContainer {
+    position: relative;
     flex: 1;
     min-height: 0;
     display: flex;
@@ -111,20 +123,86 @@
       min-height: 0;
       overflow-y: auto;
       scroll-behavior: smooth;
-      padding-bottom: calc(#{$padding_1} * 3);
+      // Room for floating player chip above the bottom edge.
+      padding-bottom: 5rem;
+    }
+
+    // Parent is `.main .SoundContainer` — use `> .SoundContainer__scroll`
+    // so the selector stays valid (avoid `&--x &__scroll` double-& bug).
+    &--player-large > .SoundContainer__scroll {
+      padding-bottom: 7.5rem;
+    }
+
+    // Multi-select bar clearance — keep sound buttons clear of hanging chip.
+    &--bulk > .SoundContainer__scroll {
+      padding-top: calc(5.2rem + 1.4rem);
     }
 
     .SoundTab {
       min-height: 10rem;
 
-      // Full-width horizontal separator between sound buttons. Forces a line
-      // break in the flex-wrap row so following buttons start on a new line.
-      .tab-separator {
+      // Group card (legacy `.tab-separator` kept as alias class).
+      .sound-group,
+      .tab-separator.sound-group {
+        flex: 0 0 100%;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0.4rem 0;
+        padding: 0.6rem 0.8rem 0.8rem;
+        border: 0.32rem solid var(--group-border, var(--btn-border, var(--primary_color)));
+        border-radius: 0.6rem;
+        background: transparent;
+        cursor: grab;
+
+        &:hover {
+          filter: brightness(1.05);
+        }
+
+        &.drag-over {
+          outline: 0.24rem dashed var(--group-border, var(--primary_color));
+          outline-offset: 0.15rem;
+        }
+      }
+
+      .sound-group__name {
+        font-family: var(--font-btn, #{$fontBold});
+        font-size: var(--font-size-sm, 1.2rem);
+        color: var(--sound-text, #{$white});
+        opacity: 0.85;
+        margin-bottom: 0.5rem;
+        user-select: none;
+        cursor: grab;
+      }
+
+      .sound-group__body,
+      .sound-orphans {
+        width: 100%;
+        min-height: 2.4rem;
+      }
+
+      .sound-align--left {
+        justify-content: flex-start;
+      }
+
+      .sound-align--center {
+        justify-content: center;
+      }
+
+      .sound-align--right {
+        justify-content: flex-end;
+      }
+
+      .sound-groups-outer {
+        width: 100%;
+      }
+
+      // Legacy bare separator line (no longer used for new groups).
+      .tab-separator:not(.sound-group) {
         flex: 0 0 100%;
         width: 100%;
         height: 0;
         margin: 0.4rem 0;
-        border-top: 0.24rem solid var(--btn-accent, var(--primary_color));
+        border-top: 0.24rem solid var(--btn-border, var(--primary_color));
         border-radius: 0.2rem;
         opacity: 0.6;
         cursor: grab;
@@ -144,8 +222,7 @@
         font-size: var(--font-size-btn, var(--font-size-md));
         color: var(--sound-text, #{$white});
         background-color: var(--color-btn, #{$color-btn});
-        // Accent color (set by the color picker) drives the border
-        border: var(--btn-border-width, 0.32rem) solid var(--btn-accent, var(--primary_color));
+        border: var(--btn-border-width, 0.32rem) solid var(--btn-border, var(--primary_color));
         padding: var(--btn_padding, #{$padding_1});
         border-radius: var(--border-radius, 0.8rem);
         max-width: var(--btn_width);
@@ -160,6 +237,17 @@
         overflow: hidden;
         transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 
+        .sound-gif {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: 50% 50%;
+          z-index: 0;
+          pointer-events: none;
+        }
+
         // Progress fill bar — width is driven by --sound-progress (set via inline
         // style from the Vue component using requestAnimationFrame).
         &::before {
@@ -169,24 +257,49 @@
           left: 0;
           bottom: 0;
           width: var(--sound-progress, 0%);
-          background-color: var(--btn-accent, var(--primary_color));
+          background-color: var(--btn-border, var(--primary_color));
           opacity: 0.3;
-          z-index: 0;
+          z-index: 2;
           pointer-events: none;
           // No CSS transition here — rAF handles frame-by-frame smoothness.
         }
 
         .sound-label {
           position: relative;
-          z-index: 1;
+          z-index: 3;
           pointer-events: none;
+        }
+
+        &.has-gif {
+          background-color: transparent;
+
+          &::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-color: var(--color-btn, #{$color-btn});
+            opacity: var(--gif-overlay, 0.72);
+            z-index: 1;
+            pointer-events: none;
+            transition: background-color 0.2s ease, opacity 0.2s ease;
+          }
+
+          &:hover,
+          &.active {
+            background-color: transparent;
+          }
+
+          &:hover::after {
+            background-color: var(--btn-bg-hover, #{$color-btn-hover});
+            opacity: var(--gif-overlay-hover, 0.38);
+          }
         }
 
         &:hover {
           cursor: pointer;
-          background-color: $color-btn-hover;
-          // Hover text uses the same accent color as the border
-          color: var(--btn-accent, var(--primary_color));
+          background-color: var(--btn-bg-hover, #{$color-btn-hover});
+          color: var(--btn-text-hover, var(--btn-border, var(--primary_color)));
+          border-color: var(--btn-border-hover, var(--btn-border, var(--primary_color)));
           outline: none;
         }
 
@@ -198,13 +311,13 @@
           // Slightly bolder border + soft glow make the active state clearly visible
           // even before the progress bar starts filling.
           border-width: var(--btn-border-width, 0.32rem);
-          box-shadow: 0 0 0.8rem var(--btn-accent, var(--primary_color));
+          box-shadow: 0 0 0.8rem var(--btn-border, var(--primary_color));
           // Suppress background transition so rAF progress updates are instant.
           transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         &.drag-over {
-          outline: 0.32rem dashed var(--btn-accent, var(--primary_color));
+          outline: 0.32rem dashed var(--btn-border, var(--primary_color));
           outline-offset: 0.2rem;
           background-color: rgba(255, 255, 255, 0.06);
         }
@@ -221,6 +334,12 @@
           opacity: 0.75;
         }
 
+        &.has-gif,
+        &.has-gif:hover,
+        &.has-gif.active {
+          background-color: transparent;
+        }
+
         .sound-spinner {
           position: absolute;
           top: 0.4rem;
@@ -228,10 +347,9 @@
           width: 1.2rem;
           height: 1.2rem;
           border: 0.24rem solid rgba(255, 255, 255, 0.3);
-          border-top-color: var(--btn-accent, var(--primary_color));
+          border-top-color: var(--btn-border, var(--primary_color));
           border-radius: 50%;
-          z-index: 2;
-          animation: sound-spin 0.7s linear infinite;
+          z-index: 4;
           pointer-events: none;
         }
       }
@@ -245,77 +363,142 @@
   }
 }
 
-// P7: bulk-edit action bar (shown while multi-select is active).
+// P7: multi-select chip — hangs under tabs (settings-sized controls).
 .bulk-bar {
-  width: fit-content;
-  max-width: 100%;
-  margin: $padding_2 auto $padding_2;
-  flex-shrink: 0;
-  padding: $padding_2;
-  background-color: var(--color-btn, #{$color-btn});
-  border: 0.24rem solid var(--primary_color);
-  border-radius: 0.8rem;
-  box-shadow: 0 -0.4rem 1.2rem rgba(0, 0, 0, 0.35);
+  --bulk-control-h: calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2);
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  z-index: 45;
+  width: max-content;
+  max-width: calc(100% - 1.2rem);
+  margin: 0;
+  padding: 0.7rem 1.2rem;
+  background-color: var(--color-bg-2, var(--color-bg, #{$color-bg}));
+  border: 0.16rem solid color-mix(in srgb, var(--primary_color) 55%, transparent);
+  border-top: none;
+  border-radius: 0 0 0.9rem 0.9rem;
+  box-shadow: 0 0.3rem 1rem color-mix(in srgb, var(--color-bg, #000) 45%, transparent);
+  backdrop-filter: blur(6px);
   flex-wrap: wrap;
-  font-size: var(--font-size-menu);
-  font-family: $fontBold;
-  color: $white;
+  gap: 0.8rem;
+  font-size: 1.44rem;
+  font-family: $fontSemiBold;
+  color: var(--color-text, #{$white});
+  box-sizing: border-box;
+  line-height: 1.2;
 
   .bulk-bar__count {
-    font-family: $fontBold;
-    font-weight: bold;
-    color: $white;
+    font-family: $fontSemiBold;
+    color: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
+    padding: 0 0.45rem;
+    white-space: nowrap;
+    font-size: 1.44rem;
   }
 
   .bulk-bar__color {
     display: inline-flex;
     align-items: center;
-    gap: 0.4em;
-    color: $white;
+    color: var(--color-text, #{$white});
 
-    input[type='color'] {
-      width: 1.4em;
-      height: 1.4em;
-      border: none;
-      background: none;
-      cursor: pointer;
+    // Color trigger: muted chrome like settings selects (no primary border).
+    .color-group-picker__trigger {
+      height: var(--bulk-control-h);
+      padding: 0 1.2rem;
+      gap: 0.6rem;
+      border-radius: 0.64rem;
+      border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
+      background: color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
+      color: var(--color-text, #{$white});
+      font-family: $fontRegular;
+      font-size: 1.44rem;
+      transition: border-color 0.15s, background 0.15s;
+
+      &:hover {
+        border-color: color-mix(in srgb, var(--color-text, #{$white}) 28%, transparent);
+        background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+      }
+    }
+
+    .color-group-picker__swatch {
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 0.35rem;
+      border: 0.12rem solid color-mix(in srgb, var(--color-text, #{$white}) 20%, transparent);
+    }
+
+    .color-group-picker__chevron {
+      font-size: 0.85rem;
     }
   }
 
   .bulk-bar__select {
-    padding: 0.35em 0.7em;
-    border-radius: 0.4em;
-    border: 0.1em solid var(--primary_color);
-    background-color: var(--color-bg, #{$color-bg});
-    color: $white;
-    font-size: 1em;
-    font-family: $fontBold;
+    height: var(--bulk-control-h);
+    padding: 0 1.2rem;
+    border-radius: 0.64rem;
+    border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
+    background: color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
+    color: var(--color-text, #{$white});
+    font-size: 1.44rem;
+    font-family: $fontRegular;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    max-width: 20rem;
+
+    &:hover,
+    &:focus {
+      border-color: color-mix(in srgb, var(--color-text, #{$white}) 28%, transparent);
+      background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+    }
+
+    option {
+      background: var(--color-bg, #{$color-bg});
+    }
   }
 
   .bulk-bar__btn {
-    padding: 0.35em 0.9em;
-    border-radius: 0.4em;
-    border: 0.1em solid var(--primary_color);
-    background-color: var(--color-bg, #{$color-bg});
-    color: $white;
+    height: var(--bulk-control-h);
+    padding: 0 1.6rem;
+    border-radius: 0.64rem;
+    border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 20%, transparent);
+    background: transparent;
+    color: var(--color-text, #{$white});
     cursor: pointer;
-    font-size: 1em;
-    font-family: $fontBold;
+    font-size: 1.44rem;
+    font-family: $fontRegular;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
 
-    &:hover {
-      background-color: var(--primary_color);
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+      border-color: color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
     }
 
     &:disabled {
-      opacity: 0.5;
+      opacity: 0.35;
       cursor: not-allowed;
     }
 
-    &--danger {
-      border-color: #e05555;
+    &--primary {
+      border-color: var(--primary_color);
+      color: var(--primary_color);
 
-      &:hover {
-        background-color: #e05555;
+      &:hover:not(:disabled) {
+        background: var(--primary_color);
+        color: var(--color-bg, #{$color-bg});
+      }
+    }
+
+    &--danger {
+      border-color: $warn;
+      color: $warn;
+
+      &:hover:not(:disabled) {
+        background: rgba($warn, 0.12);
+        border-color: $warn;
+        color: $warn;
       }
     }
   }
@@ -348,10 +531,10 @@
 // Right-side navbar: content shifts to the left instead.
 .navbar-right .main {
   margin-left: 0;
-  margin-right: calc(var(--icon_size) + $padding_1 + $padding_1 + $padding_1);
+  margin-right: var(--navbar-offset);
 }
 
-// Push tabs under open searchbar + 2rem gap.
+// Push tabs under open searchbar (+1rem top offset) + 1rem gap.
 .searchMove {
   margin-top: calc(var(--icon_size) - #{$padding_1} + 2rem);
 }
@@ -453,10 +636,12 @@
   position: absolute;
   right: 1.6rem;
   top: 1.6rem;
+  border-radius: 0.48rem;
   transition: all 0.2s ease;
 
   &:hover {
-    fill: $white;
+    fill: var(--color-bg, #{$color-bg});
+    background: var(--primary_color);
     transform: scale(1.1);
     cursor: pointer;
   }
@@ -468,9 +653,12 @@
   max-height: var(--icon_size);
   min-width: var(--icon_min_size);
   min-height: var(--icon_min_size);
+  border-radius: 0.48rem;
+  transition: fill 0.2s ease, background 0.2s ease;
 
   &:hover {
-    fill: $white;
+    fill: var(--color-bg, #{$color-bg});
+    background: var(--primary_color);
     cursor: pointer;
   }
 }

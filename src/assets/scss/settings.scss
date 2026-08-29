@@ -1,4 +1,4 @@
-﻿@use 'variables' as *;
+@use 'variables' as *;
 
 // ── Overlay backdrop ──────────────────────────────────────────────────────────
 .settings-overlay {
@@ -12,7 +12,7 @@
   // 2rem below titlebar (or window top when hidden) + 2rem above window bottom
   padding: calc(var(--topbar_height) + 2rem) 0 2rem;
   backdrop-filter: blur(0.4rem);
-  background: rgba($color-bg, 0.5);
+  background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@
   max-width: 96rem;
   height: 100%;
   min-height: 0;
-  background: $color-bg;
+  background: var(--color-bg, #{$color-bg});
   border: 0.24rem solid var(--primary_color);
   border-radius: 1.2rem;
   overflow: hidden;
@@ -41,7 +41,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 0.56rem;
-    color: rgba(238, 238, 238, 0.5);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 50%, transparent);
     transition: color 0.15s, background 0.15s;
 
     svg {
@@ -50,8 +50,8 @@
     }
 
     &:hover {
-      color: $white;
-      background: rgba(255, 255, 255, 0.08);
+      color: var(--color-text, #{$white});
+      background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
     }
   }
 }
@@ -70,7 +70,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.56rem;
-  color: rgba(238, 238, 238, 0.5);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 50%, transparent);
   transition: color 0.15s, background 0.15s;
 
   svg {
@@ -79,8 +79,8 @@
   }
 
   &:hover {
-    color: $white;
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text, #{$white});
+    background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
   }
 }
 
@@ -90,8 +90,8 @@
   flex-direction: column;
   width: 22rem;
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.25);
-  border-right: 0.16rem solid rgba(255, 255, 255, 0.07);
+  background: var(--color-bg-2, rgba(0, 0, 0, 0.25));
+  border-right: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
   padding: 2.4rem 1.2rem;
   gap: 0.4rem;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -127,9 +127,9 @@
     font-size: 1.2rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(238, 238, 238, 0.45);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 45%, transparent);
     padding: 0 0.8rem 1.2rem;
-    border-bottom: 0.16rem solid rgba(255, 255, 255, 0.07);
+    border-bottom: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
     margin-bottom: 0.8rem;
     white-space: nowrap;
     overflow: hidden;
@@ -154,20 +154,20 @@
   border-radius: 0.64rem;
   font-family: $fontRegular;
   font-size: 1.52rem;
-  color: rgba(238, 238, 238, 0.65);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 65%, transparent);
   transition: background 0.15s, color 0.15s;
   display: flex;
   align-items: center;
   gap: 0.8rem;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.07);
-    color: $white;
+    background: color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
+    color: var(--color-text, #{$white});
   }
 
   &.active {
     background: var(--primary_color);
-    color: $color-bg;
+    color: var(--color-bg, #{$color-bg});
     font-family: $fontBold;
   }
 }
@@ -204,7 +204,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.56rem;
-  color: rgba(238, 238, 238, 0.5);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 50%, transparent);
   margin-bottom: 1.2rem;
   transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
@@ -215,8 +215,8 @@
   }
 
   &:hover {
-    color: $white;
-    background: rgba(255, 255, 255, 0.07);
+    color: var(--color-text, #{$white});
+    background: color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
   }
 }
 
@@ -251,12 +251,12 @@
   &__title {
     font-family: $fontBold;
     font-size: 2.24rem;
-    color: $white;
+    color: var(--color-text, #{$white});
     margin: 0 0 2.4rem;
     padding-bottom: 1.2rem;
     padding-top: 3rem;
     padding-left: 4rem;
-    border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
+    border-bottom: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 10%, transparent);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -272,11 +272,12 @@
   gap: var(--settings-group-gap, 1.6rem);
   padding: 1.2rem 0 1.2rem 4rem;
   min-width: 0;
-  border-bottom: 0.08rem solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0.08rem solid color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
 
   > .settings-row,
   > .settings-select,
-  > .settings-input {
+  > .settings-input,
+  > .capture-dropdown {
     flex: 1 1 0;
     min-width: 0;
   }
@@ -284,7 +285,30 @@
   &--stacked {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.8rem;
+    gap: 0.48rem;
+
+    // Label flex-basis is 16rem for row layout — in a column that becomes
+    // height and creates a huge gap above the control. Reset it.
+    > .settings-label,
+    > .settings-label-info {
+      flex: none;
+      width: auto;
+      max-width: none;
+      min-height: 0;
+    }
+
+    .font-dropdown {
+      width: 100%;
+    }
+
+    > .settings-select,
+    > .settings-input {
+      width: 100%;
+    }
+
+    .settings-slider {
+      width: 100%;
+    }
   }
 
   &--inline {
@@ -313,7 +337,7 @@
 .settings-label {
   font-family: $fontRegular;
   font-size: 1.52rem;
-  color: $white;
+  color: var(--color-text, #{$white});
   flex: 0 0 var(--settings-label-w, 16rem);
   width: var(--settings-label-w, 16rem);
   min-width: 0;
@@ -325,9 +349,23 @@
 .settings-hint {
   font-family: $fontRegular;
   font-size: 1.31rem;
-  color: rgba(238, 238, 238, 0.5);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 50%, transparent);
   margin: 0;
   line-height: 1.5;
+}
+
+.settings-link-btn {
+  all: unset;
+  cursor: pointer;
+  color: var(--primary_color);
+  font-family: $fontRegular;
+  font-size: 1.31rem;
+  line-height: 1.4;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
 }
 
 .settings-section-divider {
@@ -335,7 +373,7 @@
   font-size: 1.15rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(238, 238, 238, 0.4);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 40%, transparent);
   margin: 2rem 0 0.4rem;
   padding-left: 4rem;
 }
@@ -348,10 +386,13 @@
   max-width: 100%;
   box-sizing: border-box;
   height: var(--settings-control-h);
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  // Split color/image — WebKitGTK paints native widgets white unless appearance reset.
+  background-color: color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
+  background-image: none;
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   border-radius: 0.64rem;
-  color: $white;
+  color: var(--color-text, #{$white});
+  color-scheme: dark;
   font-family: $fontRegular;
   font-size: 1.44rem;
   line-height: 1.2;
@@ -365,14 +406,24 @@
   }
 
   option {
-    background: $color-bg;
+    background: var(--color-bg, #{$color-bg});
+    color: var(--color-text, #{$white});
   }
 }
 
 .settings-select {
+  -webkit-appearance: none;
+  appearance: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  padding-right: 3.2rem;
+  // Match capture-dropdown arrow (muted chevron).
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.5L6 6l4.5-4.5' stroke='%23eeeeee' stroke-opacity='0.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.2rem center;
+  background-size: 1.2rem 0.8rem;
 }
 
 .settings-row {
@@ -382,7 +433,8 @@
   min-width: 0;
   align-items: center;
 
-  .settings-select {
+  .settings-select,
+  .capture-dropdown {
     flex: 1 1 0;
     min-width: 0;
   }
@@ -394,7 +446,7 @@
   width: 100%;
   height: 0.4rem;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   outline: none;
 
   &::-webkit-slider-thumb {
@@ -412,16 +464,16 @@
   flex: 1;
   padding: 0.72rem 1.6rem;
   background: transparent;
-  border: 0.16rem solid rgba(255, 255, 255, 0.2);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 20%, transparent);
   border-radius: 0.64rem;
-  color: $white;
+  color: var(--color-text, #{$white});
   font-family: $fontRegular;
   font-size: 1.44rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
     border-color: var(--primary_color);
   }
 
@@ -431,7 +483,7 @@
 
     &:hover {
       background: var(--primary_color);
-      color: $color-bg;
+      color: var(--color-bg, #{$color-bg});
     }
   }
 
@@ -478,7 +530,7 @@
     }
 
     &:hover .settings-btn-icon {
-      fill: $color-bg;
+      fill: var(--color-bg, #{$color-bg});
     }
   }
 }
@@ -495,7 +547,7 @@
   appearance: none;
   width: 4rem;
   height: 4rem;
-  border: 0.16rem solid rgba(255, 255, 255, 0.2);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 20%, transparent);
   border-radius: 0.64rem;
   padding: 0;
   cursor: pointer;
@@ -515,13 +567,13 @@
 .settings-color-value {
   font-family: 'Consolas', monospace;
   font-size: 1.36rem;
-  color: rgba(238, 238, 238, 0.55);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
 }
 
 // ── Code editor ───────────────────────────────────────────────────────────────
 .code-editor-wrapper {
   width: 100%;
-  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   border-radius: 0.8rem;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.3);
@@ -555,6 +607,51 @@
   width: 100%;
   max-width: 72rem;
   padding-bottom: 2.4rem;
+  // Theme Creator is not in the settings panel container — don't clamp labels to 16rem.
+  --settings-label-w: auto;
+
+  .settings-group--inline {
+    > .settings-label-info {
+      flex: 1 1 auto;
+      width: auto;
+      max-width: none;
+      min-width: 0;
+    }
+  }
+
+  .settings-label {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: nowrap;
+    line-height: 1.35;
+  }
+
+  .settings-label-info {
+    overflow: visible;
+
+    .settings-label {
+      flex: 0 1 auto;
+      width: auto;
+      max-width: none;
+      overflow: visible;
+      text-overflow: unset;
+    }
+  }
+
+  // Match native selects / text fields to font-dropdown__trigger sizing.
+  .settings-group--stacked {
+    > .settings-select,
+    > .settings-input {
+      width: 100%;
+      flex: none;
+      height: auto;
+      min-height: 0;
+      padding: 0.72rem 1.2rem;
+      font-size: 1.44rem;
+      line-height: 1.2;
+      border-radius: 0.64rem;
+    }
+  }
 }
 
 // ── Font dropdown ─────────────────────────────────────────────────────────────
@@ -568,11 +665,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.72rem 1.2rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   border-radius: 0.64rem;
   cursor: pointer;
-  color: $white;
+  color: var(--color-text, #{$white});
   font-size: 1.44rem;
   transition: border-color 0.15s;
   gap: 0.8rem;
@@ -602,15 +699,15 @@
   z-index: 200;
   max-height: 22rem;
   overflow-y: auto;
-  background: $color-bg;
-  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  background: var(--color-bg, #{$color-bg});
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   border-radius: 0.64rem;
   box-shadow: 0 0.8rem 2.4rem rgba(0, 0, 0, 0.5);
 
   &::-webkit-scrollbar { width: 0.6rem; }
   &::-webkit-scrollbar-track { background: transparent; }
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
     border-radius: 0.3rem;
   }
 }
@@ -618,7 +715,7 @@
 .font-dropdown__option {
   padding: 0.72rem 1.2rem;
   font-size: 1.52rem;
-  color: rgba(238, 238, 238, 0.75);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
   cursor: pointer;
   transition: background 0.1s;
   white-space: nowrap;
@@ -626,31 +723,31 @@
   text-overflow: ellipsis;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: $white;
+    background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+    color: var(--color-text, #{$white});
   }
 
   &.active {
     background: var(--primary_color);
-    color: $color-bg;
+    color: var(--color-bg, #{$color-bg});
   }
 }
 
 .font-dropdown__search {
   padding: 0.64rem 0.8rem;
-  border-bottom: 0.16rem solid rgba(255, 255, 255, 0.08);
+  border-bottom: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
   position: sticky;
   top: 0;
-  background: $color-bg;
+  background: var(--color-bg, #{$color-bg});
   z-index: 1;
 }
 
 .font-dropdown__search-input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.07);
-  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   border-radius: 0.48rem;
-  color: $white;
+  color: var(--color-text, #{$white});
   font-family: $fontRegular;
   font-size: 1.36rem;
   padding: 0.48rem 0.8rem;
@@ -687,7 +784,7 @@
 .about-version {
   font-family: $fontBold;
   font-size: 1.76rem;
-  color: $white;
+  color: var(--color-text, #{$white});
   width: 100%;
   text-align: center;
 
@@ -709,9 +806,9 @@
   justify-content: center;
   gap: 0.96rem;
   padding: 0.96rem 1.44rem;
-  border: 0.16rem solid rgba(255, 255, 255, 0.12);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
   border-radius: 0.8rem;
-  color: rgba(238, 238, 238, 0.7);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 70%, transparent);
   font-family: $fontRegular;
   font-size: 1.44rem;
   text-decoration: none;
@@ -725,8 +822,8 @@
 
   &:hover {
     border-color: var(--primary_color);
-    color: $white;
-    background: rgba(255, 255, 255, 0.04);
+    color: var(--color-text, #{$white});
+    background: color-mix(in srgb, var(--color-text, #{$white}) 4%, transparent);
   }
 }
 
@@ -763,7 +860,7 @@
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(0.4rem);
-  background: rgba($color-bg, 0.5);
+  background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
 }
 
 .project-dialog {
@@ -772,7 +869,7 @@
   width: 48rem;
   max-width: 86dvw;
   max-height: 80dvh;
-  background: $color-bg;
+  background: var(--color-bg, #{$color-bg});
   border: 0.24rem solid var(--primary_color);
   border-radius: 1.2rem;
   overflow: hidden;
@@ -785,12 +882,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 2rem 2.4rem;
-    border-bottom: 0.16rem solid rgba(255, 255, 255, 0.08);
+    border-bottom: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
 
     h2 {
       font-family: $fontBold;
       font-size: 1.76rem;
-      color: $white;
+      color: var(--color-text, #{$white});
       margin: 0;
     }
   }
@@ -805,7 +902,7 @@
   &__empty {
     padding: 4rem;
     text-align: center;
-    color: rgba(238, 238, 238, 0.35);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
     font-family: $fontRegular;
     font-size: 1.44rem;
   }
@@ -820,7 +917,7 @@
 
   &__footer {
     padding: 1.6rem 2.4rem;
-    border-top: 0.16rem solid rgba(255, 255, 255, 0.08);
+    border-top: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
   }
 }
 
@@ -838,10 +935,10 @@
     transition: background 0.15s;
     font-family: $fontRegular;
     font-size: 1.52rem;
-    color: rgba(238, 238, 238, 0.85);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 85%, transparent);
 
     &:hover {
-      background: rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--color-text, #{$white}) 6%, transparent);
     }
 
     &.active {
@@ -907,6 +1004,12 @@
     width: auto;
     min-width: 0;
   }
+
+  &--fluid {
+    flex: none;
+    width: auto;
+    max-width: 100%;
+  }
 }
 
 // ── Info icon with CSS tooltip ────────────────────────────────────────────────
@@ -915,7 +1018,7 @@
   display: inline-flex;
   align-items: center;
   cursor: help;
-  color: rgba(238, 238, 238, 0.3);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 30%, transparent);
   transition: color 0.15s;
   line-height: 1;
 
@@ -940,12 +1043,12 @@
     bottom: calc(100% + 0.8rem);
     transform: translateX(-50%) translateY(0.6rem);
     background: rgba(18, 18, 28, 0.97);
-    border: 0.16rem solid rgba(255, 255, 255, 0.15);
+    border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
     border-radius: 0.64rem;
     padding: 0.8rem 1.2rem;
     font-family: $fontRegular;
     font-size: 1.28rem;
-    color: rgba(238, 238, 238, 0.85);
+    color: color-mix(in srgb, var(--color-text, #{$white}) 85%, transparent);
     width: 23rem;
     white-space: normal;
     line-height: 1.5;
@@ -961,19 +1064,71 @@
 .settings-unit-input {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.48rem;
 
   .settings-input {
-    width: 9rem;
+    width: 7.2rem;
     flex: none;
     text-align: right;
+    // Kill native OS/WebKit steppers — replaced by .settings-spin.
+    appearance: textfield;
+    -moz-appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+      display: none;
+    }
+  }
+}
+
+.settings-spin {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: var(--settings-control-h);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
+  border-radius: 0.64rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
+}
+
+.settings-spin__btn {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+
+  & + & {
+    border-top: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--primary_color) 22%, transparent);
+    color: var(--primary_color);
+  }
+
+  &:active {
+    background: var(--primary_color);
+    color: var(--color-bg, #{$color-bg});
   }
 }
 
 .settings-unit-label {
   font-family: $fontRegular;
   font-size: 1.36rem;
-  color: rgba(238, 238, 238, 0.45);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 45%, transparent);
   flex-shrink: 0;
 }
 
@@ -985,7 +1140,8 @@
   width: 100%;
   margin-bottom: 0.48rem;
 
-  .settings-label {
+  .settings-label,
+  .settings-label-info {
     min-width: unset;
     margin-bottom: 0;
   }
@@ -998,10 +1154,10 @@
   font-family: 'Consolas', 'Fira Code', monospace;
   font-size: 1.36rem;
   padding: 0.16rem 0.32rem;
-  border: 0.16rem solid rgba(255, 255, 255, 0.15);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   border-radius: 0.32rem;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(238, 238, 238, 0.55);
+  background: color-mix(in srgb, var(--color-text, #{$white}) 3%, transparent);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
   outline: none;
   text-align: center;
   transition: border-color 0.15s, color 0.15s;
@@ -1009,7 +1165,7 @@
   &:hover,
   &:focus {
     border-color: var(--primary_color);
-    color: $white;
+    color: var(--color-text, #{$white});
   }
 }
 
@@ -1017,7 +1173,7 @@
 .settings-question-icon {
   width: 1.76rem !important;
   height: 1.76rem !important;
-  fill: rgba(238, 238, 238, 0.35);
+  fill: color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
   cursor: pointer;
   transition: fill 0.15s;
   flex-shrink: 0;
@@ -1031,26 +1187,90 @@
 .theme-creator-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 0 1.2rem;
-  border-bottom: 0.16rem solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 2.4rem;
+  gap: 1.2rem;
+  // Equal inset from titlebar line and bottom border.
+  padding: 1.2rem 0;
+  border-bottom: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 10%, transparent);
+  margin-bottom: 1.2rem;
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--color-bg, #{$color-bg});
+  background: var(--color-bg-2, var(--color-bg, #{$color-bg}));
+  box-sizing: border-box;
 
   &__title {
     font-family: $fontBold;
     font-size: 2.24rem;
-    color: $white;
+    line-height: 1;
+    color: var(--color-text, #{$white});
     margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  &__theme {
+    flex: 1 1 auto;
+    min-width: 12rem;
+    max-width: 32rem;
+    height: 3.6rem;
+    box-sizing: border-box;
+    padding: 0 1.2rem;
+    font-size: 1.44rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
   }
 
   &__actions {
     display: flex;
     align-items: center;
     gap: 0.64rem;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+}
+
+.theme-creator-tabs {
+  display: flex;
+  gap: 0.48rem;
+  margin-bottom: 1.6rem;
+  padding-bottom: 0.2rem;
+  flex-wrap: wrap;
+
+  &__item {
+    all: unset;
+    cursor: pointer;
+    padding: 0.64rem 1.4rem;
+    border-radius: 0.56rem;
+    font-family: $fontRegular;
+    font-size: 1.44rem;
+    color: color-mix(in srgb, var(--color-text, #{$white}) 65%, transparent);
+    border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+    &:hover {
+      background: color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
+      color: var(--color-text, #{$white});
+    }
+
+    &.active {
+      background: var(--primary_color);
+      border-color: var(--primary_color);
+      color: var(--color-bg, #{$color-bg});
+      font-family: $fontBold;
+    }
+  }
+}
+
+.theme-creator-font-upload {
+  margin: 0.4rem 0 1rem 4rem;
+  align-items: center;
+  gap: 1rem;
+
+  &__tip {
+    flex-shrink: 0;
   }
 }
 
@@ -1063,11 +1283,11 @@
   width: 3.6rem;
   height: 3.6rem;
   border-radius: 0.56rem;
-  border: 0.16rem solid rgba(255, 255, 255, 0.12);
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
   transition: background 0.15s, border-color 0.15s;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
     border-color: var(--primary_color);
   }
 }
@@ -1075,7 +1295,7 @@
 .tc-toolbar-icon {
   width: 2rem !important;
   height: 2rem !important;
-  fill: rgba(238, 238, 238, 0.65);
+  fill: color-mix(in srgb, var(--color-text, #{$white}) 65%, transparent);
 
   .tc-toolbar-btn:hover & {
     fill: var(--primary_color);

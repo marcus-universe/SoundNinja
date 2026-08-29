@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.5.0"
+version = "0.5.3"
 description = "Your best Soundboard App"
 authors = ["you"]
 license = ""
@@ -12,11 +12,16 @@ rust-version = "1.70"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default = []
 # Enables ASIO audio output support (Windows only).
 # Requires the Steinberg ASIO SDK: set CPAL_ASIO_DIR before building.
 # Official builds are WASAPI-only (MIT-clean); ASIO is opt-in:
 #   cargo tauri build --features asio
-asio = ["cpal/asio"]
+asio = ["cpal/asio", "rodio/asio"]
+# BS-RoFormer stem separation via ONNX Runtime (ort, load-dynamic) + rustfft STFT.
+# Off by default to keep contributor builds light. Enable with:
+#   cargo tauri build --features stems
+stems = ["dep:ort", "dep:rustfft", "dep:realfft", "dep:sha2"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
@@ -32,12 +37,30 @@ tauri-plugin-shell = "2.3.5"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-os = "2.3.2"
 tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
-rodio = "0.22.2"
+# Git pin: crates.io rodio 0.22.2 still on cpal 0.17 (ALSA-only Linux).
+# Master brings cpal 0.18 + PipeWire/PulseAudio hosts so Arch/PipeWire sinks
+# (interfaces, HDMI, virtual sinks) appear in Audio Settings.
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "pipewire", "pulseaudio"] }
 anyhow = "1.0.102"
-cpal = "0.17"   # same version rodio uses; direct dep enables [features] asio = ["cpal/asio"]
+# Keep in lockstep with rodio's cpal; asio / pipewire features forwarded below.
+cpal = { version = "0.18", features = ["pipewire", "pulseaudio"] }
 symphonia = { version = "0.6.0", features = ["mp3", "wav", "ogg", "flac"] }
 # GPU detection — only adapter enumeration, no compute usage yet.
 wgpu = { version = "22", default-features = false, features = ["wgsl"] }
+hound = "3.5"
+nnnoiseless = "0.5"
+rubato = "0.16"
+directories = "5"
+# Optional stem engine (gated by `stems` feature).
+# `load-dynamic` avoids static-linking ort-sys (MSVC STL symbol mismatch on VS < 17.14).
+# `copy-dylibs` + `download-binaries` place onnxruntime next to the exe for runtime load.
+ort = { version = "2.0.0-rc.11", optional = true, default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "copy-dylibs", "load-dynamic", "tls-rustls"] }
+rustfft = { version = "6.2", optional = true }
+realfft = { version = "3.4", optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "stream"] }
+sha2 = { version = "0.10", optional = true }
+tauri-plugin-updater = "2.10"
+tauri-plugin-process = "2.3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.56"

@@ -1,6 +1,10 @@
 import Database from '@tauri-apps/plugin-sql'
+import { normalizeThemeId } from '~/utils/themePresets'
+import { resolveThemeTokens } from '~/utils/themeTokens'
 
 // ── Types (mirrors the shape the components already consume) ───────────────────
+export const MAX_GIF_BYTES = 8 * 1024 * 1024
+
 export interface SoundFile {
   name: string
   path: string
@@ -10,17 +14,41 @@ export interface SoundFile {
   index: number
   tabIndexes: Record<string, number>
   color?: string
+  /** Content-addressed id into `gif_blobs` (SHA-256 hex). Bytes stay out of Pinia. */
+  gifId?: string
+  gifPosX?: number
+  gifPosY?: number
 }
+
+export interface GifBlobRow {
+  id: string
+  mime: string
+  /** Base64 of the animated GIF/WebP bytes. */
+  data: string
+  /** Base64 of a first-frame PNG poster, if extracted. */
+  poster: string | null
+  byteLen: number
+}
+
+export type ButtonAlign = 'left' | 'center' | 'right'
 
 export interface TabEntry {
   name: string
   color?: string
+  /** Default button alignment for this tab. Groups may override. */
+  buttonAlign?: ButtonAlign
 }
 
 export interface Separator {
   id: string
   tab: string
   position: number
+  /** Display name. Empty/missing → untitled Group (legacy seps). */
+  name?: string
+  borderColor?: string
+  nameColor?: string
+  /** Undefined = inherit Tab.buttonAlign */
+  buttonAlign?: ButtonAlign
 }
 
 export interface Settings {
@@ -36,21 +64,34 @@ export interface Settings {
   uniformButtonHeight?: boolean
   /** Allow drag-and-drop reordering of sounds/tabs (default on). */
   allowReorder?: boolean
-  /** Active theme mode for this project. */
-  themeMode?: 'dark' | 'light'
-  /** Accent color (single, shared by both modes). */
+  /** Accent / primary color. */
   primaryColor?: string
-  /** Background color for light mode. */
+  primaryHover?: string
+  /** Page background. */
+  bg?: string
+  /** Secondary surfaces (settings sidebar, tool windows). */
+  bg2?: string
+  /** Sound button colors. */
+  btnBg?: string
+  btnBgHover?: string
+  btnText?: string
+  btnTextHover?: string
+  btnBorder?: string
+  btnBorderHover?: string
+  /** Tab colors. */
+  tabBg?: string
+  tabBgHover?: string
+  tabText?: string
+  tabTextHover?: string
+  tabBorder?: string
+  tabBorderHover?: string
+  /** @deprecated Legacy light/dark pairs — read-migrated, never written. */
+  themeMode?: 'dark' | 'light'
   bgLight?: string
-  /** Background color for dark mode. */
   bgDark?: string
-  /** Button background for light mode. */
   btnLight?: string
-  /** Button background for dark mode. */
   btnDark?: string
-  /** Text color used on light-mode surfaces. */
   textLight?: string
-  /** Text color used on dark-mode surfaces. */
   textDark?: string
   /** Audio driver/host name (e.g. 'WASAPI', 'ASIO'). */
   outputHost?: string
@@ -60,6 +101,12 @@ export interface Settings {
   asioRightChannel?: number
   /** Enable GPU-accelerated DSP (experimental; only shown when discrete GPU detected). */
   gpuAudioEnabled?: boolean
+  /** Show the floating player on the soundboard. */
+  showPlayer?: boolean
+  /** Enlarge floating player controls / waveform. */
+  playerLarge?: boolean
+  /** When true, GIF button backgrounds animate only while hovered. Default on. */
+  gifPlayOnHover?: boolean
 }
 
 export interface ProjectConfig {
@@ -71,24 +118,35 @@ export interface ProjectConfig {
 
 export function defaultSettings(): Settings {
   return {
-    theme: 'dark-cyan',
+    theme: 'soundninja',
     customCss: '',
     outputSource: 'default',
     stopOnRetrigger: true,
     overlapSounds: false,
     uniformButtonHeight: false,
     allowReorder: true,
-    themeMode: 'dark',
     primaryColor: '#00d4ff',
-    bgLight: '#eeeeee',
-    bgDark: '#222831',
-    btnLight: '#7184a2',
-    btnDark: '#363f4d',
-    textLight: '#eeeeee',
-    textDark: '#222831',
+    primaryHover: '#33ddff',
+    bg: '#222831',
+    bg2: '#1a1e25',
+    btnBg: '#363f4d',
+    btnBgHover: '#434e5f',
+    btnText: '#eeeeee',
+    btnTextHover: '#00d4ff',
+    btnBorder: '#00d4ff',
+    btnBorderHover: '#33ddff',
+    tabBg: '#00d4ff33',
+    tabBgHover: '#00d4ff66',
+    tabText: '#eeeeee',
+    tabTextHover: '#eeeeee',
+    tabBorder: '#00d4ff',
+    tabBorderHover: '#33ddff',
     outputHost: 'WASAPI',
     asioLeftChannel: undefined,
     asioRightChannel: undefined,
+    showPlayer: true,
+    playerLarge: false,
+    gifPlayOnHover: true,
   }
 }
 
@@ -216,6 +274,35 @@ async function initSchema(d: Database): Promise<void> {
     tab TEXT,
     position INTEGER
   )`)
+  // Bytes live here, not in Pinia. saveConfig must never DELETE this table.
+  await d.execute(`CREATE TABLE IF NOT EXISTS gif_blobs (
+    id TEXT PRIMARY KEY,
+    mime TEXT NOT NULL,
+    data TEXT NOT NULL,
+    poster TEXT,
+    byte_len INTEGER
+  )`)
+  await addColumnIfMissing(d, 'sounds', 'gif_id', 'TEXT')
+  await addColumnIfMissing(d, 'sounds', 'gif_pos_x', 'REAL')
+  await addColumnIfMissing(d, 'sounds', 'gif_pos_y', 'REAL')
+  await addColumnIfMissing(d, 'separators', 'name', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'border_color', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'name_color', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
+  await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
+}
+
+async function addColumnIfMissing(
+  d: Database,
+  table: string,
+  column: string,
+  sqlType: string,
+): Promise<void> {
+  try {
+    await d.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`)
+  } catch {
+    /* column already exists on upgraded project files */
+  }
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -231,13 +318,33 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'outputSource': settings.outputSource = value; break
       case 'stopOnRetrigger': settings.stopOnRetrigger = value === 'true'; break
       case 'overlapSounds': settings.overlapSounds = value === 'true'; break
+      case 'showPlayer': settings.showPlayer = value === 'true'; break
+      case 'playerLarge': settings.playerLarge = value === 'true'; break
+      case 'gifPlayOnHover': settings.gifPlayOnHover = value !== 'false'; break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
       case 'uniformButtonHeight': settings.uniformButtonHeight = value === 'true'; break
       case 'allowReorder': settings.allowReorder = value === 'true'; break
-      case 'themeMode': settings.themeMode = value === 'light' ? 'light' : 'dark'; break
+      // Flat theme tokens
       case 'primaryColor': settings.primaryColor = value; break
+      case 'primaryHover': settings.primaryHover = value; break
+      case 'bg': settings.bg = value; break
+      case 'bg2': settings.bg2 = value; break
+      case 'btnBg': settings.btnBg = value; break
+      case 'btnBgHover': settings.btnBgHover = value; break
+      case 'btnText': settings.btnText = value; break
+      case 'btnTextHover': settings.btnTextHover = value; break
+      case 'btnBorder': settings.btnBorder = value; break
+      case 'btnBorderHover': settings.btnBorderHover = value; break
+      case 'tabBg': settings.tabBg = value; break
+      case 'tabBgHover': settings.tabBgHover = value; break
+      case 'tabText': settings.tabText = value; break
+      case 'tabTextHover': settings.tabTextHover = value; break
+      case 'tabBorder': settings.tabBorder = value; break
+      case 'tabBorderHover': settings.tabBorderHover = value; break
+      // Legacy pairs (kept in memory for resolveThemeTokens migration)
+      case 'themeMode': settings.themeMode = value === 'light' ? 'light' : 'dark'; break
       case 'bgLight': settings.bgLight = value; break
       case 'bgDark': settings.bgDark = value; break
       case 'btnLight': settings.btnLight = value; break
@@ -250,17 +357,39 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
   }
 
-  const tabRows = await d.select<{ name: string; color: string | null; position: number }[]>(
-    'SELECT name, color, position FROM tabs ORDER BY position ASC'
-  )
+  // Migrate legacy dark-* theme ids and pair fields → flat tokens.
+  settings.theme = normalizeThemeId(settings.theme)
+  if (!settings.bg && !settings.btnBg) {
+    const flat = resolveThemeTokens(settings as unknown as Record<string, unknown>)
+    Object.assign(settings, flat)
+  } else if (!settings.bg2) {
+    settings.bg2 = resolveThemeTokens(settings as unknown as Record<string, unknown>).bg2
+  }
+
+  const tabRows = await d.select<
+    { name: string; color: string | null; position: number; button_align: string | null }[]
+  >('SELECT name, color, position, button_align FROM tabs ORDER BY position ASC')
   const tabList: TabEntry[] = tabRows.map((t) => ({
     name: t.name,
     ...(t.color ? { color: t.color } : {}),
+    ...(t.button_align === 'left' || t.button_align === 'center' || t.button_align === 'right'
+      ? { buttonAlign: t.button_align }
+      : {}),
   }))
 
   const soundRows = await d.select<
-    { path: string; name: string; volume: number; color: string | null; global_index: number; active: number }[]
-  >('SELECT path, name, volume, color, global_index, active FROM sounds ORDER BY global_index ASC')
+    {
+      path: string
+      name: string
+      volume: number
+      color: string | null
+      global_index: number
+      active: number
+      gif_id: string | null
+      gif_pos_x: number | null
+      gif_pos_y: number | null
+    }[]
+  >('SELECT path, name, volume, color, global_index, active, gif_id, gif_pos_x, gif_pos_y FROM sounds ORDER BY global_index ASC')
 
   const tabLinks = await d.select<{ sound_path: string; tab: string; tab_index: number }[]>(
     'SELECT sound_path, tab, tab_index FROM sound_tabs'
@@ -288,13 +417,36 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       tabs,
       tabIndexes,
       ...(s.color ? { color: s.color } : {}),
+      ...(s.gif_id ? { gifId: s.gif_id } : {}),
+      ...(s.gif_pos_x != null ? { gifPosX: Number(s.gif_pos_x) } : {}),
+      ...(s.gif_pos_y != null ? { gifPosY: Number(s.gif_pos_y) } : {}),
     }
   })
 
-  const sepRows = await d.select<{ id: string; tab: string; position: number }[]>(
-    'SELECT id, tab, position FROM separators ORDER BY position ASC'
+  const sepRows = await d.select<
+    {
+      id: string
+      tab: string
+      position: number
+      name: string | null
+      border_color: string | null
+      name_color: string | null
+      button_align: string | null
+    }[]
+  >(
+    'SELECT id, tab, position, name, border_color, name_color, button_align FROM separators ORDER BY position ASC',
   )
-  const separators: Separator[] = sepRows.map((r) => ({ id: r.id, tab: r.tab, position: r.position }))
+  const separators: Separator[] = sepRows.map((r) => ({
+    id: r.id,
+    tab: r.tab,
+    position: r.position,
+    ...(r.name ? { name: r.name } : {}),
+    ...(r.border_color ? { borderColor: r.border_color } : {}),
+    ...(r.name_color ? { nameColor: r.name_color } : {}),
+    ...(r.button_align === 'left' || r.button_align === 'center' || r.button_align === 'right'
+      ? { buttonAlign: r.button_align }
+      : {}),
+  }))
 
   return { settings, tabList, files, separators }
 }
@@ -338,32 +490,58 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     // Note: outputSource / outputHost / outputVolume / ASIO channels are app-wide
     // (app-config.db) and must not be written into the project file.
     const settingsRows: [string, string][] = [
-      ['theme', s.theme ?? 'dark-cyan'],
+      ['theme', s.theme ?? 'soundninja'],
       ['customCss', s.customCss ?? ''],
       ['stopOnRetrigger', String(s.stopOnRetrigger ?? true)],
       ['overlapSounds', String(s.overlapSounds ?? false)],
+      ['showPlayer', String(s.showPlayer ?? true)],
+      ['playerLarge', String(s.playerLarge ?? false)],
       ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
       ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
       ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
       ['allowReorder', String(s.allowReorder ?? true)],
-      ['themeMode', s.themeMode ?? 'dark'],
+      ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
       ['primaryColor', s.primaryColor ?? '#00d4ff'],
-      ['bgLight', s.bgLight ?? '#eeeeee'],
-      ['bgDark', s.bgDark ?? '#222831'],
-      ['btnLight', s.btnLight ?? '#7184a2'],
-      ['btnDark', s.btnDark ?? '#363f4d'],
-      ['textLight', s.textLight ?? '#eeeeee'],
-      ['textDark', s.textDark ?? '#222831'],
+      ['primaryHover', s.primaryHover ?? '#33ddff'],
+      ['bg', s.bg ?? '#222831'],
+      ['bg2', s.bg2 ?? '#1a1e25'],
+      ['btnBg', s.btnBg ?? '#363f4d'],
+      ['btnBgHover', s.btnBgHover ?? '#434e5f'],
+      ['btnText', s.btnText ?? '#eeeeee'],
+      ['btnTextHover', s.btnTextHover ?? '#00d4ff'],
+      ['btnBorder', s.btnBorder ?? '#00d4ff'],
+      ['btnBorderHover', s.btnBorderHover ?? '#33ddff'],
+      ['tabBg', s.tabBg ?? '#00d4ff33'],
+      ['tabBgHover', s.tabBgHover ?? '#00d4ff66'],
+      ['tabText', s.tabText ?? '#eeeeee'],
+      ['tabTextHover', s.tabTextHover ?? '#eeeeee'],
+      ['tabBorder', s.tabBorder ?? '#00d4ff'],
+      ['tabBorderHover', s.tabBorderHover ?? '#33ddff'],
     ]
     await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
-    const tabRows = config.tabList.map((t, i) => [t.name, t.color ?? null, i])
-    await batchInsert(d, 'tabs', ['name', 'color', 'position'], tabRows)
+    const tabRows = config.tabList.map((t, i) => [
+      t.name,
+      t.color ?? null,
+      i,
+      t.buttonAlign ?? null,
+    ])
+    await batchInsert(d, 'tabs', ['name', 'color', 'position', 'button_align'], tabRows)
 
     const soundRows: unknown[][] = []
     const soundTabRows: unknown[][] = []
     for (const f of config.files) {
-      soundRows.push([f.path, f.name, f.volume ?? 0.4, f.color ?? null, f.index ?? 0, f.active ? 1 : 0])
+      soundRows.push([
+        f.path,
+        f.name,
+        f.volume ?? 0.4,
+        f.color ?? null,
+        f.index ?? 0,
+        f.active ? 1 : 0,
+        f.gifId ?? null,
+        f.gifPosX ?? 50,
+        f.gifPosY ?? 50,
+      ])
       for (const tab of f.tabs) {
         const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
         soundTabRows.push([f.path, tab, tabIdx])
@@ -372,17 +550,69 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     await batchInsert(
       d,
       'sounds',
-      ['path', 'name', 'volume', 'color', 'global_index', 'active'],
+      ['path', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
       soundRows
     )
     await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
 
-    const sepRows = (config.separators ?? []).map((sep) => [sep.id, sep.tab, sep.position])
-    await batchInsert(d, 'separators', ['id', 'tab', 'position'], sepRows)
+    const sepRows = (config.separators ?? []).map((sep) => [
+      sep.id,
+      sep.tab,
+      sep.position,
+      sep.name ?? null,
+      sep.borderColor ?? null,
+      sep.nameColor ?? null,
+      sep.buttonAlign ?? null,
+    ])
+    await batchInsert(
+      d,
+      'separators',
+      ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'button_align'],
+      sepRows,
+    )
 
     await d.execute('COMMIT')
   } catch (e) {
     try { await d.execute('ROLLBACK') } catch { /* ignore */ }
     throw e
   }
+}
+
+// ── GIF blobs (separate from the full-resync save; never wiped by saveConfig) ─
+export async function upsertGifBlob(d: Database, row: GifBlobRow): Promise<void> {
+  await d.execute(
+    `INSERT INTO gif_blobs (id, mime, data, poster, byte_len) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT(id) DO NOTHING`,
+    [row.id, row.mime, row.data, row.poster, row.byteLen],
+  )
+}
+
+export async function loadGifBlob(d: Database, id: string): Promise<GifBlobRow | null> {
+  const rows = await d.select<
+    { id: string; mime: string; data: string; poster: string | null; byte_len: number }[]
+  >('SELECT id, mime, data, poster, byte_len FROM gif_blobs WHERE id = $1', [id])
+  const r = rows[0]
+  if (!r) return null
+  return { id: r.id, mime: r.mime, data: r.data, poster: r.poster ?? null, byteLen: r.byte_len ?? 0 }
+}
+
+export async function loadGifBlobsByIds(d: Database, ids: string[]): Promise<GifBlobRow[]> {
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (!unique.length) return []
+  const out: GifBlobRow[] = []
+  for (const id of unique) {
+    const row = await loadGifBlob(d, id)
+    if (row) out.push(row)
+  }
+  return out
+}
+
+export async function gcOrphanGifs(d: Database, keepIds: string[] = []): Promise<void> {
+  const keep = [...new Set(keepIds.filter(Boolean))]
+  if (!keep.length) {
+    await d.execute('DELETE FROM gif_blobs')
+    return
+  }
+  const placeholders = keep.map((_, i) => `$${i + 1}`).join(', ')
+  await d.execute(`DELETE FROM gif_blobs WHERE id NOT IN (${placeholders})`, keep)
 }

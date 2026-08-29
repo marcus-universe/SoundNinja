@@ -24,7 +24,7 @@
                 :title="$t('project.removeRecent')"
                 @click.stop="removeFromRecent(proj)"
               >
-                <Icons icon="exit" custom-class="dialog-close project-list__remove-icon" />
+                <Icons icon="delete" custom-class="dialog-close project-list__remove-icon" />
               </button>
             </li>
           </ul>

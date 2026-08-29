@@ -17,15 +17,21 @@ body {
 
   /* ── Theme colors (overridable by themes) ────── */
   --color-bg: #{$color-bg};
+  --color-bg-2: #1a1e25;
   --color-btn: #{$color-btn};
-
-  /* ── Light/dark color pairs (P9, set at runtime) ── */
-  --color-bg-light: #eeeeee;
-  --color-bg-dark: #{$color-bg};
-  --color-btn-light: #7184a2;
-  --color-btn-dark: #{$color-btn};
-  --text-light: #eeeeee;
-  --text-dark: #222831;
+  --color-text: #{$white};
+  --primary-hover: #33ddff;
+  --btn-bg-hover: #{$color-btn-hover};
+  --btn-text-hover: #{$color-btn};
+  --btn-border: var(--primary_color);
+  --btn-border-hover: #33ddff;
+  --tab-bg: color-mix(in srgb, var(--primary_color) 20%, transparent);
+  --tab-bg-hover: color-mix(in srgb, var(--primary_color) 40%, transparent);
+  --tab-text: #{$white};
+  --tab-text-hover: #{$white};
+  --tab-border: var(--primary_color);
+  --tab-border-hover: #33ddff;
+  --tab-border-width: 0.3rem;
 
   /* ── Font families ───────────────────────────── */
   --font-regular: #{$fontRegular};
@@ -55,10 +61,13 @@ body {
   --btn-border-width: 0.32rem;
   --border-radius: 0.8rem;
   --btn_padding: #{$padding_1};
+  /* Color wash over GIF/image button backgrounds (0 = GIF only, 1 = solid). */
+  --gif-overlay: 0.72;
+  --gif-overlay-hover: 0.38;
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
 
-  /* ── Theme mode text color (P9) ──────────────── */
+  /* ── Theme text color ────────────────────────── */
   --sound-text: #{$white};
 }
 
@@ -132,9 +141,47 @@ body {
   background-color: var(--color-bg, #{$color-bg});
   margin: 0;
   padding: 0;
+  height: 100%;
   font-family: $fontRegular;
   box-sizing: border-box;
   overflow-y: hidden;
+}
+
+#__nuxt {
+  height: 100%;
+
+  > .soundninja {
+    height: 100%;
+    min-height: 100%;
+  }
+}
+
+.soundninja--tool {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  // Fixed TitleBar overlays content — same offset as .main
+  box-sizing: border-box;
+  padding-top: var(--topbar_height, 0px);
+  background: var(--color-bg-2, var(--color-bg, #{$color-bg}));
+}
+
+.soundninja__tool-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  // NuxtPage / Transition are abstract — page root must still stretch.
+  > *,
+  .record-editor-window,
+  .theme-creator-window,
+  .playing-list-window {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+  }
 }
 
 // ########################################

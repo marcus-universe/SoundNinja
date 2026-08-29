@@ -1,14 +1,20 @@
 import { defineStore } from 'pinia'
 import {
-  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig,
+  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
+  loadGifBlobsByIds, upsertGifBlob,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
+  type ButtonAlign,
 } from '~/utils/db'
+import { revokeAllGifUrls } from '~/utils/gifCache'
 
 /** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
  *  deep-clones and strips Vue reactive Proxies (which structuredClone rejects). */
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
 }
+
+/** Cap undo/redo stacks so memory stays bounded for large projects. */
+const MAX_HISTORY = 50
 
 /** Lowercase + strip spaces/punctuation so "alf" matches "A L F". */
 function compactSearch(s: string): string {
@@ -25,17 +31,65 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     dirty: false,
     saving: false,
     _persistTimer: null as ReturnType<typeof setTimeout> | null,
+    /** Stepwise undo history for soundboard mutations (sounds/tabs/separators). */
+    undoStack: [] as ProjectConfig[],
+    redoStack: [] as ProjectConfig[],
+    /** When true, mutations skip pushBeforeChange (undo/redo restore path). */
+    _historySuspended: false,
   }),
 
   getters: {
     getConfig: (state) => state.configFile,
     separators: (state) => state.configFile.separators ?? [],
+    canUndo: (state) => state.undoStack.length > 0,
+    canRedo: (state) => state.redoStack.length > 0,
   },
 
   actions: {
+    // ── Undo / redo ───────────────────────────────────────────────────────────
+    /** Snapshot current config before a tracked mutation. Clears redo. */
+    pushBeforeChange() {
+      if (this._historySuspended) return
+      this.undoStack.push(clone(this.configFile))
+      if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift()
+      this.redoStack = []
+    },
+
+    clearHistory() {
+      this.undoStack = []
+      this.redoStack = []
+    },
+
+    applySnapshot(snap: ProjectConfig) {
+      this._historySuspended = true
+      try {
+        this.configFile = clone(snap)
+        this.normalizeIndexes()
+        this.filteredFiles = this.configFile.files
+        this.writeConfig()
+      } finally {
+        this._historySuspended = false
+      }
+    },
+
+    undo() {
+      if (!this.undoStack.length) return false
+      this.redoStack.push(clone(this.configFile))
+      this.applySnapshot(this.undoStack.pop()!)
+      return true
+    },
+
+    redo() {
+      if (!this.redoStack.length) return false
+      this.undoStack.push(clone(this.configFile))
+      this.applySnapshot(this.redoStack.pop()!)
+      return true
+    },
+
     // ── Project lifecycle ─────────────────────────────────────────────────────
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
+      revokeAllGifUrls()
       const d = await openDb(dbAbsPath)
       const config = await loadConfig(d)
       this.configFile = config
@@ -44,6 +98,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.currentProjectPath = dbAbsPath
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
+      this.clearHistory()
     },
 
     /** Loads config into an already-open project DB (used by JSON import/migration). */
@@ -62,6 +117,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.filteredFiles = this.configFile.files
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
+      this.clearHistory()
       await this.persistNow()
     },
 
@@ -74,6 +130,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.dirty = false
+      this.clearHistory()
     },
 
     setCurrentProjectPath(p: string | null) {
@@ -109,6 +166,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       try {
         await withProjectDb(path, async (d) => {
           await saveConfig(d, this.configFile)
+          const keep = this.configFile.files.map((f) => f.gifId).filter((id): id is string => !!id)
+          await gcOrphanGifs(d, keep)
         })
         this.openingSnapshot = clone(this.configFile)
         this.dirty = false
@@ -129,14 +188,30 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       await ensureProjectParentDir(dbAbsPath)
       await removeInvalidProjectPlaceholder(dbAbsPath)
       const config = clone(this.configFile)
+      const gifIds = [...new Set(config.files.map((f) => f.gifId).filter((id): id is string => !!id))]
+      let blobs: Awaited<ReturnType<typeof loadGifBlobsByIds>> = []
+      if (this.currentProjectPath && gifIds.length) {
+        const oldPath = this.currentProjectPath
+        blobs = await withProjectDb(oldPath, (d) => loadGifBlobsByIds(d, gifIds))
+      }
       try {
         await this.importConfig(config, dbAbsPath)
+        if (blobs.length) {
+          await withProjectDb(dbAbsPath, async (d) => {
+            for (const row of blobs) await upsertGifBlob(d, row)
+          })
+        }
       } catch (e) {
         // Retry once after deleting a non-SQLite placeholder the dialog may have created.
         const msg = String(e)
         if (/not a database|unable to open|file is encrypted|disk image/i.test(msg)) {
           try { await (await import('@tauri-apps/api/core')).invoke('delete_file_abs', { path: dbAbsPath }) } catch { /* ignore */ }
           await this.importConfig(config, dbAbsPath)
+          if (blobs.length) {
+            await withProjectDb(dbAbsPath, async (d) => {
+              for (const row of blobs) await upsertGifBlob(d, row)
+            })
+          }
           return
         }
         throw e
@@ -144,6 +219,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     updateConfigFile(contents: ProjectConfig) {
+      this.pushBeforeChange()
       this.configFile = {
         settings: contents.settings,
         tabList: contents.tabList ?? [],
@@ -232,8 +308,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.configFile.settings.allowReorder = val
       this.writeConfig()
     },
-    setThemeMode(val: 'dark' | 'light') {
-      this.configFile.settings.themeMode = val
+    setGifPlayOnHover(val: boolean) {
+      this.configFile.settings.gifPlayOnHover = val
       this.writeConfig()
     },
     // Generic single-setting update — avoids a dedicated action per field.
@@ -249,6 +325,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
+      this.pushBeforeChange()
       this.configFile.files = [...this.configFile.files, ...files]
       this.normalizeIndexes()
       this.writeConfig()
@@ -260,22 +337,42 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     renameSound(soundindex: number, newName: string) {
+      this.pushBeforeChange()
       this.configFile.files[soundindex].name = newName
       this.writeConfig()
     },
 
     removeSound(soundindex: number) {
+      this.pushBeforeChange()
       this.configFile.files.splice(soundindex, 1)
       this.normalizeIndexes()
       this.writeConfig()
     },
 
     setSoundColor(soundindex: number, color: string) {
+      this.pushBeforeChange()
       this.configFile.files[soundindex].color = color
       this.writeConfig()
     },
 
+    setSoundGif(soundindex: number, gifId: string | null, gifPosX = 50, gifPosY = 50) {
+      const file = this.configFile.files[soundindex]
+      if (!file) return
+      this.pushBeforeChange()
+      if (gifId) {
+        file.gifId = gifId
+        file.gifPosX = gifPosX
+        file.gifPosY = gifPosY
+      } else {
+        delete file.gifId
+        delete file.gifPosX
+        delete file.gifPosY
+      }
+      this.writeConfig()
+    },
+
     setSoundTabs(soundFileIndex: number, tabs: string[]) {
+      this.pushBeforeChange()
       this.configFile.files[soundFileIndex].tabs = tabs
       this.normalizeIndexes()
       this.writeConfig()
@@ -283,6 +380,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Bulk (multi-select) actions, keyed by sound path ──────────────────────
     setSoundColorMany(paths: string[], color: string) {
+      this.pushBeforeChange()
       const set = new Set(paths)
       for (const f of this.configFile.files) {
         if (set.has(f.path)) f.color = color
@@ -291,6 +389,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     setSoundTabsMany(paths: string[], tab: string) {
+      this.pushBeforeChange()
       const set = new Set(paths)
       for (const f of this.configFile.files) {
         if (set.has(f.path) && !f.tabs.includes(tab)) f.tabs = [...f.tabs, tab]
@@ -300,6 +399,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     removeSoundsMany(paths: string[]) {
+      this.pushBeforeChange()
       const set = new Set(paths)
       this.configFile.files = this.configFile.files.filter((f) => !set.has(f.path))
       this.normalizeIndexes()
@@ -313,6 +413,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const from = sorted.findIndex((f) => f.index === draggedIdx)
         const to = sorted.findIndex((f) => f.index === targetIdx)
         if (from === -1 || to === -1 || from === to) return
+        this.pushBeforeChange()
         const [item] = sorted.splice(from, 1)
         sorted.splice(to, 0, item)
         sorted.forEach((f, i) => { f.index = i })
@@ -323,6 +424,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const from = inTab.findIndex((f) => f.index === draggedIdx)
         const to = inTab.findIndex((f) => f.index === targetIdx)
         if (from === -1 || to === -1 || from === to) return
+        this.pushBeforeChange()
         const [item] = inTab.splice(from, 1)
         inTab.splice(to, 0, item)
         inTab.forEach((f, i) => {
@@ -335,11 +437,13 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Tabs ──────────────────────────────────────────────────────────────────
     addTab(name: string) {
+      this.pushBeforeChange()
       this.configFile.tabList.push({ name })
       this.writeConfig()
     },
 
     removeTab(name: string) {
+      this.pushBeforeChange()
       this.configFile.tabList = this.configFile.tabList.filter((t) => t.name !== name)
       this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.tab !== name)
       this.writeConfig()
@@ -348,6 +452,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     renameTab(oldName: string, newName: string) {
       const tab = this.configFile.tabList.find((t) => t.name === oldName)
       if (!tab) return
+      this.pushBeforeChange()
       tab.name = newName
       this.configFile.files.forEach((f) => {
         const idx = f.tabs.indexOf(oldName)
@@ -366,6 +471,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setTabColor(name: string, color: string) {
       const tab = this.configFile.tabList.find((t) => t.name === name)
       if (tab) {
+        this.pushBeforeChange()
         tab.color = color
         this.writeConfig()
       }
@@ -376,20 +482,28 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       const from = list.findIndex((t) => t.name === draggedName)
       const to = list.findIndex((t) => t.name === targetName)
       if (from === -1 || to === -1 || from === to) return
+      this.pushBeforeChange()
       const [item] = list.splice(from, 1)
       list.splice(to, 0, item)
       this.writeConfig()
     },
 
-    // ── Separators ────────────────────────────────────────────────────────────
-    addSeparator(tab: string, position: number) {
+    // ── Separators / Groups ───────────────────────────────────────────────────
+    addSeparator(tab: string, position: number, name?: string) {
+      this.pushBeforeChange()
       if (!this.configFile.separators) this.configFile.separators = []
       const id = `sep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      this.configFile.separators.push({ id, tab, position })
+      this.configFile.separators.push({
+        id,
+        tab,
+        position,
+        ...(name ? { name } : {}),
+      })
       this.writeConfig()
     },
 
     removeSeparator(id: string) {
+      this.pushBeforeChange()
       this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.id !== id)
       this.writeConfig()
     },
@@ -397,13 +511,154 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setSeparatorPosition(id: string, position: number) {
       const sep = (this.configFile.separators ?? []).find((s) => s.id === id)
       if (sep) {
+        this.pushBeforeChange()
         sep.position = position
         this.writeConfig()
       }
     },
 
+    updateSeparator(id: string, patch: Partial<Omit<Separator, 'id'>>) {
+      const sep = (this.configFile.separators ?? []).find((s) => s.id === id)
+      if (!sep) return
+      this.pushBeforeChange()
+      if ('name' in patch) {
+        const n = patch.name?.trim()
+        if (n) sep.name = n
+        else delete sep.name
+      }
+      if ('borderColor' in patch) {
+        if (patch.borderColor) sep.borderColor = patch.borderColor
+        else delete sep.borderColor
+      }
+      if ('nameColor' in patch) {
+        if (patch.nameColor) sep.nameColor = patch.nameColor
+        else delete sep.nameColor
+      }
+      if ('buttonAlign' in patch) {
+        if (patch.buttonAlign) sep.buttonAlign = patch.buttonAlign
+        else delete sep.buttonAlign
+      }
+      if ('position' in patch && typeof patch.position === 'number') {
+        sep.position = patch.position
+      }
+      if ('tab' in patch && patch.tab) sep.tab = patch.tab
+      this.writeConfig()
+    },
+
+    setTabButtonAlign(tabName: string, align: ButtonAlign | undefined) {
+      const tab = this.configFile.tabList.find((t) => t.name === tabName)
+      if (!tab) return
+      this.pushBeforeChange()
+      if (align) tab.buttonAlign = align
+      else delete tab.buttonAlign
+      this.writeConfig()
+    },
+
+    /** Tab order key for a sound (global index on "All"). */
+    soundOrderOnTab(sound: SoundFile, tab: string): number {
+      if (tab === 'All') return sound.index ?? 0
+      return sound.tabIndexes?.[tab] ?? 0
+    },
+
+    setSoundOrderOnTab(sound: SoundFile, tab: string, order: number) {
+      if (tab === 'All') {
+        sound.index = order
+        return
+      }
+      if (!sound.tabIndexes) sound.tabIndexes = {}
+      sound.tabIndexes[tab] = order
+    },
+
+    /**
+     * Rewrite dense interleaved order for a tab: orphan sounds, then each
+     * group marker + its members. Keeps relative membership from `layout`.
+     */
+    applyBoardLayout(
+      tab: string,
+      layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
+    ) {
+      this.pushBeforeChange()
+      const byPath = new Map(this.configFile.files.map((f) => [f.path, f]))
+      let seq = 0
+      for (const path of layout.orphans) {
+        const f = byPath.get(path)
+        if (f) this.setSoundOrderOnTab(f, tab, seq++)
+      }
+      for (const g of layout.groups) {
+        const sep = (this.configFile.separators ?? []).find((s) => s.id === g.id)
+        if (sep) sep.position = seq++
+        for (const path of g.paths) {
+          const f = byPath.get(path)
+          if (f) this.setSoundOrderOnTab(f, tab, seq++)
+        }
+      }
+      this.writeConfig()
+    },
+
+    /**
+     * Rebuild board layout from current positional membership, then densify.
+     * Call after cross-group drops so float anchors never drift.
+     */
+    normalizeBoardOrder(tab: string) {
+      const layout = this.captureBoardLayout(tab)
+      this.applyBoardLayout(tab, layout)
+    },
+
+    /** Snapshot orphans + groups with member paths from current positions. */
+    captureBoardLayout(tab: string): { orphans: string[]; groups: { id: string; paths: string[] }[] } {
+      const sounds = this.configFile.files
+        .filter((f) => f.tabs.includes(tab))
+        .sort((a, b) => this.soundOrderOnTab(a, tab) - this.soundOrderOnTab(b, tab))
+      const seps = (this.configFile.separators ?? [])
+        .filter((s) => s.tab === tab)
+        .slice()
+        .sort((a, b) => a.position - b.position)
+
+      if (seps.length === 0) {
+        return { orphans: sounds.map((s) => s.path), groups: [] }
+      }
+
+      const orphans: string[] = []
+      const groups: { id: string; paths: string[] }[] = seps.map((s) => ({ id: s.id, paths: [] }))
+
+      for (const sound of sounds) {
+        const order = this.soundOrderOnTab(sound, tab)
+        let placed = false
+        for (let i = 0; i < seps.length; i++) {
+          const start = seps[i].position
+          const end = i + 1 < seps.length ? seps[i + 1].position : Number.POSITIVE_INFINITY
+          if (order >= start && order < end) {
+            groups[i].paths.push(sound.path)
+            placed = true
+            break
+          }
+        }
+        if (!placed && order < seps[0].position) orphans.push(sound.path)
+        else if (!placed) orphans.push(sound.path)
+      }
+      return { orphans, groups }
+    },
+
+    /**
+     * Reorder groups on a tab (orphans stay first). Member sounds move with
+     * their group. `orderedSepIds` is the new group order.
+     */
+    moveGroupWithMembers(tab: string, orderedSepIds: string[]) {
+      const layout = this.captureBoardLayout(tab)
+      const byId = new Map(layout.groups.map((g) => [g.id, g]))
+      const groups = orderedSepIds
+        .map((id) => byId.get(id))
+        .filter((g): g is { id: string; paths: string[] } => !!g)
+      // Keep any groups missing from orderedSepIds at the end (safety).
+      for (const g of layout.groups) {
+        if (!orderedSepIds.includes(g.id)) groups.push(g)
+      }
+      this.applyBoardLayout(tab, { orphans: layout.orphans, groups })
+    },
+
     // ── Bulk / misc ───────────────────────────────────────────────────────────
     resetAll() {
+      this.pushBeforeChange()
       this.configFile = emptyConfig()
       this.normalizeIndexes()
       this.filteredFiles = []

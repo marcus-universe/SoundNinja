@@ -36,14 +36,6 @@
     </Transition>
 
     <div class="settings-group">
-      <label class="settings-label">{{ $t('settings.main.themeMode') }}</label>
-      <select v-model="themeMode" @change="onThemeMode" class="settings-select">
-        <option value="dark">{{ $t('settings.main.themeModeDark') }}</option>
-        <option value="light">{{ $t('settings.main.themeModeLight') }}</option>
-      </select>
-    </div>
-
-    <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.navbarSide') }}</label>
       <select v-model="navbarSide" @change="onNavbarSide" class="settings-select">
         <option value="left">{{ $t('settings.main.navbarLeft') }}</option>
@@ -88,7 +80,31 @@
       <UICheckbox :modelValue="overlapSounds" @update:modelValue="onOverlapSounds" />
     </div>
 
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.showPlayer') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.showPlayerHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="showPlayer" @update:modelValue="onShowPlayer" />
+    </div>
+
+    <div v-if="showPlayer" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.playerLarge') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.playerLargeHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="playerLarge" @update:modelValue="onPlayerLarge" />
+    </div>
+
     <div class="settings-section-divider">{{ $t('settings.main.behavior') }}</div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.checkUpdatesOnStart') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.checkUpdatesOnStartHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="checkUpdatesOnStart" @update:modelValue="onCheckUpdatesOnStart" />
+    </div>
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
@@ -105,6 +121,43 @@
       </div>
       <UICheckbox :modelValue="allowReorder" @update:modelValue="onAllowReorder" />
     </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.gifPlayOnHover') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.gifPlayOnHoverHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="gifPlayOnHover" @update:modelValue="onGifPlayOnHover" />
+    </div>
+
+    <div class="settings-group settings-group--stacked">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.klipyApiKey') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.klipyApiKeyHint') }}</span>
+      </div>
+      <input
+        class="settings-input"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        :placeholder="$t('settings.main.klipyApiKeyPlaceholder')"
+        :value="klipyApiKey"
+        @change="onKlipyApiKeyEvent"
+      />
+      <button type="button" class="settings-link-btn" @click="openKlipyDocs">
+        {{ $t('settings.main.klipyGetKey') }}
+      </button>
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.navbarTooltips') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.navbarTooltipsHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="navbarTooltips" @update:modelValue="onNavbarTooltips" />
+    </div>
+
+
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
@@ -191,14 +244,51 @@
       <UICheckbox :modelValue="gpuAudioEnabled" @update:modelValue="onGpuAudio" />
     </div>
 
-   
+    <div class="settings-section-divider">{{ $t('settings.main.stemsSection') }}</div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.stemsModel') }}</span>
+        <span class="settings-hint">{{ stemsModelHint }}</span>
+        <span v-if="stemsDownloading" class="settings-hint">
+          {{ $t('recordEditor.stemsDownloading') }}
+          {{ stemsDownloadPct != null ? Math.round(stemsDownloadPct) + '%' : '' }}
+        </span>
+      </div>
+      <button
+        v-if="stemsAvailable && !stemsModelReady"
+        class="settings-btn"
+        style="flex: 0; white-space: nowrap"
+        :disabled="stemsDownloading"
+        @click="onInstallStemsModel"
+      >
+        {{ $t('settings.main.stemsInstall') }}
+      </button>
+      <span v-else-if="stemsModelReady" class="settings-hint" style="white-space: nowrap">
+        {{ $t('settings.main.stemsInstalled') }}
+      </span>
+      <span v-else class="settings-hint" style="white-space: nowrap">
+        {{ $t('settings.main.stemsUnavailable') }}
+      </span>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { openSecondaryWindow, THEME_CREATOR } from '~/utils/secondaryWindows'
+import { THEME_PRESETS, DEFAULT_THEME_ID, normalizeThemeId } from '~/utils/themePresets'
+import {
+  THEME_INLINE_VARS,
+  applyThemeTokens,
+  parseThemeCss,
+  buildThemeCss,
+  parseThemeName,
+  THEME_TOKEN_DEFAULTS,
+} from '~/utils/themeTokens'
+import { KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
@@ -213,21 +303,7 @@ function joinPath(base: string, ...parts: string[]) {
 // ── Theme Creator window ──────────────────────────────────────────────────────
 async function openThemeCreator() {
   try {
-    const existing = await WebviewWindow.getByLabel('theme-creator')
-    if (existing) {
-      await existing.setFocus()
-    } else {
-      const win = new WebviewWindow('theme-creator', {
-        url: '#/theme-creator',
-        title: 'Theme Creator',
-        width: 940,
-        height: 720,
-        minWidth: 720,
-        minHeight: 560,
-        resizable: true,
-      })
-      win.once('tauri://error', (e) => console.error('Theme Creator window error', e))
-    }
+    await openSecondaryWindow(THEME_CREATOR)
   } catch (e) {
     console.error('Failed to open Theme Creator window', e)
   }
@@ -236,27 +312,26 @@ async function openThemeCreator() {
 
 
 
-const builtinThemes = [
-  { id: 'dark-cyan',   label: 'Dark Cyan',   colors: { primaryColor: '#00d4ff', bgDark: '#222831' } },
-  { id: 'dark-purple', label: 'Dark Purple', colors: { primaryColor: '#a855f7', bgDark: '#1e1b2e' } },
-  { id: 'dark-orange', label: 'Dark Orange', colors: { primaryColor: '#ff8a29', bgDark: '#231c15' } },
-  { id: 'dark-green',  label: 'Dark Green',  colors: { primaryColor: '#22e06a', bgDark: '#162218' } },
-  { id: 'dark-pink',   label: 'Dark Pink',   colors: { primaryColor: '#f062a6', bgDark: '#231520' } },
-]
+const builtinThemes = THEME_PRESETS
 
-const selectedTheme = ref('dark-cyan')
+const selectedTheme = ref(DEFAULT_THEME_ID)
 const savedThemes = ref<string[]>([])
 const importError = ref('')
 const importSuccess = ref('')
 const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
+const showPlayer = ref(true)
+const playerLarge = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
+const gifPlayOnHover = ref(true)
+const klipyApiKey = ref('')
+const navbarTooltips = ref(true)
+const checkUpdatesOnStart = ref(true)
 const systemTitlebar = ref(false)
 const hideTitlebar = ref(false)
 const hideTitlebarWarnOpen = ref(false)
 const hideTitlebarDontRemind = ref(false)
-const themeMode = ref<'dark' | 'light'>('dark')
 const recentLimit = ref(30)
 const currentLanguage = ref(locale.value)
 const navbarSide = ref<'left' | 'right'>('left')
@@ -265,6 +340,60 @@ const cacheMaxEntryMib = ref(50)
 const cacheStatsText = ref('')
 const hasDedicatedGpu = ref(false)
 const gpuAudioEnabled = ref(false)
+const stemsAvailable = ref(false)
+const stemsModelReady = ref(false)
+const stemsModelLabel = ref('BS-RoFormer')
+const stemsModelSize = ref('~158 MB')
+const stemsDownloading = ref(false)
+const stemsDownloadPct = ref<number | null>(null)
+let unlistenStemsPct: UnlistenFn | null = null
+
+const stemsModelHint = computed(() => {
+  if (!stemsAvailable.value) return t('settings.main.stemsUnavailableHint')
+  if (stemsModelReady.value) {
+    return t('settings.main.stemsInstalledHint', {
+      model: stemsModelLabel.value,
+      size: stemsModelSize.value,
+    })
+  }
+  return t('settings.main.stemsInstallHint', {
+    model: stemsModelLabel.value,
+    size: stemsModelSize.value,
+  })
+})
+
+async function refreshStemsStatus() {
+  try {
+    const s = await invoke<{
+      available: boolean
+      modelReady: boolean
+      modelLabel: string
+      modelSizeHint: string
+    }>('get_stems_status')
+    stemsAvailable.value = !!s.available
+    stemsModelReady.value = !!s.modelReady
+    stemsModelLabel.value = s.modelLabel || 'BS-RoFormer'
+    stemsModelSize.value = s.modelSizeHint || '~158 MB'
+  } catch {
+    stemsAvailable.value = false
+    stemsModelReady.value = false
+  }
+}
+
+async function onInstallStemsModel() {
+  if (!stemsAvailable.value || stemsDownloading.value) return
+  stemsDownloading.value = true
+  stemsDownloadPct.value = 0
+  try {
+    await invoke('ensure_stems_model')
+    await refreshStemsStatus()
+  } catch (e) {
+    console.error(e)
+  } finally {
+    stemsDownloading.value = false
+    stemsDownloadPct.value = null
+  }
+}
 
 // ── Navbar side ───────────────────────────────────────────────────────────────
 async function onNavbarSide() {
@@ -310,9 +439,8 @@ function applyTheme() {
   removeCustomCssTag()
   const theme = builtinThemes.find((t) => t.id === id)
   if (!theme) return
-  // Builtin themes are presets for the per-project color model.
-  jsonStore.setThemeColors(theme.colors)
-  applyThemeColors(jsonStore.configFile?.settings)
+  jsonStore.setThemeColors(theme.tokens)
+  applyThemeTokens(jsonStore.configFile?.settings as unknown as Record<string, unknown>, theme.extras)
 }
 
 // Removes every theme variable a builtin/model theme may have set inline on
@@ -320,11 +448,7 @@ function applyTheme() {
 // cleared before a file/custom theme can take effect.
 function clearInlineThemeVars() {
   const root = document.documentElement
-  ;[
-    '--primary_color', '--color-bg', '--color-btn', '--sound-text',
-    '--color-bg-light', '--color-bg-dark', '--color-btn-light', '--color-btn-dark',
-    '--text-light', '--text-dark',
-  ].forEach((k) => root.style.removeProperty(k))
+  THEME_INLINE_VARS.forEach((k) => root.style.removeProperty(k))
 }
 
 function removeCustomCssTag() {
@@ -338,7 +462,21 @@ function injectCustomCss(css: string) {
     tag.id = 'sn-custom-theme'
     document.head.appendChild(tag)
   }
-  tag.textContent = css
+  const parsed = parseThemeCss(css)
+  if (parsed.primaryColor || parsed.bg || parsed.btnBg) {
+    const tokens = { ...THEME_TOKEN_DEFAULTS, ...parsed }
+    const name = parseThemeName(css) || 'theme'
+    const flat = buildThemeCss(name, tokens)
+    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding|--gif-overlay-hover|--gif-overlay)\s*:\s*([^;]+);/g
+    const extras: string[] = []
+    let m: RegExpExecArray | null
+    while ((m = layoutRe.exec(css)) !== null) extras.push(`  ${m[1]}: ${m[2]};`)
+    tag.textContent = extras.length
+      ? flat.replace(/\n}\s*$/, `\n${extras.join('\n')}\n}`)
+      : flat
+  } else {
+    tag.textContent = css
+  }
 }
 
 async function loadSavedThemes() {
@@ -386,10 +524,7 @@ async function importCustomCssFile() {
 }
 
 // Reads the `/* SoundNinja Theme: NAME */` comment from a theme CSS file.
-function parseThemeName(css: string): string {
-  const m = css.match(/\/\*\s*SoundNinja Theme:\s*(.+?)\s*\*\//i)
-  return m?.[1]?.trim() ?? ''
-}
+// (parseThemeName imported from ~/utils/themeTokens)
 
 async function saveImportedTheme(css: string, name: string) {
   const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
@@ -438,6 +573,16 @@ function onOverlapSounds(val: boolean) {
   jsonStore.setOverlapSounds(val)
 }
 
+function onShowPlayer(val: boolean) {
+  showPlayer.value = val
+  jsonStore.setSetting('showPlayer', val)
+}
+
+function onPlayerLarge(val: boolean) {
+  playerLarge.value = val
+  jsonStore.setSetting('playerLarge', val)
+}
+
 // ── Behavior (P8/P9) ──────────────────────────────────────────────────────────
 function onUniformButtonHeight(val: boolean) {
   uniformButtonHeight.value = val
@@ -447,6 +592,35 @@ function onUniformButtonHeight(val: boolean) {
 function onAllowReorder(val: boolean) {
   allowReorder.value = val
   jsonStore.setAllowReorder(val)
+}
+
+function onGifPlayOnHover(val: boolean) {
+  gifPlayOnHover.value = val
+  jsonStore.setGifPlayOnHover(val)
+}
+
+async function onKlipyApiKey(val: string) {
+  klipyApiKey.value = val
+  await appSettings.setKlipyApiKey(val)
+}
+
+function onKlipyApiKeyEvent(e: Event) {
+  const el = e.target as HTMLInputElement
+  onKlipyApiKey(el.value)
+}
+
+function openKlipyDocs() {
+  openInSystemBrowser(KLIPY_PARTNER_URL)
+}
+
+async function onNavbarTooltips(val: boolean) {
+  navbarTooltips.value = val
+  await appSettings.setNavbarTooltips(val)
+}
+
+async function onCheckUpdatesOnStart(val: boolean) {
+  checkUpdatesOnStart.value = val
+  await appSettings.setCheckUpdatesOnStart(val)
 }
 
 async function onSystemTitlebar(val: boolean) {
@@ -483,11 +657,6 @@ function cancelHideTitlebar() {
   hideTitlebarWarnOpen.value = false
   hideTitlebarDontRemind.value = false
   hideTitlebar.value = false
-}
-
-function onThemeMode() {
-  jsonStore.setThemeMode(themeMode.value)
-  applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
 }
 
 async function onRecentLimit() {
@@ -537,15 +706,19 @@ async function syncFromStore() {
   // Load the saved-theme options first so the dropdown always has a matching
   // <option> for a persisted `file:` theme — otherwise v-model can't select it.
   await loadSavedThemes()
-  selectedTheme.value = jsonStore.configFile?.settings?.theme ?? 'dark-cyan'
+  selectedTheme.value = normalizeThemeId(jsonStore.configFile?.settings?.theme)
   stopOnRetrigger.value = jsonStore.configFile?.settings?.stopOnRetrigger ?? true
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
+  showPlayer.value = jsonStore.configFile?.settings?.showPlayer !== false
+  playerLarge.value = jsonStore.configFile?.settings?.playerLarge === true
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
+  gifPlayOnHover.value = jsonStore.configFile?.settings?.gifPlayOnHover !== false
+  klipyApiKey.value = appSettings.klipyApiKey || ''
+  navbarTooltips.value = appSettings.navbarTooltips !== false
+  checkUpdatesOnStart.value = appSettings.checkUpdatesOnStart !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
-  themeMode.value = jsonStore.configFile?.settings?.themeMode ?? 'dark'
-  applyThemeMode(themeMode.value, jsonStore.configFile?.settings)
   recentLimit.value = appSettings.recentLimit ?? 30
   cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
   cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 50
@@ -566,6 +739,7 @@ async function syncFromStore() {
   if (hasDedicatedGpu.value) {
     gpuAudioEnabled.value = jsonStore.configFile?.settings?.gpuAudioEnabled ?? false
   }
+  await refreshStemsStatus()
 }
 
 async function onGpuAudio(val: boolean) {
@@ -583,5 +757,15 @@ watch(() => appStore.activeOverlay, async (val) => {
   await syncFromStore()
 })
 
-onMounted(syncFromStore)
+onMounted(async () => {
+  await syncFromStore()
+  unlistenStemsPct = await listen<number>('stems_model_progress', (e) => {
+    if (!stemsDownloading.value) return
+    stemsDownloadPct.value = Number(e.payload) || 0
+  })
+})
+
+onBeforeUnmount(() => {
+  if (unlistenStemsPct) unlistenStemsPct()
+})
 </script>

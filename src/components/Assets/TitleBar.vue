@@ -2,7 +2,7 @@
   <div v-if="showCustomBar" class="titlebar-wrapper">
     <!-- Top row: app title + window controls -->
     <div class="titlebar" data-tauri-drag-region>
-      <span class="titlebar__title" data-tauri-drag-region>Sound Ninja</span>
+      <span class="titlebar__title" data-tauri-drag-region>{{ windowTitle }}</span>
       <div class="titlebar__controls">
         <button class="titlebar__btn titlebar__btn--min" @click="minimize" aria-label="Minimize">
           <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -33,8 +33,8 @@
       </div>
     </div>
 
-    <!-- Second row: app menu bar -->
-    <div class="menubar" @mouseleave="closeMenu">
+    <!-- Second row: app menu bar (main window only) -->
+    <div v-if="showAppMenu" class="menubar" @mouseleave="closeMenu">
       <div
         v-for="menu in menus"
         :key="menu.id"
@@ -86,6 +86,8 @@ import { emit } from '@tauri-apps/api/event'
 const appSettings = useAppSettingsStore()
 
 const isDesktopChrome = ref(false)
+const isMainWindow = ref(true)
+const windowTitle = ref('Sound Ninja')
 const openMenu = ref<string | null>(null)
 const isMaximized = ref(false)
 
@@ -95,13 +97,15 @@ const showCustomBar = computed(() =>
   && !appSettings.hideTitlebar,
 )
 
+/** File/Edit/Help only on main — tool windows get title + controls. */
+const showAppMenu = computed(() => showCustomBar.value && isMainWindow.value)
+
 // Keep layout offset in sync when the styled bar appears (store also sets this
 // via applyWindowChrome; this covers the brief window before settings load).
-watch(showCustomBar, (visible) => {
+watch([showCustomBar, showAppMenu], ([visible, withMenu]) => {
   if (typeof document === 'undefined') return
-  if (visible) {
-    document.documentElement.style.setProperty('--topbar_height', '5.6rem')
-  }
+  if (!visible) return
+  document.documentElement.style.setProperty('--topbar_height', withMenu ? '5.6rem' : '3rem')
 }, { immediate: true })
 
 const recentProjects = computed(() => appSettings.recentProjects ?? [])
@@ -153,6 +157,9 @@ const menus: MenuGroup[] = [
     id: 'edit',
     labelKey: 'menu.edit',
     items: [
+      { id: 'undo',                 labelKey: 'menu.undo',               event: 'menu_undo' },
+      { id: 'redo',                 labelKey: 'menu.redo',               event: 'menu_redo' },
+      { id: 'sep_undo', sep: true },
       { id: 'open_settings',        labelKey: 'menu.settings',           event: 'menu_open_settings' },
       { id: 'sep4', sep: true },
       { id: 'open_themes_folder',   labelKey: 'menu.openThemesFolder',   event: 'menu_open_themes_folder' },
@@ -163,6 +170,7 @@ const menus: MenuGroup[] = [
     id: 'help',
     labelKey: 'menu.help',
     items: [
+      { id: 'check_updates', labelKey: 'menu.checkUpdates', event: 'menu_check_updates' },
       { id: 'about', labelKey: 'menu.about', event: 'menu_open_about' },
     ],
   },
@@ -208,6 +216,13 @@ async function toggleMaximize() {
 function closeWindow() { win.close() }
 
 onMounted(async () => {
+  try {
+    isMainWindow.value = win.label === 'main'
+    windowTitle.value = (await win.title()) || (isMainWindow.value ? 'Sound Ninja' : win.label)
+  } catch {
+    isMainWindow.value = true
+    windowTitle.value = 'Sound Ninja'
+  }
   try {
     const p = await platform()
     isDesktopChrome.value = p === 'windows' || p === 'linux'

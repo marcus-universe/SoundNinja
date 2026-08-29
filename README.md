@@ -59,7 +59,7 @@ Sound Ninja currently supports theoretically the following platforms:
 - Debian (Ubuntu 18.04 and above or equivalent) with the following packages installed:
   - `libwebkit2gtk-4.0-37`, `libgtk-3-0`, `libayatana-appindicator3-1`<sup>1</sup>
 - Arch with the following packages installed:
-  - `webkit2gtk`, `gtk3`, `libayatana-appindicator`<sup>1</sup>
+  - `webkit2gtk`, `gtk3`, `libayatana-appindicator`<sup>1</sup>, `libpipewire` (audio device enumeration)
 - Fedora (latest 2 versions) with the following packages installed:
   - `webkit2gtk3`, `gtk3`, `libappindicator-gtk3`<sup>1</sup>
 
@@ -103,6 +103,12 @@ bun run tauri:serve
 # or: npm run tauri:serve / pnpm tauri:serve / deno task tauri:serve
 ```
 
+Stem separation (BS-RoFormer model) needs an extra build flag and a one-time model download. See [docs/stems-model.md](./docs/stems-model.md).
+
+```bash
+npm run tauri:serve:stems
+```
+
 ### Compiles and minifies for production
 
 ```bash
@@ -120,3 +126,8 @@ bun run dev
 ### Customize configuration
 
 See [Nuxt Configuration](https://nuxt.com/docs/api/configuration/nuxt-config) and [Tauri Configuration](https://v2.tauri.app/reference/config/).
+
+## Credits
+
+- [lucidrains/BS-RoFormer](https://github.com/lucidrains/BS-RoFormer) — Band-Split RoPE Transformer, the architecture powering Sound Ninja's AI stem separation in the Record Editor. MIT licensed.
+- Weights trained by viperx; ONNX export tooling by [ZFTurbo/MSS_ONNX_TensorRT](https://github.com/ZFTurbo/MSS_ONNX_TensorRT).

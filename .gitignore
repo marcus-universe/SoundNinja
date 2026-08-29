@@ -28,3 +28,6 @@ pnpm-debug.log*
 node_modules
 agents
 .agents
+.agent
+agent
+

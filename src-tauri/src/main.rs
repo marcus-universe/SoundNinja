@@ -4,6 +4,7 @@ pub mod gpu;
 pub mod menu;
 pub mod paths;
 pub mod fsx;
+pub mod httpx;
 
 #[tauri::command]
 fn get_system_fonts() -> Vec<String> {
@@ -62,6 +63,27 @@ fn get_system_fonts_platform() -> Vec<String> {
     ]
 }
 
+/// Open http(s)/mailto/tel links in the system browser (works from secondary windows).
+#[tauri::command]
+fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return Err("Empty URL".into());
+    }
+    let lower = trimmed.to_lowercase();
+    if !(lower.starts_with("https://")
+        || lower.starts_with("http://")
+        || lower.starts_with("mailto:")
+        || lower.starts_with("tel:"))
+    {
+        return Err("URL scheme not allowed".into());
+    }
+    app.opener()
+        .open_url(trimmed, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
@@ -70,6 +92,8 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // On macOS keep native decorations (traffic lights) — the custom
             // HTML title bar in TitleBar.vue only renders on Windows/Linux.
@@ -96,17 +120,58 @@ fn main() {
             audio::devices::get_audio_hosts,
             audio::devices::get_out_devices_host,
             audio::devices::get_asio_device_channels,
+            audio::devices::get_in_devices,
+            audio::devices::get_in_devices_host,
+            audio::devices::get_loopback_devices,
             audio::playback::play_sound,
             audio::playback::get_sound_duration,
+            audio::playback::pause_sound,
+            audio::playback::resume_sound,
+            audio::playback::pause_all,
+            audio::playback::resume_all,
+            audio::playback::stop_all,
+            audio::playback::get_playing_sounds,
+            audio::playback::seek_playing,
+            audio::playback::set_playing_loop,
+            audio::playback::set_output_volume,
             audio::cache::warm_sound_cache,
             audio::cache::clear_sound_cache,
             audio::cache::get_cache_stats,
             audio::cache::set_cache_config,
-            audio::playback::set_output_volume,
+            audio::record::start_recording,
+            audio::record::stop_recording,
+            audio::record::get_live_record_peaks,
+            audio::record::get_record_level,
+            audio::record::is_recording,
+            audio::record::set_input_volume,
+            audio::record::get_input_volume,
+            audio::dsp::load_edit_session,
+            audio::dsp::get_waveform_peaks,
+            audio::dsp::get_file_waveform_peaks,
+            audio::dsp::trim_session,
+            audio::dsp::delete_range,
+            audio::dsp::normalize_session,
+            audio::dsp::denoise_session,
+            audio::dsp::undo_session,
+            audio::dsp::redo_session,
+            audio::dsp::export_session,
+            audio::dsp::stage_session_clip,
+            audio::dsp::preview_session,
+            audio::dsp::stop_preview,
+            audio::dsp::pause_preview,
+            audio::dsp::resume_preview,
+            audio::stems::get_stems_status,
+            audio::stems::ensure_stems_model,
+            audio::stems::dismiss_stems_intent,
+            audio::stems::split_session,
+            audio::stems::stems_busy,
             get_system_fonts,
+            open_external_url,
             menu::rebuild_menu,
             menu::set_recent_projects,
             menu::set_window_chrome,
+            menu::strip_window_menu,
+            menu::strip_window_menu_for,
             paths::get_default_paths,
             paths::relocate_data,
             paths::list_projects,
@@ -117,9 +182,12 @@ fn main() {
             fsx::make_dir_abs,
             fsx::list_dir_files_abs,
             fsx::copy_file_abs,
+            fsx::copy_file_to_abs,
             fsx::delete_file_abs,
             fsx::delete_dir_abs,
             fsx::collect_audio_buckets_abs,
+            httpx::download_url_bytes,
+            httpx::http_get_text,
             gpu::has_dedicated_gpu,
             gpu::set_gpu_audio,
             gpu::get_gpu_audio_enabled

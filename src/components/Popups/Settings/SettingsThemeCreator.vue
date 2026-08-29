@@ -3,231 +3,284 @@
     <!-- Sticky title bar with action icons -->
     <div class="theme-creator-toolbar">
       <h2 class="theme-creator-toolbar__title">{{ $t('settings.themeCreator.title') }}</h2>
+      <select
+        v-model="loadThemeId"
+        class="settings-select theme-creator-toolbar__theme"
+        :title="$t('settings.themeCreator.loadThemeHint')"
+        @change="onLoadTheme"
+      >
+        <option value="">{{ $t('settings.themeCreator.loadThemePlaceholder') }}</option>
+        <optgroup :label="$t('settings.themeCreator.presets')">
+          <option v-for="p in presets" :key="p.id" :value="'preset:' + p.id">{{ p.label }}</option>
+        </optgroup>
+        <optgroup v-if="savedThemes.length" :label="$t('settings.themeCreator.savedThemes')">
+          <option v-for="f in savedThemes" :key="f" :value="'file:' + f">{{ f.replace('.css', '') }}</option>
+        </optgroup>
+      </select>
       <div class="theme-creator-toolbar__actions">
-        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.importCss')" @click="importThemeFromFile">
+        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.importCssHint')" @click="importThemeFromFile">
           <Icons icon="upload" customClass="tc-toolbar-icon" />
         </button>
-        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.exportCss')" @click="exportTheme">
+        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.exportCssHint')" @click="exportTheme">
           <Icons icon="folder" customClass="tc-toolbar-icon" />
         </button>
-        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.addToThemes')" @click="saveThemeToFolder">
+        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.addToThemesHint')" @click="saveThemeToFolder">
           <Icons icon="check" customClass="tc-toolbar-icon" />
         </button>
-        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.reset')" @click="resetToDefaults">
+        <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.resetHint')" @click="resetToDefaults">
           <Icons icon="reset" customClass="tc-toolbar-icon" />
         </button>
       </div>
     </div>
 
+    <nav class="theme-creator-tabs" aria-label="Theme Creator sections">
+      <button
+        v-for="tab in creatorTabs"
+        :key="tab.id"
+        type="button"
+        class="theme-creator-tabs__item"
+        :class="{ active: activeTab === tab.id }"
+        :title="$t(tab.labelKey + 'Hint')"
+        @click="activeTab = tab.id"
+      >{{ $t(tab.labelKey) }}</button>
+    </nav>
+
     <div class="theme-creator-layout">
-      <!-- Controls column -->
       <div class="theme-creator-controls">
 
-        <div class="settings-group">
-          <label class="settings-label">{{ $t('settings.themeCreator.themeName') }}</label>
-          <input type="text" class="settings-input" v-model="themeCreator.name" :placeholder="$t('settings.themeCreator.themeNamePlaceholder')" />
-        </div>
-
-        <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
-
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.previewMode') }}</label>
-          <select v-model="previewMode" class="settings-select" @change="onPreviewModeChange">
-            <option value="dark">{{ $t('settings.themeCreator.previewDark') }}</option>
-            <option value="light">{{ $t('settings.themeCreator.previewLight') }}</option>
-          </select>
-        </div>
-
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.primaryAccent') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.primaryColor" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.primaryColor" @change="fixColorInput('primaryColor')" maxlength="9" spellcheck="false" />
+        <!-- ── General ───────────────────────────────────────────────────── -->
+        <template v-if="activeTab === 'general'">
+          <div class="settings-group settings-group--stacked">
+            <SettingsTipLabel fluid :tip="$t('settings.themeCreator.themeNameHint')">{{ $t('settings.themeCreator.themeName') }}</SettingsTipLabel>
+            <input type="text" class="settings-input" v-model="themeCreator.name" :placeholder="$t('settings.themeCreator.themeNamePlaceholder')" />
           </div>
-        </div>
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.backgroundLight') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.bgLight" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.bgLight" @change="fixColorInput('bgLight')" maxlength="9" spellcheck="false" />
-          </div>
-        </div>
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.backgroundDark') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.bgDark" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.bgDark" @change="fixColorInput('bgDark')" maxlength="9" spellcheck="false" />
-          </div>
-        </div>
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonLight') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.btnLight" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.btnLight" @change="fixColorInput('btnLight')" maxlength="9" spellcheck="false" />
-          </div>
-        </div>
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonDark') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.btnDark" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.btnDark" @change="fixColorInput('btnDark')" maxlength="9" spellcheck="false" />
-          </div>
-        </div>
 
-        <div class="settings-section-divider">{{ $t('settings.themeCreator.textColors') }}</div>
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
 
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.textLight') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.textLight" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.textLight" @change="fixColorInput('textLight')" maxlength="9" spellcheck="false" />
-          </div>
-        </div>
-        <div class="settings-group settings-group--inline">
-          <label class="settings-label">{{ $t('settings.themeCreator.textDark') }}</label>
-          <div class="settings-color-row">
-            <input type="color" class="settings-color" v-model="themeCreator.textDark" />
-            <input type="text" class="settings-color-text" v-model="themeCreator.textDark" @change="fixColorInput('textDark')" maxlength="9" spellcheck="false" />
-          </div>
-        </div>
-
-        <div class="settings-section-divider">{{ $t('settings.themeCreator.buttonTypography') }}</div>
-
-        <div class="settings-row" style="margin-bottom: 0.75rem">
-          <button class="settings-btn" @click="uploadFont">{{ $t('settings.themeCreator.uploadFont') }}</button>
-          <span v-if="fontUploadMsg" class="settings-hint" style="align-self:center">{{ fontUploadMsg }}</span>
-        </div>
-
-        <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.buttonFont') }}</label>
-          <div class="font-dropdown" ref="btnFontDropdownRef">
-            <div class="font-dropdown__trigger" @click="btnFontOpen = !btnFontOpen">
-              <span :style="{ fontFamily: themeCreator.btnFontFamily }">{{ themeCreator.btnFontFamily }}</span>
-              <span class="font-dropdown__arrow">▾</span>
+          <div
+            v-for="row in generalColorRows"
+            :key="row.key"
+            class="settings-group settings-group--inline"
+          >
+            <SettingsTipLabel fluid :tip="$t(row.labelKey + 'Hint')">{{ $t(row.labelKey) }}</SettingsTipLabel>
+            <div class="settings-color-row">
+              <input type="color" class="settings-color" :value="colorPickerValue(row.key)" @input="onColorWheel(row.key, $event)" />
+              <input type="text" class="settings-color-text" v-model="themeCreator[row.key]" @change="fixColorInput(row.key)" maxlength="9" spellcheck="false" />
             </div>
-            <div v-show="btnFontOpen" class="font-dropdown__list">
-              <div class="font-dropdown__search">
-                <input v-model="btnFontSearch" type="text" class="font-dropdown__search-input" :placeholder="$t('settings.themeCreator.searchFont')" />
+          </div>
+
+          <div class="settings-row theme-creator-font-upload">
+            <button class="settings-btn" :title="$t('settings.themeCreator.uploadFontHint')" @click="uploadFont">{{ $t('settings.themeCreator.uploadFont') }}</button>
+            <span class="settings-info-icon theme-creator-font-upload__tip">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              <span class="settings-info-icon__tip">{{ $t('settings.themeCreator.uploadFontHint') }}</span>
+            </span>
+            <span v-if="fontUploadMsg" class="settings-hint">{{ fontUploadMsg }}</span>
+          </div>
+        </template>
+
+        <!-- ── Buttons ───────────────────────────────────────────────────── -->
+        <template v-else-if="activeTab === 'buttons'">
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
+
+          <div
+            v-for="row in buttonColorRows"
+            :key="row.key"
+            class="settings-group settings-group--inline"
+          >
+            <SettingsTipLabel fluid :tip="$t(row.labelKey + 'Hint')">{{ $t(row.labelKey) }}</SettingsTipLabel>
+            <div class="settings-color-row">
+              <input type="color" class="settings-color" :value="colorPickerValue(row.key)" @input="onColorWheel(row.key, $event)" />
+              <input type="text" class="settings-color-text" v-model="themeCreator[row.key]" @change="fixColorInput(row.key)" maxlength="9" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.buttonTypography') }}</div>
+
+          <div class="settings-group settings-group--stacked">
+            <SettingsTipLabel fluid :tip="$t('settings.themeCreator.buttonFontHint')">{{ $t('settings.themeCreator.buttonFont') }}</SettingsTipLabel>
+            <div class="font-dropdown" ref="btnFontDropdownRef">
+              <div class="font-dropdown__trigger" @click="btnFontOpen = !btnFontOpen">
+                <span :style="{ fontFamily: themeCreator.btnFontFamily }">{{ themeCreator.btnFontFamily }}</span>
+                <span class="font-dropdown__arrow">▾</span>
               </div>
-              <div
-                v-for="font in filteredBtnFonts"
-                :key="'btn-' + font"
-                class="font-dropdown__option"
-                :class="{ active: themeCreator.btnFontFamily === font }"
-                :style="{ fontFamily: font }"
-                @click="themeCreator.btnFontFamily = font; btnFontOpen = false"
-              >{{ font }}</div>
-            </div>
-          </div>
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.buttonFontSize') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0.3" step="0.05" v-model.number="themeCreator.fontSizeBtn" @change="clampMin('fontSizeBtn', 0.3)" />
-              <span class="settings-unit-label">rem</span>
-            </div>
-          </div>
-          <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeBtn" />
-        </div>
-
-        <div class="settings-section-divider">{{ $t('settings.themeCreator.tabTypography') }}</div>
-
-        <div class="settings-group settings-group--stacked">
-          <label class="settings-label">{{ $t('settings.themeCreator.tabFont') }}</label>
-          <div class="font-dropdown" ref="tabFontDropdownRef">
-            <div class="font-dropdown__trigger" @click="tabFontOpen = !tabFontOpen">
-              <span :style="{ fontFamily: themeCreator.tabFontFamily }">{{ themeCreator.tabFontFamily }}</span>
-              <span class="font-dropdown__arrow">▾</span>
-            </div>
-            <div v-show="tabFontOpen" class="font-dropdown__list">
-              <div class="font-dropdown__search">
-                <input v-model="tabFontSearch" type="text" class="font-dropdown__search-input" :placeholder="$t('settings.themeCreator.searchFont')" />
+              <div v-show="btnFontOpen" class="font-dropdown__list">
+                <div class="font-dropdown__search">
+                  <input v-model="btnFontSearch" type="text" class="font-dropdown__search-input" :placeholder="$t('settings.themeCreator.searchFont')" />
+                </div>
+                <div
+                  v-for="font in filteredBtnFonts"
+                  :key="'btn-' + font"
+                  class="font-dropdown__option"
+                  :class="{ active: themeCreator.btnFontFamily === font }"
+                  :style="{ fontFamily: font }"
+                  @click="themeCreator.btnFontFamily = font; btnFontOpen = false"
+                >{{ font }}</div>
               </div>
-              <div
-                v-for="font in filteredTabFonts"
-                :key="'tab-' + font"
-                class="font-dropdown__option"
-                :class="{ active: themeCreator.tabFontFamily === font }"
-                :style="{ fontFamily: font }"
-                @click="themeCreator.tabFontFamily = font; tabFontOpen = false"
-              >{{ font }}</div>
             </div>
           </div>
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.tabFontSize') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0.3" step="0.05" v-model.number="themeCreator.fontSizeTab" @change="clampMin('fontSizeTab', 0.3)" />
-              <span class="settings-unit-label">rem</span>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.buttonFontSizeHint')">{{ $t('settings.themeCreator.buttonFontSize') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0.3" step="0.05" v-model.number="themeCreator.fontSizeBtn" @change="clampMin('fontSizeBtn', 0.3)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
             </div>
+            <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeBtn" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('fontSizeBtn')" />
           </div>
-          <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeTab" />
-        </div>
 
-        <div class="settings-section-divider">{{ $t('settings.themeCreator.layout') }}</div>
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.layout') }}</div>
 
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.buttonWidth') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="3" step="0.5" v-model.number="themeCreator.btnWidth" @change="clampMin('btnWidth', 3)" />
-              <span class="settings-unit-label">rem</span>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.buttonWidthHint')">{{ $t('settings.themeCreator.buttonWidth') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="3" step="0.5" v-model.number="themeCreator.btnWidth" @change="clampMin('btnWidth', 3)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="5" max="30" step="0.5" v-model.number="themeCreator.btnWidth" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnWidth')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.borderRadiusHint')">{{ $t('settings.themeCreator.borderRadius') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.borderRadius" @change="clampMin('borderRadius', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="4" step="0.05" v-model.number="themeCreator.borderRadius" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('borderRadius')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.borderWidthHint')">{{ $t('settings.themeCreator.borderWidth') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.02" v-model.number="themeCreator.borderWidth" @change="clampMin('borderWidth', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="2" step="0.02" v-model.number="themeCreator.borderWidth" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('borderWidth')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.buttonGapHint')">{{ $t('settings.themeCreator.buttonGap') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.buttonGap" @change="clampMin('buttonGap', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="6" step="0.05" v-model.number="themeCreator.buttonGap" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('buttonGap')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.buttonPaddingXHint')">{{ $t('settings.themeCreator.buttonPaddingX') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.btnPaddingX" @change="clampMin('btnPaddingX', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0.25" max="5" step="0.05" v-model.number="themeCreator.btnPaddingX" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnPaddingX')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.buttonPaddingYHint')">{{ $t('settings.themeCreator.buttonPaddingY') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.btnPaddingY" @change="clampMin('btnPaddingY', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0.1" max="4" step="0.05" v-model.number="themeCreator.btnPaddingY" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnPaddingY')" />
+          </div>
+
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.gifOverlaySection') }}</div>
+
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.gifOverlayHint')">{{ $t('settings.themeCreator.gifOverlay') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlay" @change="clampRange('gifOverlay', 0, 100)" />
+                <span class="settings-unit-label">%</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlay" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('gifOverlay')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.gifOverlayHoverHint')">{{ $t('settings.themeCreator.gifOverlayHover') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlayHover" @change="clampRange('gifOverlayHover', 0, 100)" />
+                <span class="settings-unit-label">%</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlayHover" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('gifOverlayHover')" />
+          </div>
+        </template>
+
+        <!-- ── Tabs ──────────────────────────────────────────────────────── -->
+        <template v-else-if="activeTab === 'tabs'">
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
+
+          <div
+            v-for="row in tabColorRows"
+            :key="row.key"
+            class="settings-group settings-group--inline"
+          >
+            <SettingsTipLabel fluid :tip="$t(row.labelKey + 'Hint')">{{ $t(row.labelKey) }}</SettingsTipLabel>
+            <div class="settings-color-row">
+              <input type="color" class="settings-color" :value="colorPickerValue(row.key)" @input="onColorWheel(row.key, $event)" />
+              <input type="text" class="settings-color-text" v-model="themeCreator[row.key]" @change="fixColorInput(row.key)" maxlength="9" spellcheck="false" />
             </div>
           </div>
-          <input type="range" class="settings-slider" min="5" max="30" step="0.5" v-model.number="themeCreator.btnWidth" />
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.borderRadius') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.borderRadius" @change="clampMin('borderRadius', 0)" />
-              <span class="settings-unit-label">rem</span>
+
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.tabTypography') }}</div>
+
+          <div class="settings-group settings-group--stacked">
+            <SettingsTipLabel fluid :tip="$t('settings.themeCreator.tabFontHint')">{{ $t('settings.themeCreator.tabFont') }}</SettingsTipLabel>
+            <div class="font-dropdown" ref="tabFontDropdownRef">
+              <div class="font-dropdown__trigger" @click="tabFontOpen = !tabFontOpen">
+                <span :style="{ fontFamily: themeCreator.tabFontFamily }">{{ themeCreator.tabFontFamily }}</span>
+                <span class="font-dropdown__arrow">▾</span>
+              </div>
+              <div v-show="tabFontOpen" class="font-dropdown__list">
+                <div class="font-dropdown__search">
+                  <input v-model="tabFontSearch" type="text" class="font-dropdown__search-input" :placeholder="$t('settings.themeCreator.searchFont')" />
+                </div>
+                <div
+                  v-for="font in filteredTabFonts"
+                  :key="'tab-' + font"
+                  class="font-dropdown__option"
+                  :class="{ active: themeCreator.tabFontFamily === font }"
+                  :style="{ fontFamily: font }"
+                  @click="themeCreator.tabFontFamily = font; tabFontOpen = false"
+                >{{ font }}</div>
+              </div>
             </div>
           </div>
-          <input type="range" class="settings-slider" min="0" max="4" step="0.05" v-model.number="themeCreator.borderRadius" />
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.borderWidth') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0" step="0.02" v-model.number="themeCreator.borderWidth" @change="clampMin('borderWidth', 0)" />
-              <span class="settings-unit-label">rem</span>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.tabFontSizeHint')">{{ $t('settings.themeCreator.tabFontSize') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0.3" step="0.05" v-model.number="themeCreator.fontSizeTab" @change="clampMin('fontSizeTab', 0.3)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
             </div>
+            <input type="range" class="settings-slider" min="0.5" max="3" step="0.05" v-model.number="themeCreator.fontSizeTab" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('fontSizeTab')" />
           </div>
-          <input type="range" class="settings-slider" min="0" max="2" step="0.02" v-model.number="themeCreator.borderWidth" />
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.buttonGap') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.buttonGap" @change="clampMin('buttonGap', 0)" />
-              <span class="settings-unit-label">rem</span>
+
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.layout') }}</div>
+
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.tabBorderWidthHint')">{{ $t('settings.themeCreator.tabBorderWidth') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.02" v-model.number="themeCreator.tabBorderWidth" @change="clampMin('tabBorderWidth', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
             </div>
+            <input type="range" class="settings-slider" min="0" max="2" step="0.02" v-model.number="themeCreator.tabBorderWidth" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('tabBorderWidth')" />
           </div>
-          <input type="range" class="settings-slider" min="0" max="6" step="0.05" v-model.number="themeCreator.buttonGap" />
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingX') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.btnPaddingX" @change="clampMin('btnPaddingX', 0)" />
-              <span class="settings-unit-label">rem</span>
-            </div>
-          </div>
-          <input type="range" class="settings-slider" min="0.25" max="5" step="0.05" v-model.number="themeCreator.btnPaddingX" />
-        </div>
-        <div class="settings-group settings-group--stacked">
-          <div class="settings-slider-header">
-            <label class="settings-label">{{ $t('settings.themeCreator.buttonPaddingY') }}</label>
-            <div class="settings-unit-input">
-              <input type="number" class="settings-input" min="0" step="0.05" v-model.number="themeCreator.btnPaddingY" @change="clampMin('btnPaddingY', 0)" />
-              <span class="settings-unit-label">rem</span>
-            </div>
-          </div>
-          <input type="range" class="settings-slider" min="0.1" max="4" step="0.05" v-model.number="themeCreator.btnPaddingY" />
-        </div>
+        </template>
 
         <p v-if="importError" class="settings-error" style="margin-top:0.5rem">{{ importError }}</p>
       </div>
@@ -253,7 +306,17 @@ import { invoke } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { readableTextColor } from '~/utils/contrast'
+import { THEME_PRESETS } from '~/utils/themePresets'
+import {
+  THEME_TOKEN_DEFAULTS,
+  TOKEN_CSS_VARS,
+  buildThemeCss as buildCssFromTokens,
+  parseThemeCss,
+  parseThemeName,
+  cssColorToHex,
+  type ThemeTokenKey,
+  type ThemeTokens,
+} from '~/utils/themeTokens'
 
 const { t } = useI18n()
 const appSettings = useAppSettingsStore()
@@ -263,27 +326,7 @@ function joinPath(base: string, ...parts: string[]) {
   return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
 }
 
-const THEME_DEFAULTS = {
-  primaryColor: '#00d4ff',
-  bgLight: '#eeeeee',
-  bgDark: '#222831',
-  btnLight: '#7184a2',
-  btnDark: '#363f4d',
-  textLight: '#eeeeee',
-  textDark: '#222831',
-  btnFontFamily: 'Nunito-Bold',
-  tabFontFamily: 'Nunito-Bold',
-}
-
-const themeCreator = reactive({
-  name: 'My Theme',
-  primaryColor: '#00d4ff',
-  bgLight: '#eeeeee',
-  bgDark: '#222831',
-  btnLight: '#7184a2',
-  btnDark: '#363f4d',
-  textLight: '#eeeeee',
-  textDark: '#222831',
+const LAYOUT_DEFAULTS = {
   btnFontFamily: 'Nunito-Bold',
   tabFontFamily: 'Nunito-Bold',
   fontSizeBtn: 1.0,
@@ -292,21 +335,171 @@ const themeCreator = reactive({
   btnWidth: 11,
   borderRadius: 0.5,
   borderWidth: 0.2,
+  tabBorderWidth: 0.3,
   buttonGap: 1.0,
   btnPaddingX: 0.75,
   btnPaddingY: 0.5,
+  gifOverlay: 72,
+  gifOverlayHover: 38,
+} as const
+
+const THEME_DEFAULTS = {
+  ...THEME_TOKEN_DEFAULTS,
+  ...LAYOUT_DEFAULTS,
+} as const
+
+type ThemeSliderKey =
+  | 'fontSizeBtn'
+  | 'fontSizeTab'
+  | 'btnWidth'
+  | 'borderRadius'
+  | 'borderWidth'
+  | 'tabBorderWidth'
+  | 'buttonGap'
+  | 'btnPaddingX'
+  | 'btnPaddingY'
+  | 'gifOverlay'
+  | 'gifOverlayHover'
+
+type CreatorTabId = 'general' | 'buttons' | 'tabs'
+
+const creatorTabs: { id: CreatorTabId; labelKey: string }[] = [
+  { id: 'general', labelKey: 'settings.themeCreator.tabGeneral' },
+  { id: 'buttons', labelKey: 'settings.themeCreator.tabButtons' },
+  { id: 'tabs', labelKey: 'settings.themeCreator.tabTabs' },
+]
+const activeTab = ref<CreatorTabId>('general')
+
+const generalColorRows: { key: ThemeTokenKey; labelKey: string }[] = [
+  { key: 'primaryColor', labelKey: 'settings.themeCreator.primaryAccent' },
+  { key: 'primaryHover', labelKey: 'settings.themeCreator.primaryHover' },
+  { key: 'bg', labelKey: 'settings.themeCreator.background' },
+  { key: 'bg2', labelKey: 'settings.themeCreator.background2' },
+]
+
+const buttonColorRows: { key: ThemeTokenKey; labelKey: string }[] = [
+  { key: 'btnBg', labelKey: 'settings.themeCreator.buttonBg' },
+  { key: 'btnBgHover', labelKey: 'settings.themeCreator.buttonBgHover' },
+  { key: 'btnText', labelKey: 'settings.themeCreator.buttonText' },
+  { key: 'btnTextHover', labelKey: 'settings.themeCreator.buttonTextHover' },
+  { key: 'btnBorder', labelKey: 'settings.themeCreator.buttonBorder' },
+  { key: 'btnBorderHover', labelKey: 'settings.themeCreator.buttonBorderHover' },
+]
+
+const tabColorRows: { key: ThemeTokenKey; labelKey: string }[] = [
+  { key: 'tabBg', labelKey: 'settings.themeCreator.tabBg' },
+  { key: 'tabBgHover', labelKey: 'settings.themeCreator.tabBgHover' },
+  { key: 'tabText', labelKey: 'settings.themeCreator.tabText' },
+  { key: 'tabTextHover', labelKey: 'settings.themeCreator.tabTextHover' },
+  { key: 'tabBorder', labelKey: 'settings.themeCreator.tabBorder' },
+  { key: 'tabBorderHover', labelKey: 'settings.themeCreator.tabBorderHover' },
+]
+
+const themeCreator = reactive({
+  name: 'My Theme',
+  ...THEME_DEFAULTS,
 })
 
-// Preview mode (preview-only; does not persist the project's themeMode).
-const previewMode = ref<'dark' | 'light'>('dark')
-function onPreviewModeChange() {
-  emit('theme_preview_mode', previewMode.value).catch(() => {})
+const presets = THEME_PRESETS
+const loadThemeId = ref('')
+const savedThemes = ref<string[]>([])
+
+/** Native color input only accepts #rrggbb — strip alpha for the wheel. */
+function colorPickerValue(key: ThemeTokenKey): string {
+  const v = themeCreator[key] || '#000000'
+  if (/^#[0-9a-f]{8}$/i.test(v)) return v.slice(0, 7)
+  if (/^#[0-9a-f]{6}$/i.test(v)) return v
+  return cssColorToHex(v)
+}
+
+function onColorWheel(key: ThemeTokenKey, e: Event) {
+  const hex = (e.target as HTMLInputElement).value
+  // Preserve alpha if the previous value had one (tab tints).
+  const prev = themeCreator[key]
+  if (/^#[0-9a-f]{8}$/i.test(prev)) {
+    themeCreator[key] = hex + prev.slice(7)
+  } else {
+    themeCreator[key] = hex
+  }
+}
+
+async function loadSavedThemes() {
+  try {
+    await invoke('make_dir_abs', { path: appSettings.themesPath })
+    const files = await invoke<string[]>('list_dir_files_abs', {
+      dir: appSettings.themesPath,
+      exts: ['css'],
+    })
+    savedThemes.value = files
+  } catch {
+    savedThemes.value = []
+  }
+}
+
+async function onLoadTheme() {
+  const id = loadThemeId.value
+  if (!id) return
+  if (id.startsWith('preset:')) {
+    const preset = presets.find((p) => p.id === id.slice(7))
+    if (!preset) return
+    Object.assign(themeCreator, preset.tokens)
+    themeCreator.name = preset.label
+    themeCreator.gifOverlay = Math.round(preset.extras.gifOverlay * 100)
+    themeCreator.gifOverlayHover = Math.round(preset.extras.gifOverlayHover * 100)
+    emitPreview()
+    return
+  }
+  if (id.startsWith('file:')) {
+    const filename = id.slice(5)
+    try {
+      const css = await invoke<string>('read_text_file_abs', {
+        path: joinPath(appSettings.themesPath, filename),
+      })
+      applyParsedTheme(css)
+    } catch (e) {
+      importError.value = `Failed: ${e}`
+    }
+  }
+}
+
+function applyParsedTheme(css: string) {
+  const parsed = parseThemeCss(css)
+  const name = parseThemeName(css)
+  if (name) themeCreator.name = name
+  Object.assign(themeCreator, parsed)
+  // Layout vars from raw CSS
+  const re = /(--[\w-]+)\s*:\s*([^;]+)/g
+  const vars: Record<string, string> = {}
+  let m: RegExpExecArray | null
+  while ((m = re.exec(css)) !== null) vars[m[1].trim()] = m[2].trim()
+  if (vars['--font-btn']) themeCreator.btnFontFamily = extractFontFamily(vars['--font-btn'])
+  if (vars['--font-tab']) themeCreator.tabFontFamily = extractFontFamily(vars['--font-tab'])
+  if (vars['--font-size-btn']) themeCreator.fontSizeBtn = parseRem(vars['--font-size-btn'])
+  if (vars['--font-size-tab']) themeCreator.fontSizeTab = parseRem(vars['--font-size-tab'])
+  if (vars['--font-size-md']) themeCreator.fontSizeMd = parseRem(vars['--font-size-md'])
+  if (vars['--btn_width']) themeCreator.btnWidth = parseRem(vars['--btn_width'])
+  if (vars['--border-radius']) themeCreator.borderRadius = parseRem(vars['--border-radius'])
+  if (vars['--btn-border-width']) themeCreator.borderWidth = parseRem(vars['--btn-border-width'])
+  if (vars['--tab-border-width']) themeCreator.tabBorderWidth = parseRem(vars['--tab-border-width'])
+  if (vars['--button-gap']) themeCreator.buttonGap = parseRem(vars['--button-gap'])
+  if (vars['--btn_padding']) {
+    const [py, px] = parsePadding(vars['--btn_padding'])
+    if (isFinite(py)) themeCreator.btnPaddingY = py
+    if (isFinite(px)) themeCreator.btnPaddingX = px
+  }
+  if (vars['--gif-overlay']) themeCreator.gifOverlay = opacityToPct(vars['--gif-overlay'])
+  if (vars['--gif-overlay-hover']) themeCreator.gifOverlayHover = opacityToPct(vars['--gif-overlay-hover'])
   emitPreview()
 }
 
-// Restores all color + font fields to the documented defaults.
 function resetToDefaults() {
   Object.assign(themeCreator, THEME_DEFAULTS)
+  loadThemeId.value = ''
+  emitPreview()
+}
+
+function resetSlider(key: ThemeSliderKey) {
+  themeCreator[key] = THEME_DEFAULTS[key]
   emitPreview()
 }
 
@@ -317,6 +510,7 @@ const fontUploadMsg = ref('')
 
 onMounted(async () => {
   if (!appSettings.loaded) await appSettings.load()
+  await loadSavedThemes()
   try {
     const fonts = await invoke<string[]>('get_system_fonts')
     if (Array.isArray(fonts) && fonts.length > 0) systemFonts.value = fonts.map((f) => f.replace(/;+$/, '').trim())
@@ -328,8 +522,6 @@ onMounted(async () => {
   } catch (e) {
     console.warn('loadCustomFonts failed', e)
   }
-  // Initialise the draft from the main window's *current* applied theme so the
-  // Theme Creator opens showing exactly what is on screen (no jump/change).
   let gotCurrent = false
   const unlisten = await listen<Record<string, string>>('theme_current', (e) => {
     if (gotCurrent) return
@@ -339,7 +531,6 @@ onMounted(async () => {
     unlisten()
   })
   await emit('theme_request_current')
-  // Fallback: if the main window never answers, push the defaults after a beat.
   setTimeout(() => {
     if (!gotCurrent) emitPreview()
   }, 400)
@@ -348,11 +539,15 @@ onMounted(async () => {
 /** Populates the draft from a set of computed CSS variables (best-effort). */
 function applyCurrentVars(v: Record<string, string> | undefined) {
   if (!v) return
-  const setColor = (key: keyof typeof themeCreator, varName: string) => {
+  const setColor = (key: ThemeTokenKey, varName: string) => {
     const raw = v[varName]
     if (!raw) return
+    if (/^#[0-9a-f]{8}$/i.test(raw.trim())) {
+      themeCreator[key] = raw.trim()
+      return
+    }
     const hex = cssColorToHex(raw)
-    if (/^#[0-9a-f]{3,8}$/i.test(hex)) (themeCreator as Record<string, unknown>)[key] = hex
+    if (/^#[0-9a-f]{3,8}$/i.test(hex)) themeCreator[key] = hex
   }
   const setNum = (key: keyof typeof themeCreator, varName: string) => {
     const raw = v[varName]
@@ -360,16 +555,12 @@ function applyCurrentVars(v: Record<string, string> | undefined) {
     const n = parseRem(raw)
     if (isFinite(n)) (themeCreator as Record<string, unknown>)[key] = n
   }
-  setColor('primaryColor', '--primary_color')
-  setColor('bgLight', '--color-bg-light')
-  setColor('bgDark', '--color-bg-dark')
-  setColor('btnLight', '--color-btn-light')
-  setColor('btnDark', '--color-btn-dark')
-  setColor('textLight', '--text-light')
-  setColor('textDark', '--text-dark')
-  // Backward-compat with single-var themes.
-  if (!v['--color-bg-dark'] && v['--color-bg']) setColor('bgDark', '--color-bg')
-  if (!v['--color-btn-dark'] && v['--color-btn']) setColor('btnDark', '--color-btn')
+  for (const [key, cssVar] of Object.entries(TOKEN_CSS_VARS) as [ThemeTokenKey, string][]) {
+    setColor(key, cssVar)
+  }
+  // Legacy compat when main still has old pair vars.
+  if (!v['--color-bg'] && v['--color-bg-dark']) setColor('bg', '--color-bg-dark')
+  if (!v['--color-btn'] && v['--color-btn-dark']) setColor('btnBg', '--color-btn-dark')
   if (v['--font-btn']) themeCreator.btnFontFamily = extractFontFamily(v['--font-btn'])
   if (v['--font-tab']) themeCreator.tabFontFamily = extractFontFamily(v['--font-tab'])
   setNum('fontSizeBtn', '--font-size-btn')
@@ -378,16 +569,17 @@ function applyCurrentVars(v: Record<string, string> | undefined) {
   setNum('btnWidth', '--btn_width')
   setNum('borderRadius', '--border-radius')
   setNum('borderWidth', '--btn-border-width')
+  setNum('tabBorderWidth', '--tab-border-width')
   setNum('buttonGap', '--button-gap')
   if (v['--btn_padding']) {
     const [py, px] = parsePadding(v['--btn_padding'])
     if (isFinite(py)) themeCreator.btnPaddingY = py
     if (isFinite(px)) themeCreator.btnPaddingX = px
   }
-  if (v['__mode']) previewMode.value = v['__mode'] === 'light' ? 'light' : 'dark'
+  if (v['--gif-overlay']) themeCreator.gifOverlay = opacityToPct(v['--gif-overlay'])
+  if (v['--gif-overlay-hover']) themeCreator.gifOverlayHover = opacityToPct(v['--gif-overlay-hover'])
 }
 
-// Uploaded fonts are listed first so they are easy to find.
 const allFonts = computed(() => [...customFonts.value, ...systemFonts.value])
 
 async function uploadFont() {
@@ -429,19 +621,23 @@ watch(themeCreator, () => {
   previewTimer = setTimeout(emitPreview, 80)
 }, { deep: true })
 
-// When the window closes without saving, tell the main window to restore its
-// persisted theme so the live preview does not stick.
 onBeforeUnmount(() => {
   emit('theme_saved').catch(() => {})
 })
 
-// ── Close prompt (Save theme before closing the window) ────────────────────
 const closePrompt = ref(false)
-let allowClose = false
+
+async function hideThemeWindow() {
+  closePrompt.value = false
+  try {
+    await getCurrentWindow().hide()
+  } catch (e) {
+    console.warn('hide theme-creator failed', e)
+  }
+}
 
 onMounted(() => {
   getCurrentWindow().onCloseRequested((event) => {
-    if (allowClose) return
     event.preventDefault()
     closePrompt.value = true
   }).catch(() => {})
@@ -449,15 +645,12 @@ onMounted(() => {
 
 async function saveAndClose() {
   closePrompt.value = false
-  allowClose = true
   await saveThemeToFolder()
 }
 
 async function discardAndClose() {
-  closePrompt.value = false
-  allowClose = true
   await emit('theme_saved').catch(() => {})
-  await getCurrentWindow().destroy()
+  await hideThemeWindow()
 }
 
 function cancelClose() {
@@ -469,8 +662,24 @@ const btnFontOpen = ref(false)
 const tabFontOpen = ref(false)
 const btnFontDropdownRef = ref<HTMLElement | null>(null)
 const tabFontDropdownRef = ref<HTMLElement | null>(null)
-onClickOutside(btnFontDropdownRef, () => { btnFontOpen.value = false })
-onClickOutside(tabFontDropdownRef, () => { tabFontOpen.value = false })
+
+function onFontDropdownPointerDown(e: PointerEvent) {
+  const t = e.target
+  if (!(t instanceof Node)) return
+  if (btnFontOpen.value && btnFontDropdownRef.value && !btnFontDropdownRef.value.contains(t)) {
+    btnFontOpen.value = false
+  }
+  if (tabFontOpen.value && tabFontDropdownRef.value && !tabFontDropdownRef.value.contains(t)) {
+    tabFontOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onFontDropdownPointerDown, true)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onFontDropdownPointerDown, true)
+})
 
 const btnFontSearch = ref('')
 const tabFontSearch = ref('')
@@ -488,41 +697,31 @@ const filteredTabFonts = computed(() => {
 })
 
 // ── Export / save ─────────────────────────────────────────────────────────────
+function currentTokens(): ThemeTokens {
+  const tokens = {} as ThemeTokens
+  for (const key of Object.keys(TOKEN_CSS_VARS) as ThemeTokenKey[]) {
+    tokens[key] = themeCreator[key]
+  }
+  return tokens
+}
+
 function buildThemeCss() {
   const name = (themeCreator.name || 'theme').trim()
-  const soundTextDark = readableTextColor(themeCreator.btnDark, themeCreator.textLight, themeCreator.textDark)
-  const soundTextLight = readableTextColor(themeCreator.btnLight, themeCreator.textLight, themeCreator.textDark)
-  return `/* SoundNinja Theme: ${name} */
-:root {
-  --primary_color: ${themeCreator.primaryColor};
-  --color-bg-light: ${themeCreator.bgLight};
-  --color-bg-dark: ${themeCreator.bgDark};
-  --color-btn-light: ${themeCreator.btnLight};
-  --color-btn-dark: ${themeCreator.btnDark};
-  --text-light: ${themeCreator.textLight};
-  --text-dark: ${themeCreator.textDark};
-  --font-btn: '${themeCreator.btnFontFamily}', sans-serif;
-  --font-tab: '${themeCreator.tabFontFamily}', sans-serif;
-  --font-size-btn: ${themeCreator.fontSizeBtn}rem;
-  --font-size-tab: ${themeCreator.fontSizeTab}rem;
-  --font-size-md: ${themeCreator.fontSizeMd}rem;
-  --btn_width: ${themeCreator.btnWidth}rem;
-  --border-radius: ${themeCreator.borderRadius}rem;
-  --btn-border-width: ${themeCreator.borderWidth}rem;
-  --button-gap: ${themeCreator.buttonGap}rem;
-  --btn_padding: ${themeCreator.btnPaddingY}rem ${themeCreator.btnPaddingX}rem;
-}
-html.theme-dark {
-  --color-bg: ${themeCreator.bgDark};
-  --color-btn: ${themeCreator.btnDark};
-  --sound-text: ${soundTextDark};
-}
-html.theme-light {
-  --color-bg: ${themeCreator.bgLight};
-  --color-btn: ${themeCreator.btnLight};
-  --sound-text: ${soundTextLight};
-}
-`
+  return buildCssFromTokens(name, currentTokens(), {
+    '--font-btn': `'${themeCreator.btnFontFamily}', sans-serif`,
+    '--font-tab': `'${themeCreator.tabFontFamily}', sans-serif`,
+    '--font-size-btn': `${themeCreator.fontSizeBtn}rem`,
+    '--font-size-tab': `${themeCreator.fontSizeTab}rem`,
+    '--font-size-md': `${themeCreator.fontSizeMd}rem`,
+    '--btn_width': `${themeCreator.btnWidth}rem`,
+    '--border-radius': `${themeCreator.borderRadius}rem`,
+    '--btn-border-width': `${themeCreator.borderWidth}rem`,
+    '--tab-border-width': `${themeCreator.tabBorderWidth}rem`,
+    '--button-gap': `${themeCreator.buttonGap}rem`,
+    '--btn_padding': `${themeCreator.btnPaddingY}rem ${themeCreator.btnPaddingX}rem`,
+    '--gif-overlay': String(themeCreator.gifOverlay / 100),
+    '--gif-overlay-hover': String(themeCreator.gifOverlayHover / 100),
+  })
 }
 
 async function exportTheme() {
@@ -541,50 +740,36 @@ async function exportTheme() {
   }
 }
 
-// ── Import ───────────────────────────────────────────────────────────────────
 const importError = ref('')
 
-function parseCssVars(css: string): Record<string, string> {
-  const result: Record<string, string> = {}
-  const re = /(--[\w-]+)\s*:\s*([^;]+)/g
-  let m
-  while ((m = re.exec(css)) !== null) {
-    result[m[1].trim()] = m[2].trim()
-  }
-  return result
-}
-
-function cssColorToHex(color: string): string {
-  const c = color.trim()
-  if (/^#[0-9a-f]{3,8}$/i.test(c)) return c
-  try {
-    const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = 1
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = c
-    ctx.fillRect(0, 0, 1, 1)
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
-    return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')
-  } catch {
-    return c
-  }
-}
-
-function fixColorInput(key: 'primaryColor' | 'bgLight' | 'bgDark' | 'btnLight' | 'btnDark' | 'textLight' | 'textDark') {
-  const hex = cssColorToHex(themeCreator[key])
+function fixColorInput(key: ThemeTokenKey) {
+  const raw = themeCreator[key]
+  if (/^#[0-9a-f]{8}$/i.test(raw)) return
+  const hex = cssColorToHex(raw)
   if (/^#[0-9a-f]{6}$/i.test(hex)) themeCreator[key] = hex
 }
 
-function clampMin(
-  key: 'fontSizeBtn' | 'fontSizeTab' | 'btnWidth' | 'borderRadius' | 'borderWidth' | 'buttonGap' | 'btnPaddingX' | 'btnPaddingY',
-  min: number,
-) {
+function clampMin(key: ThemeSliderKey, min: number) {
   const v = Number(themeCreator[key])
   themeCreator[key] = isNaN(v) ? min : parseFloat(Math.max(min, v).toFixed(2))
 }
 
+function clampRange(key: ThemeSliderKey, min: number, max: number) {
+  const v = Number(themeCreator[key])
+  const n = isNaN(v) ? min : v
+  themeCreator[key] = parseFloat(Math.min(max, Math.max(min, n)).toFixed(0))
+}
+
+/** CSS opacity 0–1 (or leftover 0–100 / 55%) → Theme Creator percent. */
+function opacityToPct(v: string): number {
+  const n = parseFloat(v)
+  if (!isFinite(n)) return LAYOUT_DEFAULTS.gifOverlay
+  if (n <= 1) return Math.round(n * 100)
+  return Math.round(Math.min(100, Math.max(0, n)))
+}
+
 function extractFontFamily(v: string): string {
-  const m = v.match(/['"]([^'"]+)['"]/);
+  const m = v.match(/['"]([^'"]+)['"]/)
   if (m) return m[1].replace(/;+$/, '').trim()
   return v.split(',')[0].replace(/;+$/, '').trim()
 }
@@ -598,12 +783,6 @@ function parsePadding(v: string): [number, number] {
   return [parseFloat(parts[0]), parseFloat(parts[1] ?? parts[0])]
 }
 
-// Reads the `/* SoundNinja Theme: NAME */` comment (first line) from a theme CSS.
-function parseThemeName(css: string): string {
-  const m = css.match(/\/\*\s*SoundNinja Theme:\s*(.+?)\s*\*\//i)
-  return m ? m[1].trim() : ''
-}
-
 async function importThemeFromFile() {
   importError.value = ''
   try {
@@ -614,47 +793,13 @@ async function importThemeFromFile() {
     })
     if (!filePath) return
     const css = await invoke<string>('read_text_file_abs', { path: filePath as string })
-    const vars = parseCssVars(css)
-    const hasPairs = '--color-bg-dark' in vars || '--color-btn-dark' in vars
-    const required = hasPairs
-      ? ['--primary_color', '--font-btn', '--font-tab', '--font-size-btn', '--font-size-tab', '--btn_width', '--border-radius', '--btn_padding']
-      : ['--primary_color', '--color-bg', '--color-btn', '--font-btn', '--font-tab', '--font-size-btn', '--font-size-tab', '--btn_width', '--border-radius', '--btn_padding']
-    const missing = required.filter((v) => !(v in vars))
-    if (missing.length > 0) {
-      importError.value = `${t('settings.themeCreator.importError')} ${missing.join(', ')}`
+    const parsed = parseThemeCss(css)
+    if (!parsed.primaryColor) {
+      importError.value = t('settings.themeCreator.importError') + ' --primary_color'
       return
     }
-    const parsedName = parseThemeName(css)
-    if (parsedName) themeCreator.name = parsedName
-    themeCreator.primaryColor = cssColorToHex(vars['--primary_color'])
-    if (hasPairs) {
-      if (vars['--color-bg-light']) themeCreator.bgLight = cssColorToHex(vars['--color-bg-light'])
-      if (vars['--color-bg-dark']) themeCreator.bgDark = cssColorToHex(vars['--color-bg-dark'])
-      if (vars['--color-btn-light']) themeCreator.btnLight = cssColorToHex(vars['--color-btn-light'])
-      if (vars['--color-btn-dark']) themeCreator.btnDark = cssColorToHex(vars['--color-btn-dark'])
-      if (vars['--text-light']) themeCreator.textLight = cssColorToHex(vars['--text-light'])
-      if (vars['--text-dark']) themeCreator.textDark = cssColorToHex(vars['--text-dark'])
-    } else {
-      // Single-var theme: map background/button to both light and dark.
-      const bg = cssColorToHex(vars['--color-bg'])
-      const btn = cssColorToHex(vars['--color-btn'])
-      themeCreator.bgLight = bg
-      themeCreator.bgDark = bg
-      themeCreator.btnLight = btn
-      themeCreator.btnDark = btn
-    }
-    themeCreator.btnFontFamily = extractFontFamily(vars['--font-btn'])
-    themeCreator.tabFontFamily = extractFontFamily(vars['--font-tab'])
-    themeCreator.fontSizeBtn = parseRem(vars['--font-size-btn'])
-    themeCreator.fontSizeTab = parseRem(vars['--font-size-tab'])
-    if (vars['--font-size-md']) themeCreator.fontSizeMd = parseRem(vars['--font-size-md'])
-    themeCreator.btnWidth = parseRem(vars['--btn_width'])
-    themeCreator.borderRadius = parseRem(vars['--border-radius'])
-    if (vars['--btn-border-width']) themeCreator.borderWidth = parseRem(vars['--btn-border-width'])
-    if (vars['--button-gap']) themeCreator.buttonGap = parseRem(vars['--button-gap'])
-    const [py, px] = parsePadding(vars['--btn_padding'])
-    themeCreator.btnPaddingY = py
-    themeCreator.btnPaddingX = px
+    applyParsedTheme(css)
+    loadThemeId.value = ''
   } catch (e) {
     importError.value = `Failed: ${e}`
   }
@@ -669,10 +814,8 @@ async function saveThemeToFolder() {
       path: joinPath(appSettings.themesPath, `${safeName}.css`),
       contents: css,
     })
-    // Tell the main window to select + persist this theme, then close.
     await emit('theme_apply', { theme: `file:${safeName}.css` })
-    allowClose = true
-    await getCurrentWindow().destroy()
+    await hideThemeWindow()
   } catch (e) {
     console.error('Save to themes folder failed', e)
   }
