@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       update_aur:
-        description: "Push PKGBUILD update to AUR (publish the GitHub release first so AppImage URL is public)."
+        description: "DISABLED — AUR deploy off until account/secrets exist. Leave false."
         required: false
         type: boolean
         default: false
@@ -32,7 +32,9 @@ jobs:
             args: "--target x86_64-pc-windows-msvc -- --features stems"
 
           # Linux x64 → .deb + AppImage (AppImage feeds AUR package)
-          - platform: ubuntu-22.04
+          # ubuntu-24.04: cpal/rodio pipewire → libspa 0.10 needs PipeWire ≥ 1.0
+          # headers (22.04 ships 0.3.48 → E0425/E0560 on spa_meta_* / video flags).
+          - platform: ubuntu-24.04
             rust_targets: x86_64-unknown-linux-gnu
             args: "--target x86_64-unknown-linux-gnu -- --features stems"
 
@@ -60,15 +62,17 @@ jobs:
           targets: ${{ matrix.rust_targets }}
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libasound2-dev
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libpulse-dev
 
       - name: Install frontend dependencies
         run: npm ci
@@ -93,6 +97,8 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: add repo secret TAURI_SIGNING_PRIVATE_KEY (minisign private key
+          # matching plugins.updater.pubkey) then set createUpdaterArtifacts true.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
@@ -112,20 +118,15 @@ jobs:
             In-app updates use signed updater artifacts + `latest.json` (see `docs/updater.md`).
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           args: ${{ matrix.args }}
 
+  # AUR deploy disabled — maintainer not registered on AUR yet.
+  # Re-enable when AUR_USERNAME / AUR_EMAIL / AUR_SSH_PRIVATE_KEY secrets exist:
+  # restore the `if:` below (tag push or workflow_dispatch update_aur).
   aur-update:
     needs: build
-    # Tag pushes always attempt AUR update. Manual runs only when update_aur=true.
-    # AppImage must be publicly downloadable — publish the draft release first for manual AUR updates.
-    if: >
-      always() &&
-      needs.build.result == 'success' &&
-      (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'workflow_dispatch' && inputs.update_aur)
-      )
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
