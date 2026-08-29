@@ -2,6 +2,7 @@
     <div
         class="TabContainer flex_c_h flex_start"
         :class="{ searchMove: appStore.Searchbar.SearchbarActive }"
+        :style="activeTabUnderline ? { '--tab-list-underline': activeTabUnderline } : {}"
         ref="tabContainerRef"
         @wheel.prevent="onTabWheel"
     >
@@ -36,6 +37,7 @@
 
 <script setup>
 import Sortable from 'sortablejs'
+import { parseOverride } from '~/utils/colorOverride'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -46,9 +48,17 @@ let sortable = null
 
 const allowReorder = computed(() => jsonStore.configFile?.settings?.allowReorder !== false)
 
+const activeTabUnderline = computed(() => {
+  const name = appStore.currentTab
+  if (!name || name === 'All') return ''
+  const tab = (jsonStore.configFile?.tabList ?? []).find((t) => t.name === name)
+  const o = parseOverride(tab?.color)
+  return o.border || o.bg || ''
+})
+
 function onTabWheel(e) {
-  if (tabContainerRef.value) {
-    tabContainerRef.value.scrollBy({ left: e.deltaY + e.deltaX, behavior: 'smooth' })
+  if (tabListRef.value) {
+    tabListRef.value.scrollBy({ left: e.deltaY + e.deltaX, behavior: 'smooth' })
   }
 }
 

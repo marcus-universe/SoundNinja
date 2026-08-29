@@ -15,14 +15,14 @@
         >
         <div :key="'tab:' + currentTab" class="SoundTab-wrap">
         <div
-            class="SoundTab flex_c_v flex_start button-gaps"
+            class="SoundTab flex_c_v flex_start"
             ref="boardRef"
             :style="uniformHeight ? { '--btn-min-height': uniformHeight + 'px' } : {}"
         >
             <!-- Orphan strip: sounds before first group -->
             <div
                 class="sound-orphans sound-section-body flex_c_h flex_start button-gaps flex_wrap"
-                :class="orphanAlignClass"
+                :class="[orphanAlignClass, { 'sound-orphans--empty': orphanSounds.length === 0 }]"
                 data-section-id="orphans"
                 ref="orphansRef"
             >
@@ -118,6 +118,7 @@
 </template>
 
 <script setup>
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
@@ -313,9 +314,14 @@ function destroySortables() {
 
 function revertDom(evt) {
   const { oldIndex, item, from } = evt
-  if (oldIndex == null) return
-  from.removeChild(item)
-  from.insertBefore(item, from.children[oldIndex] ?? null)
+  if (oldIndex == null || !item || !from) return
+  // Cross-list drops already reparented `item` onto `to`. Pull it from
+  // wherever it is now, then put it back in `from` at oldIndex.
+  try {
+    item.parentNode?.removeChild(item)
+  } catch { /* detached */ }
+  const anchor = from.children[oldIndex] ?? null
+  if (anchor !== item) from.insertBefore(item, anchor)
 }
 
 function layoutFromDom() {
@@ -363,14 +369,19 @@ function bindInnerSortable(el) {
     disabled: reorderDisabled(),
     draggable: '.Soundbtn',
     ghostClass: 'drag-over',
+    emptyInsertThreshold: 48,
+    swapThreshold: 0.65,
     onEnd: onInnerEnd,
   })
   innerSortables.push(s)
 }
 
-function setupSortables() {
+function setupSortables(retry = true) {
   destroySortables()
-  if (!groupsOuterRef.value || !orphansRef.value) return
+  if (!groupsOuterRef.value || !orphansRef.value) {
+    if (retry) nextTick(() => setupSortables(false))
+    return
+  }
 
   outerSortable = Sortable.create(groupsOuterRef.value, {
     animation: 180,

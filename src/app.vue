@@ -58,9 +58,8 @@
 
 <script setup>
 import { readTextFile, rename, BaseDirectory } from '@tauri-apps/plugin-fs'
-import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
-import { listen } from '@tauri-apps/api/event'
-import { emit } from '@tauri-apps/api/event'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { emit, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
@@ -76,10 +75,10 @@ import {
 } from '~/utils/themeTokens'
 import {
   createProjectFolder,
-  ensureSaveProjectPath,
   listProjects,
-  PROJECT_FILE_FILTER,
-  PROJECT_SAVE_FILTER,
+  pickOpenPaths,
+  pickProjectFile,
+  pickSaveProjectFile,
   projectNameFromDbPath,
   safeProjectName,
 } from '~/utils/projects'
@@ -299,14 +298,14 @@ function formatError(e) {
 }
 
 async function handleMenuOpenProject() {
-  const selected = await openDialog({
-    title: 'Open Project',
-    filters: [PROJECT_FILE_FILTER],
-    multiple: false,
-  })
-  if (!selected || Array.isArray(selected)) return
+  const dbPath = await pickProjectFile()
+  if (!dbPath) return
+  const choice = await confirmUnsaved()
+  if (choice === 'cancel') return
+  if (choice === 'save' && !(await persistOrReport())) return
   try {
-    await openProjectPath(selected)
+    await openProjectPath(dbPath)
+    await applyPersistedTheme(jsonStore.configFile)
   } catch (e) {
     console.error('Failed to open project', e)
     appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
@@ -318,13 +317,8 @@ async function handleMenuSave() {
 }
 
 async function handleMenuSaveAs() {
-  const path = await saveDialog({
-    title: 'Save Project As',
-    filters: [PROJECT_SAVE_FILTER],
-    defaultPath: `project.${PROJECT_SAVE_FILTER.extensions[0]}`,
-  })
-  if (!path) return
-  const dbPath = ensureSaveProjectPath(path)
+  const dbPath = await pickSaveProjectFile()
+  if (!dbPath) return
   await withSavePopup(async () => {
     await jsonStore.saveAs(dbPath)
     await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
@@ -337,9 +331,10 @@ async function handleMenuImportAudio() {
     title: 'Import Audio Files',
     filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg'] }],
   })
-  if (!Array.isArray(selected)) return
+  const files = pickOpenPaths(selected)
+  if (!files.length) return
   const indexLength = jsonStore.configFile.files.length
-  const soundlist = selected.map((file, index) => {
+  const soundlist = files.map((file, index) => {
     const tabs = ['All']
     if (appStore.currentTab !== 'All') tabs.push(appStore.currentTab)
     return {
@@ -389,6 +384,14 @@ function clearInlineThemeVars() {
   const root = document.documentElement
   THEME_INLINE_VARS.forEach((v) => root.style.removeProperty(v))
 }
+
+watch(
+  () => jsonStore.currentProjectPath,
+  async (path, prev) => {
+    if (!isMain.value || !path || path === prev) return
+    await applyPersistedTheme(jsonStore.configFile)
+  },
+)
 
 async function applyPersistedTheme(config) {
   const s = config?.settings

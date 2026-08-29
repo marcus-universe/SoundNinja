@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import {
-  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
+  openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
   loadGifBlobsByIds, upsertGifBlob, healFolderTabMembership, mergeTabsFromUsage,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
@@ -174,6 +174,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         throw new Error('No project database is open.')
       }
       const path = this.currentProjectPath
+      const bak = path + '.bak'
+      const { invoke } = await import('@tauri-apps/api/core')
+      try {
+        await invoke('copy_file_to_abs', { src: path, dst: bak })
+      } catch { /* first save may have no file yet */ }
       this.saving = true
       try {
         await withProjectDb(path, async (d) => {
@@ -185,6 +190,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         this.dirty = false
       } catch (e) {
         console.error('Failed to persist project', e)
+        try {
+          await invoke('copy_file_to_abs', { src: bak, dst: path })
+          await reopenDb(path)
+        } catch { /* restore best-effort */ }
         throw e
       } finally {
         this.saving = false

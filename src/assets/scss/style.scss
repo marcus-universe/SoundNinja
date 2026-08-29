@@ -19,9 +19,10 @@
   transition: margin-left 0.2s ease, margin-right 0.2s ease;
   overflow: hidden;
 
-  // Gap between tabs and soundboard. Collapses when multi-select bar
-  // hangs flush under tabs (scroll padding restores button spacing).
-  gap: 1rem;
+  // Gap between tabs and soundboard. Tight — empty orphan strip used
+  // to stack with this and look like a missing row. Collapses when
+  // multi-select bar hangs flush under tabs.
+  gap: 0.4rem;
 
   &--bulk {
     gap: 0;
@@ -29,24 +30,11 @@
 
   .TabContainer {
     flex-shrink: 0;
-    overflow-x: auto;
+    overflow: hidden;
     flex-wrap: nowrap;
-    scroll-behavior: smooth;
-    scrollbar-width: thin;
-    scrollbar-color: var(--primary_color) transparent;
-
-    &::-webkit-scrollbar {
-      height: 0.3rem;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: var(--primary_color);
-      border-radius: 0.2rem;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
+    align-items: stretch;
+    border-bottom: var(--tab-border-width, 0.3rem) solid var(--tab-list-underline, var(--tab-border, var(--primary_color)));
+    transition: border-color 0.15s ease;
 
     .tab {
       flex-shrink: 0;
@@ -85,6 +73,8 @@
     }
 
     .addTab {
+      flex-shrink: 0;
+      align-self: center;
       fill: var(--primary_color);
       width: calc(var(--icon_size) - 1.6rem);
       border-radius: 0.48rem;
@@ -107,7 +97,26 @@
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: stretch;
-    flex-shrink: 0;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary_color) transparent;
+
+    &::-webkit-scrollbar {
+      height: 0.3rem;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--primary_color);
+      border-radius: 0.2rem;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
   }
 
   .SoundContainer {
@@ -221,7 +230,7 @@
         flex: 0 0 100%;
         width: 100%;
         box-sizing: border-box;
-        margin: 0.4rem 0;
+        margin: 0 0 0.4rem;
         padding: 0.6rem 0.8rem 0.8rem;
         border: 0.32rem solid var(--group-border, var(--btn-border, var(--primary_color)));
         border-radius: 0.6rem;
@@ -252,6 +261,21 @@
       .sound-orphans {
         width: 100%;
         min-height: 2.4rem;
+      }
+
+      // Empty orphan strip must not reserve a row + flex-gap under tabs.
+      // 1px keeps Sortable's empty-list hit box; emptyInsertThreshold covers drop.
+      .sound-orphans:not(.sound-orphans--empty) {
+        margin-bottom: var(--button-gap, #{$padding_1});
+      }
+
+      .sound-orphans--empty {
+        min-height: 1px;
+        height: 1px;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        border: 0;
       }
 
       .sound-align--left {

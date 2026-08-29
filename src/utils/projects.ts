@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 
 export interface ProjectInfo {
   name: string
@@ -10,15 +11,16 @@ export const PROJECT_EXT = 'sninja'
 /** Legacy extension still accepted when opening. */
 export const PROJECT_EXT_LEGACY = 'db'
 
-export const PROJECT_FILE_FILTER = {
+/** Matches `@tauri-apps/plugin-dialog` `DialogFilter` (extensions must be mutable). */
+export const PROJECT_FILE_FILTER: { name: string; extensions: string[] } = {
   name: 'Sound Ninja Project',
   extensions: [PROJECT_EXT, PROJECT_EXT_LEGACY],
-} as const
+}
 
-export const PROJECT_SAVE_FILTER = {
+export const PROJECT_SAVE_FILTER: { name: string; extensions: string[] } = {
   name: 'Sound Ninja Project',
   extensions: [PROJECT_EXT],
-} as const
+}
 
 const PROJECT_BASENAME_SNINJA = `project.${PROJECT_EXT}`
 const PROJECT_BASENAME_DB = `project.${PROJECT_EXT_LEGACY}`
@@ -51,6 +53,41 @@ export async function createProjectFolder(projectsPath: string, name: string): P
   const folder = join(projectsPath, safeProjectName(name))
   await invoke('make_dir_abs', { path: folder })
   return join(folder, PROJECT_BASENAME_SNINJA)
+}
+
+/** Tauri open dialog may return a string, a one-item array, or null. */
+export function pickOpenPath(selected: string | string[] | null | undefined): string | null {
+  if (selected == null) return null
+  if (Array.isArray(selected)) return selected[0] || null
+  return selected || null
+}
+
+/** Same as pickOpenPath but keeps every selected path (multi-file dialogs). */
+export function pickOpenPaths(selected: string | string[] | null | undefined): string[] {
+  if (selected == null) return []
+  if (Array.isArray(selected)) return selected.filter(Boolean)
+  return selected ? [selected] : []
+}
+
+/** Native "Open Project" dialog. Lives here so Vue SFCs avoid TSX-generic parse bugs. */
+export async function pickProjectFile(): Promise<string | null> {
+  const selected = await openDialog({
+    title: 'Open Project',
+    filters: [PROJECT_FILE_FILTER],
+    multiple: false,
+  })
+  return pickOpenPath(selected)
+}
+
+/** Native "Save Project As" dialog. Always returns a `.sninja` path or null. */
+export async function pickSaveProjectFile(): Promise<string | null> {
+  const path = await saveDialog({
+    title: 'Save Project As',
+    filters: [PROJECT_SAVE_FILTER],
+    defaultPath: `project.${PROJECT_EXT}`,
+  })
+  if (!path) return null
+  return ensureSaveProjectPath(path)
 }
 
 /** True if path looks like a Sound Ninja project file (.sninja or legacy .db). */
@@ -104,7 +141,7 @@ export function projectNameFromDbPath(dbPath: string): string {
   const file = parts[parts.length - 1] ?? dbPath
   const lower = file.toLowerCase()
   if (lower === PROJECT_BASENAME_SNINJA || lower === PROJECT_BASENAME_DB) {
-    return parts.length >= 2 ? parts[parts.length - 2] : dbPath
+    return parts.length >= 2 ? (parts[parts.length - 2] ?? dbPath) : dbPath
   }
   return file.replace(/\.(sninja|db)$/i, '')
 }

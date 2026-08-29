@@ -64,13 +64,12 @@
 </template>
 
 <script setup lang="ts">
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import {
-  PROJECT_FILE_FILTER,
   createProjectFolder,
   projectDbPath,
   projectNameFromDbPath,
+  pickProjectFile,
   type ProjectInfo,
 } from '~/utils/projects'
 
@@ -130,15 +129,11 @@ async function removeFromRecent(proj: ProjectInfo) {
 }
 
 async function openExisting() {
-  const selected = await openDialog({
-    title: 'Open Project',
-    filters: [PROJECT_FILE_FILTER],
-    multiple: false,
-  })
-  if (!selected || Array.isArray(selected)) return
+  const dbPath = await pickProjectFile()
+  if (!dbPath) return
   try {
-    await jsonStore.openProject(selected)
-    await appSettings.touchRecent(selected, projectNameFromDbPath(selected))
+    await jsonStore.openProject(dbPath)
+    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
     await jsonStore.validateSoundPaths()
     if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
     closeDialog()
