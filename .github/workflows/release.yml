@@ -72,26 +72,6 @@ jobs:
             libpipewire-0.3-dev \
             libpulse-dev
 
-      # Windows env vars mangle multiline minisign keys → "Missing comment in secret key".
-      # Write a key file and prefer TAURI_SIGNING_PRIVATE_KEY_PATH on Windows only.
-      - name: Prepare updater signing key (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
-            Write-Error "TAURI_SIGNING_PRIVATE_KEY secret is empty"
-            exit 1
-          }
-          $keyPath = Join-Path $env:RUNNER_TEMP "tauri_signing.key"
-          $key = $env:TAURI_SIGNING_PRIVATE_KEY -replace '\\n', "`n"
-          [System.IO.File]::WriteAllText($keyPath, $key)
-          Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY_PATH=$keyPath"
-          # Prefer path over env contents on Windows
-          Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY="
-          Write-Host "Signing key written ($((Get-Item $keyPath).Length) bytes)"
-
       - name: Install frontend dependencies
         run: npm ci
 
@@ -115,9 +95,9 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: add repo secret TAURI_SIGNING_PRIVATE_KEY (minisign private key
+          # matching plugins.updater.pubkey) then set createUpdaterArtifacts true.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}
-          # Wrong / unexpected password → "Missing comment in secret key". Leave empty if key has none.
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Force npm — repo has pnpm-lock.yaml/bun.lock which otherwise make the action pick pnpm/bun
