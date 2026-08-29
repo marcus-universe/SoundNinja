@@ -68,7 +68,25 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libasound2-dev
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libpulse-dev
+
+      - name: Normalize updater signing key
+        shell: bash
+        env:
+          RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          # Multiline private keys break easily as Windows env vars. Write a file
+          # and use TAURI_SIGNING_PRIVATE_KEY_PATH instead.
+          if [ -z "$RAW_KEY" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY secret is empty — updater signing will fail."
+            exit 1
+          fi
+          # Support secrets stored with literal \n sequences; strip CR.
+          printf '%s\n' "$RAW_KEY" | sed 's/\r$//' | sed 's/\\n/\n/g' > "$RUNNER_TEMP/tauri_signing.key"
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$RUNNER_TEMP/tauri_signing.key" >> "$GITHUB_ENV"
+          echo "Signing key written ($(wc -c < "$RUNNER_TEMP/tauri_signing.key") bytes)"
 
       - name: Install frontend dependencies
         run: npm ci
@@ -93,7 +111,10 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # Prefer path form — avoids multiline secret env issues on Windows.
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}
+          # Omit / leave empty when the key has no password. A wrong password
+          # yields: "incorrect updater private key password: Missing comment in secret key".
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Force npm — repo has pnpm-lock.yaml/bun.lock which otherwise make the action pick pnpm/bun
@@ -112,7 +133,7 @@ jobs:
             In-app updates use signed updater artifacts + `latest.json` (see `docs/updater.md`).
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           args: ${{ matrix.args }}
 
   aur-update:

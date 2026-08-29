@@ -10,9 +10,9 @@ A keypair was generated for this project. The **public** key is in `src-tauri/ta
 
 1. Keep the private key secret (never commit it). Default path if generated locally: `~/.tauri/soundninja.key`
 2. Add GitHub Actions secrets on the repo:
-   - `TAURI_SIGNING_PRIVATE_KEY` — full contents of the private key file
-   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — password if the key has one (omit / empty if none)
-3. Release workflow signs updater artifacts and uploads `latest.json` (`includeUpdaterJson: true`).
+   - `TAURI_SIGNING_PRIVATE_KEY` — full contents of the private key file (keep real newlines, or literal `\n`)
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — password if the key has one. If the key has **no** password, delete this secret or leave it empty. A wrong password fails CI with `Missing comment in secret key`.
+3. Release workflow writes the key to a temp file (`TAURI_SIGNING_PRIVATE_KEY_PATH`) so Windows runners do not mangle multiline env values, signs updater artifacts, and uploads `latest.json` (`uploadUpdaterJson: true`).
 
 If you lose the private key, generate a new pair with `npx tauri signer generate`, replace `pubkey` in `tauri.conf.json`, and ship a **manual** install once — old builds cannot verify new signatures.
 
