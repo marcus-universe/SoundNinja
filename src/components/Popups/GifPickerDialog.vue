@@ -1,0 +1,305 @@
+<template>
+  <DialogField :title="step === 'position' ? $t('gifPicker.positionTitle') : $t('gifPicker.title')" @close="close">
+    <p v-if="error" class="dialog-error">{{ error }}</p>
+
+    <template v-if="step === 'browse'">
+      <div class="gif-picker__info">
+        <p class="gif-picker__hint">{{ $t('gifPicker.info') }}</p>
+        <div class="gif-picker__info-actions">
+          <UIButton @click="openPartner">{{ $t('gifPicker.getKey') }}</UIButton>
+          <UIButton @click="pickLocal">{{ $t('gifPicker.localFile') }}</UIButton>
+        </div>
+      </div>
+      <div class="gif-picker__toolbar">
+        <input
+          class="ui-input gif-picker__search"
+          type="search"
+          :placeholder="$t('gifPicker.searchPlaceholder')"
+          :disabled="!hasKey || loading"
+          v-model="query"
+          @keydown.enter.prevent="runSearch"
+        />
+        <UIButton :disabled="!hasKey || loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
+      </div>
+      <div class="gif-picker__grid" v-if="items.length">
+        <button
+          v-for="g in items"
+          :key="g.id"
+          type="button"
+          class="gif-picker__cell"
+          :title="g.title"
+          @click="selectRemote(g)"
+        >
+          <img :src="g.thumbUrl" :alt="g.title" draggable="false" />
+        </button>
+      </div>
+      <p v-else-if="!loading && searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
+      <p v-if="loading" class="gif-picker__hint">…</p>
+      <button type="button" class="gif-picker__attr" @click="openKlipy">{{ $t('gifPicker.poweredBy') }}</button>
+    </template>
+
+    <template v-else>
+      <p class="gif-picker__hint">{{ $t('gifPicker.positionHint') }}</p>
+      <div
+        class="gif-picker__preview"
+        @pointerdown.prevent="onDragStart"
+        @pointermove="onDragMove"
+        @pointerup="onDragEnd"
+        @pointerleave="onDragEnd"
+      >
+        <img
+          v-if="previewUrl"
+          class="gif-picker__preview-img"
+          :src="previewUrl"
+          :style="{ objectPosition: posX + '% ' + posY + '%' }"
+          draggable="false"
+        />
+      </div>
+      <div class="flex_c_h gap1 dialog-actions">
+        <UIButton :disabled="loading" @click="applyGif">{{ $t('gifPicker.apply') }}</UIButton>
+        <UIButton v-if="existingGif" @click="removeGif">{{ $t('gifPicker.remove') }}</UIButton>
+        <UIButton @click="backToBrowse">{{ $t('gifPicker.cancel') }}</UIButton>
+      </div>
+    </template>
+  </DialogField>
+</template>
+
+<script setup>
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
+import { searchKlipy, trendingKlipy } from '~/utils/klipy'
+import {
+  MAX_GIF_BYTES,
+  upsertGifBlob,
+  withProjectDb,
+} from '~/utils/db'
+import {
+  bytesToB64,
+  b64ToBytes,
+  cacheGifRow,
+  detectImageMime,
+  extractPosterPng,
+  isAnimatedImageMime,
+  isLocalImageMime,
+  sha256Hex,
+} from '~/utils/gifCache'
+import { KLIPY_HOME_URL, KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
+
+const { t } = useI18n()
+const appStore = useAppStore()
+const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
+
+const step = ref('browse')
+const query = ref('')
+const items = ref([])
+const loading = ref(false)
+const searched = ref(false)
+const error = ref('')
+const posX = ref(50)
+const posY = ref(50)
+const previewUrl = ref('')
+const pendingMime = ref('image/gif')
+/** Keep bytes off Vue reactivity — Uint8Array + Proxy is a bad mix. */
+let pendingBytes = null
+let drag = null
+
+const hasKey = computed(() => !!appSettings.klipyApiKey?.trim())
+const targetIndex = computed(() => appStore.gifPickerIndex)
+const existingGif = computed(() => {
+  const i = targetIndex.value
+  if (i == null || i < 0) return false
+  return !!jsonStore.configFile.files[i]?.gifId
+})
+
+function close() {
+  revokePreview()
+  appStore.closeGifPicker()
+}
+
+function revokePreview() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = ''
+  }
+}
+
+async function openKlipy() {
+  await openInSystemBrowser(KLIPY_HOME_URL)
+}
+
+async function openPartner() {
+  await openInSystemBrowser(KLIPY_PARTNER_URL)
+}
+
+async function loadTrending() {
+  if (!hasKey.value) return
+  loading.value = true
+  error.value = ''
+  try {
+    items.value = await trendingKlipy(appSettings.klipyApiKey)
+    searched.value = true
+  } catch (e) {
+    error.value = String(e)
+    items.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function runSearch() {
+  if (!hasKey.value) return
+  const q = query.value.trim()
+  loading.value = true
+  error.value = ''
+  try {
+    items.value = q
+      ? await searchKlipy(appSettings.klipyApiKey, q)
+      : await trendingKlipy(appSettings.klipyApiKey)
+    searched.value = true
+  } catch (e) {
+    error.value = String(e)
+    items.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function selectRemote(g) {
+  error.value = ''
+  loading.value = true
+  try {
+    const b64 = await invoke('download_url_bytes', { url: g.gifUrl })
+    const bytes = b64ToBytes(b64)
+    if (bytes.length > MAX_GIF_BYTES) {
+      error.value = t('gifPicker.tooLarge')
+      return
+    }
+    const mime = detectImageMime(bytes) || 'image/gif'
+    beginPosition(bytes, mime)
+  } catch (e) {
+    error.value = t('gifPicker.downloadFailed') + ' ' + String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function pickLocal() {
+  error.value = ''
+  try {
+    const filePath = await open({
+      multiple: false,
+      title: t('gifPicker.localFile'),
+      filters: [{ name: 'Images / GIF', extensions: ['gif', 'webp', 'png', 'jpg', 'jpeg'] }],
+    })
+    if (!filePath) return
+    const b64 = await invoke('read_file_base64_abs', { path: filePath })
+    const bytes = b64ToBytes(b64)
+    if (bytes.length > MAX_GIF_BYTES) {
+      error.value = t('gifPicker.tooLarge')
+      return
+    }
+    const mime = detectImageMime(bytes)
+    if (!mime || !isLocalImageMime(mime)) {
+      error.value = t('gifPicker.badType')
+      return
+    }
+    beginPosition(bytes, mime)
+  } catch (e) {
+    error.value = String(e)
+  }
+}
+
+function beginPosition(bytes, mime) {
+  revokePreview()
+    pendingBytes = bytes
+    pendingMime.value = mime
+  previewUrl.value = URL.createObjectURL(new Blob([bytes], { type: mime }))
+  const i = targetIndex.value
+  const file = i != null ? jsonStore.configFile.files[i] : null
+  posX.value = file?.gifPosX ?? 50
+  posY.value = file?.gifPosY ?? 50
+  step.value = 'position'
+}
+
+function onDragStart(e) {
+  drag = { x: e.clientX, y: e.clientY, px: posX.value, py: posY.value, el: e.currentTarget }
+  e.currentTarget.setPointerCapture?.(e.pointerId)
+}
+
+function onDragMove(e) {
+  if (!drag) return
+  const rect = drag.el.getBoundingClientRect()
+  const dx = ((e.clientX - drag.x) / Math.max(1, rect.width)) * 100
+  const dy = ((e.clientY - drag.y) / Math.max(1, rect.height)) * 100
+  posX.value = Math.max(0, Math.min(100, drag.px - dx))
+  posY.value = Math.max(0, Math.min(100, drag.py - dy))
+}
+
+function onDragEnd() {
+  drag = null
+}
+
+function backToBrowse() {
+  revokePreview()
+  pendingBytes = null
+  step.value = 'browse'
+}
+
+async function applyGif() {
+  const i = targetIndex.value
+  const bytes = pendingBytes
+  const path = jsonStore.currentProjectPath
+  if (i == null || i < 0 || !bytes || !path) return
+  error.value = ''
+  loading.value = true
+  try {
+    const mime = pendingMime.value
+    const id = await sha256Hex(bytes)
+    let posterB64 = null
+    if (isAnimatedImageMime(mime)) {
+      try {
+        const poster = await extractPosterPng(bytes, mime)
+        posterB64 = bytesToB64(poster)
+      } catch { /* poster optional; hover-off will reuse the GIF */ }
+    }
+    const row = {
+      id,
+      mime,
+      data: bytesToB64(bytes),
+      poster: posterB64,
+      byteLen: bytes.length,
+    }
+    await withProjectDb(path, (d) => upsertGifBlob(d, row))
+    cacheGifRow(row)
+    jsonStore.setSoundGif(i, id, posX.value, posY.value)
+    close()
+  } catch (e) {
+    error.value = t('gifPicker.saveFailed') + ' ' + String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+function removeGif() {
+  const i = targetIndex.value
+  if (i == null || i < 0) return
+  jsonStore.setSoundGif(i, null)
+  close()
+}
+
+onMounted(() => {
+  const i = targetIndex.value
+  const file = i != null ? jsonStore.configFile.files[i] : null
+  if (file?.gifId) {
+    posX.value = file.gifPosX ?? 50
+    posY.value = file.gifPosY ?? 50
+  }
+  loadTrending()
+})
+
+onUnmounted(() => {
+  revokePreview()
+  pendingBytes = null
+})
+</script>

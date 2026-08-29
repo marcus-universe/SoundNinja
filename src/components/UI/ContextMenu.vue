@@ -87,6 +87,21 @@
             @change="onOverrideChange"
           />
         </li>
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="openGifPicker"
+          @mouseenter="hoveredItem = 'gifBg'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="gif" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.gifBg') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'gifBg'" class="context-menu__desc">{{ $t('contextMenu.gifBgDesc') }}</span>
+          </Transition>
+        </li>
       </ul>
     </div>
     <!-- invisible backdrop to close on outside click -->
@@ -280,6 +295,14 @@ function close() {
   appStore.closeContextMenu()
   colorPickerOpen.value = false
   moveToTabOpen.value = false
+}
+
+function openGifPicker() {
+  const { targetIndex } = appStore.contextMenu
+  close()
+  if (typeof targetIndex === 'number' && targetIndex >= 0) {
+    appStore.openGifPicker(targetIndex)
+  }
 }
 
 onMounted(() => {

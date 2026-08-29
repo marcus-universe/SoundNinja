@@ -46,10 +46,23 @@ export const TOKEN_CSS_VARS: Record<ThemeTokenKey, string> = {
   tabBorderHover: '--tab-border-hover',
 }
 
+/** Color wash over GIF/image buttons (0 = media only, 1 = solid). Hover must differ or GIF hover is invisible. */
+export type ThemeGifOverlay = {
+  gifOverlay: number
+  gifOverlayHover: number
+}
+
+export const GIF_OVERLAY_DEFAULTS: ThemeGifOverlay = {
+  gifOverlay: 0.72,
+  gifOverlayHover: 0.38,
+}
+
 /** All CSS vars that may be set inline by the theme system (cleared before file themes). */
 export const THEME_INLINE_VARS = [
   ...Object.values(TOKEN_CSS_VARS),
   '--color-text',
+  '--gif-overlay',
+  '--gif-overlay-hover',
 ]
 
 /** Lighten a #rrggbb hex by `amount` (0–1). Falls back to input on parse fail. */
@@ -156,7 +169,8 @@ export function resolveThemeTokens(
 
 /** Apply resolved tokens as inline CSS vars on <html>. */
 export function applyThemeTokens(
-  settings: Record<string, unknown> | undefined | null
+  settings: Record<string, unknown> | undefined | null,
+  overlay?: Partial<ThemeGifOverlay>
 ): void {
   if (typeof document === 'undefined') return
   const tokens = resolveThemeTokens(settings)
@@ -169,6 +183,10 @@ export function applyThemeTokens(
     '--color-text',
     readableTextColor(tokens.bg, '#eeeeee', '#222831')
   )
+  const idle = overlay?.gifOverlay ?? GIF_OVERLAY_DEFAULTS.gifOverlay
+  const hover = overlay?.gifOverlayHover ?? GIF_OVERLAY_DEFAULTS.gifOverlayHover
+  root.style.setProperty('--gif-overlay', String(idle))
+  root.style.setProperty('--gif-overlay-hover', String(hover))
 }
 
 /** Build a SoundNinja theme CSS file from flat tokens (+ optional layout extras). */

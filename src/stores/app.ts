@@ -31,6 +31,8 @@ export const useAppStore = defineStore('app', {
     selectedSoundPaths: [] as string[],
     draggingSoundIndex: null as number | null,
     draggingTabName: null as string | null,
+    /** Sound array index whose GIF picker is open, or null. */
+    gifPickerIndex: null as number | null,
     contextMenu: {
       visible: false,
       x: 0,
@@ -152,6 +154,14 @@ export const useAppStore = defineStore('app', {
 
     closeContextMenu() {
       this.contextMenu.visible = false
+    },
+
+    openGifPicker(targetIndex: number) {
+      this.gifPickerIndex = targetIndex
+    },
+
+    closeGifPicker() {
+      this.gifPickerIndex = null
     },
   },
 })

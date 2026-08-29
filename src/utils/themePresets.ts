@@ -2,22 +2,26 @@
 
 import {
   THEME_TOKEN_DEFAULTS,
+  GIF_OVERLAY_DEFAULTS,
   lightenHex,
   darkenHex,
   withAlpha,
   type ThemeTokens,
+  type ThemeGifOverlay,
 } from '~/utils/themeTokens'
 
 export type ThemePreset = {
   id: string
   label: string
   tokens: ThemeTokens
+  extras: ThemeGifOverlay
 }
 
 function preset(
   id: string,
   label: string,
-  partial: Partial<ThemeTokens> & Pick<ThemeTokens, 'primaryColor' | 'bg' | 'btnBg'>
+  partial: Partial<ThemeTokens> & Pick<ThemeTokens, 'primaryColor' | 'bg' | 'btnBg'>,
+  overlay: Partial<ThemeGifOverlay> = {}
 ): ThemePreset {
   const primary = partial.primaryColor
   const btnBg = partial.btnBg
@@ -42,7 +46,12 @@ function preset(
     tabBorder: partial.tabBorder ?? primary,
     tabBorderHover: partial.tabBorderHover ?? lightenHex(primary),
   }
-  return { id, label, tokens }
+  return {
+    id,
+    label,
+    tokens,
+    extras: { ...GIF_OVERLAY_DEFAULTS, ...overlay },
+  }
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
@@ -53,7 +62,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBg: '#363f4d',
     btnBgHover: '#434e5f',
     btnText: '#eeeeee',
-  }),
+  }, { gifOverlay: 0.72, gifOverlayHover: 0.38 }),
   preset('soundninja-light', 'SoundNinja-Light', {
     primaryColor: '#0088aa',
     bg: '#eeeeee',
@@ -63,7 +72,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnText: '#ffffff',
     tabText: '#222831',
     tabTextHover: '#222831',
-  }),
+  }, { gifOverlay: 0.55, gifOverlayHover: 0.22 }),
   preset('solarized', 'Solarized', {
     primaryColor: '#268bd2',
     bg: '#002b36',
@@ -72,7 +81,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBgHover: '#0a4a5a',
     btnText: '#93a1a1',
     btnTextHover: '#268bd2',
-  }),
+  }, { gifOverlay: 0.78, gifOverlayHover: 0.42 }),
   preset('monokai', 'Monokai', {
     primaryColor: '#a6e22e',
     bg: '#272822',
@@ -81,7 +90,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBgHover: '#49483e',
     btnText: '#f8f8f2',
     btnTextHover: '#a6e22e',
-  }),
+  }, { gifOverlay: 0.70, gifOverlayHover: 0.36 }),
   preset('dracula', 'Dracula', {
     primaryColor: '#bd93f9',
     bg: '#282a36',
@@ -90,7 +99,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBgHover: '#565a73',
     btnText: '#f8f8f2',
     btnTextHover: '#bd93f9',
-  }),
+  }, { gifOverlay: 0.74, gifOverlayHover: 0.38 }),
   preset('nord', 'Nord', {
     primaryColor: '#88c0d0',
     bg: '#2e3440',
@@ -99,7 +108,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBgHover: '#434c5e',
     btnText: '#eceff4',
     btnTextHover: '#88c0d0',
-  }),
+  }, { gifOverlay: 0.74, gifOverlayHover: 0.40 }),
   preset('gruvbox', 'Gruvbox', {
     primaryColor: '#fabd2f',
     bg: '#282828',
@@ -108,7 +117,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBgHover: '#504945',
     btnText: '#ebdbb2',
     btnTextHover: '#fabd2f',
-  }),
+  }, { gifOverlay: 0.70, gifOverlayHover: 0.34 }),
   preset('cobalt', 'Cobalt', {
     primaryColor: '#ff9d00',
     bg: '#193549',
@@ -117,7 +126,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     btnBgHover: '#29587a',
     btnText: '#ffffff',
     btnTextHover: '#ff9d00',
-  }),
+  }, { gifOverlay: 0.68, gifOverlayHover: 0.32 }),
 ]
 
 export const DEFAULT_THEME_ID = 'soundninja'

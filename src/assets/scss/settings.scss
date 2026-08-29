@@ -354,6 +354,20 @@
   line-height: 1.5;
 }
 
+.settings-link-btn {
+  all: unset;
+  cursor: pointer;
+  color: var(--primary_color);
+  font-family: $fontRegular;
+  font-size: 1.31rem;
+  line-height: 1.4;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
 .settings-section-divider {
   font-family: $fontBold;
   font-size: 1.15rem;

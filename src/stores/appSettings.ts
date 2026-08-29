@@ -38,6 +38,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
     navbarTooltips: true,
     /** Check GitHub Releases for a newer version on app start. Default on. */
     checkUpdatesOnStart: true,
+    /** User-supplied Klipy GIF API key (app-wide, never stored in project files). */
+    klipyApiKey: '',
     /** App-wide audio prefs (not stored in project files). */
     outputSource: 'default',
     outputHost: 'WASAPI',
@@ -89,6 +91,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
       // Default enabled when unset (first launch / older configs).
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
+      this.klipyApiKey = s.klipyApiKey || ''
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
         || s.inputSource != null || s.inputHost != null
@@ -232,6 +235,12 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.checkUpdatesOnStart = !!enabled
       const d = await this._db()
       await saveSetting(d, 'checkUpdatesOnStart', this.checkUpdatesOnStart ? '1' : '0')
+    },
+
+    async setKlipyApiKey(key: string) {
+      this.klipyApiKey = (key || '').trim()
+      const d = await this._db()
+      await saveSetting(d, 'klipyApiKey', this.klipyApiKey)
     },
 
     /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */

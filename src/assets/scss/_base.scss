@@ -61,6 +61,9 @@ body {
   --btn-border-width: 0.32rem;
   --border-radius: 0.8rem;
   --btn_padding: #{$padding_1};
+  /* Color wash over GIF/image button backgrounds (0 = GIF only, 1 = solid). */
+  --gif-overlay: 0.72;
+  --gif-overlay-hover: 0.38;
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
 

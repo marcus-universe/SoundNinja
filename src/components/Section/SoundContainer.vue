@@ -25,9 +25,14 @@
                     :btnStyle="getBtnStyle(item.sound)"
                     :loading="loadingPaths.has(item.sound.path)"
                     :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(item.sound.path)"
+                    :gifSrc="gifSrcFor(item.sound)"
+                    :gifPosX="item.sound.gifPosX ?? 50"
+                    :gifPosY="item.sound.gifPosY ?? 50"
+                    :hasGif="!!item.sound.gifId"
                     :data-sound-path="item.sound.path"
                     @play="onSoundClick(item.sound)"
                     @contextmenu="(e) => openSoundMenu(e, item.sound)"
+                    @gifhover="(on) => onGifHover(item.sound, on)"
                 />
             </template>
         </div>
@@ -65,6 +70,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
 import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/utils/colorOverride'
+import { getDb } from '~/utils/db'
+import { ensureGifUrls, peekGifUrls } from '~/utils/gifCache'
+
+const MAX_ANIM_GIFS = 16
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -143,6 +152,8 @@ onMounted(() => {
 onUnmounted(() => {
   sortable?.destroy()
   sortable = null
+  gifObserver?.disconnect()
+  gifObserver = null
 })
 
 const currentTab = computed(() => appStore.currentTab)
@@ -163,6 +174,79 @@ const JSONFile = computed(() => {
 })
 
 const Settings = computed(() => jsonStore.configFile?.settings)
+
+const gifPlayOnHover = computed(() => Settings.value?.gifPlayOnHover !== false)
+const visibleByPath = reactive({})
+const hoveredPath = ref(null)
+const gifUrls = reactive({})
+let gifObserver = null
+
+function onGifHover(sound, on) {
+  if (on) hoveredPath.value = sound.path
+  else if (hoveredPath.value === sound.path) hoveredPath.value = null
+}
+
+function shouldAnimate(sound) {
+  if (!sound.gifId) return false
+  if (!visibleByPath[sound.path]) return false
+  if (gifPlayOnHover.value) return hoveredPath.value === sound.path
+  return true
+}
+
+const animatingPaths = computed(() => {
+  const paths = []
+  for (const item of displayItems.value) {
+    if (item.kind !== 'sound') continue
+    if (!shouldAnimate(item.sound)) continue
+    paths.push(item.sound.path)
+    if (paths.length >= MAX_ANIM_GIFS) break
+  }
+  return new Set(paths)
+})
+
+function gifSrcFor(sound) {
+  if (!sound.gifId) return ''
+  const urls = gifUrls[sound.gifId] || peekGifUrls(sound.gifId)
+  if (!urls) return ''
+  if (animatingPaths.value.has(sound.path)) return urls.animUrl
+  return urls.posterUrl
+}
+
+async function loadVisibleGifs() {
+  const d = getDb()
+  if (!d) return
+  for (const item of displayItems.value) {
+    if (item.kind !== 'sound' || !item.sound.gifId) continue
+    if (!visibleByPath[item.sound.path]) continue
+    if (gifUrls[item.sound.gifId]) continue
+    try {
+      const urls = await ensureGifUrls(d, item.sound.gifId)
+      if (urls) gifUrls[item.sound.gifId] = urls
+    } catch (e) {
+      console.error('Failed to load GIF blob', e)
+    }
+  }
+}
+
+function setupGifObserver() {
+  gifObserver?.disconnect()
+  const root = soundListRef.value?.closest('.SoundContainer__scroll') || null
+  gifObserver = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const path = e.target.getAttribute('data-sound-path')
+        if (!path) continue
+        if (e.isIntersecting) visibleByPath[path] = true
+        else delete visibleByPath[path]
+      }
+      loadVisibleGifs()
+    },
+    { root, rootMargin: '80px', threshold: 0.01 },
+  )
+  nextTick(() => {
+    soundListRef.value?.querySelectorAll('.Soundbtn').forEach((el) => gifObserver.observe(el))
+  })
+}
 
 // P8: enable/disable drag reordering based on the per-project setting.
 watch(
@@ -212,6 +296,23 @@ const displayItems = computed(() => {
   items.sort((a, b) => orderOf(a) - orderOf(b))
   return items
 })
+
+watch(
+  [
+    () => displayItems.value.map((i) => i.domKey).join('|'),
+    () => jsonStore.configFile.files.map((f) => f.gifId || '').join('|'),
+  ],
+  () => {
+    for (const f of jsonStore.configFile.files) {
+      if (!f.gifId || gifUrls[f.gifId]) continue
+      const urls = peekGifUrls(f.gifId)
+      if (urls) gifUrls[f.gifId] = urls
+    }
+    setupGifObserver()
+    loadVisibleGifs()
+  },
+  { flush: 'post' },
+)
 
 // P8: re-measure uniform button height when the setting or the item list changes.
 watch(
@@ -364,6 +465,7 @@ let unlistenFinished = null
 let unlistenPlaying = null
 
 onMounted(async () => {
+  setupGifObserver()
   unlistenFinished = await listen('sound_finished', (event) => {
     const path = event.payload
     const idx = jsonStore.configFile.files.findIndex((f) => f.path === path)

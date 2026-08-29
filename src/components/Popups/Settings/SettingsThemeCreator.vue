@@ -192,6 +192,29 @@
             </div>
             <input type="range" class="settings-slider" min="0.1" max="4" step="0.05" v-model.number="themeCreator.btnPaddingY" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('btnPaddingY')" />
           </div>
+
+          <div class="settings-section-divider">{{ $t('settings.themeCreator.gifOverlaySection') }}</div>
+
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.gifOverlayHint')">{{ $t('settings.themeCreator.gifOverlay') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlay" @change="clampRange('gifOverlay', 0, 100)" />
+                <span class="settings-unit-label">%</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlay" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('gifOverlay')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.gifOverlayHoverHint')">{{ $t('settings.themeCreator.gifOverlayHover') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlayHover" @change="clampRange('gifOverlayHover', 0, 100)" />
+                <span class="settings-unit-label">%</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlayHover" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('gifOverlayHover')" />
+          </div>
         </template>
 
         <!-- ── Tabs ──────────────────────────────────────────────────────── -->
@@ -316,6 +339,8 @@ const LAYOUT_DEFAULTS = {
   buttonGap: 1.0,
   btnPaddingX: 0.75,
   btnPaddingY: 0.5,
+  gifOverlay: 72,
+  gifOverlayHover: 38,
 } as const
 
 const THEME_DEFAULTS = {
@@ -333,6 +358,8 @@ type ThemeSliderKey =
   | 'buttonGap'
   | 'btnPaddingX'
   | 'btnPaddingY'
+  | 'gifOverlay'
+  | 'gifOverlayHover'
 
 type CreatorTabId = 'general' | 'buttons' | 'tabs'
 
@@ -417,6 +444,8 @@ async function onLoadTheme() {
     if (!preset) return
     Object.assign(themeCreator, preset.tokens)
     themeCreator.name = preset.label
+    themeCreator.gifOverlay = Math.round(preset.extras.gifOverlay * 100)
+    themeCreator.gifOverlayHover = Math.round(preset.extras.gifOverlayHover * 100)
     emitPreview()
     return
   }
@@ -458,6 +487,8 @@ function applyParsedTheme(css: string) {
     if (isFinite(py)) themeCreator.btnPaddingY = py
     if (isFinite(px)) themeCreator.btnPaddingX = px
   }
+  if (vars['--gif-overlay']) themeCreator.gifOverlay = opacityToPct(vars['--gif-overlay'])
+  if (vars['--gif-overlay-hover']) themeCreator.gifOverlayHover = opacityToPct(vars['--gif-overlay-hover'])
   emitPreview()
 }
 
@@ -545,6 +576,8 @@ function applyCurrentVars(v: Record<string, string> | undefined) {
     if (isFinite(py)) themeCreator.btnPaddingY = py
     if (isFinite(px)) themeCreator.btnPaddingX = px
   }
+  if (v['--gif-overlay']) themeCreator.gifOverlay = opacityToPct(v['--gif-overlay'])
+  if (v['--gif-overlay-hover']) themeCreator.gifOverlayHover = opacityToPct(v['--gif-overlay-hover'])
 }
 
 const allFonts = computed(() => [...customFonts.value, ...systemFonts.value])
@@ -686,6 +719,8 @@ function buildThemeCss() {
     '--tab-border-width': `${themeCreator.tabBorderWidth}rem`,
     '--button-gap': `${themeCreator.buttonGap}rem`,
     '--btn_padding': `${themeCreator.btnPaddingY}rem ${themeCreator.btnPaddingX}rem`,
+    '--gif-overlay': String(themeCreator.gifOverlay / 100),
+    '--gif-overlay-hover': String(themeCreator.gifOverlayHover / 100),
   })
 }
 
@@ -717,6 +752,20 @@ function fixColorInput(key: ThemeTokenKey) {
 function clampMin(key: ThemeSliderKey, min: number) {
   const v = Number(themeCreator[key])
   themeCreator[key] = isNaN(v) ? min : parseFloat(Math.max(min, v).toFixed(2))
+}
+
+function clampRange(key: ThemeSliderKey, min: number, max: number) {
+  const v = Number(themeCreator[key])
+  const n = isNaN(v) ? min : v
+  themeCreator[key] = parseFloat(Math.min(max, Math.max(min, n)).toFixed(0))
+}
+
+/** CSS opacity 0–1 (or leftover 0–100 / 55%) → Theme Creator percent. */
+function opacityToPct(v: string): number {
+  const n = parseFloat(v)
+  if (!isFinite(n)) return LAYOUT_DEFAULTS.gifOverlay
+  if (n <= 1) return Math.round(n * 100)
+  return Math.round(Math.min(100, Math.max(0, n)))
 }
 
 function extractFontFamily(v: string): string {

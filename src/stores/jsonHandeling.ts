@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import {
-  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig,
+  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
+  loadGifBlobsByIds, upsertGifBlob,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
 } from '~/utils/db'
+import { revokeAllGifUrls } from '~/utils/gifCache'
 
 /** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
  *  deep-clones and strips Vue reactive Proxies (which structuredClone rejects). */
@@ -86,6 +88,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Project lifecycle ─────────────────────────────────────────────────────
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
+      revokeAllGifUrls()
       const d = await openDb(dbAbsPath)
       const config = await loadConfig(d)
       this.configFile = config
@@ -162,6 +165,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       try {
         await withProjectDb(path, async (d) => {
           await saveConfig(d, this.configFile)
+          const keep = this.configFile.files.map((f) => f.gifId).filter((id): id is string => !!id)
+          await gcOrphanGifs(d, keep)
         })
         this.openingSnapshot = clone(this.configFile)
         this.dirty = false
@@ -182,15 +187,30 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       await ensureProjectParentDir(dbAbsPath)
       await removeInvalidProjectPlaceholder(dbAbsPath)
       const config = clone(this.configFile)
+      const gifIds = [...new Set(config.files.map((f) => f.gifId).filter((id): id is string => !!id))]
+      let blobs: Awaited<ReturnType<typeof loadGifBlobsByIds>> = []
+      if (this.currentProjectPath && gifIds.length) {
+        const oldPath = this.currentProjectPath
+        blobs = await withProjectDb(oldPath, (d) => loadGifBlobsByIds(d, gifIds))
+      }
       try {
         await this.importConfig(config, dbAbsPath)
-        // importConfig already clears history
+        if (blobs.length) {
+          await withProjectDb(dbAbsPath, async (d) => {
+            for (const row of blobs) await upsertGifBlob(d, row)
+          })
+        }
       } catch (e) {
         // Retry once after deleting a non-SQLite placeholder the dialog may have created.
         const msg = String(e)
         if (/not a database|unable to open|file is encrypted|disk image/i.test(msg)) {
           try { await (await import('@tauri-apps/api/core')).invoke('delete_file_abs', { path: dbAbsPath }) } catch { /* ignore */ }
           await this.importConfig(config, dbAbsPath)
+          if (blobs.length) {
+            await withProjectDb(dbAbsPath, async (d) => {
+              for (const row of blobs) await upsertGifBlob(d, row)
+            })
+          }
           return
         }
         throw e
@@ -287,6 +307,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.configFile.settings.allowReorder = val
       this.writeConfig()
     },
+    setGifPlayOnHover(val: boolean) {
+      this.configFile.settings.gifPlayOnHover = val
+      this.writeConfig()
+    },
     // Generic single-setting update — avoids a dedicated action per field.
     setSetting(key: keyof Settings, val: unknown) {
       (this.configFile.settings as Record<string, unknown>)[key] = val
@@ -327,6 +351,22 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setSoundColor(soundindex: number, color: string) {
       this.pushBeforeChange()
       this.configFile.files[soundindex].color = color
+      this.writeConfig()
+    },
+
+    setSoundGif(soundindex: number, gifId: string | null, gifPosX = 50, gifPosY = 50) {
+      const file = this.configFile.files[soundindex]
+      if (!file) return
+      this.pushBeforeChange()
+      if (gifId) {
+        file.gifId = gifId
+        file.gifPosX = gifPosX
+        file.gifPosY = gifPosY
+      } else {
+        delete file.gifId
+        delete file.gifPosX
+        delete file.gifPosY
+      }
       this.writeConfig()
     },
 

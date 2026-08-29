@@ -124,6 +124,33 @@
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.gifPlayOnHover') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.gifPlayOnHoverHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="gifPlayOnHover" @update:modelValue="onGifPlayOnHover" />
+    </div>
+
+    <div class="settings-group settings-group--stacked">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.klipyApiKey') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.klipyApiKeyHint') }}</span>
+      </div>
+      <input
+        class="settings-input"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        :placeholder="$t('settings.main.klipyApiKeyPlaceholder')"
+        :value="klipyApiKey"
+        @change="onKlipyApiKeyEvent"
+      />
+      <button type="button" class="settings-link-btn" @click="openKlipyDocs">
+        {{ $t('settings.main.klipyGetKey') }}
+      </button>
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.navbarTooltips') }}</span>
         <span class="settings-hint">{{ $t('settings.main.navbarTooltipsHint') }}</span>
       </div>
@@ -261,6 +288,7 @@ import {
   parseThemeName,
   THEME_TOKEN_DEFAULTS,
 } from '~/utils/themeTokens'
+import { KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
@@ -296,6 +324,8 @@ const showPlayer = ref(true)
 const playerLarge = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
+const gifPlayOnHover = ref(true)
+const klipyApiKey = ref('')
 const navbarTooltips = ref(true)
 const checkUpdatesOnStart = ref(true)
 const systemTitlebar = ref(false)
@@ -410,7 +440,7 @@ function applyTheme() {
   const theme = builtinThemes.find((t) => t.id === id)
   if (!theme) return
   jsonStore.setThemeColors(theme.tokens)
-  applyThemeTokens(jsonStore.configFile?.settings as unknown as Record<string, unknown>)
+  applyThemeTokens(jsonStore.configFile?.settings as unknown as Record<string, unknown>, theme.extras)
 }
 
 // Removes every theme variable a builtin/model theme may have set inline on
@@ -437,7 +467,7 @@ function injectCustomCss(css: string) {
     const tokens = { ...THEME_TOKEN_DEFAULTS, ...parsed }
     const name = parseThemeName(css) || 'theme'
     const flat = buildThemeCss(name, tokens)
-    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding)\s*:\s*([^;]+);/g
+    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding|--gif-overlay-hover|--gif-overlay)\s*:\s*([^;]+);/g
     const extras: string[] = []
     let m: RegExpExecArray | null
     while ((m = layoutRe.exec(css)) !== null) extras.push(`  ${m[1]}: ${m[2]};`)
@@ -564,6 +594,25 @@ function onAllowReorder(val: boolean) {
   jsonStore.setAllowReorder(val)
 }
 
+function onGifPlayOnHover(val: boolean) {
+  gifPlayOnHover.value = val
+  jsonStore.setGifPlayOnHover(val)
+}
+
+async function onKlipyApiKey(val: string) {
+  klipyApiKey.value = val
+  await appSettings.setKlipyApiKey(val)
+}
+
+function onKlipyApiKeyEvent(e: Event) {
+  const el = e.target as HTMLInputElement
+  onKlipyApiKey(el.value)
+}
+
+function openKlipyDocs() {
+  openInSystemBrowser(KLIPY_PARTNER_URL)
+}
+
 async function onNavbarTooltips(val: boolean) {
   navbarTooltips.value = val
   await appSettings.setNavbarTooltips(val)
@@ -664,6 +713,8 @@ async function syncFromStore() {
   playerLarge.value = jsonStore.configFile?.settings?.playerLarge === true
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
+  gifPlayOnHover.value = jsonStore.configFile?.settings?.gifPlayOnHover !== false
+  klipyApiKey.value = appSettings.klipyApiKey || ''
   navbarTooltips.value = appSettings.navbarTooltips !== false
   checkUpdatesOnStart.value = appSettings.checkUpdatesOnStart !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'

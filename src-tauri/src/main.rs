@@ -4,6 +4,7 @@ pub mod gpu;
 pub mod menu;
 pub mod paths;
 pub mod fsx;
+pub mod httpx;
 
 #[tauri::command]
 fn get_system_fonts() -> Vec<String> {
@@ -185,6 +186,8 @@ fn main() {
             fsx::delete_file_abs,
             fsx::delete_dir_abs,
             fsx::collect_audio_buckets_abs,
+            httpx::download_url_bytes,
+            httpx::http_get_text,
             gpu::has_dedicated_gpu,
             gpu::set_gpu_audio,
             gpu::get_gpu_audio_enabled
