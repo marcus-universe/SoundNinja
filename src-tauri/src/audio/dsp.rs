@@ -830,6 +830,25 @@ pub fn replace_session_range(
     })
 }
 
+/// Clone a time range (or whole session) as interleaved PCM.
+pub fn clone_session_range(
+    session_id: &str,
+    start_sec: Option<f64>,
+    end_sec: Option<f64>,
+) -> Result<(Vec<f32>, u32, u16), String> {
+    with_session_mut(session_id, |sess| {
+        let (start, end) = resolve_sample_range(sess, start_sec, end_sec);
+        if end <= start {
+            return Err("Export range is empty".into());
+        }
+        Ok((
+            sess.samples[start..end].to_vec(),
+            sess.sample_rate,
+            sess.channels,
+        ))
+    })
+}
+
 pub fn export_session_to_temp(
     app: &AppHandle,
     session_id: &str,

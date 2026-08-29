@@ -217,12 +217,39 @@
       <UICheckbox :modelValue="gpuAudioEnabled" @update:modelValue="onGpuAudio" />
     </div>
 
-   
+    <div class="settings-section-divider">{{ $t('settings.main.stemsSection') }}</div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.stemsModel') }}</span>
+        <span class="settings-hint">{{ stemsModelHint }}</span>
+        <span v-if="stemsDownloading" class="settings-hint">
+          {{ $t('recordEditor.stemsDownloading') }}
+          {{ stemsDownloadPct != null ? Math.round(stemsDownloadPct) + '%' : '' }}
+        </span>
+      </div>
+      <button
+        v-if="stemsAvailable && !stemsModelReady"
+        class="settings-btn"
+        style="flex: 0; white-space: nowrap"
+        :disabled="stemsDownloading"
+        @click="onInstallStemsModel"
+      >
+        {{ $t('settings.main.stemsInstall') }}
+      </button>
+      <span v-else-if="stemsModelReady" class="settings-hint" style="white-space: nowrap">
+        {{ $t('settings.main.stemsInstalled') }}
+      </span>
+      <span v-else class="settings-hint" style="white-space: nowrap">
+        {{ $t('settings.main.stemsUnavailable') }}
+      </span>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openSecondaryWindow, THEME_CREATOR } from '~/utils/secondaryWindows'
 import { THEME_PRESETS, DEFAULT_THEME_ID, normalizeThemeId } from '~/utils/themePresets'
@@ -283,6 +310,60 @@ const cacheMaxEntryMib = ref(50)
 const cacheStatsText = ref('')
 const hasDedicatedGpu = ref(false)
 const gpuAudioEnabled = ref(false)
+const stemsAvailable = ref(false)
+const stemsModelReady = ref(false)
+const stemsModelLabel = ref('BS-RoFormer')
+const stemsModelSize = ref('~158 MB')
+const stemsDownloading = ref(false)
+const stemsDownloadPct = ref<number | null>(null)
+let unlistenStemsPct: UnlistenFn | null = null
+
+const stemsModelHint = computed(() => {
+  if (!stemsAvailable.value) return t('settings.main.stemsUnavailableHint')
+  if (stemsModelReady.value) {
+    return t('settings.main.stemsInstalledHint', {
+      model: stemsModelLabel.value,
+      size: stemsModelSize.value,
+    })
+  }
+  return t('settings.main.stemsInstallHint', {
+    model: stemsModelLabel.value,
+    size: stemsModelSize.value,
+  })
+})
+
+async function refreshStemsStatus() {
+  try {
+    const s = await invoke<{
+      available: boolean
+      modelReady: boolean
+      modelLabel: string
+      modelSizeHint: string
+    }>('get_stems_status')
+    stemsAvailable.value = !!s.available
+    stemsModelReady.value = !!s.modelReady
+    stemsModelLabel.value = s.modelLabel || 'BS-RoFormer'
+    stemsModelSize.value = s.modelSizeHint || '~158 MB'
+  } catch {
+    stemsAvailable.value = false
+    stemsModelReady.value = false
+  }
+}
+
+async function onInstallStemsModel() {
+  if (!stemsAvailable.value || stemsDownloading.value) return
+  stemsDownloading.value = true
+  stemsDownloadPct.value = 0
+  try {
+    await invoke('ensure_stems_model')
+    await refreshStemsStatus()
+  } catch (e) {
+    console.error(e)
+  } finally {
+    stemsDownloading.value = false
+    stemsDownloadPct.value = null
+  }
+}
 
 // ── Navbar side ───────────────────────────────────────────────────────────────
 async function onNavbarSide() {
@@ -607,6 +688,7 @@ async function syncFromStore() {
   if (hasDedicatedGpu.value) {
     gpuAudioEnabled.value = jsonStore.configFile?.settings?.gpuAudioEnabled ?? false
   }
+  await refreshStemsStatus()
 }
 
 async function onGpuAudio(val: boolean) {
@@ -624,5 +706,15 @@ watch(() => appStore.activeOverlay, async (val) => {
   await syncFromStore()
 })
 
-onMounted(syncFromStore)
+onMounted(async () => {
+  await syncFromStore()
+  unlistenStemsPct = await listen<number>('stems_model_progress', (e) => {
+    if (!stemsDownloading.value) return
+    stemsDownloadPct.value = Number(e.payload) || 0
+  })
+})
+
+onBeforeUnmount(() => {
+  if (unlistenStemsPct) unlistenStemsPct()
+})
 </script>

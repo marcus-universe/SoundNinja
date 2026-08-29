@@ -115,7 +115,7 @@ pub fn get_input_volume() -> f32 {
 
 fn build_stream_f32(
     device: &cpal::Device,
-    config: &cpal::StreamConfig,
+    config: cpal::StreamConfig,
     tx: SyncSender<Vec<f32>>,
     stop: Arc<AtomicBool>,
 ) -> Result<cpal::Stream, String> {
@@ -137,7 +137,7 @@ fn build_stream_f32(
 
 fn build_stream_i16(
     device: &cpal::Device,
-    config: &cpal::StreamConfig,
+    config: cpal::StreamConfig,
     tx: SyncSender<Vec<f32>>,
     stop: Arc<AtomicBool>,
 ) -> Result<cpal::Stream, String> {
@@ -237,10 +237,10 @@ pub fn start_recording(
     let stream_join = thread::spawn(move || {
         let stream = match sample_format {
             cpal::SampleFormat::F32 => {
-                build_stream_f32(&device, &config, chunk_tx, stop_c.clone())
+                build_stream_f32(&device, config.clone(), chunk_tx, stop_c.clone())
             }
             cpal::SampleFormat::I16 => {
-                build_stream_i16(&device, &config, chunk_tx, stop_c.clone())
+                build_stream_i16(&device, config.clone(), chunk_tx, stop_c.clone())
             }
             other => Err(format!("Unsupported sample format: {other:?}")),
         };

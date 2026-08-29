@@ -5,19 +5,56 @@ use serde::Serialize;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn device_display_name(d: &cpal::Device) -> Option<String> {
-    d.description().ok().map(|desc| {
-        desc.extended()
-            .first()
-            .cloned()
-            .unwrap_or_else(|| desc.name().to_string())
-    })
+/// Friendly, unique label for UI + settings persistence.
+///
+/// PipeWire often puts a short card nick in `name()` and the useful route/port
+/// label (e.g. "Scarlett 18i20 3rd Gen Headphones 1") in `extended()`. Prefer that.
+pub fn device_display_name(d: &cpal::Device) -> Option<String> {
+    if let Ok(desc) = d.description() {
+        if let Some(ext) = desc.extended().next() {
+            let ext = ext.trim();
+            if !ext.is_empty() {
+                return Some(ext.to_string());
+            }
+        }
+        let primary = desc.name().trim();
+        if !primary.is_empty() && !is_internal_device_label(primary) {
+            return Some(primary.to_string());
+        }
+    }
+    d.id().ok().map(|id| id.to_string()).filter(|s| !is_internal_device_label(s))
+}
+
+fn is_internal_device_label(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "sink_default"
+            | "input_default"
+            | "output_default"
+            | "unknown"
+            | "null"
+            | "discard all samples (playback) or generate zero samples (capture)"
+    ) || name.to_ascii_lowercase().starts_with("loopback-")
 }
 
 /// cpal's `HostId::name()` is the enum variant (`"Wasapi"`), while the UI historically
 /// stores `"WASAPI"`. Treat those as equal (case-insensitive).
 fn host_name_matches(id_name: &str, wanted: &str) -> bool {
     id_name.eq_ignore_ascii_case(wanted)
+}
+
+/// UI / default preference: PipeWire > PulseAudio > Alsa on Linux; Wasapi first on Windows.
+fn host_sort_key(name: &str) -> u8 {
+    match name.to_ascii_lowercase().as_str() {
+        "pipewire" => 0,
+        "pulseaudio" => 1,
+        "wasapi" => 0,
+        "coreaudio" => 0,
+        "asio" => 1,
+        "jack" => 3,
+        "alsa" => 4,
+        _ => 10,
+    }
 }
 
 /// Resolve a host id by name. Returns `None` when `host_name` is empty / "default"
@@ -142,33 +179,47 @@ pub fn find_device_by_name(
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 /// Returns the names of all audio hosts available on this platform
-/// (e.g. "WASAPI"; "ASIO" only when built with `--features asio`).
+/// (e.g. "PipeWire"/"Alsa" on Linux; "Wasapi"; "ASIO" only with `--features asio`).
 #[tauri::command]
 pub fn get_audio_hosts() -> Vec<String> {
-    cpal::available_hosts()
+    let mut hosts: Vec<String> = cpal::available_hosts()
         .into_iter()
         .map(|id| id.name().to_string())
-        .collect()
+        .collect();
+    hosts.sort_by_key(|h| host_sort_key(h));
+    hosts
 }
 
 /// Returns output-device names across all hosts (backward-compat: no params).
 #[tauri::command]
 pub fn get_out_devices() -> Vec<String> {
-    get_output_devices_for_host_name(None)
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|d| device_display_name(&d))
-        .inspect(|n| println!("Device: {}", n))
-        .collect()
+    unique_preserve_order(
+        get_output_devices_for_host_name(None)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|d| device_display_name(&d))
+            .inspect(|n| println!("Device: {}", n))
+            .collect(),
+    )
 }
 
 /// Returns output-device names for a specific driver/host.
 #[tauri::command]
 pub fn get_out_devices_host(host: String) -> Vec<String> {
-    get_output_devices_for_host_name(Some(&host))
-        .unwrap_or_default()
+    unique_preserve_order(
+        get_output_devices_for_host_name(Some(&host))
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|d| device_display_name(&d))
+            .collect(),
+    )
+}
+
+fn unique_preserve_order(names: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    names
         .into_iter()
-        .filter_map(|d| device_display_name(&d))
+        .filter(|n| seen.insert(n.clone()))
         .collect()
 }
 
@@ -198,7 +249,7 @@ pub struct CaptureDeviceInfo {
     pub loopback: bool,
 }
 
-/// Returns capture sources: real mics + WASAPI loopback (PC Audio) outputs.
+/// Returns capture sources: real mics + loopback (PC Audio) outputs.
 #[tauri::command]
 pub fn get_loopback_devices(host: Option<String>) -> Vec<CaptureDeviceInfo> {
     let host_ref = host.as_deref();
@@ -215,6 +266,10 @@ pub fn get_loopback_devices(host: Option<String>) -> Vec<CaptureDeviceInfo> {
 
     for d in get_output_devices_for_host_name(host_ref).unwrap_or_default() {
         if let Some(name) = device_display_name(&d) {
+            // Avoid listing the same PipeWire duplex sink twice (sinks are often duplex).
+            if out.iter().any(|e| e.name == name) {
+                continue;
+            }
             out.push(CaptureDeviceInfo {
                 name: format!("{} (PC Audio)", name),
                 loopback: true,
@@ -261,4 +316,41 @@ pub fn get_asio_device_channels(device_name: String) -> Vec<String> {
     }
     #[cfg(not(feature = "asio"))]
     vec![]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linux_host_lists_real_sinks() {
+        let hosts = get_audio_hosts();
+        let host = hosts
+            .iter()
+            .find(|h| h.eq_ignore_ascii_case("pipewire"))
+            .or_else(|| hosts.iter().find(|h| h.eq_ignore_ascii_case("pulseaudio")))
+            .cloned();
+        let Some(host) = host else {
+            // CI / machines without PipeWire — ALSA-only is fine.
+            eprintln!("skip: no PipeWire/PulseAudio host in {hosts:?}");
+            return;
+        };
+        let outs = get_out_devices_host(host);
+        assert!(
+            !outs.is_empty(),
+            "expected PipeWire/Pulse sinks, got empty list"
+        );
+        // On this Arch setup we expect at least one named sink (not only ALSA plugins).
+        assert!(
+            outs.iter().any(|n| {
+                let l = n.to_ascii_lowercase();
+                l.contains("scarlett")
+                    || l.contains("headphones")
+                    || l.contains("soundboard")
+                    || l.contains("hdmi")
+                    || l.contains("line output")
+            }),
+            "expected real system sinks, got {outs:?}"
+        );
+    }
 }

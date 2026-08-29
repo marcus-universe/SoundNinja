@@ -1,22 +1,24 @@
-# Stem Separation Model (HTDemucs-ORT)
+# Stem Separation Model (BS-RoFormer)
 
-SoundNinja’s Record Editor can split a recording into **vocals** or **music** (drums + bass + other) using AI stem separation.
+SoundNinja’s Record Editor can keep **vocals** or **music** (mix − vocals) using AI stem separation.
 
-The model is **not bundled** with the app. It is a third-party ONNX model that must be downloaded (about **~200 MB**) before the feature works.
+The model is **not bundled** with the app. It is a third-party ONNX model (~**158 MB**) downloaded on first use (or when the Windows installer checkbox / first-run prompt is accepted).
 
 ## Model details
 
 | | |
 | --- | --- |
-| **Name** | HTDemucs-ORT (`htdemucs_ort_v1`) |
-| **Type** | Hybrid Transformer Demucs (Meta Demucs v4 lineage), converted for ONNX Runtime |
-| **Provider** | [gentij/htdemucs-ort on Hugging Face](https://huggingface.co/gentij/htdemucs-ort) |
-| **Library** | [stem-splitter-core](https://github.com/gentij/stem-splitter-core) |
-| **Size** | ~200 MB |
-| **Stems** | vocals, drums, bass, other |
+| **Name** | BS-RoFormer (`bs_roformer_ep317_sdr12.9755`) |
+| **Type** | Band-Split RoPE Transformer, uint8 ONNX (no-STFT host pipeline) |
+| **Architecture** | [lucidrains/BS-RoFormer](https://github.com/lucidrains/BS-RoFormer) |
+| **Weights** | viperx `ep_317_sdr_12.9755` (vocals SDR ≈ 12.9 dB on MUSDB18HQ) |
+| **ONNX export** | [xycld/BS-RoFormer-ONNX](https://huggingface.co/xycld/BS-RoFormer-ONNX) |
+| **Runtime** | ONNX Runtime via Rust `ort` + host STFT/iSTFT (`rustfft` / `realfft`) |
+| **Size** | ~158 MB (single-file uint8 quantized) |
+| **Stems** | vocals; music = residual (`mix − vocals`) |
 
-Model page: https://huggingface.co/gentij/htdemucs-ort  
-Manifest (used by the downloader): https://huggingface.co/gentij/htdemucs-ort/resolve/main/manifest.json
+Model page: https://huggingface.co/xycld/BS-RoFormer-ONNX  
+Direct file: `bs_roformer_ep317_sdr12.9755_quantized_uint8.onnx`
 
 ## Requirements
 
@@ -29,67 +31,74 @@ Manifest (used by the downloader): https://huggingface.co/gentij/htdemucs-ort/re
    npm run tauri:build:stems
    ```
 
-2. **Windows / MSVC**  
-   Prebuilt ONNX Runtime libs need a recent MSVC toolchain:
-   - Visual Studio 2022 **17.14+**
-   - MSVC toolset **14.44+**
+   Release CI passes `--features stems` for all platforms.
 
-   With older toolsets (e.g. 14.43), linking fails with unresolved symbols such as `__std_find_first_of_trivial_pos_*`. Update Visual Studio, then rebuild with `--features stems`.
+2. **Windows / MSVC**  
+   The stem engine loads ONNX Runtime **dynamically** (`ort` `load-dynamic` + `copy-dylibs`), so older VS 2022 toolsets can link the app. A working MSVC + Windows SDK is still required to build.
 
 3. **Disk space & network**  
-   First use downloads ~200 MB. Keep a stable connection.
+   First download is ~158 MB. Keep a stable connection.
 
-## Install via the Record Editor (recommended)
+## How users get the model
+
+### Windows installer checkbox
+
+The NSIS installer shows a page:
+
+> Download the AI stem separation model on first launch (~158 MB)
+
+Default: **checked**. This only writes  
+`HKCU\Software\com.soundninja.dev\WantStemsModel = 1`  
+— the download happens inside the app (resumable, with progress UI).
+
+### Linux / macOS first-run prompt
+
+On first launch (deb, AppImage, AUR, DMG), if the model is missing, the same download dialog appears. A `stems-asked` marker under the model directory prevents re-asking after Yes/No.
+
+### Settings escape hatch
+
+**Settings → Stem Separation → Download model** reinstalls or installs after a decline. On Windows/Linux the Record Editor **Stems** button stays hidden until the model is present (or installer intent is still pending).
+
+### Record Editor
 
 1. Open **Record Editor** from the player bar.
 2. Record or load a session.
 3. Click **Stems** → **Keep Vocals** or **Keep Music**.
-4. If the model is missing, a dialog appears:
-   - Model name and size
-   - Third-party notice
-   - Link to the Hugging Face page
-5. Click **Yes** / **Ja**.
-6. Wait for the download progress to finish.
-7. Separation runs automatically after the model is ready.
-
-Next time the model is already cached, the dialog is skipped and stems run directly.
+4. If the model is missing (and the button is visible), confirm the download dialog.
+5. Separation runs after the model is ready.
 
 ### Cache location
 
-`stem-splitter-core` stores models under the OS cache for project  
-`dev.StemSplitter.stem-splitter-core`, typically:
-
 | OS | Path |
 | --- | --- |
-| Windows | `%LOCALAPPDATA%\StemSplitter\stem-splitter-core\cache\models\` |
-| macOS | `~/Library/Caches/dev.StemSplitter.stem-splitter-core/models/` |
-| Linux | `~/.cache/stem-splitter-core/models/` |
+| Windows | `%APPDATA%\com.soundninja.dev\models\bs_roformer\` (or portable app-data) |
+| macOS | `~/Library/Application Support/com.soundninja.dev/models/bs_roformer/` |
+| Linux | `~/.local/share/com.soundninja.dev/models/bs_roformer/` |
 
-Files are named from the manifest (name + SHA prefix). Do not rename them if you place files manually.
+Exact base follows Tauri `app_data_dir` / portable-first layout in `paths.rs`.
 
-## Manual / offline notes
+## Visibility rules
 
-SoundNinja’s normal path is **in-app download** via `ensure_stems_model` / `prepare_model("htdemucs_ort_v1")`.
-
-If you need to inspect or mirror the model:
-
-1. Open https://huggingface.co/gentij/htdemucs-ort
-2. Check the repo files and `manifest.json` for the exact ONNX artifact URL and SHA-256.
-3. Prefer letting the app download so checksum verification matches the library.
-
-Manual copy into the cache folder only works if the filename and checksum match what `stem-splitter-core` expects.
+| Platform | Model missing, no intent | Model missing + intent / first-run | Model ready |
+| --- | --- | --- | --- |
+| Windows | Stems button **hidden** | Prompt / button visible | Visible |
+| Linux | Stems button **hidden** (after decline) | First-run prompt | Visible |
+| macOS | Button visible; download on use | First-run prompt | Visible |
 
 ## Troubleshooting
 
 | Problem | What to do |
 | --- | --- |
 | “Stem engine not compiled” / dialog says engine missing | Rebuild with `npm run tauri:serve:stems` after updating VS/MSVC. |
-| Link / “Open model page” does nothing | Needs `opener` permission (app capability). Restart the app after updating. Or open https://huggingface.co/gentij/htdemucs-ort in a browser. |
-| Download stuck / fails | Check network, disk space, firewall; retry **Yes**. |
-| Link error `__std_find_first_of_trivial_pos_*` | Update Visual Studio 2022 to 17.14+ and rebuild with `--features stems`. |
-| Separation slow | First run may warm ORT; GPU providers (e.g. DirectML) are used when available. |
+| Stems button missing on Windows/Linux | Install via **Settings → Stem Separation**, or reinstall with the checkbox enabled. |
+| Download stuck / fails | Check network, disk space, firewall; retry from Settings. |
+| Missing `onnxruntime.dll` / `.so` next to the exe | Rebuild with `--features stems` so `copy-dylibs` stages the runtime. |
+| Separation slow | uint8 dynamic quantization runs on **CPU** EP; first run warms ORT. |
 
 ## License / attribution
 
 - App code: see the SoundNinja repository license.
-- Model and ONNX export: follow the terms on the Hugging Face model page and upstream Demucs / stem-splitter-core projects. SoundNinja does **not** host or redistribute the model weights.
+- Architecture: [lucidrains/BS-RoFormer](https://github.com/lucidrains/BS-RoFormer) (MIT).
+- Training / tooling: [ZFTurbo/Music-Source-Separation-Training](https://github.com/ZFTurbo/Music-Source-Separation-Training), [ZFTurbo/MSS_ONNX_TensorRT](https://github.com/ZFTurbo/MSS_ONNX_TensorRT) (MIT).
+- Weights: community (viperx); confirm training-data license before commercial redistribution.
+- SoundNinja does **not** host or redistribute the model weights.

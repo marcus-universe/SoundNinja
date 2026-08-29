@@ -1,10 +1,4 @@
 fn main() {
-    // When `stems` is on, ort's prebuilt C++ objects need the MSVC C++ stdlib.
-    // Harmless if the feature is off (cfg gates this out).
-    #[cfg(all(windows, feature = "stems"))]
-    {
-        println!("cargo:rustc-link-lib=dylib=msvcprt");
-    }
-
+    // Stem engine uses ort with `load-dynamic` — no static msvcprt link needed.
     tauri_build::build();
 }

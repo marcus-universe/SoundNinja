@@ -1,6 +1,6 @@
 {
   "name": "soundninja",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "private": true,
   "scripts": {
     "dev": "nuxt dev --port 3000",
@@ -13,7 +13,9 @@
     "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
     "tauri:build:macos": "tauri build --target universal-apple-darwin",
     "tauri:serve": "tauri dev",
+    "tauri:serve:linux": "GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev",
     "tauri:serve:stems": "tauri dev -- --features stems",
+    "tauri:serve:stems:linux": "GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev -- --features stems",
     "tauri:build:stems": "tauri build -- --features stems",
     "tauri": "tauri",
     "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\"",

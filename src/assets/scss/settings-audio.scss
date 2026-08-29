@@ -230,24 +230,20 @@
     }
   }
 
-  // Wide enough for 3 digits + %; hide spin buttons that steal width.
+  // Compact strip: digit field only; hide custom steppers to save width.
   .settings-unit-input .settings-input {
-    width: 7.2rem;
-    max-width: 7.2rem;
-    min-width: 7.2rem;
-    flex: 0 0 7.2rem;
+    width: 5.6rem;
+    max-width: 5.6rem;
+    min-width: 5.6rem;
+    flex: 0 0 5.6rem;
     box-sizing: border-box;
     padding-left: 0.6rem;
     padding-right: 0.6rem;
     text-align: right;
+  }
 
-    appearance: textfield;
-
-    &::-webkit-outer-spin-button,
-    &::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
+  .settings-spin {
+    display: none;
   }
 }
 

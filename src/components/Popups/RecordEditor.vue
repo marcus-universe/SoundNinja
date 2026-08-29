@@ -143,7 +143,7 @@
           </button>
         </QuickInfo>
 
-        <div class="record-editor__stems-menu">
+        <div v-if="stemsVisible" class="record-editor__stems-menu">
           <QuickInfo :text="$t('recordEditor.stems')">
             <button class="record-editor__btn" type="button" :disabled="!session || busy" @click="stemsOpen = !stemsOpen">
               <Icons icon="stems" />
@@ -286,9 +286,9 @@
     >
       <p class="settings-hint">{{ $t('recordEditor.stemsDownloadIntro') }}</p>
       <p class="settings-hint">
-        <strong>{{ stemsStatus?.modelLabel || 'HTDemucs-ORT' }}</strong>
+        <strong>{{ stemsStatus?.modelLabel || 'BS-RoFormer' }}</strong>
         — {{ $t('recordEditor.stemsModelDesc') }}
-        ({{ stemsStatus?.modelSizeHint || '~200 MB' }})
+        ({{ stemsStatus?.modelSizeHint || '~158 MB' }})
       </p>
       <p class="settings-hint">{{ $t('recordEditor.stemsThirdParty') }}</p>
       <p class="settings-hint">
@@ -296,7 +296,7 @@
           class="record-editor__link"
           href="#"
           @click.prevent="openStemsModelPage"
-        >{{ stemsStatus?.modelPageUrl || 'https://huggingface.co/gentij/htdemucs-ort' }}</a>
+        >{{ stemsStatus?.modelPageUrl || 'https://huggingface.co/xycld/BS-RoFormer-ONNX' }}</a>
       </p>
       <p v-if="!stemsStatus?.available" class="record-editor__queue-warn">
         {{ $t('recordEditor.stemsEngineMissing') }}
@@ -342,6 +342,7 @@ import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
+import { platform } from '@tauri-apps/plugin-os'
 
 interface SessionInfo {
   session_id: string
@@ -372,6 +373,9 @@ interface StagedClip {
 interface StemsStatus {
   available: boolean
   modelReady: boolean
+  installIntent: boolean
+  canPrompt: boolean
+  hasBeenAsked: boolean
   modelName: string
   modelLabel: string
   modelPageUrl: string
@@ -397,6 +401,7 @@ const stemsPendingMode = ref<string | null>(null)
 const stemsStatus = ref<StemsStatus | null>(null)
 const stemsDownloading = ref(false)
 const stemsDownloadPct = ref<number | null>(null)
+const osPlatform = ref('')
 const importTab = ref('')
 const closePrompt = ref(false)
 const dirty = ref(false)
@@ -447,6 +452,14 @@ const displayDuration = computed(() => {
 })
 
 const canZoom = computed(() => displayDuration.value > 0.05)
+
+/** Win/Linux: hide Stems until model installed. macOS: always show when engine present (in-app download). */
+const stemsVisible = computed(() => {
+  const s = stemsStatus.value
+  if (!s?.available) return false
+  if (s.modelReady) return true
+  return osPlatform.value === 'macos'
+})
 
 const viewDuration = computed(() => {
   const dur = displayDuration.value
@@ -1099,15 +1112,21 @@ async function doStems(mode: string) {
   stemsPrompt.value = true
 }
 
-function cancelStemsPrompt() {
+async function cancelStemsPrompt() {
   if (stemsDownloading.value) return
   stemsPrompt.value = false
   stemsPendingMode.value = null
   stemsDownloadPct.value = null
+  try {
+    await invoke('dismiss_stems_intent')
+    stemsStatus.value = await invoke<StemsStatus>('get_stems_status')
+  } catch {
+    /* ignore */
+  }
 }
 
 async function openStemsModelPage() {
-  const url = stemsStatus.value?.modelPageUrl || 'https://huggingface.co/gentij/htdemucs-ort'
+  const url = stemsStatus.value?.modelPageUrl || 'https://huggingface.co/xycld/BS-RoFormer-ONNX'
   try {
     await invoke('open_external_url', { url })
   } catch (e1) {
@@ -1122,14 +1141,9 @@ async function openStemsModelPage() {
 
 async function confirmStemsDownload() {
   const mode = stemsPendingMode.value
-  if (!mode) {
-    cancelStemsPrompt()
-    return
-  }
 
   if (!stemsStatus.value?.available) {
     statusText.value = ''
-    // Still open model page so user can inspect the third-party model.
     await openStemsModelPage()
     return
   }
@@ -1143,7 +1157,8 @@ async function confirmStemsDownload() {
     stemsPrompt.value = false
     stemsPendingMode.value = null
     stemsDownloadPct.value = null
-    await runStemsSplit(mode)
+    // First-run / Settings install: no pending mode — just finish download.
+    if (mode) await runStemsSplit(mode)
   } catch (e) {
     const msg = String(e)
     statusText.value = msg.includes('STEMS_ENGINE_UNAVAILABLE')
@@ -1437,6 +1452,21 @@ function onKeyDown(e: KeyboardEvent) {
 
 onMounted(async () => {
   await ensureSettings()
+  try {
+    osPlatform.value = await platform()
+  } catch {
+    osPlatform.value = ''
+  }
+  try {
+    stemsStatus.value = await invoke<StemsStatus>('get_stems_status')
+    if (stemsStatus.value?.canPrompt) {
+      stemsPendingMode.value = null
+      stemsDownloadPct.value = null
+      stemsPrompt.value = true
+    }
+  } catch {
+    /* stems optional */
+  }
 
   unlistenLevel = await listen<number>('record_level', (e) => {
     level.value = Number(e.payload) || 0

@@ -142,6 +142,10 @@
               v-model.number="outputVolumePct"
               @change="onVolumeChange"
             />
+            <div class="settings-spin" aria-hidden="true">
+              <button type="button" class="settings-spin__btn" tabindex="-1" @click="nudgeOutputVolume(1)">▴</button>
+              <button type="button" class="settings-spin__btn" tabindex="-1" @click="nudgeOutputVolume(-1)">▾</button>
+            </div>
             <span class="settings-unit-label">%</span>
           </div>
         </div>
@@ -175,6 +179,10 @@
               v-model.number="inputVolumePct"
               @change="onInputVolumeChange"
             />
+            <div class="settings-spin" aria-hidden="true">
+              <button type="button" class="settings-spin__btn" tabindex="-1" @click="nudgeInputVolume(1)">▴</button>
+              <button type="button" class="settings-spin__btn" tabindex="-1" @click="nudgeInputVolume(-1)">▾</button>
+            </div>
             <span class="settings-unit-label">%</span>
           </div>
         </div>
@@ -209,7 +217,7 @@ interface CaptureDeviceInfo {
 }
 
 const audioHosts = ref<string[]>([])
-const hostSelected = ref('Wasapi')
+const hostSelected = ref('')
 const outputDevices = ref<string[]>([])
 const outputSelected = ref('')
 const inputDevices = ref<CaptureDeviceInfo[]>([])
@@ -253,12 +261,15 @@ function loopbackLabel(name: string) {
   return name.replace(/\s*\(PC Audio\)\s*$/i, '')
 }
 
-/** Match saved host labels (WASAPI / Wasapi / asio) to cpal's real host id name. */
+/** Match saved host labels (WASAPI / PipeWire / Alsa) to cpal's real host id name. */
 function resolveHostName(saved: string | null | undefined, hosts: string[]): string {
-  const fallback = hosts[0] ?? 'Wasapi'
-  if (!hosts.length) return saved || 'Wasapi'
+  // Backend sorts hosts: PipeWire → PulseAudio → Wasapi → … → Alsa
+  const fallback = hosts[0] ?? ''
+  if (!hosts.length) return saved || ''
   if (!saved) return fallback
   const hit = hosts.find((h) => h.toLowerCase() === saved.toLowerCase())
+  // Legacy Windows default on Linux/mac → pick platform-preferred host.
+  if (!hit && saved.toLowerCase() === 'wasapi') return fallback
   return hit ?? fallback
 }
 
@@ -269,9 +280,9 @@ function isAsioHost(name: string) {
 async function loadAudioHosts() {
   try {
     const hosts = await invoke<string[]>('get_audio_hosts')
-    audioHosts.value = hosts?.length ? hosts : ['Wasapi']
+    audioHosts.value = hosts?.length ? hosts : []
   } catch {
-    audioHosts.value = ['Wasapi']
+    audioHosts.value = []
   }
 }
 
@@ -356,6 +367,16 @@ async function onInputVolumeChange() {
   const pct = Math.max(0, Math.min(200, Math.round(inputVolumePct.value)))
   inputVolumePct.value = pct
   await appSettings.setInputVolume(pct / 100)
+}
+
+async function nudgeOutputVolume(delta: number) {
+  outputVolumePct.value = Math.max(0, Math.min(100, Math.round((outputVolumePct.value || 0) + delta)))
+  await onVolumeChange()
+}
+
+async function nudgeInputVolume(delta: number) {
+  inputVolumePct.value = Math.max(0, Math.min(200, Math.round((inputVolumePct.value || 0) + delta)))
+  await onInputVolumeChange()
 }
 
 async function resetOutputVolume() {

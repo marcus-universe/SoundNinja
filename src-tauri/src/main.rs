@@ -161,6 +161,7 @@ fn main() {
             audio::dsp::resume_preview,
             audio::stems::get_stems_status,
             audio::stems::ensure_stems_model,
+            audio::stems::dismiss_stems_intent,
             audio::stems::split_session,
             audio::stems::stems_busy,
             get_system_fonts,

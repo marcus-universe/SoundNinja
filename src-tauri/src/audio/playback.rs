@@ -1,5 +1,4 @@
-use cpal::traits::DeviceTrait;
-use rodio::{self, cpal, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
+use rodio::{self, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
 use serde::Serialize;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -9,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
 
-use super::devices::get_output_devices_for_host_name;
+use super::devices::{device_display_name, get_output_devices_for_host_name};
 
 // --- Global output volume (stored as f32 bits in an atomic) ---
 
@@ -172,18 +171,7 @@ impl AudioStream {
         let device = get_output_devices_for_host_name(host_name)
             .map_err(|e| e.to_string())?
             .into_iter()
-            .find(|d| {
-                d.description()
-                    .map(|desc| {
-                        let full_name = desc
-                            .extended()
-                            .first()
-                            .cloned()
-                            .unwrap_or_else(|| desc.name().to_string());
-                        full_name == device_name
-                    })
-                    .unwrap_or(false)
-            })
+            .find(|d| device_display_name(d).as_deref() == Some(device_name))
             .ok_or_else(|| format!("Device '{}' not found", device_name))?;
         let device_sink = DeviceSinkBuilder::from_device(device)
             .map_err(|e| e.to_string())?
