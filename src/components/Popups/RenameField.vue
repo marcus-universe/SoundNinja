@@ -1,6 +1,6 @@
 <template>
   <DialogField :title="dialogTitle" :error-message="appStore.ErrorMessage" @close="Exit">
-    <UIInput v-model="typedName" :placeholder="$t('rename.placeholder')" />
+    <UIInput v-model="typedName" :placeholder="$t('rename.placeholder')" @keydown.enter.prevent="setName" />
     <UIButton :full-width="true" @click="setName">{{ $t('rename.confirm') }}</UIButton>
   </DialogField>
 </template>
@@ -46,10 +46,18 @@ function setName() {
   }
 }
 
-onMounted(() => {
-  onKeyStroke('Enter', () => setName())
-  onKeyStroke('Escape', () => Exit())
-})
+function onKey(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    setName()
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    Exit()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKey))
+onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
 

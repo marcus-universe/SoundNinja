@@ -193,7 +193,24 @@ export function mergeTabsFromUsage(config: ProjectConfig): number {
   }
   for (const s of config.separators ?? []) add(s.tab)
   for (const name of extra) list.push({ name })
+  dedupeTabList(config)
   return extra.length
+}
+
+/** Drop duplicate tab names so SQLite `tabs.name` PRIMARY KEY cannot fail. */
+export function dedupeTabList(config: ProjectConfig): number {
+  const list = config.tabList ?? []
+  const seen = new Set<string>()
+  const next = []
+  for (const t of list) {
+    const n = t?.name
+    if (!n || seen.has(n)) continue
+    seen.add(n)
+    next.push(t)
+  }
+  const removed = list.length - next.length
+  if (removed) config.tabList = next
+  return removed
 }
 
 export function healFolderTabMembership(config: ProjectConfig): number {
@@ -604,6 +621,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   ]
   await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
+  dedupeTabList(config)
   const tabRows = config.tabList.map((t, i) => [
     t.name,
     t.color ?? null,

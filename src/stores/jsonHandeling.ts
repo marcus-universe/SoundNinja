@@ -461,8 +461,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Tabs ──────────────────────────────────────────────────────────────────
     addTab(name: string) {
+      const trimmed = String(name ?? '').trim()
+      if (!trimmed) return
+      if (this.configFile.tabList.some((t) => t.name === trimmed)) return
       this.pushBeforeChange()
-      this.configFile.tabList.push({ name })
+      this.configFile.tabList.push({ name: trimmed })
       this.writeConfig()
     },
 
@@ -476,18 +479,21 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     renameTab(oldName: string, newName: string) {
       const tab = this.configFile.tabList.find((t) => t.name === oldName)
       if (!tab) return
+      const trimmed = String(newName ?? '').trim()
+      if (!trimmed || trimmed === oldName) return
+      if (this.configFile.tabList.some((t) => t.name === trimmed)) return
       this.pushBeforeChange()
-      tab.name = newName
+      tab.name = trimmed
       this.configFile.files.forEach((f) => {
         const idx = f.tabs.indexOf(oldName)
-        if (idx !== -1) f.tabs[idx] = newName
+        if (idx !== -1) f.tabs[idx] = trimmed
         if (f.tabIndexes && oldName in f.tabIndexes) {
-          f.tabIndexes[newName] = f.tabIndexes[oldName]
+          f.tabIndexes[trimmed] = f.tabIndexes[oldName]
           delete f.tabIndexes[oldName]
         }
       })
       ;(this.configFile.separators ?? []).forEach((s) => {
-        if (s.tab === oldName) s.tab = newName
+        if (s.tab === oldName) s.tab = trimmed
       })
       this.writeConfig()
     },
