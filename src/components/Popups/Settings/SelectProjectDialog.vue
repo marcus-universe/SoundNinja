@@ -35,6 +35,11 @@
         <div class="project-dialog__footer">
           <div class="new-project-row">
             <button class="settings-btn" @click="openExisting">{{ $t('project.openExisting') }}</button>
+            <button
+              v-if="jsonStore.missingPaths?.length"
+              class="settings-btn"
+              @click="appStore.setRelinkActive(true)"
+            >{{ $t('relink.title') }}</button>
           </div>
           <div class="new-project-row">
             <input
@@ -105,6 +110,8 @@ async function selectProject(proj: ProjectInfo) {
     }
     await jsonStore.openProject(proj.dbPath)
     await appSettings.touchRecent(proj.dbPath, proj.name)
+    await jsonStore.validateSoundPaths()
+    if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
     closeDialog()
   } catch (e) {
     console.error('Failed to load project', e)
@@ -132,6 +139,8 @@ async function openExisting() {
   try {
     await jsonStore.openProject(selected)
     await appSettings.touchRecent(selected, projectNameFromDbPath(selected))
+    await jsonStore.validateSoundPaths()
+    if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
     closeDialog()
   } catch (e) {
     console.error('Failed to open project', e)

@@ -48,10 +48,17 @@ impl StftEngine {
         let mut input = self.forward.make_input_vec();
         let mut spectrum = self.forward.make_output_vec();
 
+        let gpu_frames = crate::gpu::window_frames(&padded, &self.window, HOP_LENGTH, N_FFT);
+
         for frame in 0..n_frames {
-            let start = frame * HOP_LENGTH;
-            for i in 0..N_FFT {
-                input[i] = padded[start + i] * self.window[i];
+            if let Some(ref frames) = gpu_frames {
+                let start = frame * N_FFT;
+                input.copy_from_slice(&frames[start..start + N_FFT]);
+            } else {
+                let start = frame * HOP_LENGTH;
+                for i in 0..N_FFT {
+                    input[i] = padded[start + i] * self.window[i];
+                }
             }
             self.forward
                 .process(&mut input, &mut spectrum)

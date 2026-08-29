@@ -27,6 +27,7 @@ export const useAppStore = defineStore('app', {
     importFoldersActive: false,
     importChooserActive: false,
     selectProjectActive: false,
+    relinkActive: false,
     multiSelectActive: false,
     selectedSoundPaths: [] as string[],
     draggingSoundIndex: null as number | null,
@@ -94,6 +95,10 @@ export const useAppStore = defineStore('app', {
 
     setSelectProjectActive(val: boolean) {
       this.selectProjectActive = val
+    },
+
+    setRelinkActive(val: boolean) {
+      this.relinkActive = val
     },
 
     setCurrentTab(val: string) {

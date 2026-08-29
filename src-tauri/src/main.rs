@@ -179,6 +179,8 @@ fn main() {
             fsx::read_file_base64_abs,
             fsx::write_text_file_abs,
             fsx::path_exists_abs,
+            fsx::paths_exist_abs,
+            fsx::find_files_by_names,
             fsx::make_dir_abs,
             fsx::list_dir_files_abs,
             fsx::copy_file_abs,

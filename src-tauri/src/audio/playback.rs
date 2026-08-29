@@ -1,9 +1,8 @@
 use rodio::{self, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
 use serde::Serialize;
-use std::io::Cursor;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
@@ -27,21 +26,26 @@ pub fn set_output_volume(volume: f32) {
 
 #[tauri::command]
 pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
+    probe_duration(&sound_path)
+}
+
+fn probe_duration(sound_path: &str) -> Result<f64, String> {
+    use std::fs::File;
     use symphonia::core::formats::FormatOptions;
     use symphonia::core::formats::probe::Hint;
     use symphonia::core::io::MediaSourceStream;
     use symphonia::core::meta::MetadataOptions;
 
-    // Load from cache (or disk on first access — result is cached for next time).
-    let bytes = super::cache::load_bytes(&sound_path)?;
+    if let Some(secs) = super::cache::cached_duration(sound_path) {
+        return Ok(secs);
+    }
 
-    let mss = MediaSourceStream::new(
-        Box::new(Cursor::new(bytes.clone())),
-        Default::default(),
-    );
+    let file = File::open(sound_path)
+        .map_err(|e| format!("Failed to open '{}': {}", sound_path, e))?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let mut hint = Hint::new();
-    if let Some(ext) = std::path::Path::new(&sound_path)
+    if let Some(ext) = std::path::Path::new(sound_path)
         .extension()
         .and_then(|e| e.to_str())
     {
@@ -59,15 +63,18 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
             if let (Some(n_frames), Some(tb)) = (track.num_frames, track.time_base) {
                 let secs = n_frames as f64 * tb.numer.get() as f64 / tb.denom.get() as f64;
                 if secs > 0.0 {
+                    super::cache::store_duration(sound_path, secs);
                     return Ok(secs);
                 }
             }
         }
     }
 
-    // Fallback: let rodio decode from the in-memory bytes.
-    let decoder = rodio::Decoder::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
-    Ok(decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0))
+    let cursor = super::cache::open_cursor(sound_path)?;
+    let decoder = rodio::Decoder::new(cursor).map_err(|e| e.to_string())?;
+    let secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
+    super::cache::store_duration(sound_path, secs);
+    Ok(secs)
 }
 
 // --- Playing list snapshot (shared with frontend) ---
@@ -201,9 +208,9 @@ struct PlayingSound {
 
 // --- Helpers ---
 
-fn load_source(path: &str) -> Result<rodio::Decoder<Cursor<Arc<[u8]>>>, String> {
-    let bytes = super::cache::load_bytes(path)?;
-    rodio::Decoder::new(Cursor::new(bytes)).map_err(|e| e.to_string())
+fn load_source(path: &str) -> Result<rodio::Decoder<super::cache::AudioCursor>, String> {
+    let cursor = super::cache::open_cursor(path)?;
+    rodio::Decoder::new(cursor).map_err(|e| e.to_string())
 }
 
 /// Ensures the stream targets `device_name`/`host_name`, reopening only when they changed.
@@ -512,11 +519,16 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                             new_player.append(source.amplify(current_volume()));
                             playing.push(PlayingSound {
                                 player: new_player,
-                                path,
+                                path: path.clone(),
                                 looping: false,
                                 duration_secs,
                                 position_origin_secs: 0.0,
                             });
+                            if duration_secs > 0.0 {
+                                super::cache::store_duration(&path, duration_secs);
+                            }
+                            let keep: Vec<String> = playing.iter().map(|s| s.path.clone()).collect();
+                            super::cache::evict_idle(&keep);
                             sync_playing_list(&app_handle, &playing);
                         }
                         Err(e) => {
@@ -570,18 +582,19 @@ pub fn play_sound(
     host_name: Option<String>,
     active: bool,
     overlap: bool,
-) -> Result<String, String> {
+) -> Result<f64, String> {
     if active {
         send_msg(AudioMsg::StopOne { path: sound_path })?;
-        Ok("stopped".to_string())
+        Ok(0.0)
     } else {
+        let duration = probe_duration(&sound_path).unwrap_or(0.0);
         send_msg(AudioMsg::Play {
             path: sound_path,
             device_name,
             host_name,
             overlap,
         })?;
-        Ok("playing".to_string())
+        Ok(duration)
     }
 }
 

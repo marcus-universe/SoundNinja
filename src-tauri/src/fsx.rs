@@ -202,3 +202,62 @@ pub fn collect_audio_buckets_abs(
 
     Ok(out)
 }
+
+#[tauri::command]
+pub fn paths_exist_abs(paths: Vec<String>) -> Vec<bool> {
+    paths.into_iter().map(|p| Path::new(&p).exists()).collect()
+}
+
+#[derive(Serialize)]
+pub struct FileNameMatch {
+    pub name: String,
+    pub paths: Vec<String>,
+}
+
+/// BFS scan of `roots` up to `max_depth` for files whose basename is in `names`.
+#[tauri::command]
+pub fn find_files_by_names(
+    roots: Vec<String>,
+    names: Vec<String>,
+    max_depth: usize,
+) -> Result<Vec<FileNameMatch>, String> {
+    use std::collections::HashMap;
+    let wanted: std::collections::HashSet<String> = names
+        .iter()
+        .map(|n| n.to_lowercase())
+        .collect();
+    let mut found: HashMap<String, Vec<String>> = HashMap::new();
+
+    for root in roots {
+        let root_path = PathBuf::from(&root);
+        if !root_path.exists() {
+            continue;
+        }
+        let mut queue: VecDeque<(PathBuf, usize)> = VecDeque::new();
+        queue.push_back((root_path, 0));
+        while let Some((dir, depth)) = queue.pop_front() {
+            let entries = match fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry_res in entries {
+                let Ok(entry) = entry_res else { continue };
+                let path = entry.path();
+                let Ok(ty) = entry.file_type() else { continue };
+                if ty.is_file() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if wanted.contains(&name.to_lowercase()) {
+                        found.entry(name).or_default().push(path.to_string_lossy().to_string());
+                    }
+                } else if ty.is_dir() && depth < max_depth {
+                    queue.push_back((path, depth + 1));
+                }
+            }
+        }
+    }
+
+    Ok(found
+        .into_iter()
+        .map(|(name, paths)| FileNameMatch { name, paths })
+        .collect())
+}

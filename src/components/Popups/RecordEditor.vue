@@ -607,11 +607,22 @@ function stopPlayheadAnim() {
   }
 }
 
+let lastPlayheadPaint = 0
 function tickPlayhead() {
   if (!isPlaying.value || isPaused.value || !session.value) return
+  if (document.hidden) {
+    rafId = requestAnimationFrame(tickPlayhead)
+    return
+  }
+  const now = performance.now()
+  if (now - lastPlayheadPaint < 50) {
+    rafId = requestAnimationFrame(tickPlayhead)
+    return
+  }
+  lastPlayheadPaint = now
   playheadSec.value = Math.min(
     session.value.duration_secs,
-    playOffset + (performance.now() - playStartedAt) / 1000,
+    playOffset + (now - playStartedAt) / 1000,
   )
   // Keep playhead in view while playing
   if (playheadSec.value > viewEnd.value || playheadSec.value < viewStart.value) {
@@ -1390,12 +1401,12 @@ async function importStaged(all: boolean) {
   }
 }
 
-async function hideEditorWindow() {
+async function destroyEditorWindow() {
   closePrompt.value = false
   try {
-    await getCurrentWindow().hide()
+    await getCurrentWindow().destroy()
   } catch (e) {
-    console.warn('hide record-editor failed', e)
+    console.warn('destroy record-editor failed', e)
   }
 }
 
@@ -1408,7 +1419,7 @@ async function discardAndClose() {
     }
     staged.value = []
   } catch { /* ignore */ }
-  await hideEditorWindow()
+  await destroyEditorWindow()
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -1495,12 +1506,8 @@ onMounted(async () => {
 
   getCurrentWindow()
     .onCloseRequested((event) => {
-      // Keep webview alive (hide) so reopen skips full Nuxt boot.
+      if (!dirty.value && !recording.value && !staged.value.length) return
       event.preventDefault()
-      if (!dirty.value && !recording.value && !staged.value.length) {
-        hideEditorWindow()
-        return
-      }
       closePrompt.value = true
     })
     .catch(() => {})

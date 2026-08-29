@@ -7,6 +7,13 @@
         }"
     >
         <div class="SoundContainer__scroll">
+        <Transition
+            :name="tabTransitionName"
+            :mode="tabTransitionMode"
+            :css="tabTransition !== 'none'"
+            :duration="tabTransitionDuration"
+        >
+        <div :key="'tab:' + currentTab" class="SoundTab-wrap">
         <div
             class="SoundTab flex_c_v flex_start button-gaps"
             ref="boardRef"
@@ -30,6 +37,8 @@
                     :gifPosX="sound.gifPosX ?? 50"
                     :gifPosY="sound.gifPosY ?? 50"
                     :hasGif="!!sound.gifId"
+                    :progressPaused="!!playingSounds.get(sound.index)?.paused || !windowFocused"
+                    :missing="!!jsonStore.missingPaths?.includes(sound.path)"
                     :data-sound-path="sound.path"
                     @play="onSoundClick(sound)"
                     @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
@@ -66,6 +75,8 @@
                             :gifPosX="sound.gifPosX ?? 50"
                             :gifPosY="sound.gifPosY ?? 50"
                             :hasGif="!!sound.gifId"
+                            :progressPaused="!!playingSounds.get(sound.index)?.paused || !windowFocused"
+                            :missing="!!jsonStore.missingPaths?.includes(sound.path)"
                             :data-sound-path="sound.path"
                             @play="onSoundClick(sound)"
                             @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
@@ -75,6 +86,8 @@
                 </div>
             </div>
         </div>
+        </div>
+        </Transition>
         </div>
 
         <Transition name="fade">
@@ -109,10 +122,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
 import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/utils/colorOverride'
-import { withProjectDb, loadGifBlobsByIds } from '~/utils/db'
-import { cacheGifRow, peekGifUrls } from '~/utils/gifCache'
+import { withProjectDb, loadGifBlobsByIds, normalizeTabTransition } from '~/utils/db'
+import { cacheGifRow, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
 
-const MAX_ANIM_GIFS = 16
+const MAX_ANIM_GIFS = 8
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -143,6 +156,8 @@ const bulkBaseColors = computed(() => {
 })
 
 const currentTab = computed(() => appStore.currentTab)
+const playingSounds = reactive(new Map())
+const windowFocused = ref(true)
 
 const JSONFile = computed(() => {
   const tab = currentTab.value
@@ -155,11 +170,44 @@ const JSONFile = computed(() => {
     : jsonStore.configFile?.files
 
   return filesToFilter
-    ?.filter((sound) => sound.tabs.includes(tab))
+    ?.filter((sound) => sound.tabs?.includes(tab))
     .sort(sortByIndex)
 })
 
 const Settings = computed(() => jsonStore.configFile?.settings)
+
+const tabTransition = computed(() => normalizeTabTransition(Settings.value?.tabTransition))
+const slideDir = ref('left')
+const tabOrderNames = computed(() => [
+  'All',
+  ...(jsonStore.configFile?.tabList ?? []).map((t) => t.name),
+])
+
+watch(currentTab, (next, prev) => {
+  const order = tabOrderNames.value
+  const a = order.indexOf(prev)
+  const b = order.indexOf(next)
+  if (a < 0 || b < 0 || a === b) return
+  slideDir.value = b > a ? 'left' : 'right'
+})
+
+const tabTransitionName = computed(() => {
+  const t = tabTransition.value
+  if (t === 'none') return ''
+  if (t === 'slide') return slideDir.value === 'left' ? 'tab-slide-left' : 'tab-slide-right'
+  if (t === 'fade') return 'tab-fade'
+  return 'tab-stagger'
+})
+
+const tabTransitionMode = computed(() => {
+  const t = tabTransition.value
+  return t === 'fade' || t === 'stagger' ? 'out-in' : undefined
+})
+
+const tabTransitionDuration = computed(() => {
+  if (tabTransition.value === 'stagger') return { enter: 380, leave: 380 }
+  return undefined
+})
 
 const tabEntry = computed(() =>
   (jsonStore.configFile?.tabList ?? []).find((t) => t.name === currentTab.value),
@@ -232,6 +280,16 @@ const displaySections = computed(() => {
 
 const orphanSounds = computed(() => displaySections.value.find((s) => s.kind === 'orphans')?.sounds ?? [])
 const groupSections = computed(() => displaySections.value.filter((s) => s.kind === 'group'))
+
+const staggerIndexByKey = computed(() => {
+  const map = {}
+  let i = 0
+  for (const s of orphanSounds.value) map[s.path] = i++
+  for (const sec of groupSections.value) {
+    for (const s of sec.sounds) map[s.path] = i++
+  }
+  return map
+})
 
 const allDisplaySounds = computed(() => {
   const out = []
@@ -352,6 +410,7 @@ function onGifHover(sound, on) {
 
 function shouldAnimate(sound) {
   if (!sound.gifId) return false
+  if (!windowFocused.value) return false
   if (!visibleByPath[sound.path]) return false
   if (gifPlayOnHover.value) return hoveredPath.value === sound.path
   return true
@@ -396,6 +455,18 @@ async function loadVisibleGifs() {
   }
 }
 
+function releaseOffscreenGif(soundPath) {
+  const file = jsonStore.configFile?.files?.find((f) => f.path === soundPath)
+  const id = file?.gifId
+  if (!id) return
+  const stillVisible = jsonStore.configFile.files.some(
+    (f) => f.gifId === id && f.path !== soundPath && visibleByPath[f.path],
+  )
+  if (stillVisible) return
+  revokeGifUrls(id)
+  delete gifUrls[id]
+}
+
 function setupGifObserver() {
   gifObserver?.disconnect()
   const root = boardRef.value?.closest('.SoundContainer__scroll') || null
@@ -405,7 +476,10 @@ function setupGifObserver() {
         const path = e.target.getAttribute('data-sound-path')
         if (!path) continue
         if (e.isIntersecting) visibleByPath[path] = true
-        else delete visibleByPath[path]
+        else {
+          delete visibleByPath[path]
+          releaseOffscreenGif(path)
+        }
       }
       loadVisibleGifs()
     },
@@ -476,6 +550,18 @@ watch(
   { flush: 'post' },
 )
 
+watch(currentTab, () => {
+  destroySortables()
+  gifObserver?.disconnect()
+  gifObserver = null
+  for (const k of Object.keys(visibleByPath)) delete visibleByPath[k]
+  nextTick(() => {
+    setupSortables()
+    setupGifObserver()
+    loadVisibleGifs()
+  })
+})
+
 watch(
   [() => Settings.value?.uniformButtonHeight, () => allDisplaySounds.value.length],
   () => updateUniformHeight(),
@@ -494,9 +580,22 @@ function openSeparatorMenu(event, sep) {
 
 function getBtnStyle(sound) {
   const style = {}
+  const si = staggerIndexByKey.value[sound.path]
+  if (si != null) style['--stagger-i'] = si
   const info = playingSounds.get(sound.index)
-  if (sound.active && info) {
-    style['--sound-progress'] = info.percent + '%'
+  if (sound.active && info && info.duration > 0) {
+    const elapsed = info.paused
+      ? (info.elapsedMs || 0) / 1000
+      : Math.min(info.duration, (Date.now() - info.startTime) / 1000)
+    const from = Math.min(100, (elapsed / info.duration) * 100)
+    style['--sound-progress-from'] = from + '%'
+    if (info.paused || !windowFocused.value) {
+      style['--sound-progress'] = from + '%'
+      style['--sound-progress-dur'] = '0s'
+    } else {
+      style['--sound-progress'] = '100%'
+      style['--sound-progress-dur'] = Math.max(0, info.duration - elapsed) + 's'
+    }
   }
   const o = parseOverride(sound.color)
   if (o.bg) style['--color-btn'] = o.bg
@@ -519,63 +618,21 @@ function openSoundMenu(event, sound) {
   })
 }
 
-const playingSounds = reactive(new Map())
-let rafId = null
-
-function anyProgressRunning() {
-  for (const info of playingSounds.values()) {
-    if (!info.paused) return true
-  }
-  return false
-}
-
-function tickProgress() {
-  if (!anyProgressRunning()) {
-    rafId = null
-    return
-  }
-  const now = Date.now()
-  for (const info of playingSounds.values()) {
-    if (info.paused || !(info.duration > 0)) continue
-    info.percent = Math.min(
-      100,
-      ((now - info.startTime) / 1000 / info.duration) * 100,
-    )
-  }
-  rafId = requestAnimationFrame(tickProgress)
-}
-
-function ensureProgressLoop() {
-  if (rafId === null && anyProgressRunning()) {
-    rafId = requestAnimationFrame(tickProgress)
-  }
-}
-
 function startProgress(soundFileIndex, duration) {
   playingSounds.set(soundFileIndex, {
     duration,
     startTime: Date.now(),
-    percent: 0,
     paused: false,
     elapsedMs: 0,
   })
-  ensureProgressLoop()
 }
 
 function stopProgress(soundFileIndex) {
   playingSounds.delete(soundFileIndex)
-  if (!anyProgressRunning() && rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
 }
 
 function stopAllProgress() {
   playingSounds.clear()
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
 }
 
 function syncProgressPauseState(list) {
@@ -590,14 +647,12 @@ function syncProgressPauseState(list) {
     const posSec = Number(snap.positionSecs)
     if (Number.isFinite(posSec) && info.duration > 0) {
       info.elapsedMs = Math.max(0, posSec * 1000)
-      info.percent = Math.min(100, (info.elapsedMs / 1000 / info.duration) * 100)
       info.startTime = Date.now() - info.elapsedMs
     }
 
     if (shouldPause && !info.paused) {
       if (!Number.isFinite(posSec)) {
         info.elapsedMs = Math.max(0, Date.now() - info.startTime)
-        info.percent = Math.min(100, (info.elapsedMs / 1000 / info.duration) * 100)
       }
       info.paused = true
     } else if (!shouldPause && info.paused) {
@@ -607,20 +662,20 @@ function syncProgressPauseState(list) {
       info.paused = false
     }
   }
-
-  if (!anyProgressRunning() && rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  } else {
-    ensureProgressLoop()
-  }
 }
 
 let unlistenFinished = null
 let unlistenPlaying = null
 
+function syncWindowFocus() {
+  windowFocused.value = !document.hidden && document.hasFocus()
+}
+
 onMounted(async () => {
   setupGifObserver()
+  document.addEventListener('visibilitychange', syncWindowFocus)
+  window.addEventListener('focus', syncWindowFocus)
+  window.addEventListener('blur', syncWindowFocus)
   unlistenFinished = await listen('sound_finished', (event) => {
     const path = event.payload
     const idx = jsonStore.configFile.files.findIndex((f) => f.path === path)
@@ -640,6 +695,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopAllProgress()
+  document.removeEventListener('visibilitychange', syncWindowFocus)
+  window.removeEventListener('focus', syncWindowFocus)
+  window.removeEventListener('blur', syncWindowFocus)
   if (unlistenFinished) unlistenFinished()
   if (unlistenPlaying) unlistenPlaying()
 })
@@ -647,6 +705,10 @@ onUnmounted(() => {
 function onSoundClick(sound) {
   if (appStore.multiSelectActive) {
     appStore.toggleSoundSelection(sound.path)
+    return
+  }
+  if (jsonStore.missingPaths.includes(sound.path)) {
+    appStore.setRelinkActive(true)
     return
   }
   setActiveSound(sound)
@@ -692,17 +754,14 @@ async function setActiveSound(sound) {
       active: false,
       overlap: overlapSounds,
     })
-      .catch((e) => console.error('Sound playback error', e))
-      .finally(() => loadingPaths.delete(sound.path))
-
-    invoke('get_sound_duration', { soundPath: sound.path })
       .then((duration) => {
         if (!sound.active) return
         if (typeof duration === 'number' && duration > 0) {
           startProgress(sound.index, duration)
         }
       })
-      .catch((e) => console.error('Could not get sound duration', e))
+      .catch((e) => console.error('Sound playback error', e))
+      .finally(() => loadingPaths.delete(sound.path))
   } else {
     if (!stopOnRetrigger) return
     stopProgress(sound.index)

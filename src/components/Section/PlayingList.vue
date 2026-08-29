@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { PeakLayer, blitPeaks, drawPlayhead, startThrottledClock } from '~/utils/waveformDraw'
 
 export interface PlayingInfo {
   path: string
@@ -89,11 +90,12 @@ const canvasByPath = new Map<string, HTMLCanvasElement>()
 const scrubPath = ref<string | null>(null)
 const seekInFlight = ref<string | null>(null)
 
-let rafId: number | null = null
+let waveClock: { stop: () => void } | null = null
 /** Coalesce scrub pointermove redraws to one paint per animation frame. */
 let scrubDrawRaf: number | null = null
 let scrubDrawPath: string | null = null
 const anchorByPath = new Map<string, { originMs: number; elapsedMs: number; paused: boolean }>()
+const peakLayerByPath = new Map<string, PeakLayer>()
 
 function scheduleScrubDraw(path: string) {
   scrubDrawPath = path
@@ -149,6 +151,7 @@ function syncFromItems() {
       hoverByPath.delete(key)
       anchorByPath.delete(key)
       canvasByPath.delete(key)
+      peakLayerByPath.delete(key)
     }
   }
 
@@ -177,17 +180,17 @@ function syncFromItems() {
 function ensureClock() {
   const anyRunning = props.items.some((i) => !i.paused)
   if (!anyRunning) {
-    if (rafId != null) {
-      cancelAnimationFrame(rafId)
-      rafId = null
-    }
+    waveClock?.stop()
+    waveClock = null
     return
   }
-  if (rafId != null) return
-  const tick = () => {
+  if (waveClock) return
+  waveClock = startThrottledClock(20, () => {
     const now = Date.now()
+    let running = false
     for (const item of props.items) {
       if (item.paused || scrubPath.value === item.path) continue
+      running = true
       const anchor = anchorByPath.get(item.path)
       const dur = durationByPath.get(item.path) || 0
       if (!anchor || dur <= 0) continue
@@ -202,9 +205,12 @@ function ensureClock() {
       playheadByPath.set(item.path, sec)
       drawWave(item.path)
     }
-    rafId = requestAnimationFrame(tick)
-  }
-  rafId = requestAnimationFrame(tick)
+    if (!running) {
+      waveClock = null
+      return false
+    }
+    return true
+  })
 }
 
 function drawWave(path: string) {
@@ -213,64 +219,31 @@ function drawWave(path: string) {
   const dpr = window.devicePixelRatio || 1
   const cssW = canvas.clientWidth || 180
   const cssH = canvas.clientHeight || 28
+  let layer = peakLayerByPath.get(path)
+  if (!layer) {
+    layer = new PeakLayer()
+    peakLayerByPath.set(path, layer)
+  }
   if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
     canvas.width = Math.floor(cssW * dpr)
     canvas.height = Math.floor(cssH * dpr)
+    layer.invalidate()
   }
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, cssW, cssH)
-
-  const mid = cssH / 2
   const data = peaksByPath.get(path) || []
-  const pairs = Math.floor(data.length / 2)
-  const accent = getComputedStyle(document.documentElement)
-    .getPropertyValue('--primary_color')
-    .trim() || '#00d4ff'
-  const muted = 'rgba(255,255,255,0.22)'
-
-  if (pairs > 0) {
-    const step = cssW / pairs
-    ctx.fillStyle = muted
-    for (let i = 0; i < pairs; i++) {
-      const minV = data[i * 2]
-      const maxV = data[i * 2 + 1]
-      const y1 = mid + minV * mid
-      const y2 = mid + maxV * mid
-      ctx.fillRect(i * step, y1, Math.max(1, step * 0.85), Math.max(1, y2 - y1))
-    }
-  } else {
-    ctx.strokeStyle = muted
-    ctx.beginPath()
-    ctx.moveTo(0, mid)
-    ctx.lineTo(cssW, mid)
-    ctx.stroke()
-  }
-
+  blitPeaks(ctx, layer.ensure(cssW, cssH, dpr, data), cssW, cssH)
   const dur = durationByPath.get(path) || 0
-  const head = playheadByPath.get(path) || 0
-  if (dur > 0) {
-    const hover = hoverByPath.get(path)
-    if (hover != null && scrubPath.value !== path) {
-      const hx = (hover / dur) * cssW
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)'
-      ctx.lineWidth = 1
-      ctx.setLineDash([3, 3])
-      ctx.beginPath()
-      ctx.moveTo(hx, 0)
-      ctx.lineTo(hx, cssH)
-      ctx.stroke()
-      ctx.setLineDash([])
-    }
-    const x = (head / dur) * cssW
-    ctx.strokeStyle = accent
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, cssH)
-    ctx.stroke()
-  }
+  const hover = hoverByPath.get(path)
+  drawPlayhead(
+    ctx,
+    cssW,
+    cssH,
+    dur,
+    playheadByPath.get(path) || 0,
+    hover != null && scrubPath.value !== path ? hover : null,
+  )
 }
 
 function secFromPointer(path: string, e: PointerEvent) {
@@ -406,6 +379,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (rafId != null) cancelAnimationFrame(rafId)
+  waveClock?.stop()
+  waveClock = null
 })
 </script>

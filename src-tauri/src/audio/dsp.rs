@@ -29,8 +29,14 @@ pub struct EditSession {
     pub redo: Option<(Vec<f32>, u32, u16)>,
 }
 
+const MAX_UNDO_SAMPLES: usize = 8 * 1024 * 1024; // ~32 MiB of f32
+
 fn push_undo(sess: &mut EditSession) {
     sess.redo = None;
+    if sess.samples.len() > MAX_UNDO_SAMPLES {
+        sess.undo = None;
+        return;
+    }
     sess.undo = Some((sess.samples.clone(), sess.sample_rate, sess.channels));
 }
 
@@ -302,6 +308,11 @@ fn peaks_from_samples(
         .min(frames)
         .max(start_frame + 1);
     let span = end_frame - start_frame;
+    if start_sec.is_none() && end_sec.is_none() {
+        if let Some(gpu) = crate::gpu::bucket_peaks(&samples[..frames * ch], buckets) {
+            return gpu;
+        }
+    }
     let mut peaks = Vec::with_capacity(buckets * 2);
     for b in 0..buckets {
         let start = start_frame + b * span / buckets;
@@ -518,7 +529,7 @@ pub async fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec
     .map_err(|e| e.to_string())??;
 
     if let Ok(mut cache) = peaks_cache().lock() {
-        if cache.len() >= 32 {
+        if cache.len() >= 16 {
             cache.clear();
         }
         cache.insert(key, peaks.clone());
@@ -587,9 +598,11 @@ pub fn normalize_session(
             .fold(0.0f32, f32::max);
         if peak > 1e-9 {
             push_undo(sess);
-            let gain = target / peak;
-            for s in &mut sess.samples[start..end] {
-                *s = (*s * gain).clamp(-1.0, 1.0);
+            if !crate::gpu::normalize_range(&mut sess.samples[start..end], target) {
+                let gain = target / peak;
+                for s in &mut sess.samples[start..end] {
+                    *s = (*s * gain).clamp(-1.0, 1.0);
+                }
             }
         }
         Ok(SessionInfo {

@@ -43,6 +43,16 @@
       </select>
     </div>
 
+    <div class="settings-group">
+      <label class="settings-label">{{ $t('settings.main.tabTransition') }}</label>
+      <select v-model="tabTransition" @change="onTabTransition" class="settings-select">
+        <option value="slide">{{ $t('settings.main.tabTransitionSlide') }}</option>
+        <option value="fade">{{ $t('settings.main.tabTransitionFade') }}</option>
+        <option value="stagger">{{ $t('settings.main.tabTransitionStagger') }}</option>
+        <option value="none">{{ $t('settings.main.tabTransitionNone') }}</option>
+      </select>
+    </div>
+
     <DialogField
       v-if="nameDialogOpen"
       :title="$t('settings.main.themeNoNameTitle')"
@@ -289,6 +299,7 @@ import {
   THEME_TOKEN_DEFAULTS,
 } from '~/utils/themeTokens'
 import { KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
+import { normalizeTabTransition, type TabTransition } from '~/utils/db'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
@@ -325,6 +336,7 @@ const playerLarge = ref(false)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
 const gifPlayOnHover = ref(true)
+const tabTransition = ref<TabTransition>('slide')
 const klipyApiKey = ref('')
 const navbarTooltips = ref(true)
 const checkUpdatesOnStart = ref(true)
@@ -335,8 +347,8 @@ const hideTitlebarDontRemind = ref(false)
 const recentLimit = ref(30)
 const currentLanguage = ref(locale.value)
 const navbarSide = ref<'left' | 'right'>('left')
-const cacheMaxSizeMib = ref(256)
-const cacheMaxEntryMib = ref(50)
+const cacheMaxSizeMib = ref(64)
+const cacheMaxEntryMib = ref(16)
 const cacheStatsText = ref('')
 const hasDedicatedGpu = ref(false)
 const gpuAudioEnabled = ref(false)
@@ -599,6 +611,12 @@ function onGifPlayOnHover(val: boolean) {
   jsonStore.setGifPlayOnHover(val)
 }
 
+function onTabTransition() {
+  const val = normalizeTabTransition(tabTransition.value)
+  tabTransition.value = val
+  jsonStore.setSetting('tabTransition', val)
+}
+
 async function onKlipyApiKey(val: string) {
   klipyApiKey.value = val
   await appSettings.setKlipyApiKey(val)
@@ -677,8 +695,8 @@ async function refreshCacheStats() {
 }
 
 async function onCacheConfig() {
-  const maxSize = Math.max(32, Math.min(4096, Number(cacheMaxSizeMib.value) || 256))
-  const maxEntry = Math.max(1, Math.min(500, Number(cacheMaxEntryMib.value) || 50))
+  const maxSize = Math.max(32, Math.min(4096, Number(cacheMaxSizeMib.value) || 64))
+  const maxEntry = Math.max(1, Math.min(500, Number(cacheMaxEntryMib.value) || 16))
   cacheMaxSizeMib.value = maxSize
   cacheMaxEntryMib.value = maxEntry
   jsonStore.setCacheConfig(maxSize, maxEntry)
@@ -714,14 +732,15 @@ async function syncFromStore() {
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
   gifPlayOnHover.value = jsonStore.configFile?.settings?.gifPlayOnHover !== false
+  tabTransition.value = normalizeTabTransition(jsonStore.configFile?.settings?.tabTransition)
   klipyApiKey.value = appSettings.klipyApiKey || ''
   navbarTooltips.value = appSettings.navbarTooltips !== false
   checkUpdatesOnStart.value = appSettings.checkUpdatesOnStart !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
   recentLimit.value = appSettings.recentLimit ?? 30
-  cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
-  cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 50
+  cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 64
+  cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 16
   applyTheme()
   try {
     await invoke('set_cache_config', {

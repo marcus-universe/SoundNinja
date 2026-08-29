@@ -10,7 +10,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { PlayingInfo } from '~/components/Section/PlayingList.vue'
 
 const playing = ref<PlayingInfo[]>([])
@@ -29,12 +28,6 @@ onMounted(async () => {
   unlisten = await listen<PlayingInfo[]>('playing_changed', (e) => {
     playing.value = e.payload ?? []
   })
-  getCurrentWindow()
-    .onCloseRequested((event) => {
-      event.preventDefault()
-      getCurrentWindow().hide().catch(() => {})
-    })
-    .catch(() => {})
 })
 
 onUnmounted(() => {

@@ -73,6 +73,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { openSecondaryWindow, PLAYING_LIST, RECORD_EDITOR } from '~/utils/secondaryWindows'
+import { PeakLayer, blitPeaks, drawPlayhead, startThrottledClock } from '~/utils/waveformDraw'
 import type { PlayingInfo } from './PlayingList.vue'
 
 const jsonStore = useJsonHandelingStore()
@@ -88,7 +89,7 @@ const waveCanvas = ref<HTMLCanvasElement | null>(null)
 const scrubbing = ref(false)
 
 let unlisten: UnlistenFn | null = null
-let waveRaf: number | null = null
+let waveClock: { stop: () => void } | null = null
 let wavePath = ''
 let progressAnchorMs = 0
 let progressElapsedMs = 0
@@ -96,6 +97,7 @@ let progressPaused = true
 let seekInFlight = false
 /** Coalesce scrub pointermove redraws to one paint per animation frame. */
 let scrubDrawRaf: number | null = null
+const peakLayer = new PeakLayer()
 
 function scheduleScrubDraw() {
   if (scrubDrawRaf != null) return
@@ -234,11 +236,11 @@ async function loadWaveform(path: string) {
 }
 
 function startWaveClock() {
-  if (waveRaf != null) return
-  const tick = () => {
-    if (!scrubbing.value && !progressPaused && durationSec.value > 0) {
+  if (waveClock) return
+  waveClock = startThrottledClock(20, () => {
+    if (progressPaused) return false
+    if (!scrubbing.value && durationSec.value > 0) {
       let sec = (Date.now() - progressAnchorMs) / 1000
-      // When looping, wrap locally until backend snapshot confirms restart.
       if (loopOn.value && sec >= durationSec.value) {
         sec = sec % durationSec.value
         progressElapsedMs = sec * 1000
@@ -249,16 +251,13 @@ function startWaveClock() {
       playheadSec.value = sec
       drawWave()
     }
-    waveRaf = requestAnimationFrame(tick)
-  }
-  waveRaf = requestAnimationFrame(tick)
+    return !progressPaused
+  })
 }
 
 function stopWaveClock() {
-  if (waveRaf != null) {
-    cancelAnimationFrame(waveRaf)
-    waveRaf = null
-  }
+  waveClock?.stop()
+  waveClock = null
 }
 
 function drawWave() {
@@ -270,60 +269,21 @@ function drawWave() {
   if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
     canvas.width = Math.floor(cssW * dpr)
     canvas.height = Math.floor(cssH * dpr)
+    peakLayer.invalidate()
   }
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, cssW, cssH)
-
-  const mid = cssH / 2
-  const data = peaks.value
-  const pairs = Math.floor(data.length / 2)
-  const accent = getComputedStyle(document.documentElement)
-    .getPropertyValue('--primary_color')
-    .trim() || '#00d4ff'
-  const muted = 'rgba(255,255,255,0.22)'
-
-  if (pairs > 0) {
-    const step = cssW / pairs
-    ctx.fillStyle = muted
-    for (let i = 0; i < pairs; i++) {
-      const minV = data[i * 2]
-      const maxV = data[i * 2 + 1]
-      const y1 = mid + minV * mid
-      const y2 = mid + maxV * mid
-      const h = Math.max(1, y2 - y1)
-      ctx.fillRect(i * step, y1, Math.max(1, step * 0.85), h)
-    }
-  } else {
-    ctx.strokeStyle = muted
-    ctx.beginPath()
-    ctx.moveTo(0, mid)
-    ctx.lineTo(cssW, mid)
-    ctx.stroke()
-  }
-
-  if (durationSec.value > 0) {
-    // Hover preview (where a click would seek) — drawn under the real playhead.
-    if (hoverSec.value != null && !scrubbing.value) {
-      const hx = (hoverSec.value / durationSec.value) * cssW
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)'
-      ctx.lineWidth = 1
-      ctx.setLineDash([3, 3])
-      ctx.beginPath()
-      ctx.moveTo(hx, 0)
-      ctx.lineTo(hx, cssH)
-      ctx.stroke()
-      ctx.setLineDash([])
-    }
-    const x = (playheadSec.value / durationSec.value) * cssW
-    ctx.strokeStyle = accent
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, cssH)
-    ctx.stroke()
-  }
+  const layer = peakLayer.ensure(cssW, cssH, dpr, peaks.value)
+  blitPeaks(ctx, layer, cssW, cssH)
+  drawPlayhead(
+    ctx,
+    cssW,
+    cssH,
+    durationSec.value,
+    playheadSec.value,
+    hoverSec.value != null && !scrubbing.value ? hoverSec.value : null,
+  )
 }
 
 function secFromPointer(e: PointerEvent) {

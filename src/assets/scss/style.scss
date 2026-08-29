@@ -119,12 +119,86 @@
     padding: 0 $padding_2 0 $padding_2;
 
     &__scroll {
+      position: relative;
       flex: 1;
       min-height: 0;
+      overflow-x: hidden;
       overflow-y: auto;
       scroll-behavior: smooth;
       // Room for floating player chip above the bottom edge.
       padding-bottom: 5rem;
+    }
+
+    .SoundTab-wrap {
+      width: 100%;
+    }
+
+    // Tab-switch: slide (outgoing overlays; incoming stays in flow).
+    .tab-slide-left-leave-active,
+    .tab-slide-right-leave-active {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      width: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .tab-slide-left-enter-active,
+    .tab-slide-left-leave-active,
+    .tab-slide-right-enter-active,
+    .tab-slide-right-leave-active {
+      transition: transform 0.28s ease, opacity 0.28s ease;
+    }
+
+    .tab-slide-left-leave-to {
+      transform: translateX(-24%);
+      opacity: 0;
+    }
+
+    .tab-slide-left-enter-from {
+      transform: translateX(24%);
+      opacity: 0;
+    }
+
+    .tab-slide-right-leave-to {
+      transform: translateX(24%);
+      opacity: 0;
+    }
+
+    .tab-slide-right-enter-from {
+      transform: translateX(-24%);
+      opacity: 0;
+    }
+
+    .tab-fade-enter-active,
+    .tab-fade-leave-active {
+      transition: opacity 0.2s ease;
+    }
+
+    .tab-fade-enter-from,
+    .tab-fade-leave-to {
+      opacity: 0;
+    }
+
+    .tab-stagger-enter-active .Soundbtn,
+    .tab-stagger-leave-active .Soundbtn {
+      // Keyframes beat .Soundbtn { transition: color/bg only } so zoom actually runs.
+      animation-duration: 0.14s;
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      animation-fill-mode: both;
+      animation-delay: min(calc(var(--stagger-i, 0) * 12ms), 220ms);
+      transform-origin: center center;
+    }
+
+    .tab-stagger-enter-active .Soundbtn {
+      animation-name: tab-stagger-zoom-in;
+    }
+
+    .tab-stagger-leave-active .Soundbtn {
+      animation-name: tab-stagger-zoom-out;
+      animation-timing-function: ease-in;
     }
 
     // Parent is `.main .SoundContainer` — use `> .SoundContainer__scroll`
@@ -248,8 +322,7 @@
           pointer-events: none;
         }
 
-        // Progress fill bar — width is driven by --sound-progress (set via inline
-        // style from the Vue component using requestAnimationFrame).
+        // Progress fill — CSS animation from --sound-progress-from to 100%.
         &::before {
           content: '';
           position: absolute;
@@ -261,13 +334,25 @@
           opacity: 0.3;
           z-index: 2;
           pointer-events: none;
-          // No CSS transition here — rAF handles frame-by-frame smoothness.
+        }
+
+        &.active:not(.progress-paused)::before {
+          animation: sound-progress-fill var(--sound-progress-dur, 0s) linear forwards;
+        }
+
+        &.progress-paused::before {
+          animation: none;
         }
 
         .sound-label {
           position: relative;
           z-index: 3;
           pointer-events: none;
+        }
+
+        &.missing {
+          opacity: 0.55;
+          outline: 0.16rem dashed color-mix(in srgb, #ff6b6b 70%, var(--primary_color));
         }
 
         &.has-gif {
@@ -360,6 +445,33 @@
 @keyframes sound-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes sound-progress-fill {
+  from { width: var(--sound-progress-from, 0%); }
+  to { width: 100%; }
+}
+
+@keyframes tab-stagger-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tab-stagger-zoom-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.45);
   }
 }
 

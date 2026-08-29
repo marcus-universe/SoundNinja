@@ -85,6 +85,12 @@
       "allowReorderHint": "Enable drag-and-drop reordering of sounds and groups",
       "gifPlayOnHover": "GIFs play only on hover",
       "gifPlayOnHoverHint": "Animate GIF button backgrounds only while the cursor is over that button. Off = every visible GIF loops.",
+      "tabTransition": "Tab transition",
+      "tabTransitionHint": "Animation when switching tabs on the soundboard",
+      "tabTransitionSlide": "Slide",
+      "tabTransitionFade": "Fade",
+      "tabTransitionStagger": "Buttons one by one",
+      "tabTransitionNone": "None",
       "klipyApiKey": "Klipy API key",
       "klipyApiKeyHint": "Klipy search needs your own free API key. Local PNG, JPEG, GIF, and WebP files work without a key and are stored in the project file.",
       "klipyApiKeyPlaceholder": "Paste API key…",
@@ -275,7 +281,17 @@
   },
   "common": {
     "saving": "Saving…",
+    "saved": "Project saved.",
+    "savedTitle": "Saved",
     "loading": "Loading…"
+  },
+  "relink": {
+    "title": "Missing sound files",
+    "message": "{count} sound file(s) are missing. Select a folder to search and relink them.",
+    "pickFolder": "Select folder",
+    "apply": "Relink selected",
+    "skip": "Skip",
+    "noMatch": "No match yet"
   },
   "bulk": {
     "selected": "{count} selected",

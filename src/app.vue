@@ -25,12 +25,17 @@
           <UIButton @click="resolveUnsaved('cancel')">{{ $t('dialog.cancel') }}</UIButton>
         </div>
       </DialogField>
-      <Transition name="fade">
-        <div v-if="jsonStore.saving" class="saving-indicator flex_c_h align_c gap1">
-          <span class="saving-indicator__spinner" aria-hidden="true" />
-          <span>{{ $t('common.saving') }}</span>
+      <RelinkDialog v-if="appStore.relinkActive" />
+      <DialogField
+        v-if="savePopup"
+        :title="savePopup === 'saved' ? $t('common.savedTitle') : $t('common.saving')"
+        @close="savePopup = null"
+      >
+        <div class="flex_c_v align_c gap1 save-popup-body">
+          <span v-if="savePopup === 'saving'" class="saving-indicator__spinner" aria-hidden="true" />
+          <p class="dialog-text">{{ savePopup === 'saved' ? $t('common.saved') : $t('common.saving') }}</p>
         </div>
-      </Transition>
+      </DialogField>
     </template>
     <NuxtPage v-if="isMain" v-slot="{ Component }">
       <transition name="fade" mode="out-in">
@@ -38,9 +43,13 @@
       </transition>
     </NuxtPage>
     <div v-else class="soundninja__tool-page">
+      <div v-if="!toolReady" class="tool-loading flex_c_v align_c">
+        <span class="saving-indicator__spinner" aria-hidden="true" />
+        <span>{{ $t('common.loading') }}</span>
+      </div>
       <NuxtPage v-slot="{ Component }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" />
+          <component :is="Component" @vue:mounted="toolReady = true" />
         </transition>
       </NuxtPage>
     </div>
@@ -81,12 +90,19 @@ const appSettings = useAppSettingsStore()
 const { setLocale } = useI18n()
 
 const updateDialogRef = ref(null)
+const savePopup = ref(null)
+let savePopupTimer = null
 
 // Secondary windows (e.g. the Theme Creator) reuse the same SPA bundle. Only the
 // main window owns the project/menu lifecycle; others just render their page.
 const isMain = ref(true)
+const toolReady = ref(false)
 if (import.meta.client) {
   try { isMain.value = getCurrentWindow().label === 'main' } catch { /* non-tauri */ }
+  if (!isMain.value) {
+    // Fallback if page mount event is missed.
+    setTimeout(() => { toolReady.value = true }, 800)
+  }
 }
 
 function joinPath(base, ...parts) {
@@ -125,6 +141,12 @@ function onUndoRedoKeydown(e) {
   } else if (key === 'y' && !e.shiftKey) {
     e.preventDefault()
     runHistoryAction(() => jsonStore.redo())
+  } else if (key === 's' && e.shiftKey) {
+    e.preventDefault()
+    runHistoryAction(() => { handleMenuSaveAs() })
+  } else if (key === 's') {
+    e.preventDefault()
+    runHistoryAction(() => { handleMenuSave() })
   }
 }
 
@@ -163,6 +185,11 @@ async function openProjectPath(dbPath) {
   } catch (e) {
     // Project open is primary action; recents update failure should not abort flow.
     console.error('Failed to update recent projects', e)
+  }
+  await jsonStore.validateSoundPaths()
+  if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
+  if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
+    invoke('set_gpu_audio', { enabled: true }).catch(() => {})
   }
 }
 
@@ -223,15 +250,27 @@ function resolveUnsaved(choice) {
   if (resolve) resolve(choice)
 }
 
-async function persistOrReport() {
+async function withSavePopup(work) {
+  if (savePopupTimer) {
+    clearTimeout(savePopupTimer)
+    savePopupTimer = null
+  }
+  savePopup.value = 'saving'
   try {
-    await jsonStore.persistNow()
+    await work()
+    savePopup.value = 'saved'
+    savePopupTimer = setTimeout(() => { savePopup.value = null }, 1000)
     return true
   } catch (e) {
+    savePopup.value = null
     console.error('Failed to save project', e)
     appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
     return false
   }
+}
+
+async function persistOrReport() {
+  return withSavePopup(() => jsonStore.persistNow())
 }
 
 async function handleMenuNewProject() {
@@ -285,14 +324,11 @@ async function handleMenuSaveAs() {
     defaultPath: `project.${PROJECT_SAVE_FILTER.extensions[0]}`,
   })
   if (!path) return
-  try {
-    const dbPath = ensureSaveProjectPath(path)
+  const dbPath = ensureSaveProjectPath(path)
+  await withSavePopup(async () => {
     await jsonStore.saveAs(dbPath)
     await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
-  } catch (e) {
-    console.error('Failed to save project as', e)
-    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
-  }
+  })
 }
 
 async function handleMenuImportAudio() {
@@ -403,6 +439,9 @@ onMounted(async () => {
   // One-time: pull audio device/volume prefs out of the project into app-config.db.
   await appSettings.migrateAudioFromProject(jsonStore.configFile?.settings)
   await applyPersistedTheme(jsonStore.configFile)
+  if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
+    invoke('set_gpu_audio', { enabled: true }).catch(() => {})
+  }
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
@@ -498,13 +537,6 @@ onMounted(async () => {
       tabList: (jsonStore.configFile?.tabList || []).map((t) => t.name),
     }).catch(() => {})
   })
-
-  // Warm secondary windows in background so first open is not a full SPA boot.
-  setTimeout(() => {
-    import('~/utils/secondaryWindows')
-      .then((m) => m.prewarmSecondaryWindows())
-      .catch(() => {})
-  }, 1500)
 
   // Optional silent update check after startup settles (popup only if update exists).
   if (appSettings.checkUpdatesOnStart !== false) {

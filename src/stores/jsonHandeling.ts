@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import {
   openDb, withProjectDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
-  loadGifBlobsByIds, upsertGifBlob,
+  loadGifBlobsByIds, upsertGifBlob, healFolderTabMembership, mergeTabsFromUsage,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
 } from '~/utils/db'
@@ -30,6 +30,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     openingSnapshot: null as ProjectConfig | null,
     dirty: false,
     saving: false,
+    missingPaths: [] as string[],
     _persistTimer: null as ReturnType<typeof setTimeout> | null,
     /** Stepwise undo history for soundboard mutations (sounds/tabs/separators). */
     undoStack: [] as ProjectConfig[],
@@ -97,7 +98,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.currentProjectPath = dbAbsPath
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
+      this.missingPaths = []
       this.clearHistory()
+    },
+
+    async validateSoundPaths() {
+      const paths = this.configFile.files.map((f) => f.path).filter(Boolean)
+      this.missingPaths = []
+      if (!paths.length) return
+      const { invoke } = await import('@tauri-apps/api/core')
+      const exists = await invoke<boolean[]>('paths_exist_abs', { paths })
+      this.missingPaths = paths.filter((_, i) => !exists[i])
     },
 
     /** Loads config into an already-open project DB (used by JSON import/migration). */
@@ -112,6 +123,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         files: config.files ?? [],
         separators: config.separators ?? [],
       }
+      mergeTabsFromUsage(this.configFile)
+      healFolderTabMembership(this.configFile)
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.openingSnapshot = clone(this.configFile)
@@ -394,6 +407,18 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         if (set.has(f.path) && !f.tabs.includes(tab)) f.tabs = [...f.tabs, tab]
       }
       this.normalizeIndexes()
+      this.writeConfig()
+    },
+
+    relinkSounds(pairs: { from: string; to: string }[]) {
+      if (!pairs.length) return
+      this.pushBeforeChange()
+      const map = new Map(pairs.map((p) => [p.from, p.to]))
+      for (const f of this.configFile.files) {
+        const next = map.get(f.path)
+        if (next) f.path = next
+      }
+      this.missingPaths = this.missingPaths.filter((p) => !map.has(p))
       this.writeConfig()
     },
 

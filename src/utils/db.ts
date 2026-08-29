@@ -32,6 +32,14 @@ export interface GifBlobRow {
 
 export type ButtonAlign = 'left' | 'center' | 'right'
 
+export type TabTransition = 'slide' | 'fade' | 'stagger' | 'none'
+
+const TAB_TRANSITIONS: TabTransition[] = ['slide', 'fade', 'stagger', 'none']
+
+export function normalizeTabTransition(value: unknown): TabTransition {
+  return TAB_TRANSITIONS.includes(value as TabTransition) ? (value as TabTransition) : 'slide'
+}
+
 export interface TabEntry {
   name: string
   color?: string
@@ -107,6 +115,8 @@ export interface Settings {
   playerLarge?: boolean
   /** When true, GIF button backgrounds animate only while hovered. Default on. */
   gifPlayOnHover?: boolean
+  /** Board animation when switching tabs. Unknown/missing → slide. */
+  tabTransition?: TabTransition
 }
 
 export interface ProjectConfig {
@@ -147,11 +157,64 @@ export function defaultSettings(): Settings {
     showPlayer: true,
     playerLarge: false,
     gifPlayOnHover: true,
+    tabTransition: 'slide',
   }
 }
 
 export function emptyConfig(): ProjectConfig {
   return { settings: defaultSettings(), tabList: [], files: [], separators: [] }
+}
+
+/** Parent folder of a sound path (`C:\board\Lolli\foo.wav` → `Lolli`). */
+export function parentFolderName(filePath: string): string {
+  const norm = String(filePath || '').replace(/\\/g, '/').replace(/\/+$/, '')
+  const parts = norm.split('/').filter(Boolean)
+  if (parts.length < 2) return ''
+  return parts[parts.length - 2]
+}
+
+/**
+ * Sounds imported as folders-on-All often have tabs named after those folders
+ * but only an `All` row in `sound_tabs`. Assign the matching tab so the board
+ * is not empty. Skips sounds that already belong to a non-All tab.
+ */
+/** Tabs table can be empty while sound_tabs / separators still name tabs. */
+export function mergeTabsFromUsage(config: ProjectConfig): number {
+  const list = config.tabList ?? (config.tabList = [])
+  const have = new Set(list.map((t) => t.name))
+  const extra: string[] = []
+  const add = (name: string | undefined) => {
+    if (!name || name === 'All' || have.has(name)) return
+    have.add(name)
+    extra.push(name)
+  }
+  for (const f of config.files ?? []) {
+    for (const t of f.tabs ?? []) add(t)
+  }
+  for (const s of config.separators ?? []) add(s.tab)
+  for (const name of extra) list.push({ name })
+  return extra.length
+}
+
+export function healFolderTabMembership(config: ProjectConfig): number {
+  const names = (config.tabList ?? []).map((t) => t.name).filter(Boolean)
+  if (!names.length) return 0
+  const exact = new Map(names.map((n) => [n, n]))
+  const lower = new Map(names.map((n) => [n.toLowerCase(), n]))
+  let healed = 0
+  for (const f of config.files ?? []) {
+    if (!Array.isArray(f.tabs)) f.tabs = ['All']
+    if (f.tabs.some((t) => t && t !== 'All')) continue
+    const folder = parentFolderName(f.path)
+    if (!folder) continue
+    const tab = exact.get(folder) ?? lower.get(folder.toLowerCase())
+    if (!tab) continue
+    f.tabs = ['All', tab]
+    if (!f.tabIndexes) f.tabIndexes = {}
+    if (f.tabIndexes[tab] == null) f.tabIndexes[tab] = f.index ?? 0
+    healed++
+  }
+  return healed
 }
 
 // ── Connection handling ───────────────────────────────────────────────────────
@@ -335,6 +398,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'showPlayer': settings.showPlayer = value === 'true'; break
       case 'playerLarge': settings.playerLarge = value === 'true'; break
       case 'gifPlayOnHover': settings.gifPlayOnHover = value !== 'false'; break
+      case 'tabTransition': settings.tabTransition = normalizeTabTransition(value); break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -462,7 +526,10 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       : {}),
   }))
 
-  return { settings, tabList, files, separators }
+  const config = { settings, tabList, files, separators }
+  mergeTabsFromUsage(config)
+  healFolderTabMembership(config)
+  return config
 }
 
 // ── Save (full re-sync inside a transaction) ──────────────────────────────────
@@ -512,11 +579,12 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['overlapSounds', String(s.overlapSounds ?? false)],
     ['showPlayer', String(s.showPlayer ?? true)],
     ['playerLarge', String(s.playerLarge ?? false)],
-    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
-    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
+    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 64)],
+    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 16)],
     ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
     ['allowReorder', String(s.allowReorder ?? true)],
     ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
+    ['tabTransition', normalizeTabTransition(s.tabTransition)],
     ['primaryColor', s.primaryColor ?? '#00d4ff'],
     ['primaryHover', s.primaryHover ?? '#33ddff'],
     ['bg', s.bg ?? '#222831'],

@@ -627,12 +627,12 @@ onBeforeUnmount(() => {
 
 const closePrompt = ref(false)
 
-async function hideThemeWindow() {
+async function destroyThemeWindow() {
   closePrompt.value = false
   try {
-    await getCurrentWindow().hide()
+    await getCurrentWindow().destroy()
   } catch (e) {
-    console.warn('hide theme-creator failed', e)
+    console.warn('destroy theme-creator failed', e)
   }
 }
 
@@ -650,7 +650,7 @@ async function saveAndClose() {
 
 async function discardAndClose() {
   await emit('theme_saved').catch(() => {})
-  await hideThemeWindow()
+  await destroyThemeWindow()
 }
 
 function cancelClose() {
@@ -815,7 +815,7 @@ async function saveThemeToFolder() {
       contents: css,
     })
     await emit('theme_apply', { theme: `file:${safeName}.css` })
-    await hideThemeWindow()
+    await destroyThemeWindow()
   } catch (e) {
     console.error('Save to themes folder failed', e)
   }

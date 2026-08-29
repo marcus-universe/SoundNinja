@@ -184,6 +184,16 @@ body {
   }
 }
 
+.tool-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--color-text, #eee);
+  background: var(--color-bg-2, var(--color-bg, #222831));
+}
+
 // ########################################
 // Align Classes
 // ########################################

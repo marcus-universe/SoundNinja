@@ -14,6 +14,14 @@ export function peekGifUrls(id: string): GifUrls | null {
   return cache.get(id) ?? null
 }
 
+export function revokeGifUrls(id: string): void {
+  const urls = cache.get(id)
+  if (!urls) return
+  URL.revokeObjectURL(urls.animUrl)
+  if (urls.posterUrl !== urls.animUrl) URL.revokeObjectURL(urls.posterUrl)
+  cache.delete(id)
+}
+
 export function revokeAllGifUrls(): void {
   for (const urls of cache.values()) {
     URL.revokeObjectURL(urls.animUrl)

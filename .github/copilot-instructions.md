@@ -17,7 +17,7 @@
 | Persistence | [SQLite](https://www.sqlite.org/) via [tauri-plugin-sql](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/sql) (one `project.db` per project) |
 | Styling   | [SCSS](https://sass-lang.com/) (`.scss` syntax)                            |
 | i18n      | [@nuxtjs/i18n](https://i18n.nuxtjs.org/) (`en`/`de`, strategy `no_prefix`) |
-| Audio     | [Howler.js](https://howlerjs.com/) (frontend), [rodio](https://github.com/RustAudio/rodio) + [symphonia](https://github.com/pdeljanov/Symphonia) (backend via Tauri) |
+| Audio     | [rodio](https://github.com/RustAudio/rodio) + [symphonia](https://github.com/pdeljanov/Symphonia) + [cpal](https://github.com/RustAudio/cpal) (Rust backend) |
 | Desktop   | [Tauri v2](https://tauri.app/) — Rust backend, WebView frontend            |
 | Utilities | [VueUse](https://vueuse.org/), [SortableJS](https://sortablejs.github.io/Sortable/) |
 | Build     | [Nuxt](https://nuxt.com/) (`nuxt generate`) + [`@tauri-apps/cli`](https://tauri.app/) |
@@ -95,9 +95,10 @@ src-tauri/                  # Tauri / Rust backend
 - Do not introduce plain CSS files unless explicitly required.
 
 ### Audio Playback
-- Frontend audio preview uses **Howler.js**.
-- Actual device routing / multi-output playback is handled in Rust via **rodio** and **cpal** (`src-tauri/src/audio/`).
-- The Rust `SINK` global is `unsafe`; treat all modifications to it with care and prefer encapsulating changes inside the `audio` module.
+- Playback is Rust-only via **rodio** + **cpal** (`src-tauri/src/audio/`). The frontend never decodes or plays audio itself.
+- A persistent `MixerDeviceSink` / `AudioStream` is kept on the audio thread (no global `SINK`).
+- Sound cache holds raw file bytes (lazy LRU). Playback streams from disk on cache miss.
+- Optional GPU DSP (`src-tauri/src/gpu.rs`) is for offline work (peaks, normalize, STFT windowing), not realtime mix.
 
 ---
 
@@ -191,7 +192,7 @@ The following features are on the roadmap. Check the [GitHub Project Board](http
 - [tauri-plugin-sql](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/sql)
 - [rodio (Rust audio)](https://docs.rs/rodio)
 - [cpal (Rust audio I/O)](https://docs.rs/cpal)
-- [Howler.js](https://howlerjs.com/)
+- [wgpu](https://docs.rs/wgpu) (optional offline GPU DSP)
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
 

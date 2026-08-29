@@ -91,7 +91,7 @@ async function stripMenu(label: string) {
   }
 }
 
-/** Create (hidden) if needed. Keeps SPA warm for fast show later. */
+/** Create if needed. Shown immediately so first-open is not a hidden SPA boot. */
 export async function ensureSecondaryWindow(spec: SecondaryWindowSpec): Promise<WebviewWindow> {
   const existing = await WebviewWindow.getByLabel(spec.label)
   if (existing) return existing
@@ -113,8 +113,8 @@ export async function ensureSecondaryWindow(spec: SecondaryWindowSpec): Promise<
         minWidth: spec.minWidth,
         minHeight: spec.minHeight,
         resizable: true,
-        visible: false,
-        focus: false,
+        visible: true,
+        focus: true,
         decorations: chrome.decorations,
       })
       await waitCreated(win)
@@ -153,21 +153,9 @@ export async function openSecondaryWindow(spec: SecondaryWindowSpec): Promise<We
   return win
 }
 
-export async function hideSecondaryWindow(label: string): Promise<void> {
+/** Destroy a secondary window so its WebView2 process is released. */
+export async function destroySecondaryWindow(label: string): Promise<void> {
   const win = await WebviewWindow.getByLabel(label)
   if (!win) return
-  await win.hide()
-}
-
-/** Background-warm secondary tool windows after main is ready. */
-export function prewarmSecondaryWindows(): void {
-  void ensureSecondaryWindow(RECORD_EDITOR).catch((e) => {
-    console.warn('prewarm record-editor failed', e)
-  })
-  void ensureSecondaryWindow(THEME_CREATOR).catch((e) => {
-    console.warn('prewarm theme-creator failed', e)
-  })
-  void ensureSecondaryWindow(PLAYING_LIST).catch((e) => {
-    console.warn('prewarm playing-list failed', e)
-  })
+  await win.destroy()
 }
