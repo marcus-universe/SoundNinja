@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       update_aur:
-        description: "Push PKGBUILD update to AUR (publish the GitHub release first so AppImage URL is public)."
+        description: "DISABLED — AUR deploy off until account/secrets exist. Leave false."
         required: false
         type: boolean
         default: false
@@ -121,17 +121,12 @@ jobs:
           uploadUpdaterJson: true
           args: ${{ matrix.args }}
 
+  # AUR deploy disabled — maintainer not registered on AUR yet.
+  # Re-enable when AUR_USERNAME / AUR_EMAIL / AUR_SSH_PRIVATE_KEY secrets exist:
+  # restore the `if:` below (tag push or workflow_dispatch update_aur).
   aur-update:
     needs: build
-    # Tag pushes always attempt AUR update. Manual runs only when update_aur=true.
-    # AppImage must be publicly downloadable — publish the draft release first for manual AUR updates.
-    if: >
-      always() &&
-      needs.build.result == 'success' &&
-      (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'workflow_dispatch' && inputs.update_aur)
-      )
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
