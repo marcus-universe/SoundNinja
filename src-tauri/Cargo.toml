@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.5.4"
+version = "0.6.0"
 description = "Your best Soundboard App"
 authors = ["you"]
 license = ""
