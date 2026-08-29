@@ -109,8 +109,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
 import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/utils/colorOverride'
-import { getDb } from '~/utils/db'
-import { ensureGifUrls, peekGifUrls } from '~/utils/gifCache'
+import { withProjectDb, loadGifBlobsByIds } from '~/utils/db'
+import { cacheGifRow, peekGifUrls } from '~/utils/gifCache'
 
 const MAX_ANIM_GIFS = 16
 
@@ -376,18 +376,23 @@ function gifSrcFor(sound) {
 }
 
 async function loadVisibleGifs() {
-  const d = getDb()
-  if (!d) return
+  const path = jsonStore.currentProjectPath
+  if (!path) return
+  const ids = []
   for (const sound of allDisplaySounds.value) {
     if (!sound.gifId) continue
     if (!visibleByPath[sound.path]) continue
-    if (gifUrls[sound.gifId]) continue
-    try {
-      const urls = await ensureGifUrls(d, sound.gifId)
-      if (urls) gifUrls[sound.gifId] = urls
-    } catch (e) {
-      console.error('Failed to load GIF blob', e)
+    if (gifUrls[sound.gifId] || peekGifUrls(sound.gifId)) continue
+    ids.push(sound.gifId)
+  }
+  if (!ids.length) return
+  try {
+    const rows = await withProjectDb(path, (d) => loadGifBlobsByIds(d, ids))
+    for (const row of rows) {
+      gifUrls[row.id] = cacheGifRow(row)
     }
+  } catch (e) {
+    console.error('Failed to load GIF blob', e)
   }
 }
 

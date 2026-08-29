@@ -184,6 +184,18 @@ export async function openDb(dbAbsPath: string): Promise<Database> {
   return withDbLock(async () => openDbUnlocked(dbAbsPath))
 }
 
+function isRecoverableDbError(e: unknown): boolean {
+  return /closed pool|database is locked|\(code:\s*5\)|SQLITE_BUSY/i.test(String(e))
+}
+
+/** WAL + busy_timeout so readers do not instantly fail while a write is in flight.
+ *  busy_timeout is per-connection; we set it on every open. */
+async function configureConnection(d: Database): Promise<void> {
+  await d.execute('PRAGMA journal_mode=WAL')
+  await d.execute('PRAGMA busy_timeout=5000')
+  await d.execute('PRAGMA synchronous=NORMAL')
+}
+
 async function openDbUnlocked(dbAbsPath: string): Promise<Database> {
   const url = toUrl(dbAbsPath)
   if (db && currentUrl === url) return db
@@ -191,6 +203,7 @@ async function openDbUnlocked(dbAbsPath: string): Promise<Database> {
   db = await Database.load(url)
   currentUrl = url
   currentPath = dbAbsPath
+  await configureConnection(db)
   await initSchema(db)
   return db
 }
@@ -209,6 +222,7 @@ async function reopenDbUnlocked(dbAbsPath: string): Promise<Database> {
   db = await Database.load(url)
   currentUrl = url
   currentPath = dbAbsPath
+  await configureConnection(db)
   await initSchema(db)
   return db
 }
@@ -227,8 +241,8 @@ export function getDbPath(): string | null {
 }
 
 /**
- * Opens the project DB (reloading once on closed-pool errors) and runs `fn`
- * under the connection lock so saves cannot race project switches.
+ * Opens the project DB (reloading once on closed-pool / SQLITE_BUSY) and runs
+ * `fn` under the connection lock so saves cannot race project switches.
  */
 export async function withProjectDb<T>(
   dbAbsPath: string,
@@ -239,7 +253,7 @@ export async function withProjectDb<T>(
     try {
       return await fn(d)
     } catch (e) {
-      if (!/closed pool/i.test(String(e))) throw e
+      if (!isRecoverableDbError(e)) throw e
       d = await reopenDbUnlocked(dbAbsPath)
       return await fn(d)
     }
@@ -478,104 +492,100 @@ async function batchInsert(
 }
 
 export async function saveConfig(d: Database, config: ProjectConfig): Promise<void> {
-  await d.execute('BEGIN')
-  try {
-    await d.execute('DELETE FROM settings')
-    await d.execute('DELETE FROM tabs')
-    await d.execute('DELETE FROM sounds')
-    await d.execute('DELETE FROM sound_tabs')
-    await d.execute('DELETE FROM separators')
+  // Do NOT wrap this in BEGIN/COMMIT. tauri-plugin-sql uses an sqlx pool;
+  // each execute() may land on a different connection. BEGIN on conn A +
+  // DELETE on conn B = SQLITE_BUSY ("database is locked"). An abandoned
+  // BEGIN also poisons that pooled connection until the app restarts.
+  await d.execute('DELETE FROM settings')
+  await d.execute('DELETE FROM tabs')
+  await d.execute('DELETE FROM sounds')
+  await d.execute('DELETE FROM sound_tabs')
+  await d.execute('DELETE FROM separators')
 
-    const s = config.settings
-    // Note: outputSource / outputHost / outputVolume / ASIO channels are app-wide
-    // (app-config.db) and must not be written into the project file.
-    const settingsRows: [string, string][] = [
-      ['theme', s.theme ?? 'soundninja'],
-      ['customCss', s.customCss ?? ''],
-      ['stopOnRetrigger', String(s.stopOnRetrigger ?? true)],
-      ['overlapSounds', String(s.overlapSounds ?? false)],
-      ['showPlayer', String(s.showPlayer ?? true)],
-      ['playerLarge', String(s.playerLarge ?? false)],
-      ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
-      ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
-      ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
-      ['allowReorder', String(s.allowReorder ?? true)],
-      ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
-      ['primaryColor', s.primaryColor ?? '#00d4ff'],
-      ['primaryHover', s.primaryHover ?? '#33ddff'],
-      ['bg', s.bg ?? '#222831'],
-      ['bg2', s.bg2 ?? '#1a1e25'],
-      ['btnBg', s.btnBg ?? '#363f4d'],
-      ['btnBgHover', s.btnBgHover ?? '#434e5f'],
-      ['btnText', s.btnText ?? '#eeeeee'],
-      ['btnTextHover', s.btnTextHover ?? '#00d4ff'],
-      ['btnBorder', s.btnBorder ?? '#00d4ff'],
-      ['btnBorderHover', s.btnBorderHover ?? '#33ddff'],
-      ['tabBg', s.tabBg ?? '#00d4ff33'],
-      ['tabBgHover', s.tabBgHover ?? '#00d4ff66'],
-      ['tabText', s.tabText ?? '#eeeeee'],
-      ['tabTextHover', s.tabTextHover ?? '#eeeeee'],
-      ['tabBorder', s.tabBorder ?? '#00d4ff'],
-      ['tabBorderHover', s.tabBorderHover ?? '#33ddff'],
-    ]
-    await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
+  const s = config.settings
+  // Note: outputSource / outputHost / outputVolume / ASIO channels are app-wide
+  // (app-config.db) and must not be written into the project file.
+  const settingsRows: [string, string][] = [
+    ['theme', s.theme ?? 'soundninja'],
+    ['customCss', s.customCss ?? ''],
+    ['stopOnRetrigger', String(s.stopOnRetrigger ?? true)],
+    ['overlapSounds', String(s.overlapSounds ?? false)],
+    ['showPlayer', String(s.showPlayer ?? true)],
+    ['playerLarge', String(s.playerLarge ?? false)],
+    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
+    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 50)],
+    ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
+    ['allowReorder', String(s.allowReorder ?? true)],
+    ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
+    ['primaryColor', s.primaryColor ?? '#00d4ff'],
+    ['primaryHover', s.primaryHover ?? '#33ddff'],
+    ['bg', s.bg ?? '#222831'],
+    ['bg2', s.bg2 ?? '#1a1e25'],
+    ['btnBg', s.btnBg ?? '#363f4d'],
+    ['btnBgHover', s.btnBgHover ?? '#434e5f'],
+    ['btnText', s.btnText ?? '#eeeeee'],
+    ['btnTextHover', s.btnTextHover ?? '#00d4ff'],
+    ['btnBorder', s.btnBorder ?? '#00d4ff'],
+    ['btnBorderHover', s.btnBorderHover ?? '#33ddff'],
+    ['tabBg', s.tabBg ?? '#00d4ff33'],
+    ['tabBgHover', s.tabBgHover ?? '#00d4ff66'],
+    ['tabText', s.tabText ?? '#eeeeee'],
+    ['tabTextHover', s.tabTextHover ?? '#eeeeee'],
+    ['tabBorder', s.tabBorder ?? '#00d4ff'],
+    ['tabBorderHover', s.tabBorderHover ?? '#33ddff'],
+  ]
+  await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
-    const tabRows = config.tabList.map((t, i) => [
-      t.name,
-      t.color ?? null,
-      i,
-      t.buttonAlign ?? null,
+  const tabRows = config.tabList.map((t, i) => [
+    t.name,
+    t.color ?? null,
+    i,
+    t.buttonAlign ?? null,
+  ])
+  await batchInsert(d, 'tabs', ['name', 'color', 'position', 'button_align'], tabRows)
+
+  const soundRows: unknown[][] = []
+  const soundTabRows: unknown[][] = []
+  for (const f of config.files) {
+    soundRows.push([
+      f.path,
+      f.name,
+      f.volume ?? 0.4,
+      f.color ?? null,
+      f.index ?? 0,
+      f.active ? 1 : 0,
+      f.gifId ?? null,
+      f.gifPosX ?? 50,
+      f.gifPosY ?? 50,
     ])
-    await batchInsert(d, 'tabs', ['name', 'color', 'position', 'button_align'], tabRows)
-
-    const soundRows: unknown[][] = []
-    const soundTabRows: unknown[][] = []
-    for (const f of config.files) {
-      soundRows.push([
-        f.path,
-        f.name,
-        f.volume ?? 0.4,
-        f.color ?? null,
-        f.index ?? 0,
-        f.active ? 1 : 0,
-        f.gifId ?? null,
-        f.gifPosX ?? 50,
-        f.gifPosY ?? 50,
-      ])
-      for (const tab of f.tabs) {
-        const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
-        soundTabRows.push([f.path, tab, tabIdx])
-      }
+    for (const tab of f.tabs) {
+      const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
+      soundTabRows.push([f.path, tab, tabIdx])
     }
-    await batchInsert(
-      d,
-      'sounds',
-      ['path', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
-      soundRows
-    )
-    await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
-
-    const sepRows = (config.separators ?? []).map((sep) => [
-      sep.id,
-      sep.tab,
-      sep.position,
-      sep.name ?? null,
-      sep.borderColor ?? null,
-      sep.nameColor ?? null,
-      sep.buttonAlign ?? null,
-    ])
-    await batchInsert(
-      d,
-      'separators',
-      ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'button_align'],
-      sepRows,
-    )
-
-    await d.execute('COMMIT')
-  } catch (e) {
-    try { await d.execute('ROLLBACK') } catch { /* ignore */ }
-    throw e
   }
+  await batchInsert(
+    d,
+    'sounds',
+    ['path', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
+    soundRows
+  )
+  await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
+
+  const sepRows = (config.separators ?? []).map((sep) => [
+    sep.id,
+    sep.tab,
+    sep.position,
+    sep.name ?? null,
+    sep.borderColor ?? null,
+    sep.nameColor ?? null,
+    sep.buttonAlign ?? null,
+  ])
+  await batchInsert(
+    d,
+    'separators',
+    ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'button_align'],
+    sepRows,
+  )
 }
 
 // ── GIF blobs (separate from the full-resync save; never wiped by saveConfig) ─

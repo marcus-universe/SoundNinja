@@ -90,8 +90,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
       revokeAllGifUrls()
-      const d = await openDb(dbAbsPath)
-      const config = await loadConfig(d)
+      const config = await withProjectDb(dbAbsPath, (d) => loadConfig(d))
       this.configFile = config
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files

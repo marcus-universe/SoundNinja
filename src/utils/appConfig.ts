@@ -29,6 +29,9 @@ function toUrl(dbAbsPath: string): string {
 export async function openAppConfigDb(dbAbsPath: string): Promise<Database> {
   if (db) return db
   db = await Database.load(toUrl(dbAbsPath))
+  await db.execute('PRAGMA journal_mode=WAL')
+  await db.execute('PRAGMA busy_timeout=5000')
+  await db.execute('PRAGMA synchronous=NORMAL')
   await initSchema(db)
   return db
 }

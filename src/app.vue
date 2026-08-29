@@ -223,10 +223,21 @@ function resolveUnsaved(choice) {
   if (resolve) resolve(choice)
 }
 
+async function persistOrReport() {
+  try {
+    await jsonStore.persistNow()
+    return true
+  } catch (e) {
+    console.error('Failed to save project', e)
+    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
+    return false
+  }
+}
+
 async function handleMenuNewProject() {
   const choice = await confirmUnsaved()
   if (choice === 'cancel') return
-  if (choice === 'save') await jsonStore.persistNow()
+  if (choice === 'save' && !(await persistOrReport())) return
   try {
     const existing = await listProjects(appSettings.projectsPath)
     const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
@@ -264,12 +275,7 @@ async function handleMenuOpenProject() {
 }
 
 async function handleMenuSave() {
-  try {
-    await jsonStore.persistNow()
-  } catch (e) {
-    console.error('Failed to save project', e)
-    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
-  }
+  await persistOrReport()
 }
 
 async function handleMenuSaveAs() {
@@ -412,7 +418,7 @@ onMounted(async () => {
     if (!path || typeof path !== 'string') return
     const choice = await confirmUnsaved()
     if (choice === 'cancel') return
-    if (choice === 'save') await jsonStore.persistNow()
+    if (choice === 'save' && !(await persistOrReport())) return
     const stillExists = await invoke('path_exists_abs', { path })
     if (!stillExists) {
       await appSettings.removeRecentProject(path)
@@ -445,7 +451,7 @@ onMounted(async () => {
     event.preventDefault()
     const choice = await confirmUnsaved()
     if (choice === 'cancel') return
-    if (choice === 'save') await jsonStore.persistNow()
+    if (choice === 'save' && !(await persistOrReport())) return
     allowClose = true
     await mainWindow.destroy()
   })
