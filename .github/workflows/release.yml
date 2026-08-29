@@ -32,7 +32,9 @@ jobs:
             args: "--target x86_64-pc-windows-msvc -- --features stems"
 
           # Linux x64 → .deb + AppImage (AppImage feeds AUR package)
-          - platform: ubuntu-22.04
+          # ubuntu-24.04: cpal/rodio pipewire → libspa 0.10 needs PipeWire ≥ 1.0
+          # headers (22.04 ships 0.3.48 → E0425/E0560 on spa_meta_* / video flags).
+          - platform: ubuntu-24.04
             rust_targets: x86_64-unknown-linux-gnu
             args: "--target x86_64-unknown-linux-gnu -- --features stems"
 
@@ -60,12 +62,12 @@ jobs:
           targets: ${{ matrix.rust_targets }}
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
             libasound2-dev \
