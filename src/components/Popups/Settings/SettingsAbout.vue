@@ -10,6 +10,23 @@
       <span class="about-version__num">v{{ appVersion }}</span>
     </div>
 
+    <div v-if="primaryIp" class="about-ip">
+      <span class="about-ip__label">{{ $t('settings.about.ipAddress') }}</span>
+      <span class="about-ip__value">{{ primaryIp }}</span>
+      <button
+        type="button"
+        class="about-ip__copy"
+        :title="$t('settings.about.copy')"
+        @click="copyIp"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="about-ip__icon">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        {{ ipCopied ? $t('settings.about.copied') : $t('settings.about.copy') }}
+      </button>
+    </div>
+
     <div class="about-links">
       <a
         href="https://github.com/marcus-universe/SoundNinja"
@@ -53,8 +70,13 @@
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app'
 import { openInSystemBrowser } from '~/utils/openExternal'
+import { copyText } from '~/utils/clipboard'
+import { getLocalIps } from '~/utils/remote'
 
 const appVersion = ref('')
+const primaryIp = ref('')
+const ipCopied = ref(false)
+let ipCopiedTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   try {
@@ -62,7 +84,26 @@ onMounted(async () => {
   } catch {
     appVersion.value = ''
   }
+  try {
+    const ips = await getLocalIps()
+    primaryIp.value = ips.find((row) => row.primary)?.ip || ips[0]?.ip || ''
+  } catch {
+    primaryIp.value = ''
+  }
 })
+
+onUnmounted(() => {
+  if (ipCopiedTimer) clearTimeout(ipCopiedTimer)
+})
+
+async function copyIp() {
+  if (!primaryIp.value) return
+  const ok = await copyText(primaryIp.value)
+  if (!ok) return
+  ipCopied.value = true
+  if (ipCopiedTimer) clearTimeout(ipCopiedTimer)
+  ipCopiedTimer = setTimeout(() => { ipCopied.value = false }, 1600)
+}
 
 async function openReleaseNotes() {
   const version = appVersion.value.replace(/^v/i, '')

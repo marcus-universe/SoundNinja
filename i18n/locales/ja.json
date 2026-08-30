@@ -50,6 +50,7 @@
       "audio": "オーディオ",
       "hotkeys": "ホットキー",
       "performance": "パフォーマンス",
+      "remote": "リモート",
       "theme": "テーマ",
       "about": "情報"
     },
@@ -299,11 +300,32 @@
         "SFX"
       ]
     },
+    "remote": {
+      "title": "リモート制御",
+      "enable": "リモートサーバーを有効化",
+      "enableHint": "Bitfocus Companion などのクライアントがネットワーク経由でサウンドを再生できます。",
+      "port": "ポート",
+      "portInUse": "ポート {port} は既に使用中です",
+      "token": "トークン",
+      "tokenHint": "任意。クライアントは Bearer トークンまたは ?token= クエリで送信します。",
+      "generate": "生成",
+      "status": "状態",
+      "running": "実行中",
+      "stopped": "停止",
+      "clients": "{count} 台接続",
+      "address": "アドレス",
+      "copy": "コピー",
+      "copied": "コピーしました",
+      "firewallHint": "初回起動時、Windows がファイアウォール許可を求めることがあります。"
+    },
     "about": {
       "title": "情報",
       "githubLink": "GitHub で開発を支援",
       "licenseLink": "ライセンス — GNU General Public License v3",
-      "releaseNotes": "リリースノート"
+      "releaseNotes": "リリースノート",
+      "ipAddress": "システム IP",
+      "copy": "コピー",
+      "copied": "コピーしました"
     }
   },
   "project": {

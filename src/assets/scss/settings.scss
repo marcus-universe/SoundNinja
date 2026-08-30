@@ -916,6 +916,110 @@
   }
 }
 
+.about-ip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+  width: 100%;
+  padding: 0.96rem 1.44rem;
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+  border-radius: 0.8rem;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 70%, transparent);
+  font-family: $fontRegular;
+  font-size: 1.44rem;
+
+  &__label {
+    opacity: 0.75;
+  }
+
+  &__value {
+    font-family: $fontBold;
+    color: var(--primary_color);
+  }
+
+  &__copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.48rem;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-family: $fontRegular;
+    font-size: 1.36rem;
+    padding: 0.24rem 0.4rem;
+
+    &:hover {
+      color: var(--color-text, #{$white});
+    }
+  }
+
+  &__icon {
+    width: 1.44rem;
+    height: 1.44rem;
+  }
+}
+
+.remote-addr-list {
+  list-style: none;
+  margin: 0.64rem 0 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.64rem;
+}
+
+.remote-addr {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+
+  &__text {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.48rem 0.8rem;
+  }
+
+  &__url {
+    font-family: $fontRegular;
+    font-size: 1.44rem;
+    color: var(--color-text, #{$white});
+    word-break: break-all;
+  }
+
+  &__tag,
+  &__name {
+    font-family: $fontRegular;
+    font-size: 1.2rem;
+    color: color-mix(in srgb, var(--color-text, #{$white}) 50%, transparent);
+  }
+
+  &__tag {
+    color: var(--primary_color);
+  }
+}
+
+.settings-success {
+  font-family: $fontRegular;
+  font-size: 1.31rem;
+  color: var(--primary_color);
+  margin: 0;
+}
+
+.settings-error {
+  font-family: $fontRegular;
+  font-size: 1.31rem;
+  color: $warn;
+  margin: 0;
+}
+
 .about-links {
   display: flex;
   flex-direction: column;

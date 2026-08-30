@@ -50,6 +50,7 @@
       "audio": "Audio",
       "hotkeys": "Atajos",
       "performance": "Rendimiento",
+      "remote": "Remoto",
       "theme": "Tema",
       "about": "Acerca de"
     },
@@ -299,11 +300,32 @@
         "SFX"
       ]
     },
+    "remote": {
+      "title": "Control remoto",
+      "enable": "Activar servidor remoto",
+      "enableHint": "Permite que Bitfocus Companion y otros clientes disparen sonidos por la red.",
+      "port": "Puerto",
+      "portInUse": "El puerto {port} ya está en uso",
+      "token": "Token",
+      "tokenHint": "Opcional. Los clientes deben enviarlo como token Bearer o consulta ?token=.",
+      "generate": "Generar",
+      "status": "Estado",
+      "running": "En ejecución",
+      "stopped": "Detenido",
+      "clients": "{count} conectados",
+      "address": "Direcciones",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "firewallHint": "Windows puede pedir permiso para que Sound Ninja atraviese el firewall la primera vez que arranca el servidor."
+    },
     "about": {
       "title": "Acerca de",
       "githubLink": "Apoya el desarrollo en GitHub",
       "licenseLink": "Licencia — GNU General Public License v3",
-      "releaseNotes": "Notas de la versión"
+      "releaseNotes": "Notas de la versión",
+      "ipAddress": "IP del sistema",
+      "copy": "Copiar",
+      "copied": "Copiado"
     }
   },
   "project": {

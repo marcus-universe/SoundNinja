@@ -50,6 +50,7 @@
       "audio": "音频",
       "hotkeys": "快捷键",
       "performance": "性能",
+      "remote": "远程",
       "theme": "主题",
       "about": "关于"
     },
@@ -299,11 +300,32 @@
         "SFX"
       ]
     },
+    "remote": {
+      "title": "远程控制",
+      "enable": "启用远程服务器",
+      "enableHint": "允许 Bitfocus Companion 和其他客户端通过网络触发声音。",
+      "port": "端口",
+      "portInUse": "端口 {port} 已被占用",
+      "token": "令牌",
+      "tokenHint": "可选。客户端需以 Bearer 令牌或 ?token= 查询参数发送。",
+      "generate": "生成",
+      "status": "状态",
+      "running": "运行中",
+      "stopped": "已停止",
+      "clients": "已连接 {count} 个",
+      "address": "地址",
+      "copy": "复制",
+      "copied": "已复制",
+      "firewallHint": "首次启动服务器时，Windows 可能会询问是否允许 Sound Ninja 通过防火墙。"
+    },
     "about": {
       "title": "关于",
       "githubLink": "在 GitHub 上支持开发",
       "licenseLink": "许可证 — GNU General Public License v3",
-      "releaseNotes": "发行说明"
+      "releaseNotes": "发行说明",
+      "ipAddress": "系统 IP",
+      "copy": "复制",
+      "copied": "已复制"
     }
   },
   "project": {

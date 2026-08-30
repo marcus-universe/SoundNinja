@@ -48,6 +48,7 @@
           <SettingsHotkeys v-else-if="activeTab === 'hotkeys'" />
           <SettingsAudio v-else-if="activeTab === 'audio'" />
           <SettingsPerformance v-else-if="activeTab === 'performance'" />
+          <SettingsRemote v-else-if="activeTab === 'remote'" />
           <SettingsAbout v-else-if="activeTab === 'about'" />
         </main>
 
@@ -90,6 +91,11 @@ const tabs = computed(() => [
     id: 'performance',
     label: t('settings.tabs.performance'),
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  },
+  {
+    id: 'remote',
+    label: t('settings.tabs.remote'),
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 16.24a6 6 0 010-8.49M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/></svg>`,
   },
   {
     id: 'about',

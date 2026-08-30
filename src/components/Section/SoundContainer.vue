@@ -546,7 +546,7 @@ const boardSignature = computed(() => {
 watch(
   [
     boardSignature,
-    () => jsonStore.configFile.files.map((f) => f.gifId || '').join('|'),
+    () => (jsonStore.configFile?.files ?? []).map((f) => f.gifId || '').join('|'),
   ],
   () => {
     for (const f of jsonStore.configFile.files) {
@@ -705,6 +705,7 @@ onMounted(async () => {
     syncProgressPauseState(event.payload ?? [])
   })
   window.addEventListener('sn:play-sound-id', onPlaySoundId)
+  window.addEventListener('sn:stop-sound-id', onStopSoundId)
   window.addEventListener('sn:stop-all', onHotkeyStopAll)
 })
 
@@ -716,6 +717,7 @@ onUnmounted(() => {
   if (unlistenFinished) unlistenFinished()
   if (unlistenPlaying) unlistenPlaying()
   window.removeEventListener('sn:play-sound-id', onPlaySoundId)
+  window.removeEventListener('sn:stop-sound-id', onStopSoundId)
   window.removeEventListener('sn:stop-all', onHotkeyStopAll)
 })
 
@@ -732,6 +734,28 @@ function playSoundById(soundId) {
 function onPlaySoundId(e) {
   const id = e?.detail
   if (typeof id === 'string' && id) playSoundById(id)
+}
+
+function stopSoundById(soundId) {
+  const sound = jsonStore.configFile.files.find((f) => f.id === soundId)
+  if (!sound || !sound.active) return
+  const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
+  const overlapSounds = Settings.value.overlapSounds ?? false
+  stopProgress(sound.index)
+  loadingPaths.delete(sound.path)
+  jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
+  invoke('play_sound', {
+    soundPath: sound.path,
+    deviceName: appSettings.outputSource,
+    hostName: appSettings.outputHost || null,
+    active: true,
+    overlap: overlapSounds,
+  }).catch((e) => console.error('Remote stop error', e))
+}
+
+function onStopSoundId(e) {
+  const id = e?.detail
+  if (typeof id === 'string' && id) stopSoundById(id)
 }
 
 function onHotkeyStopAll() {

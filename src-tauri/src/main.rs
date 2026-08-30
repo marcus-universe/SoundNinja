@@ -7,6 +7,7 @@ pub mod fsx;
 pub mod httpx;
 pub mod soundboard;
 pub mod hotkeys;
+pub mod remote;
 
 #[tauri::command]
 fn get_system_fonts() -> Vec<String> {
@@ -201,7 +202,12 @@ fn main() {
             soundboard::make_temp_dir,
             soundboard::export_soundboard_zip,
             soundboard::import_soundboard_zip,
-            hotkeys::set_global_sound_hotkeys
+            hotkeys::set_global_sound_hotkeys,
+            remote::remote_start,
+            remote::remote_stop,
+            remote::remote_status,
+            remote::remote_publish_state,
+            remote::get_local_ips
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

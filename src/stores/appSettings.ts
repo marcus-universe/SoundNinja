@@ -65,6 +65,11 @@ export const useAppSettingsStore = defineStore('appSettings', {
     hotkeys: { ...DEFAULT_APP_HOTKEYS } as Record<AppHotkeyAction, string>,
     /** When true, sound-trigger combos register as OS-global shortcuts. */
     soundTriggersGlobal: false,
+    /** HTTP+WS remote-control server (Companion). Off until the user enables it. */
+    remoteEnabled: false,
+    remotePort: 7331,
+    remoteToken: '',
+    remoteError: '',
   }),
 
   getters: {
@@ -107,6 +112,13 @@ export const useAppSettingsStore = defineStore('appSettings', {
         this.hotkeys = { ...DEFAULT_APP_HOTKEYS }
       }
       this.soundTriggersGlobal = s.soundTriggersGlobal === '1' || s.soundTriggersGlobal === 'true'
+      this.remoteEnabled = s.remoteEnabled === '1' || s.remoteEnabled === 'true'
+      const parsedPort = s.remotePort != null ? Number(s.remotePort) : 7331
+      this.remotePort = Number.isFinite(parsedPort) && parsedPort >= 1 && parsedPort <= 65535
+        ? Math.round(parsedPort)
+        : 7331
+      this.remoteToken = s.remoteToken || ''
+      this.remoteError = ''
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
         || s.inputSource != null || s.inputHost != null
@@ -268,6 +280,44 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.soundTriggersGlobal = !!enabled
       const d = await this._db()
       await saveSetting(d, 'soundTriggersGlobal', this.soundTriggersGlobal ? '1' : '0')
+    },
+
+    async setRemoteEnabled(enabled: boolean) {
+      this.remoteEnabled = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'remoteEnabled', this.remoteEnabled ? '1' : '0')
+      await this.applyRemote()
+    },
+
+    async setRemotePort(port: number) {
+      const next = Number.isFinite(port) ? Math.max(1, Math.min(65535, Math.round(port))) : 7331
+      this.remotePort = next
+      const d = await this._db()
+      await saveSetting(d, 'remotePort', String(this.remotePort))
+      if (this.remoteEnabled) await this.applyRemote()
+    },
+
+    async setRemoteToken(token: string) {
+      this.remoteToken = (token || '').trim()
+      const d = await this._db()
+      await saveSetting(d, 'remoteToken', this.remoteToken)
+      if (this.remoteEnabled) await this.applyRemote()
+    },
+
+    /** Start or stop the Rust remote server to match stored prefs. */
+    async applyRemote() {
+      const { remoteStart, remoteStop } = await import('~/utils/remote')
+      this.remoteError = ''
+      try {
+        if (this.remoteEnabled) {
+          await remoteStart(this.remotePort, this.remoteToken)
+        } else {
+          await remoteStop()
+        }
+      } catch (e) {
+        this.remoteError = e instanceof Error ? e.message : String(e)
+        throw e
+      }
     },
 
     async setKlipyApiKey(key: string) {

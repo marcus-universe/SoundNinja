@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import {
   openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
   loadGifBlobsByIds, upsertGifBlob, healFolderTabMembership, mergeTabsFromUsage,
+  persistSoundIds,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
 } from '~/utils/db'
@@ -92,7 +93,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
       revokeAllGifUrls()
-      const config = await withProjectDb(dbAbsPath, (d) => loadConfig(d))
+      let config = await withProjectDb(dbAbsPath, (d) => loadConfig(d))
+      if (!config.files.length) {
+        config = await this.tryRestoreFromBak(dbAbsPath, config)
+      }
       this.configFile = config
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
@@ -102,7 +106,42 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.missingPaths = []
       this.clearHistory()
       if (ensureSoundIds(this.configFile.files)) {
+        try {
+          await withProjectDb(dbAbsPath, (d) => persistSoundIds(d, this.configFile.files))
+        } catch (e) {
+          console.error('Failed to persist sound ids', e)
+        }
+      }
+    },
+
+    /** If a failed save emptied `sounds`, recover files from project.sninja.bak. */
+    async tryRestoreFromBak(dbAbsPath: string, current: ProjectConfig): Promise<ProjectConfig> {
+      const bak = dbAbsPath + '.bak'
+      const restored = dbAbsPath.replace(/\.sninja$/i, '.restored.sninja')
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const candidates: string[] = []
+        if (await invoke<boolean>('path_exists_abs', { path: bak })) candidates.push(bak)
+        if (await invoke<boolean>('path_exists_abs', { path: restored })) candidates.push(restored)
+        if (!candidates.length) return current
+        let bakConfig: ProjectConfig | null = null
+        for (const source of candidates) {
+          const loaded = await withProjectDb(source, (d) => loadConfig(d))
+          if (loaded.files.length) {
+            bakConfig = loaded
+            break
+          }
+        }
+        await reopenDb(dbAbsPath)
+        if (!bakConfig?.files.length) return current
+        this.configFile = bakConfig
+        this.currentProjectPath = dbAbsPath
         await this.persistNow()
+        return this.configFile
+      } catch (e) {
+        console.error('Failed to restore project from backup', e)
+        try { await reopenDb(dbAbsPath) } catch { /* ignore */ }
+        return current
       }
     },
 
@@ -269,13 +308,14 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       byGlobal.forEach((f, i) => { f.index = i })
 
       for (const f of files) {
+        if (!Array.isArray(f.tabs)) f.tabs = ['All']
         if (!f.tabIndexes) f.tabIndexes = {}
         for (const key of Object.keys(f.tabIndexes)) {
           if (!f.tabs.includes(key)) delete f.tabIndexes[key]
         }
       }
       for (const tab of (this.configFile.tabList ?? []).map((t) => t.name)) {
-        const inTab = files.filter((f) => f.tabs.includes(tab))
+        const inTab = files.filter((f) => f.tabs?.includes(tab))
         inTab.sort((a, b) => {
           const av = a.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
           const bv = b.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER

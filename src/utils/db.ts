@@ -361,7 +361,8 @@ async function initSchema(d: Database): Promise<void> {
     volume REAL,
     color TEXT,
     global_index INTEGER,
-    active INTEGER
+    active INTEGER,
+    sound_id TEXT
   )`)
   await d.execute(`CREATE TABLE IF NOT EXISTS sound_tabs (
     sound_path TEXT,
@@ -389,7 +390,7 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'separators', 'name_color', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
-  await addColumnIfMissing(d, 'sounds', 'id', 'TEXT')
+  await addColumnIfMissing(d, 'sounds', 'sound_id', 'TEXT')
 }
 
 async function addColumnIfMissing(
@@ -402,6 +403,60 @@ async function addColumnIfMissing(
     await d.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`)
   } catch {
     /* column already exists on upgraded project files */
+  }
+}
+
+async function tableColumns(d: Database, table: string): Promise<Set<string>> {
+  try {
+    const rows = await d.select<{ name: string }[]>(`PRAGMA table_info(${table})`)
+    return new Set((rows ?? []).map((r) => r.name))
+  } catch {
+    return new Set()
+  }
+}
+
+/** Load sounds without requiring a specific id column (avoids empty board on migrate). */
+async function loadSoundRows(d: Database): Promise<{
+  path: string
+  sound_id?: string | null
+  name: string
+  volume: number
+  color: string | null
+  global_index: number
+  active: number
+  gif_id?: string | null
+  gif_pos_x?: number | null
+  gif_pos_y?: number | null
+}[]> {
+  const cols = await tableColumns(d, 'sounds')
+  const idSql = cols.has('sound_id')
+    ? 'sound_id'
+    : cols.has('id')
+      ? 'id'
+      : 'NULL'
+  const gifId = cols.has('gif_id') ? 'gif_id' : 'NULL'
+  const gifX = cols.has('gif_pos_x') ? 'gif_pos_x' : 'NULL'
+  const gifY = cols.has('gif_pos_y') ? 'gif_pos_y' : 'NULL'
+  try {
+    return await d.select(
+      `SELECT path, ${idSql} AS sound_id, name, volume, color, global_index, active, ${gifId} AS gif_id, ${gifX} AS gif_pos_x, ${gifY} AS gif_pos_y FROM sounds ORDER BY global_index ASC`,
+    )
+  } catch {
+    return await d.select(
+      'SELECT path, name, volume, color, global_index, active FROM sounds ORDER BY global_index ASC',
+    )
+  }
+}
+
+/** Write missing sound ids with UPDATE — never a full DELETE+INSERT resync. */
+export async function persistSoundIds(d: Database, files: SoundFile[]): Promise<void> {
+  const cols = await tableColumns(d, 'sounds')
+  if (!cols.has('sound_id')) {
+    await addColumnIfMissing(d, 'sounds', 'sound_id', 'TEXT')
+  }
+  for (const f of files) {
+    if (!f.id || !f.path) continue
+    await d.execute('UPDATE sounds SET sound_id = $1 WHERE path = $2', [f.id, f.path])
   }
 }
 
@@ -481,20 +536,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       : {}),
   }))
 
-  const soundRows = await d.select<
-    {
-      path: string
-      id: string | null
-      name: string
-      volume: number
-      color: string | null
-      global_index: number
-      active: number
-      gif_id: string | null
-      gif_pos_x: number | null
-      gif_pos_y: number | null
-    }[]
-  >('SELECT path, id, name, volume, color, global_index, active, gif_id, gif_pos_x, gif_pos_y FROM sounds ORDER BY global_index ASC')
+  const soundRows = await loadSoundRows(d)
 
   const tabLinks = await d.select<{ sound_path: string; tab: string; tab_index: number }[]>(
     'SELECT sound_path, tab, tab_index FROM sound_tabs'
@@ -515,7 +557,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
     return {
       path: s.path,
-      id: s.id || '',
+      id: s.sound_id || '',
       name: s.name,
       volume: s.volume,
       index: s.global_index,
@@ -569,12 +611,14 @@ async function batchInsert(
   table: string,
   cols: string[],
   rows: unknown[][],
-  chunkRows = 100
+  chunkRows = 50
 ): Promise<void> {
   if (rows.length === 0) return
+  // SQLite default SQLITE_MAX_VARIABLE_NUMBER is 999. Keep a margin.
+  const maxRows = Math.max(1, Math.min(chunkRows, Math.floor(900 / Math.max(cols.length, 1))))
   const colSql = cols.join(', ')
-  for (let i = 0; i < rows.length; i += chunkRows) {
-    const chunk = rows.slice(i, i + chunkRows)
+  for (let i = 0; i < rows.length; i += maxRows) {
+    const chunk = rows.slice(i, i + maxRows)
     const placeholders: string[] = []
     const params: unknown[] = []
     let p = 1
@@ -591,6 +635,18 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   // each execute() may land on a different connection. BEGIN on conn A +
   // DELETE on conn B = SQLITE_BUSY ("database is locked"). An abandoned
   // BEGIN also poisons that pooled connection until the app restarts.
+  const incoming = config.files?.length ?? 0
+  if (incoming === 0) {
+    try {
+      const rows = await d.select<{ c: number }[]>('SELECT COUNT(*) AS c FROM sounds')
+      const existing = Number(rows?.[0]?.c ?? 0)
+      if (existing > 0) {
+        throw new Error(`Refusing to persist 0 sounds over ${existing} existing rows`)
+      }
+    } catch (e) {
+      if (String(e).includes('Refusing to persist')) throw e
+    }
+  }
   await d.execute('DELETE FROM settings')
   await d.execute('DELETE FROM tabs')
   await d.execute('DELETE FROM sounds')
@@ -657,7 +713,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       f.gifPosX ?? 50,
       f.gifPosY ?? 50,
     ])
-    for (const tab of f.tabs) {
+    for (const tab of f.tabs ?? ['All']) {
       const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
       soundTabRows.push([f.path, tab, tabIdx])
     }
@@ -665,7 +721,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await batchInsert(
     d,
     'sounds',
-    ['path', 'id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
+    ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
     soundRows
   )
   await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)

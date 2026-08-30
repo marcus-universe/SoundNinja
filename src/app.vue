@@ -110,6 +110,7 @@ import {
   safeProjectName,
 } from '~/utils/projects'
 import { resolveAppLocale } from '~/utils/locales'
+import { publishRemoteState } from '~/utils/remote'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
@@ -178,6 +179,37 @@ function runAppHotkey(action) {
 function playSoundById(soundId) {
   if (!soundId) return
   window.dispatchEvent(new CustomEvent('sn:play-sound-id', { detail: soundId }))
+}
+
+function stopSoundById(soundId) {
+  if (!soundId) return
+  window.dispatchEvent(new CustomEvent('sn:stop-sound-id', { detail: soundId }))
+}
+
+function handleRemoteCommand(payload) {
+  const action = payload?.action
+  const id = typeof payload?.id === 'string' ? payload.id : ''
+  if (action === 'trigger') {
+    playSoundById(id)
+    return
+  }
+  if (action === 'stop') {
+    if (id) stopSoundById(id)
+    else {
+      invoke('stop_all').catch(() => {})
+      window.dispatchEvent(new CustomEvent('sn:stop-all'))
+    }
+  }
+}
+
+let remotePublishTimer = null
+function scheduleRemotePublish() {
+  if (remotePublishTimer) clearTimeout(remotePublishTimer)
+  remotePublishTimer = setTimeout(() => {
+    remotePublishTimer = null
+    if (!appSettings.remoteEnabled) return
+    publishRemoteState(jsonStore.configFile?.files).catch(() => {})
+  }, 150)
 }
 
 function onHotkeyKeydown(e) {
@@ -695,6 +727,9 @@ onMounted(async () => {
     const id = e?.payload
     if (typeof id === 'string') playSoundById(id)
   })
+  listen('remote_command', (e) => {
+    handleRemoteCommand(e?.payload)
+  })
   listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
   listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
 
@@ -707,6 +742,20 @@ onMounted(async () => {
       JSON.stringify(jsonStore.configFile?.settings?.soundHotkeys || []),
     ],
     () => { syncGlobalSoundHotkeys() },
+  )
+
+  if (appSettings.remoteEnabled) {
+    try { await appSettings.applyRemote() } catch { /* remoteError set in store */ }
+    scheduleRemotePublish()
+  }
+  watch(
+    () => jsonStore.configFile?.files,
+    () => { scheduleRemotePublish() },
+    { deep: true },
+  )
+  watch(
+    () => appSettings.remoteEnabled,
+    (on) => { if (on) scheduleRemotePublish() },
   )
 
   // Prompt to save unsaved changes before the window closes.
