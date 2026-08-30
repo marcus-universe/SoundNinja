@@ -57,6 +57,7 @@ export interface Separator {
   name?: string
   borderColor?: string
   nameColor?: string
+  bgColor?: string
   /** Undefined = inherit Tab.buttonAlign */
   buttonAlign?: ButtonAlign
 }
@@ -388,6 +389,7 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'separators', 'name', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'border_color', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'name_color', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'bg_color', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'sounds', 'sound_id', 'TEXT')
@@ -579,10 +581,11 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       name: string | null
       border_color: string | null
       name_color: string | null
+      bg_color: string | null
       button_align: string | null
     }[]
   >(
-    'SELECT id, tab, position, name, border_color, name_color, button_align FROM separators ORDER BY position ASC',
+    'SELECT id, tab, position, name, border_color, name_color, bg_color, button_align FROM separators ORDER BY position ASC',
   )
   const separators: Separator[] = sepRows.map((r) => ({
     id: r.id,
@@ -591,6 +594,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     ...(r.name ? { name: r.name } : {}),
     ...(r.border_color ? { borderColor: r.border_color } : {}),
     ...(r.name_color ? { nameColor: r.name_color } : {}),
+    ...(r.bg_color ? { bgColor: r.bg_color } : {}),
     ...(r.button_align === 'left' || r.button_align === 'center' || r.button_align === 'right'
       ? { buttonAlign: r.button_align }
       : {}),
@@ -733,12 +737,13 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     sep.name ?? null,
     sep.borderColor ?? null,
     sep.nameColor ?? null,
+    sep.bgColor ?? null,
     sep.buttonAlign ?? null,
   ])
   await batchInsert(
     d,
     'separators',
-    ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'button_align'],
+    ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'bg_color', 'button_align'],
     sepRows,
   )
 }

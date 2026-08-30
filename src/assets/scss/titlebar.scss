@@ -110,8 +110,9 @@
 
   &__subdropdown {
     top: 0;
-    left: 100%;
-    margin-left: 0.24rem;
+    // Overlap parent so the mouse path to the right never hits a dead gap.
+    left: calc(100% - 0.2rem);
+    margin-left: 0;
   }
 
   &__entry {
@@ -148,6 +149,11 @@
 
     &--sub .menubar__subdropdown {
       display: none;
+    }
+
+    &--sub:hover .menubar__subdropdown,
+    &--sub.is-open .menubar__subdropdown {
+      display: block;
     }
   }
 

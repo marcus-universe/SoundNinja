@@ -297,31 +297,42 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     /**
-     * Ensure every sound has a compact global `index` and a `tabIndexes` entry
-     * for each tab it belongs to. Prunes stale tab entries and appends new ones.
+     * Fill missing tab/order keys, then densify each tab so group markers
+     * keep slots on the same number line as sounds. Sound-only compacting
+     * (0..n) steals those slots and shuffles group membership on load.
      */
     normalizeIndexes() {
       const files = this.configFile.files
       if (!files) return
 
-      const byGlobal = [...files].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-      byGlobal.forEach((f, i) => { f.index = i })
-
       for (const f of files) {
         if (!Array.isArray(f.tabs)) f.tabs = ['All']
+        if (!f.tabs.includes('All')) f.tabs.unshift('All')
         if (!f.tabIndexes) f.tabIndexes = {}
         for (const key of Object.keys(f.tabIndexes)) {
           if (!f.tabs.includes(key)) delete f.tabIndexes[key]
         }
       }
-      for (const tab of (this.configFile.tabList ?? []).map((t) => t.name)) {
+
+      const tabs = ['All', ...(this.configFile.tabList ?? []).map((t) => t.name)]
+      for (const tab of tabs) {
         const inTab = files.filter((f) => f.tabs?.includes(tab))
-        inTab.sort((a, b) => {
-          const av = a.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
-          const bv = b.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
-          return av !== bv ? av - bv : a.index - b.index
-        })
-        inTab.forEach((f, i) => { f.tabIndexes[tab] = i })
+        const seps = (this.configFile.separators ?? []).filter((s) => s.tab === tab)
+        let max = -1
+        for (const f of inTab) {
+          const o = this.soundOrderOnTab(f, tab)
+          if (Number.isFinite(o)) max = Math.max(max, o)
+        }
+        for (const s of seps) {
+          if (Number.isFinite(s.position)) max = Math.max(max, s.position)
+        }
+        for (const f of inTab) {
+          const raw = tab === 'All' ? f.index : f.tabIndexes[tab]
+          if (raw == null || !Number.isFinite(Number(raw))) {
+            this.setSoundOrderOnTab(f, tab, ++max)
+          }
+        }
+        this.applyBoardLayoutSilent(tab, this.captureBoardLayout(tab))
       }
     },
 
@@ -628,6 +639,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         if (patch.nameColor) sep.nameColor = patch.nameColor
         else delete sep.nameColor
       }
+      if ('bgColor' in patch) {
+        if (patch.bgColor) sep.bgColor = patch.bgColor
+        else delete sep.bgColor
+      }
       if ('buttonAlign' in patch) {
         if (patch.buttonAlign) sep.buttonAlign = patch.buttonAlign
         else delete sep.buttonAlign
@@ -667,11 +682,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
      * Rewrite dense interleaved order for a tab: orphan sounds, then each
      * group marker + its members. Keeps relative membership from `layout`.
      */
-    applyBoardLayout(
+    applyBoardLayoutSilent(
       tab: string,
       layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
     ) {
-      this.pushBeforeChange()
       const byPath = new Map(this.configFile.files.map((f) => [f.path, f]))
       let seq = 0
       for (const path of layout.orphans) {
@@ -686,6 +700,14 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
           if (f) this.setSoundOrderOnTab(f, tab, seq++)
         }
       }
+    },
+
+    applyBoardLayout(
+      tab: string,
+      layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
+    ) {
+      this.pushBeforeChange()
+      this.applyBoardLayoutSilent(tab, layout)
       this.writeConfig()
     },
 

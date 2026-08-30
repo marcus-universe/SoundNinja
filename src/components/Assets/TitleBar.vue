@@ -34,7 +34,12 @@
     </div>
 
     <!-- Second row: app menu bar (main window only) -->
-    <div v-if="showAppMenu" class="menubar" @mouseleave="closeMenu">
+    <div
+      v-if="showAppMenu"
+      class="menubar"
+      @mouseenter="cancelCloseMenu"
+      @mouseleave="scheduleCloseMenu"
+    >
       <div
         v-for="menu in menus"
         :key="menu.id"
@@ -50,10 +55,17 @@
             <div
               v-else-if="item.id === 'recent_sub'"
               class="menubar__entry menubar__entry--sub"
+              :class="{ 'is-open': recentOpen }"
+              @mouseenter="openRecentSub"
+              @mouseleave="scheduleCloseRecentSub"
             >
               <span>{{ $t(item.labelKey) }}</span>
               <span class="menubar__arrow">▶</span>
-              <div class="menubar__subdropdown">
+              <div
+                class="menubar__subdropdown"
+                @mouseenter="openRecentSub"
+                @mouseleave="scheduleCloseRecentSub"
+              >
                 <div
                   v-if="recentProjects.length === 0"
                   class="menubar__entry menubar__entry--disabled"
@@ -89,7 +101,10 @@ const isDesktopChrome = ref(false)
 const isMainWindow = ref(true)
 const windowTitle = ref('Sound Ninja')
 const openMenu = ref<string | null>(null)
+const recentOpen = ref(false)
 const isMaximized = ref(false)
+let menuCloseTimer: ReturnType<typeof setTimeout> | null = null
+let recentCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 const showCustomBar = computed(() =>
   isDesktopChrome.value
@@ -183,11 +198,47 @@ function isActionItem(item: MenuItem): item is MenuAction {
 }
 
 function toggleMenu(id: string) {
+  cancelCloseMenu()
   openMenu.value = openMenu.value === id ? null : id
+  if (!openMenu.value) recentOpen.value = false
 }
 
 function closeMenu() {
+  if (menuCloseTimer) {
+    clearTimeout(menuCloseTimer)
+    menuCloseTimer = null
+  }
+  if (recentCloseTimer) {
+    clearTimeout(recentCloseTimer)
+    recentCloseTimer = null
+  }
   openMenu.value = null
+  recentOpen.value = false
+}
+
+function cancelCloseMenu() {
+  if (menuCloseTimer) {
+    clearTimeout(menuCloseTimer)
+    menuCloseTimer = null
+  }
+}
+
+function scheduleCloseMenu() {
+  cancelCloseMenu()
+  menuCloseTimer = setTimeout(() => closeMenu(), 280)
+}
+
+function openRecentSub() {
+  if (recentCloseTimer) {
+    clearTimeout(recentCloseTimer)
+    recentCloseTimer = null
+  }
+  recentOpen.value = true
+}
+
+function scheduleCloseRecentSub() {
+  if (recentCloseTimer) clearTimeout(recentCloseTimer)
+  recentCloseTimer = setTimeout(() => { recentOpen.value = false }, 280)
 }
 
 async function emitEvent(event: string, payload?: unknown) {
@@ -239,5 +290,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (unlistenResized) unlistenResized()
+  if (menuCloseTimer) clearTimeout(menuCloseTimer)
+  if (recentCloseTimer) clearTimeout(recentCloseTimer)
 })
 </script>

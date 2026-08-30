@@ -234,6 +234,7 @@ const orphanAlignClass = computed(() => alignClassFor(null))
 function groupCardStyle(sep) {
   const style = {}
   if (sep.borderColor) style['--group-border'] = sep.borderColor
+  if (sep.bgColor) style['--group-bg'] = sep.bgColor
   return style
 }
 

@@ -239,7 +239,7 @@
         padding: 0.6rem 0.8rem 0.8rem;
         border: 0.32rem solid var(--group-border, var(--btn-border, var(--primary_color)));
         border-radius: 0.6rem;
-        background: transparent;
+        background: var(--group-bg, transparent);
         cursor: grab;
 
         &:hover {

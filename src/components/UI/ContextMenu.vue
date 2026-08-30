@@ -212,6 +212,10 @@
             />
           </div>
           <label class="context-menu__color-row">
+            <span>{{ $t('contextMenu.groupBgColor') }}</span>
+            <input type="color" :value="activeGroup?.bgColor || groupFallback.bg" @input="onGroupBgColor" />
+          </label>
+          <label class="context-menu__color-row">
             <span>{{ $t('contextMenu.groupBorderColor') }}</span>
             <input type="color" :value="activeGroup?.borderColor || groupFallback.border" @input="onGroupBorderColor" />
           </label>
@@ -350,10 +354,11 @@ function setGroupAlign(align) {
 
 const groupFallback = computed(() => {
   const btn = themeButtonColors()
-  return { border: btn.border, name: btn.text }
+  return { bg: btn.bg, border: btn.border, name: btn.text }
 })
 
 const groupEffective = computed(() => ({
+  bg: activeGroup.value?.bgColor || groupFallback.value.bg,
   border: activeGroup.value?.borderColor || groupFallback.value.border,
   name: activeGroup.value?.nameColor || groupFallback.value.name,
 }))
@@ -363,7 +368,7 @@ const groupHueDragValue = ref(0)
 const groupHue = computed(() =>
   groupHueDragging.value
     ? groupHueDragValue.value
-    : leadHue([groupEffective.value.border, groupEffective.value.name]),
+    : leadHue([groupEffective.value.border, groupEffective.value.bg, groupEffective.value.name]),
 )
 
 let groupHueSnap = null
@@ -371,7 +376,7 @@ let groupHueSnapHue = 0
 
 function beginGroupHue() {
   groupHueSnap = { ...groupEffective.value }
-  groupHueSnapHue = leadHue([groupHueSnap.border, groupHueSnap.name])
+  groupHueSnapHue = leadHue([groupHueSnap.border, groupHueSnap.bg, groupHueSnap.name])
   groupHueDragValue.value = groupHueSnapHue
   groupHueDragging.value = true
 }
@@ -387,9 +392,15 @@ function onGroupHue(next) {
   groupHueDragValue.value = next
   const shifted = shiftColorRecord(groupHueSnap, next - groupHueSnapHue)
   jsonStore.updateSeparator(appStore.contextMenu.targetName, {
+    bgColor: shifted.bg,
     borderColor: shifted.border,
     nameColor: shifted.name,
   })
+}
+
+function onGroupBgColor(e) {
+  const id = appStore.contextMenu.targetName
+  jsonStore.updateSeparator(id, { bgColor: e.target.value })
 }
 
 function onGroupBorderColor(e) {
@@ -404,7 +415,7 @@ function onGroupNameColor(e) {
 
 function resetGroupColors() {
   const id = appStore.contextMenu.targetName
-  jsonStore.updateSeparator(id, { borderColor: undefined, nameColor: undefined })
+  jsonStore.updateSeparator(id, { borderColor: undefined, nameColor: undefined, bgColor: undefined })
 }
 
 function addGroup() {
