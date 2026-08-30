@@ -3,7 +3,7 @@
     type="button"
     class="dialog-close-btn"
     :title="title"
-    aria-label="Close"
+    :aria-label="title || $t('titlebar.close')"
     @click="$emit('close')"
   >
     <Icons icon="exit" custom-class="dialog-close" />

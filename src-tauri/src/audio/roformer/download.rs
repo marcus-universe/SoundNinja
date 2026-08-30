@@ -4,7 +4,14 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
+
+static CANCEL: AtomicBool = AtomicBool::new(false);
+
+pub fn cancel_download() {
+    CANCEL.store(true, Ordering::SeqCst);
+}
 
 use super::{MODEL_FILENAME, MODEL_MIN_BYTES, MODEL_SHA256, MODEL_URL};
 
@@ -61,6 +68,7 @@ fn verify_sha256(path: &Path, expected_hex: &str) -> Result<bool, String> {
 /// Stream-download model to `.part`, verify, rename into place.
 /// Emits `stems_progress` / `stems_model_progress` on `app`.
 pub fn download_model(app: &AppHandle) -> Result<(), String> {
+    CANCEL.store(false, Ordering::SeqCst);
     let dest = model_file_path(app)?;
     if file_looks_ready(&dest) {
         emit(app, "download", 100.0, "Model ready");
@@ -98,6 +106,11 @@ pub fn download_model(app: &AppHandle) -> Result<(), String> {
     let mut buf = [0u8; 1024 * 64];
 
     loop {
+        if CANCEL.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = fs::remove_file(&part);
+            return Err("cancelled".into());
+        }
         let n = resp.read(&mut buf).map_err(|e| e.to_string())?;
         if n == 0 {
             break;

@@ -44,9 +44,18 @@
     "expand": "Ausklappen",
     "tabs": {
       "main": "Allgemein",
+      "behavior": "Verhalten",
       "audio": "Audio",
+      "performance": "Leistung",
       "theme": "Theme",
       "about": "Info"
+    },
+    "behavior": {
+      "playback": "Wiedergabe",
+      "window": "Fenster",
+      "controls": "Steuerung",
+      "ui": "Oberfläche",
+      "gifs": "Gifs"
     },
     "main": {
       "title": "Allgemein",
@@ -92,9 +101,13 @@
       "tabTransitionStagger": "Buttons nacheinander",
       "tabTransitionNone": "Keine",
       "klipyApiKey": "Klipy-API-Schlüssel",
-      "klipyApiKeyHint": "Die Klipy-Suche braucht einen eigenen kostenlosen API-Schlüssel. Lokale PNG-, JPEG-, GIF- und WebP-Dateien gehen ohne Schlüssel und liegen in der Projektdatei.",
+      "klipyApiKeyHint": "Die Klipy-Suche braucht einen eigenen kostenlosen API-Schlüssel. Der Schlüssel wird app-weit gespeichert und nie in Projektdateien geschrieben. Nur PNG-, JPEG-, GIF- und WebP-Dateien liegen im Projekt.",
       "klipyApiKeyPlaceholder": "API-Schlüssel einfügen…",
       "klipyGetKey": "API-Schlüssel / Docs holen",
+      "klipyDocs": "Docs",
+      "klipyCreateKey": "API-Schlüssel erstellen",
+      "klipyShowKey": "API-Schlüssel anzeigen",
+      "klipyHideKey": "API-Schlüssel verbergen",
       "navbarTooltips": "Seitenleisten-Tooltips",
       "navbarTooltipsHint": "Beim Hover eine Beschriftung neben jedem Seitenleisten-Button zeigen",
       "checkUpdatesOnStart": "Beim Start nach Updates suchen",
@@ -123,6 +136,7 @@
       "stemsSection": "Stem-Separation",
       "stemsModel": "KI-Stem-Modell",
       "stemsInstall": "Modell laden",
+      "stemsCancel": "Abbrechen",
       "stemsInstalled": "Installiert",
       "stemsUnavailable": "Nicht in diesem Build",
       "stemsInstallHint": "{model} ({size}) herunterladen, um Stimme/Musik im Record Editor zu trennen.",
@@ -262,7 +276,8 @@
     "about": {
       "title": "Info",
       "githubLink": "Entwicklung auf GitHub unterstützen",
-      "licenseLink": "Lizenz — GNU General Public License v3"
+      "licenseLink": "Lizenz — GNU General Public License v3",
+      "releaseNotes": "Release Notes"
     }
   },
   "project": {
@@ -283,7 +298,46 @@
     "saving": "Speichern…",
     "saved": "Projekt gespeichert.",
     "savedTitle": "Gespeichert",
-    "loading": "Laden…"
+    "loading": "Laden…",
+    "failedOpenProject": "Projekt konnte nicht geöffnet werden",
+    "failedSaveProject": "Projekt konnte nicht gespeichert werden.",
+    "failedCreateProject": "Projekt konnte nicht erstellt werden",
+    "projectGone": "Projekt existiert nicht mehr.",
+    "newProject": "Neues Projekt",
+    "unknownError": "Unbekannter Fehler",
+    "importAudioFiles": "Audiodateien importieren",
+    "audioFiles": "Audiodateien"
+  },
+  "tabs": {
+    "all": "Alle",
+    "addTab": "Tab hinzufügen"
+  },
+  "splash": {
+    "loading": "Startet…",
+    "settings": "Einstellungen werden geladen…",
+    "fonts": "Schriftarten werden geladen…",
+    "project": "Projekt wird geöffnet…",
+    "theme": "Theme wird angewendet…",
+    "ready": "Bereit"
+  },
+  "importFolders": {
+    "title": "Ordner importieren",
+    "addFolders": "Ordner hinzufügen",
+    "dragReorder": "Ziehen zum Sortieren",
+    "importAsTabs": "Als Tabs importieren",
+    "importToCurrent": "In aktuellen Tab importieren",
+    "selectFolders": "Ordner auswählen"
+  },
+  "titlebar": {
+    "minimize": "Minimieren",
+    "restore": "Wiederherstellen",
+    "maximize": "Maximieren",
+    "close": "Schließen"
+  },
+  "firstRun": {
+    "title": "Sprache wählen",
+    "message": "Wähle die Sprache für Sound Ninja. Du kannst das später in den Einstellungen ändern.",
+    "continue": "Weiter"
   },
   "relink": {
     "title": "Fehlende Sounddateien",
@@ -345,12 +399,12 @@
   },
   "gifPicker": {
     "title": "GIF-Hintergrund",
-    "searchPlaceholder": "Search KLIPY",
+    "searchPlaceholder": "KLIPY durchsuchen",
     "localFile": "Bild / GIF wählen",
-    "poweredBy": "Powered by KLIPY",
-    "info": "Die Klipy-Suche braucht einen eigenen API-Schlüssel von partner.klipy.com (Einstellungen). Lokale PNG-, JPEG-, GIF- und WebP-Dateien gehen ohne Schlüssel und werden für Offline-Nutzung in dieses Projekt geschrieben.",
+    "poweredBy": "Bereitgestellt von KLIPY",
+    "info": "Die Klipy-Suche braucht einen eigenen API-Schlüssel (Einstellungen → Verhalten). Der Schlüssel wird app-weit gespeichert und nie in Projektdateien geschrieben. Nur PNG-, JPEG-, GIF- und WebP-Dateien liegen im Projekt.",
     "getKey": "API-Schlüssel / Docs holen",
-    "noKey": "Klipy-API-Schlüssel in den Einstellungen eintragen, um GIFs zu suchen. Lokale Dateien gehen trotzdem.",
+    "noKey": "Klipy-API-Schlüssel unter Einstellungen → Verhalten eintragen, um GIFs zu suchen. Lokale Dateien gehen trotzdem.",
     "empty": "Keine GIFs gefunden.",
     "positionTitle": "Position anpassen",
     "positionHint": "Ziehen zum Verschieben. Das GIF füllt den Button und schneidet Überstand ab.",
@@ -400,9 +454,9 @@
     "openReleases": "Releases öffnen"
   },
   "player": {
-    "play": "Play",
+    "play": "Abspielen",
     "pause": "Pause",
-    "stop": "Stop",
+    "stop": "Stopp",
     "record": "Aufnahme",
     "playlist": "Wiedergabeliste",
     "playlistEmpty": "Keine Sounds aktiv",
@@ -456,7 +510,6 @@
     "importSpecificTab": "In Tab importieren…",
     "import": "Importieren",
     "importSessionNow": "Aktuelle Session importieren",
-    "import": "Importieren",
     "unsavedTitle": "Aufnahme verwerfen?",
     "unsavedHint": "Du hast ungespeicherte Aufnahmen, Änderungen oder Clips in der Warteliste. Trotzdem schließen?",
     "discard": "Verwerfen",

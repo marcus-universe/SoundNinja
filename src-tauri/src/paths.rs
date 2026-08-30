@@ -170,3 +170,23 @@ pub fn list_projects(projects_path: String) -> Result<Vec<ProjectInfo>, String> 
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(out)
 }
+
+/// Windows installer language: HKCU\Software\com.soundninja.dev\DefaultLanguage
+#[tauri::command]
+pub fn read_install_language() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(key) = hkcu.open_subkey("Software\\com.soundninja.dev") {
+            if let Ok(v) = key.get_value::<String, _>("DefaultLanguage") {
+                let trimmed = v.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+    }
+    None
+}

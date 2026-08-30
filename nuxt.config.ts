@@ -31,6 +31,10 @@ export default defineNuxtConfig({
     locales: [
       { code: 'en', name: 'English', file: 'en.json' },
       { code: 'de', name: 'Deutsch', file: 'de.json' },
+      { code: 'es', name: 'Español', file: 'es.json' },
+      { code: 'fr', name: 'Français', file: 'fr.json' },
+      { code: 'ja', name: '日本語', file: 'ja.json' },
+      { code: 'zh-Hans', name: '简体中文', file: 'zh-Hans.json' },
     ],
     langDir: 'locales/',
     detectBrowserLanguage: false,
@@ -58,6 +62,7 @@ export default defineNuxtConfig({
     '~/assets/scss/pages.scss',
     '~/assets/scss/settings-audio.scss',
     '~/assets/scss/player.scss',
+    '~/assets/scss/splash.scss',
   ],
 
   // Nuxt 4.4.x plugins often transform without emitting maps; keep them off for Tauri builds.
@@ -104,7 +109,7 @@ export default defineNuxtConfig({
           // the main soundboard loads without waiting for them.
           manualChunks(id) {
             if (id.includes('SettingsThemeCreator')) return 'chunk-theme-creator'
-            if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsOverlay')) return 'chunk-settings'
+            if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsBehavior') || id.includes('SettingsPerformance') || id.includes('SettingsOverlay')) return 'chunk-settings'
           },
         },
       },

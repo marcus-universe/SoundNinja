@@ -368,6 +368,55 @@
   }
 }
 
+.settings-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  align-items: center;
+}
+
+.settings-password-row {
+  display: flex;
+  align-items: center;
+  gap: 0.64rem;
+  width: 100%;
+
+  .settings-input--wide {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+  .settings-eye-icon {
+    width: 1.6rem;
+    height: 1.6rem;
+    display: block;
+  }
+}
+
+.stems-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.stems-progress__bar {
+  width: 100%;
+  height: 0.56rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+}
+
+.stems-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary_color);
+  transition: width 0.12s linear;
+}
+
 .settings-section-divider {
   font-family: $fontBold;
   font-size: 1.15rem;
@@ -812,6 +861,9 @@
   font-family: $fontRegular;
   font-size: 1.44rem;
   text-decoration: none;
+  background: none;
+  width: 100%;
+  cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 
   &__icon {

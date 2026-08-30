@@ -32,9 +32,7 @@
     flex-shrink: 0;
     overflow: hidden;
     flex-wrap: nowrap;
-    align-items: stretch;
-    border-bottom: var(--tab-border-width, 0.3rem) solid var(--tab-list-underline, var(--tab-border, var(--primary_color)));
-    transition: border-color 0.15s ease;
+    align-items: center;
 
     .tab {
       flex-shrink: 0;
@@ -72,12 +70,22 @@
       }
     }
 
+    .addTab-tip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      align-self: center;
+      padding: 0 0.4rem;
+      z-index: 3;
+    }
+
     .addTab {
       flex-shrink: 0;
-      align-self: center;
+      display: block;
       fill: var(--primary_color);
-      width: calc(var(--icon_size) - 1.6rem);
-      border-radius: 0.48rem;
+      width: var(--icon_size);
+      height: var(--icon_size);
+      border-radius: 0.56rem;
       transition: fill 0.2s ease, transform 0.2s ease, background 0.2s ease;
 
       &:hover {
@@ -90,32 +98,29 @@
   }
 
   // Wrapper around the draggable tab list (SortableJS container).
-  // Real flex box so SortableJS can compute child positions; behaves like the
-  // surrounding tab row.
+  // Grows only as wide as tabs; shrinks + scrolls when the window is narrow
+  // so the + button stays on the trailing edge.
   .tab-list {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: stretch;
-    flex: 1;
+    align-self: center;
+    flex: 0 1 auto;
     min-width: 0;
+    height: auto;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-behavior: smooth;
-    scrollbar-width: thin;
-    scrollbar-color: var(--primary_color) transparent;
+    // Overlay / hide native bar so it cannot lift the pills above All / +.
+    // Horizontal scroll still works via wheel (Tabs.vue onTabWheel).
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 
     &::-webkit-scrollbar {
-      height: 0.3rem;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: var(--primary_color);
-      border-radius: 0.2rem;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
+      display: none;
+      height: 0;
+      width: 0;
     }
   }
 

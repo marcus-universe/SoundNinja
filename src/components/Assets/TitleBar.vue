@@ -4,7 +4,7 @@
     <div class="titlebar" data-tauri-drag-region>
       <span class="titlebar__title" data-tauri-drag-region>{{ windowTitle }}</span>
       <div class="titlebar__controls">
-        <button class="titlebar__btn titlebar__btn--min" @click="minimize" aria-label="Minimize">
+        <button class="titlebar__btn titlebar__btn--min" @click="minimize" :aria-label="$t('titlebar.minimize')">
           <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="1" y="5.5" width="10" height="1" rx="0.5" fill="currentColor"/>
           </svg>
@@ -12,7 +12,7 @@
         <button
           class="titlebar__btn titlebar__btn--max"
           @click="toggleMaximize"
-          :aria-label="isMaximized ? 'Restore' : 'Maximize'"
+          :aria-label="isMaximized ? $t('titlebar.restore') : $t('titlebar.maximize')"
         >
           <!-- Restore (two overlapping squares) when maximized -->
           <svg v-if="isMaximized" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -24,7 +24,7 @@
             <rect x="1.5" y="1.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
         </button>
-        <button class="titlebar__btn titlebar__btn--close" @click="closeWindow" aria-label="Close">
+        <button class="titlebar__btn titlebar__btn--close" @click="closeWindow" :aria-label="$t('titlebar.close')">
           <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
             <line x1="10.5" y1="1.5" x2="1.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>

@@ -234,6 +234,12 @@ pub fn stems_busy() -> bool {
     BUSY.load(Ordering::SeqCst)
 }
 
+#[cfg(feature = "stems")]
+#[tauri::command]
+pub fn cancel_stems_model_download() {
+    crate::audio::roformer::cancel_download();
+}
+
 #[cfg(not(feature = "stems"))]
 #[tauri::command]
 pub fn ensure_stems_model(_app: AppHandle) -> Result<(), String> {
@@ -265,3 +271,7 @@ Rebuild with --features stems."
 pub fn stems_busy() -> bool {
     false
 }
+
+#[cfg(not(feature = "stems"))]
+#[tauri::command]
+pub fn cancel_stems_model_download() {}

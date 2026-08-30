@@ -1,0 +1,95 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4rem;
+  background: var(--color-bg, #0e1116);
+  pointer-events: all;
+}
+
+.splash__logo {
+  width: min(22rem, 46vw);
+  height: auto;
+  display: block;
+}
+
+.splash__bar-wrap {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.64rem;
+  align-items: stretch;
+}
+
+.splash__label {
+  font-family: var(--font-regular, inherit);
+  font-size: 1.2rem;
+  color: color-mix(in srgb, var(--color-text, #fff) 55%, transparent);
+  text-align: center;
+}
+
+.splash__bar {
+  height: 0.48rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text, #fff) 10%, transparent);
+}
+
+.splash__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary_color, #3ad0e8);
+  transition: width 0.28s ease;
+}
+
+.splash-fade-leave-active {
+  transition: opacity 0.35s ease;
+}
+
+.splash-fade-leave-to {
+  opacity: 0;
+}
+
+.first-run {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, #000 55%, transparent);
+}
+
+.first-run__card {
+  width: min(42rem, 90vw);
+  padding: 2.4rem;
+  border-radius: 1.2rem;
+  background: var(--color-bg2, var(--color-bg, #161b22));
+  border: 0.16rem solid color-mix(in srgb, var(--primary_color, #3ad0e8) 35%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.first-run__title {
+  margin: 0;
+  font-size: 1.8rem;
+  color: var(--color-text, #fff);
+}
+
+.first-run__message {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-text, #fff) 70%, transparent);
+}
+
+.first-run__actions {
+  display: flex;
+  justify-content: flex-end;
+}

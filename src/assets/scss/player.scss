@@ -74,6 +74,22 @@
   }
 }
 
+// Teleported tip (document.body) — escapes overflow:hidden ancestors.
+.qtip__tip--fixed {
+  position: fixed;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  z-index: 20000;
+  opacity: 0;
+  pointer-events: none;
+
+  &.is-open {
+    opacity: 1;
+  }
+}
+
 // ── Floating player (compact chip above sound buttons) ────────────────────────
 .player-float {
   position: absolute;

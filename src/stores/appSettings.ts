@@ -243,18 +243,10 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await saveSetting(d, 'klipyApiKey', this.klipyApiKey)
     },
 
-    /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */
-    async applyWindowChrome() {
-      const nativeChrome = this.titlebarMode === 'system'
-      const hidden = this.hideTitlebar
-      try {
-        await invoke('set_window_chrome', { nativeChrome, hidden })
-      } catch (e) {
-        console.error('set_window_chrome failed', e)
-      }
+    /** CSS --topbar_height only. Does not touch OS decorations or emit events. */
+    async applyChromeCss() {
       if (typeof document === 'undefined') return
-      // Main styled bar: 3rem title + 2.6rem menubar ≈ 5.6rem.
-      // Secondary styled bar: title row only ≈ 3rem. System/hidden = 0.
+      const hidden = this.hideTitlebar
       const showStyled = !hidden && this.titlebarMode === 'styled'
       let topbar = '0px'
       if (showStyled) {
@@ -266,6 +258,36 @@ export const useAppSettingsStore = defineStore('appSettings', {
         topbar = isMain ? '5.6rem' : '3rem'
       }
       document.documentElement.style.setProperty('--topbar_height', topbar)
+    },
+
+    /** Apply chrome prefs received from another window (no OS re-invoke, no re-emit). */
+    async applyChromeFromEvent(payload: { titlebarMode?: TitlebarMode; hideTitlebar?: boolean }) {
+      if (payload.titlebarMode === 'system' || payload.titlebarMode === 'styled') {
+        this.titlebarMode = payload.titlebarMode
+      }
+      if (typeof payload.hideTitlebar === 'boolean') {
+        this.hideTitlebar = payload.hideTitlebar
+      }
+      await this.applyChromeCss()
+    },
+
+    /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */
+    async applyWindowChrome() {
+      const nativeChrome = this.titlebarMode === 'system'
+      const hidden = this.hideTitlebar
+      try {
+        await invoke('set_window_chrome', { nativeChrome, hidden })
+      } catch (e) {
+        console.error('set_window_chrome failed', e)
+      }
+      await this.applyChromeCss()
+      try {
+        const { emit } = await import('@tauri-apps/api/event')
+        await emit('sn:chrome-changed', {
+          titlebarMode: this.titlebarMode,
+          hideTitlebar: this.hideTitlebar,
+        })
+      } catch { /* non-tauri */ }
     },
 
     /** Pushes master volume into the Rust audio engine. */

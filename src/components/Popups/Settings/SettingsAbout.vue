@@ -22,6 +22,15 @@
         </svg>
         {{ $t('settings.about.githubLink') }}
       </a>
+      <button type="button" class="about-link" @click="openReleaseNotes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="about-link__icon">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        {{ $t('settings.about.releaseNotes') }}
+      </button>
       <a
         href="https://github.com/marcus-universe/SoundNinja/blob/Sound-Ninja-Tauri/LICENSE"
         target="_blank"
@@ -43,6 +52,7 @@
 
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app'
+import { openInSystemBrowser } from '~/utils/openExternal'
 
 const appVersion = ref('')
 
@@ -53,4 +63,22 @@ onMounted(async () => {
     appVersion.value = ''
   }
 })
+
+async function openReleaseNotes() {
+  const version = appVersion.value.replace(/^v/i, '')
+  const tagUrl = `https://github.com/marcus-universe/SoundNinja/releases/tag/v${version}`
+  const latestUrl = 'https://github.com/marcus-universe/SoundNinja/releases/latest'
+  if (!version) {
+    await openInSystemBrowser(latestUrl)
+    return
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/marcus-universe/SoundNinja/releases/tags/v${version}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
+    await openInSystemBrowser(res.ok ? tagUrl : latestUrl)
+  } catch {
+    await openInSystemBrowser(latestUrl)
+  }
+}
 </script>

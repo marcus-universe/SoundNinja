@@ -129,14 +129,14 @@
 <!-- Add / Import (icon-park-solid:add) -->
 <svg v-if="icon === 'add'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" :class="[customClass]" @click="$emit('triggered', icon)">
   <defs>
-    <mask id="sn-icon-park-add">
+    <mask :id="addMaskId">
       <g fill="none" stroke-linejoin="round" stroke-width="4">
         <rect width="36" height="36" x="6" y="6" fill="#fff" stroke="#fff" rx="3"/>
         <path stroke="#000" stroke-linecap="round" d="M24 16v16m-8-8h16"/>
       </g>
     </mask>
   </defs>
-  <path class="cls-1" d="M0 0h48v48H0z" mask="url(#sn-icon-park-add)"/>
+  <path class="cls-1" d="M0 0h48v48H0z" :mask="`url(#${addMaskId})`"/>
 </svg>
 
 <!-- Project (material-symbols:dashboard-rounded) -->
@@ -231,6 +231,7 @@
 </template>
 
 <script>
+let addMaskSeq = 0
 export default {
     emits: ['triggered'],
     props: {
@@ -244,6 +245,10 @@ export default {
             default: ''
         }
     },
-
+    data() {
+        return {
+            addMaskId: `sn-icon-park-add-${++addMaskSeq}`,
+        }
+    },
 }
 </script>

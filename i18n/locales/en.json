@@ -44,9 +44,18 @@
     "expand": "Expand",
     "tabs": {
       "main": "Main",
+      "behavior": "Behavior",
       "audio": "Audio",
+      "performance": "Performance",
       "theme": "Theme",
       "about": "About"
+    },
+    "behavior": {
+      "playback": "Playback",
+      "window": "Window",
+      "controls": "Controls",
+      "ui": "UI",
+      "gifs": "Gifs"
     },
     "main": {
       "title": "Main",
@@ -92,9 +101,13 @@
       "tabTransitionStagger": "Buttons one by one",
       "tabTransitionNone": "None",
       "klipyApiKey": "Klipy API key",
-      "klipyApiKeyHint": "Klipy search needs your own free API key. Local PNG, JPEG, GIF, and WebP files work without a key and are stored in the project file.",
+      "klipyApiKeyHint": "Klipy search needs your own free API key. The key is stored app-wide and is never written into project files. Only PNG, JPEG, GIF, and WebP files are saved in the project.",
       "klipyApiKeyPlaceholder": "Paste API key…",
       "klipyGetKey": "Get API key / docs",
+      "klipyDocs": "Docs",
+      "klipyCreateKey": "Create API Key",
+      "klipyShowKey": "Show API key",
+      "klipyHideKey": "Hide API key",
       "navbarTooltips": "Sidebar tooltips",
       "navbarTooltipsHint": "Show a label next to each sidebar button on hover",
       "checkUpdatesOnStart": "Check for updates on start",
@@ -123,6 +136,7 @@
       "stemsSection": "Stem Separation",
       "stemsModel": "AI stem model",
       "stemsInstall": "Download model",
+      "stemsCancel": "Cancel",
       "stemsInstalled": "Installed",
       "stemsUnavailable": "Not in this build",
       "stemsInstallHint": "Download {model} ({size}) to enable Keep Vocals / Keep Music in the Record Editor.",
@@ -262,7 +276,8 @@
     "about": {
       "title": "About",
       "githubLink": "Support development on GitHub",
-      "licenseLink": "License — GNU General Public License v3"
+      "licenseLink": "License — GNU General Public License v3",
+      "releaseNotes": "Release Notes"
     }
   },
   "project": {
@@ -283,7 +298,46 @@
     "saving": "Saving…",
     "saved": "Project saved.",
     "savedTitle": "Saved",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "failedOpenProject": "Failed to open project",
+    "failedSaveProject": "Failed to save project.",
+    "failedCreateProject": "Failed to create project",
+    "projectGone": "Project no longer exists.",
+    "newProject": "New Project",
+    "unknownError": "Unknown error",
+    "importAudioFiles": "Import Audio Files",
+    "audioFiles": "Audio Files"
+  },
+  "tabs": {
+    "all": "All",
+    "addTab": "Add tab"
+  },
+  "splash": {
+    "loading": "Starting…",
+    "settings": "Loading settings…",
+    "fonts": "Loading fonts…",
+    "project": "Opening project…",
+    "theme": "Applying theme…",
+    "ready": "Ready"
+  },
+  "importFolders": {
+    "title": "Import Folders",
+    "addFolders": "Add Folders",
+    "dragReorder": "Drag to reorder",
+    "importAsTabs": "Import as Tabs",
+    "importToCurrent": "Import to current Tab",
+    "selectFolders": "Select Folders"
+  },
+  "titlebar": {
+    "minimize": "Minimize",
+    "restore": "Restore",
+    "maximize": "Maximize",
+    "close": "Close"
+  },
+  "firstRun": {
+    "title": "Choose language",
+    "message": "Select the language for Sound Ninja. You can change this later in Settings.",
+    "continue": "Continue"
   },
   "relink": {
     "title": "Missing sound files",
@@ -348,9 +402,9 @@
     "searchPlaceholder": "Search KLIPY",
     "localFile": "Choose image / GIF",
     "poweredBy": "Powered by KLIPY",
-    "info": "Klipy search needs your own API key from partner.klipy.com (Main Settings). Local PNG, JPEG, GIF, and WebP files work without a key and are saved into this project for offline use.",
+    "info": "Klipy search needs your own API key (Settings → Behavior). The key is stored app-wide and is never written into project files. Only PNG, JPEG, GIF, and WebP files are saved in the project.",
     "getKey": "Get API key / docs",
-    "noKey": "Add a Klipy API key in Main Settings to search GIFs. Local files still work.",
+    "noKey": "Add a Klipy API key in Settings → Behavior to search GIFs. Local files still work.",
     "empty": "No GIFs found.",
     "positionTitle": "Adjust position",
     "positionHint": "Drag to pan. The GIF fills the button and crops overflow.",
@@ -456,7 +510,6 @@
     "importSpecificTab": "Import into Tab…",
     "import": "Import",
     "importSessionNow": "Import current session",
-    "import": "Import",
     "unsavedTitle": "Discard recording?",
     "unsavedHint": "You have unsaved recordings, edits, or staged clips. Close anyway?",
     "discard": "Discard",

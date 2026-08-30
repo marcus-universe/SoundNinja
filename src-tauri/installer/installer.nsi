@@ -80,6 +80,9 @@ Var OldMainBinaryName
 Var StemsDialog
 Var StemsCheckbox
 Var StemsCheckboxState
+Var LangDialog
+Var LangCombo
+Var LangChoice
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -393,6 +396,67 @@ FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_DIRECTORY
 
+; 5a. Default app language
+Page custom LangPageCreate LangPageLeave
+
+Function LangPageCreate
+ ${If} $PassiveMode = 1
+ ${OrIf} ${Silent}
+ Abort
+ ${EndIf}
+ !insertmacro MUI_HEADER_TEXT "Language" "Choose the default language for Sound Ninja"
+ nsDialogs::Create 1018
+ Pop $LangDialog
+ ${If} $LangDialog == error
+ Abort
+ ${EndIf}
+
+ ${NSD_CreateLabel} 0 0 100% 28u "Select the language used when Sound Ninja first starts. You can change this later in Settings."
+ Pop $0
+
+ ${NSD_CreateDropList} 0 40u 70% 12u ""
+ Pop $LangCombo
+ ${NSD_CB_AddString} $LangCombo "English"
+ ${NSD_CB_AddString} $LangCombo "Deutsch"
+ ${NSD_CB_AddString} $LangCombo "Español"
+ ${NSD_CB_AddString} $LangCombo "Français"
+ ${NSD_CB_AddString} $LangCombo "日本語"
+ ${NSD_CB_AddString} $LangCombo "简体中文"
+
+ ${If} $LangChoice == "de"
+  ${NSD_CB_SelectString} $LangCombo "Deutsch"
+ ${ElseIf} $LangChoice == "es"
+  ${NSD_CB_SelectString} $LangCombo "Español"
+ ${ElseIf} $LangChoice == "fr"
+  ${NSD_CB_SelectString} $LangCombo "Français"
+ ${ElseIf} $LangChoice == "ja"
+  ${NSD_CB_SelectString} $LangCombo "日本語"
+ ${ElseIf} $LangChoice == "zh-Hans"
+  ${NSD_CB_SelectString} $LangCombo "简体中文"
+ ${Else}
+  ${NSD_CB_SelectString} $LangCombo "English"
+ ${EndIf}
+
+ nsDialogs::Show
+FunctionEnd
+
+Function LangPageLeave
+ ${NSD_GetText} $LangCombo $0
+ ${If} $0 == "Deutsch"
+  StrCpy $LangChoice "de"
+ ${ElseIf} $0 == "Español"
+  StrCpy $LangChoice "es"
+ ${ElseIf} $0 == "Français"
+  StrCpy $LangChoice "fr"
+ ${ElseIf} $0 == "日本語"
+  StrCpy $LangChoice "ja"
+ ${ElseIf} $0 == "简体中文"
+  StrCpy $LangChoice "zh-Hans"
+ ${Else}
+  StrCpy $LangChoice "en"
+ ${EndIf}
+FunctionEnd
+
 ; 5b. Optional AI stem model download (on first app launch)
 Page custom StemsPageCreate StemsPageLeave
 
@@ -513,6 +577,22 @@ FunctionEnd
 Function .onInit
  ; Default: download stem model on first launch (checkbox page can uncheck).
  StrCpy $StemsCheckboxState 1
+ StrCpy $LangChoice "en"
+ ${If} $LANGUAGE = 1031
+  StrCpy $LangChoice "de"
+ ${ElseIf} $LANGUAGE = 1034
+  StrCpy $LangChoice "es"
+ ${ElseIf} $LANGUAGE = 3082
+  StrCpy $LangChoice "es"
+ ${ElseIf} $LANGUAGE = 1036
+  StrCpy $LangChoice "fr"
+ ${ElseIf} $LANGUAGE = 1041
+  StrCpy $LangChoice "ja"
+ ${ElseIf} $LANGUAGE = 2052
+  StrCpy $LangChoice "zh-Hans"
+ ${ElseIf} $LANGUAGE = 1028
+  StrCpy $LangChoice "zh-Hans"
+ ${EndIf}
 
  ${GetOptions} $CMDLINE "/P" $PassiveMode
  ${IfNot} ${Errors}
@@ -725,6 +805,11 @@ Section Install
  ${Else}
   WriteRegDWORD HKCU "Software\com.soundninja.dev" "WantStemsModel" 0
  ${EndIf}
+
+ ${If} $LangChoice == ""
+  StrCpy $LangChoice "en"
+ ${EndIf}
+ WriteRegStr HKCU "Software\com.soundninja.dev" "DefaultLanguage" $LangChoice
 
  ; Silent/passive installs: default to wanting the model if state was never set
  ${If} $PassiveMode = 1

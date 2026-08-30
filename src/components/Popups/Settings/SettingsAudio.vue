@@ -2,35 +2,33 @@
   <section :class="{ 'settings-audio-compact': compact }">
     <h2 v-if="!compact" class="settings-content__title">{{ $t('settings.audio.title') }}</h2>
 
-    <template v-if="!compact">
-      <!-- Audio Driver (host) -->
-      <div class="settings-group">
-        <div class="settings-label-info">
-          <label class="settings-label">{{ $t('settings.audio.audioDriver') }}</label>
-        </div>
-        <div class="settings-row">
-          <select v-model="hostSelected" @change="onHostChange" class="settings-select">
-            <option v-for="h in audioHosts" :key="h" :value="h">{{ h }}</option>
-          </select>
-          <Icons icon="question" customClass="settings-question-icon" @triggered="asioInfoOpen = true" />
-        </div>
+    <!-- Audio Driver (host) -->
+    <div class="settings-group" :class="{ 'settings-group--compact': compact }">
+      <div class="settings-label-info">
+        <label class="settings-label">{{ $t('settings.audio.audioDriver') }}</label>
       </div>
-
-      <DialogField v-if="asioInfoOpen" :title="$t('settings.audio.asioInfoTitle')" @close="asioInfoOpen = false">
-        <p class="settings-hint">{{ $t('settings.audio.audioDriverHint') }}</p>
-      </DialogField>
-
-      <!-- Output Device -->
-      <div class="settings-group">
-        <label class="settings-label">{{ $t('settings.audio.outputDevice') }}</label>
-        <div class="settings-row">
-          <select v-model="outputSelected" @change="selectOutputDevice" class="settings-select">
-            <option v-for="device in outputDevices" :key="device" :value="device">{{ device }}</option>
-          </select>
-          <button class="settings-btn settings-btn--icon" @click="loadOutputDevices" :title="$t('settings.audio.refresh')">&#x21BB;</button>
-        </div>
+      <div class="settings-row">
+        <select v-model="hostSelected" @change="onHostChange" class="settings-select">
+          <option v-for="h in audioHosts" :key="h" :value="h">{{ h }}</option>
+        </select>
+        <Icons v-if="!compact" icon="question" customClass="settings-question-icon" @triggered="asioInfoOpen = true" />
       </div>
-    </template>
+    </div>
+
+    <DialogField v-if="asioInfoOpen" :title="$t('settings.audio.asioInfoTitle')" @close="asioInfoOpen = false">
+      <p class="settings-hint">{{ $t('settings.audio.audioDriverHint') }}</p>
+    </DialogField>
+
+    <!-- Output Device -->
+    <div class="settings-group" :class="{ 'settings-group--compact': compact }">
+      <label class="settings-label">{{ $t('settings.audio.outputDevice') }}</label>
+      <div class="settings-row">
+        <select v-model="outputSelected" @change="selectOutputDevice" class="settings-select">
+          <option v-for="device in outputDevices" :key="device" :value="device">{{ device }}</option>
+        </select>
+        <button class="settings-btn settings-btn--icon" @click="loadOutputDevices" :title="$t('settings.audio.refresh')">&#x21BB;</button>
+      </div>
+    </div>
 
     <!-- Input / Capture Device -->
     <div class="settings-group" :class="{ 'settings-group--compact': compact }">
@@ -444,6 +442,8 @@ watch(
     appSettings.inputVolume,
     appSettings.outputVolume,
     appSettings.inputHost,
+    appSettings.outputSource,
+    appSettings.outputHost,
   ],
   () => {
     if (!props.compact) return
@@ -451,6 +451,12 @@ watch(
     inputVolumePct.value = Math.round((appSettings.inputVolume ?? 1) * 100)
     if (appSettings.inputSource && inputDevices.value.some((d) => d.name === appSettings.inputSource)) {
       inputSelected.value = appSettings.inputSource
+    }
+    if (appSettings.outputSource && outputDevices.value.includes(appSettings.outputSource)) {
+      outputSelected.value = appSettings.outputSource
+    }
+    if (appSettings.outputHost) {
+      hostSelected.value = resolveHostName(appSettings.outputHost, audioHosts.value)
     }
   },
 )

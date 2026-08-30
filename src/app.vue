@@ -5,6 +5,14 @@
   >
     <!-- Styled chrome for main + secondary (Record Editor / Theme Creator). -->
     <TitleBar />
+    <Transition name="splash-fade">
+      <Splash v-if="isMain && booting" :percent="splashPercent" :label="splashLabel" />
+    </Transition>
+    <LanguagePicker
+      v-if="isMain && languagePickerOpen"
+      :initial="languagePickerInitial"
+      @done="onFirstLanguage"
+    />
     <template v-if="isMain">
       <NavBar />
       <ErrorAlert />
@@ -82,11 +90,12 @@ import {
   projectNameFromDbPath,
   safeProjectName,
 } from '~/utils/projects'
+import { resolveAppLocale } from '~/utils/locales'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
 const appSettings = useAppSettingsStore()
-const { setLocale } = useI18n()
+const { t, setLocale } = useI18n()
 
 const updateDialogRef = ref(null)
 const savePopup = ref(null)
@@ -96,6 +105,13 @@ let savePopupTimer = null
 // main window owns the project/menu lifecycle; others just render their page.
 const isMain = ref(true)
 const toolReady = ref(false)
+const booting = ref(true)
+const splashPercent = ref(8)
+const splashLabel = ref('')
+const languagePickerOpen = ref(false)
+const languagePickerInitial = ref('en')
+let languagePickerResolve = null
+let unlistenChrome = null
 if (import.meta.client) {
   try { isMain.value = getCurrentWindow().label === 'main' } catch { /* non-tauri */ }
   if (!isMain.value) {
@@ -263,7 +279,7 @@ async function withSavePopup(work) {
   } catch (e) {
     savePopup.value = null
     console.error('Failed to save project', e)
-    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedSaveProject')}\n\n${formatError(e)}`)
     return false
   }
 }
@@ -279,19 +295,19 @@ async function handleMenuNewProject() {
   try {
     const existing = await listProjects(appSettings.projectsPath)
     const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
-    let name = 'New Project'
+    let name = t('common.newProject')
     let n = 2
-    while (names.has(safeProjectName(name).toLowerCase())) name = `New Project ${n++}`
+    while (names.has(safeProjectName(name).toLowerCase())) name = `${t('common.newProject')} ${n++}`
     const dbPath = await createProjectFolder(appSettings.projectsPath, name)
     await openProjectPath(dbPath)
   } catch (e) {
     console.error('Failed to create project', e)
-    appStore.setErrorActive(`Failed to create project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedCreateProject')}\n\n${formatError(e)}`)
   }
 }
 
 function formatError(e) {
-  if (e == null) return 'Unknown error'
+  if (e == null) return t('common.unknownError')
   if (typeof e === 'string') return e
   if (e instanceof Error) return e.message || String(e)
   try { return JSON.stringify(e) } catch { return String(e) }
@@ -308,7 +324,7 @@ async function handleMenuOpenProject() {
     await applyPersistedTheme(jsonStore.configFile)
   } catch (e) {
     console.error('Failed to open project', e)
-    appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(e)}`)
   }
 }
 
@@ -328,8 +344,8 @@ async function handleMenuSaveAs() {
 async function handleMenuImportAudio() {
   const selected = await openDialog({
     multiple: true,
-    title: 'Import Audio Files',
-    filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg'] }],
+    title: t('common.importAudioFiles'),
+    filters: [{ name: t('common.audioFiles'), extensions: ['mp3', 'wav', 'ogg'] }],
   })
   const files = pickOpenPaths(selected)
   if (!files.length) return
@@ -417,8 +433,40 @@ async function applyPersistedTheme(config) {
   applyThemeTokens(s, getPreset(theme)?.extras)
 }
 
+async function applyBootLocale(code) {
+  const next = resolveAppLocale(code)
+  await setLocale(next)
+  await appSettings.setLocale(next)
+  invoke('rebuild_menu', { lang: next }).catch(() => {})
+}
+
+function onFirstLanguage(code) {
+  languagePickerOpen.value = false
+  const resolve = languagePickerResolve
+  languagePickerResolve = null
+  if (resolve) resolve(code)
+}
+
+function waitForLanguagePick(initial) {
+  languagePickerInitial.value = initial
+  languagePickerOpen.value = true
+  return new Promise((resolve) => {
+    languagePickerResolve = resolve
+  })
+}
+
 onMounted(async () => {
+  splashLabel.value = t('splash.settings')
+  splashPercent.value = 12
   await appSettings.load()
+  splashPercent.value = 28
+
+  unlistenChrome = await listen('sn:chrome-changed', (e) => {
+    const payload = e?.payload
+    if (!payload || typeof payload !== 'object') return
+    appSettings.applyChromeFromEvent(payload)
+  })
+
   if (!isMain.value) {
     // Theme Creator / Record Editor: apply locale + chrome, skip project/menu ownership.
     // Tab list for Record Editor comes via `record_context` events from main.
@@ -427,24 +475,43 @@ onMounted(async () => {
     await appSettings.applyWindowChrome()
     return
   }
+
   if (appSettings.locale) {
-    setLocale(appSettings.locale)
-    invoke('rebuild_menu', { lang: appSettings.locale }).catch(() => {})
+    await applyBootLocale(appSettings.locale)
+  } else {
+    let installed = null
+    try { installed = await invoke('read_install_language') } catch { /* ignore */ }
+    const guessed = resolveAppLocale(installed || (typeof navigator !== 'undefined' ? navigator.language : 'en'))
+    if (installed) {
+      await applyBootLocale(guessed)
+    } else {
+      const picked = await waitForLanguagePick(guessed)
+      await applyBootLocale(picked)
+    }
   }
+  splashLabel.value = t('splash.fonts')
+  splashPercent.value = 48
   // Register any uploaded custom fonts so themed fonts render everywhere.
   loadCustomFonts(appSettings.fontsPath).catch(() => {})
+  splashLabel.value = t('splash.project')
+  splashPercent.value = 68
   try {
     await bootstrapProject()
   } catch (e) {
     console.error('Failed to bootstrap project', e)
-    appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(e)}`)
   }
   // One-time: pull audio device/volume prefs out of the project into app-config.db.
   await appSettings.migrateAudioFromProject(jsonStore.configFile?.settings)
+  splashLabel.value = t('splash.theme')
+  splashPercent.value = 88
   await applyPersistedTheme(jsonStore.configFile)
   if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
     invoke('set_gpu_audio', { enabled: true }).catch(() => {})
   }
+  splashLabel.value = t('splash.ready')
+  splashPercent.value = 100
+  setTimeout(() => { booting.value = false }, 280)
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
@@ -464,7 +531,7 @@ onMounted(async () => {
     const stillExists = await invoke('path_exists_abs', { path })
     if (!stillExists) {
       await appSettings.removeRecentProject(path)
-      appStore.setErrorActive('Project no longer exists.')
+      appStore.setErrorActive(t('common.projectGone'))
       return
     }
     try {
@@ -472,7 +539,7 @@ onMounted(async () => {
       await applyPersistedTheme(jsonStore.configFile)
     } catch (err) {
       console.error('Failed to open project', err)
-      appStore.setErrorActive(`Failed to open project.\n\n${formatError(err)}`)
+      appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(err)}`)
     }
   })
   listen('menu_save', handleMenuSave)
@@ -575,6 +642,10 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (unlistenChrome) {
+    unlistenChrome()
+    unlistenChrome = null
+  }
   if (isMain.value) {
     window.removeEventListener('keydown', onUndoRedoKeydown)
   }

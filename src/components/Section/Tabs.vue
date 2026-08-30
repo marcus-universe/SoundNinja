@@ -12,7 +12,7 @@
             :class="{ active: 'All' === appStore.currentTab }"
             @click="CheckTabContent('All')"
         >
-            All
+            {{ $t('tabs.all') }}
         </div>
 
         <div class="tab-list" ref="tabListRef">
@@ -27,7 +27,9 @@
             />
         </div>
 
-        <Icons :customClass="'addTab'" :icon="'plus'" @triggered="AddTab" />
+        <QuickInfo class="addTab-tip" :text="$t('tabs.addTab')" below fixed>
+          <Icons :customClass="'addTab icon'" :icon="'add'" @triggered="AddTab" />
+        </QuickInfo>
 
         <Transition name="fade">
             <RenameField v-if="appStore.PopupActive.active" />
