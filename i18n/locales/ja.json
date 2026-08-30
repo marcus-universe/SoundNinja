@@ -155,6 +155,8 @@
       "cacheMaxSizeHint": "音声キャッシュに予約する RAM の合計です。上限に達すると最も使われていない音から削除されます。",
       "cacheMaxEntry": "1 件あたりの最大ファイルサイズ",
       "cacheMaxEntryHint": "この上限より大きいファイルはキャッシュされず、常にディスクから直接読み込みます。",
+      "preloadGifs": "GIF / 画像を先読み",
+      "preloadGifsHint": "すべてのボタン GIF と画像をメモリに保持します。タブ切替がすぐ終わります。RAM を多く使います。",
       "cacheStatus": "キャッシュの状態",
       "cacheStatsText": "{count} 件キャッシュ済み \u00b7 {size} MiB 使用中",
       "clearCache": "キャッシュを消去",

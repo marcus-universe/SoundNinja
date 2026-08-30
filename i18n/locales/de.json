@@ -155,6 +155,8 @@
       "cacheMaxSizeHint": "Gesamter RAM-Speicher f\u00fcr den Sound-Cache. Bei \u00dcberschreitung werden zuletzt-genutzte Sounds ausgelagert (LRU).",
       "cacheMaxEntry": "Max. Dateigr\u00f6\u00dfe pro Eintrag",
       "cacheMaxEntryHint": "Dateien \u00fcber diesem Limit werden nie gecacht und immer direkt von der Festplatte gelesen.",
+      "preloadGifs": "GIFs / Bilder vorladen",
+      "preloadGifsHint": "Alle Button-GIFs und -Bilder im Speicher behalten. Tabwechsel bleibt sofort. Mehr RAM.",
       "cacheStatus": "Cache-Status",
       "cacheStatsText": "{count} Sound(s) gecacht \u00b7 {size} MiB belegt",
       "clearCache": "Cache leeren",

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import {
   openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
-  loadGifBlobsByIds, upsertGifBlob, healFolderTabMembership, mergeTabsFromUsage,
+  healFolderTabMembership, mergeTabsFromUsage,
   persistSoundIds,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
@@ -245,42 +245,37 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     /**
-     * Saves the current in-memory project to a new file path (Save As).
-     * Handles empty Save-dialog placeholders that break SQLite open.
+     * Save As: flush live DB, then copy the SQLite file (gif_blobs included).
+     * Avoids pulling every GIF across IPC and rewriting the whole DB.
      */
     async saveAs(dbAbsPath: string) {
       const { ensureProjectParentDir, removeInvalidProjectPlaceholder } = await import('~/utils/projects')
+      const { invoke } = await import('@tauri-apps/api/core')
       await ensureProjectParentDir(dbAbsPath)
       await removeInvalidProjectPlaceholder(dbAbsPath)
-      const config = clone(this.configFile)
-      const gifIds = [...new Set(config.files.map((f) => f.gifId).filter((id): id is string => !!id))]
-      let blobs: Awaited<ReturnType<typeof loadGifBlobsByIds>> = []
-      if (this.currentProjectPath && gifIds.length) {
-        const oldPath = this.currentProjectPath
-        blobs = await withProjectDb(oldPath, (d) => loadGifBlobsByIds(d, gifIds))
+
+      const src = this.currentProjectPath
+      if (!src) {
+        await this.importConfig(clone(this.configFile), dbAbsPath)
+        return
       }
-      try {
-        await this.importConfig(config, dbAbsPath)
-        if (blobs.length) {
-          await withProjectDb(dbAbsPath, async (d) => {
-            for (const row of blobs) await upsertGifBlob(d, row)
-          })
-        }
-      } catch (e) {
-        // Retry once after deleting a non-SQLite placeholder the dialog may have created.
-        const msg = String(e)
-        if (/not a database|unable to open|file is encrypted|disk image/i.test(msg)) {
-          try { await (await import('@tauri-apps/api/core')).invoke('delete_file_abs', { path: dbAbsPath }) } catch { /* ignore */ }
-          await this.importConfig(config, dbAbsPath)
-          if (blobs.length) {
-            await withProjectDb(dbAbsPath, async (d) => {
-              for (const row of blobs) await upsertGifBlob(d, row)
-            })
-          }
-          return
-        }
-        throw e
+
+      const same = src.replace(/\\/g, '/').toLowerCase() === dbAbsPath.replace(/\\/g, '/').toLowerCase()
+      if (same) {
+        await this.persistNow()
+        return
       }
+
+      await this.persistNow()
+      await withProjectDb(src, async (d) => {
+        try { await d.execute('PRAGMA wal_checkpoint(TRUNCATE)') } catch { /* copy main file anyway */ }
+      })
+      await invoke('copy_file_to_abs', { src, dst: dbAbsPath })
+      await reopenDb(dbAbsPath)
+      this.currentProjectPath = dbAbsPath
+      this.openingSnapshot = clone(this.configFile)
+      this.dirty = false
+      this.clearHistory()
     },
 
     updateConfigFile(contents: ProjectConfig) {
@@ -387,6 +382,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
     setGifPlayOnHover(val: boolean) {
       this.configFile.settings.gifPlayOnHover = val
+      this.writeConfig()
+    },
+    setPreloadGifs(val: boolean) {
+      this.configFile.settings.preloadGifs = val
       this.writeConfig()
     },
     // Generic single-setting update — avoids a dedicated action per field.

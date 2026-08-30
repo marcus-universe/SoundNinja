@@ -40,6 +40,14 @@
       <button class="settings-btn" style="flex: 0; white-space: nowrap" @click="onClearCache">{{ $t('settings.main.clearCache') }}</button>
     </div>
 
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.preloadGifs') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.preloadGifsHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="preloadGifs" @update:modelValue="onPreloadGifs" />
+    </div>
+
     <div v-if="hasDedicatedGpu" class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.gpuAudio') }}</span>
@@ -92,6 +100,7 @@ const appSettings = useAppSettingsStore()
 
 const cacheMaxSizeMib = ref(64)
 const cacheMaxEntryMib = ref(16)
+const preloadGifs = ref(false)
 const cacheStatsText = ref('')
 const hasDedicatedGpu = ref(false)
 const gpuAudioEnabled = ref(false)
@@ -194,6 +203,11 @@ async function onClearCache() {
   }
 }
 
+function onPreloadGifs(val: boolean) {
+  preloadGifs.value = val
+  jsonStore.setPreloadGifs(val)
+}
+
 async function onGpuAudio(val: boolean) {
   gpuAudioEnabled.value = val
   jsonStore.setSetting('gpuAudioEnabled', val)
@@ -208,6 +222,7 @@ async function syncFromStore() {
   if (!appSettings.loaded) await appSettings.load()
   cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 64
   cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 16
+  preloadGifs.value = jsonStore.configFile?.settings?.preloadGifs === true
   try {
     await invoke('set_cache_config', {
       maxSizeMib: cacheMaxSizeMib.value,

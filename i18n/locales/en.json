@@ -155,6 +155,8 @@
       "cacheMaxSizeHint": "Total RAM reserved for sound caching. Least-recently-used sounds are evicted when the limit is reached.",
       "cacheMaxEntry": "Max file size per entry",
       "cacheMaxEntryHint": "Files larger than this limit are never cached and are always read directly from disk.",
+      "preloadGifs": "Preload GIFs / images",
+      "preloadGifsHint": "Keep all button GIFs and images in memory. Tab switches stay instant. Uses more RAM.",
       "cacheStatus": "Cache status",
       "cacheStatsText": "{count} sound(s) cached \u00b7 {size} MiB used",
       "clearCache": "Clear cache",

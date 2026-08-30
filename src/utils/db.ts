@@ -118,6 +118,8 @@ export interface Settings {
   playerLarge?: boolean
   /** When true, GIF button backgrounds animate only while hovered. Default on. */
   gifPlayOnHover?: boolean
+  /** Keep GIF/image blobs in memory across tabs so switching does not reload them. */
+  preloadGifs?: boolean
   /** Board animation when switching tabs. Unknown/missing → slide. */
   tabTransition?: TabTransition
   /** User-added sound trigger bindings (travel with the project). */
@@ -162,6 +164,7 @@ export function defaultSettings(): Settings {
     showPlayer: true,
     playerLarge: false,
     gifPlayOnHover: true,
+    preloadGifs: false,
     tabTransition: 'slide',
     soundHotkeys: [],
   }
@@ -478,6 +481,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'showPlayer': settings.showPlayer = value === 'true'; break
       case 'playerLarge': settings.playerLarge = value === 'true'; break
       case 'gifPlayOnHover': settings.gifPlayOnHover = value !== 'false'; break
+      case 'preloadGifs': settings.preloadGifs = value === 'true'; break
       case 'tabTransition': settings.tabTransition = normalizeTabTransition(value); break
       case 'soundHotkeys':
         try { settings.soundHotkeys = JSON.parse(value) } catch { settings.soundHotkeys = [] }
@@ -672,6 +676,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
     ['allowReorder', String(s.allowReorder ?? true)],
     ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
+    ['preloadGifs', String(s.preloadGifs === true)],
     ['tabTransition', normalizeTabTransition(s.tabTransition)],
     ['soundHotkeys', JSON.stringify(s.soundHotkeys ?? [])],
     ['primaryColor', s.primaryColor ?? '#00d4ff'],

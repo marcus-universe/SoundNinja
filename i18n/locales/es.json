@@ -155,6 +155,8 @@
       "cacheMaxSizeHint": "RAM total reservada para la caché de sonidos. Los sonidos menos recientes se expulsan al alcanzar el límite.",
       "cacheMaxEntry": "Tamaño máximo por entrada",
       "cacheMaxEntryHint": "Los archivos mayores que este límite nunca se cachean y siempre se leen del disco.",
+      "preloadGifs": "Precargar GIFs / imágenes",
+      "preloadGifsHint": "Mantener todos los GIF e imágenes de botones en memoria. Cambiar de pestaña es instantáneo. Usa más RAM.",
       "cacheStatus": "Estado de la caché",
       "cacheStatsText": "{count} sonido(s) en caché \u00b7 {size} MiB usados",
       "clearCache": "Vaciar caché",

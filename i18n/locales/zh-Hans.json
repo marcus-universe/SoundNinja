@@ -155,6 +155,8 @@
       "cacheMaxSizeHint": "为声音缓存预留的总内存。达到上限时会淘汰最久未使用的声音。",
       "cacheMaxEntry": "单条最大文件大小",
       "cacheMaxEntryHint": "超过此限制的文件永不缓存，始终直接从磁盘读取。",
+      "preloadGifs": "预加载 GIF / 图片",
+      "preloadGifsHint": "将所有按钮的 GIF 和图片保留在内存中。切换标签页即时显示。占用更多内存。",
       "cacheStatus": "缓存状态",
       "cacheStatsText": "已缓存 {count} 个声音 \u00b7 已用 {size} MiB",
       "clearCache": "清空缓存",

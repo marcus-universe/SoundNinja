@@ -410,6 +410,7 @@ onUnmounted(() => {
 })
 
 const gifPlayOnHover = computed(() => Settings.value?.gifPlayOnHover !== false)
+const preloadGifs = computed(() => Settings.value?.preloadGifs === true)
 const visibleByPath = reactive({})
 const hoveredPath = ref(null)
 const gifUrls = reactive({})
@@ -445,19 +446,22 @@ function gifSrcFor(sound) {
   return urls.posterUrl
 }
 
-async function loadVisibleGifs() {
+async function loadGifIds(ids) {
+  const unique = [...new Set(ids.filter(Boolean))]
+  const missing = unique.filter((id) => !gifUrls[id] && !peekGifUrls(id))
+  if (!missing.length) {
+    for (const id of unique) {
+      if (!gifUrls[id]) {
+        const urls = peekGifUrls(id)
+        if (urls) gifUrls[id] = urls
+      }
+    }
+    return
+  }
   const path = jsonStore.currentProjectPath
   if (!path) return
-  const ids = []
-  for (const sound of allDisplaySounds.value) {
-    if (!sound.gifId) continue
-    if (!visibleByPath[sound.path]) continue
-    if (gifUrls[sound.gifId] || peekGifUrls(sound.gifId)) continue
-    ids.push(sound.gifId)
-  }
-  if (!ids.length) return
   try {
-    const rows = await withProjectDb(path, (d) => loadGifBlobsByIds(d, ids))
+    const rows = await withProjectDb(path, (d) => loadGifBlobsByIds(d, missing))
     for (const row of rows) {
       gifUrls[row.id] = cacheGifRow(row)
     }
@@ -466,7 +470,27 @@ async function loadVisibleGifs() {
   }
 }
 
+async function loadVisibleGifs() {
+  if (preloadGifs.value) {
+    await loadAllGifs()
+    return
+  }
+  const ids = []
+  for (const sound of allDisplaySounds.value) {
+    if (!sound.gifId) continue
+    if (!visibleByPath[sound.path]) continue
+    ids.push(sound.gifId)
+  }
+  await loadGifIds(ids)
+}
+
+async function loadAllGifs() {
+  const ids = (jsonStore.configFile?.files ?? []).map((f) => f.gifId).filter(Boolean)
+  await loadGifIds(ids)
+}
+
 function releaseOffscreenGif(soundPath) {
+  if (preloadGifs.value) return
   const file = jsonStore.configFile?.files?.find((f) => f.path === soundPath)
   const id = file?.gifId
   if (!id) return
@@ -571,6 +595,10 @@ watch(currentTab, () => {
     setupGifObserver()
     loadVisibleGifs()
   })
+})
+
+watch(preloadGifs, (on) => {
+  if (on) loadAllGifs()
 })
 
 watch(

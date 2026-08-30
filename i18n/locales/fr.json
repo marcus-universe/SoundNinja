@@ -155,6 +155,8 @@
       "cacheMaxSizeHint": "RAM totale réservée au cache des sons. Les sons les moins récemment utilisés sont évincés lorsque la limite est atteinte.",
       "cacheMaxEntry": "Taille max. par entrée",
       "cacheMaxEntryHint": "Les fichiers plus grands que cette limite ne sont jamais mis en cache et sont toujours lus depuis le disque.",
+      "preloadGifs": "Précharger les GIFs / images",
+      "preloadGifsHint": "Garder tous les GIF et images des boutons en mémoire. Changer d’onglet reste instantané. Plus de RAM.",
       "cacheStatus": "État du cache",
       "cacheStatsText": "{count} son(s) en cache \u00b7 {size} MiB utilisés",
       "clearCache": "Vider le cache",
