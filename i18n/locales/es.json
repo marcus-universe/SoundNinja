@@ -12,6 +12,8 @@
     "saveAs": "Guardar como…",
     "importAudio": "Importar archivos de audio",
     "importFolders": "Importar carpetas",
+    "exportSoundboard": "Exportar soundboard",
+    "importSoundboard": "Importar soundboard",
     "quit": "Salir",
     "undo": "Deshacer",
     "redo": "Rehacer",
@@ -46,6 +48,7 @@
       "main": "Principal",
       "behavior": "Comportamiento",
       "audio": "Audio",
+      "hotkeys": "Atajos",
       "performance": "Rendimiento",
       "theme": "Tema",
       "about": "Acerca de"
@@ -56,6 +59,29 @@
       "controls": "Controles",
       "ui": "Interfaz",
       "gifs": "GIFs"
+    },
+    "hotkeys": {
+      "actions": "Acciones de la app",
+      "actionsHint": "Haz clic en un atajo y pulsa una tecla. Escape cancela. Retroceso borra.",
+      "triggers": "Disparadores de sonido",
+      "triggersHint": "Añade sonidos por ID (cópiala en la selección múltiple). No se listan todos solos.",
+      "globalTriggers": "Disparadores globales",
+      "globalTriggersHint": "Activa sonidos aunque Sound Ninja esté en segundo plano. Las letras sueltas roban el teclado en otras apps.",
+      "addTrigger": "Añadir disparador",
+      "remove": "Quitar",
+      "pressKey": "Pulsa una tecla…",
+      "unset": "Ninguno",
+      "soundIdPlaceholder": "ID del sonido",
+      "unknownId": "ID desconocida",
+      "conflict": "Se liberó el atajo anterior de {combo}",
+      "action": {
+        "save": "Guardar",
+        "saveAs": "Guardar como",
+        "undo": "Deshacer",
+        "redo": "Rehacer",
+        "search": "Buscar",
+        "stopAll": "Detener todos los sonidos"
+      }
     },
     "main": {
       "title": "Principal",
@@ -395,7 +421,11 @@
     "colorBorder": "Borde",
     "colorBorderHover": "Borde al pasar",
     "resetColor": "Restablecer valor",
-    "resetAllColors": "Restablecer todos los colores"
+    "resetAllColors": "Restablecer todos los colores",
+    "copyId": "Copiar ID",
+    "copyIdDesc": "Copiar el ID único de este sonido",
+    "assignHotkey": "Asignar atajo",
+    "assignHotkeyDesc": "Añadir un disparador de reproducción en Ajustes"
   },
   "gifPicker": {
     "title": "Fondo GIF",
@@ -514,5 +544,13 @@
     "unsavedHint": "Tienes grabaciones, ediciones o clips en preparación sin guardar. ¿Cerrar de todos modos?",
     "discard": "Descartar",
     "cancel": "Cancelar"
+  },
+  "soundboard": {
+    "exportTitle": "Exportar soundboard",
+    "importTitle": "Importar soundboard",
+    "exporting": "Empaquetando sonidos…",
+    "importing": "Descomprimiendo soundboard…",
+    "exportFailed": "Error al exportar el soundboard",
+    "importFailed": "Error al importar el soundboard"
   }
 }

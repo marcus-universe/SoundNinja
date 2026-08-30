@@ -454,6 +454,24 @@
           background-color: transparent;
         }
 
+        .sound-id-chip {
+          position: absolute;
+          top: 0.36rem;
+          right: 0.36rem;
+          z-index: 3;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 0.85rem;
+          letter-spacing: 0.04em;
+          line-height: 1;
+          padding: 0.18rem 0.36rem;
+          border-radius: 0.32rem;
+          color: var(--btn-text, #eeeeee);
+          background: color-mix(in srgb, var(--color-bg, #222831) 72%, transparent);
+          border: 0.1rem solid color-mix(in srgb, var(--btn-border, var(--primary_color)) 55%, transparent);
+          pointer-events: auto;
+          user-select: none;
+        }
+
         .sound-spinner {
           position: absolute;
           top: 0.4rem;

@@ -13,6 +13,11 @@ import {
   type RecentProject,
 } from '~/utils/appConfig'
 import type Database from '@tauri-apps/plugin-sql'
+import {
+  DEFAULT_APP_HOTKEYS,
+  parseAppHotkeys,
+  type AppHotkeyAction,
+} from '~/utils/hotkeys'
 
 const DEFAULT_RECENT_LIMIT = 30
 
@@ -56,6 +61,10 @@ export const useAppSettingsStore = defineStore('appSettings', {
     /** True once audio keys exist in app-config.db (or after one-time project migrate). */
     audioMigrated: false,
     loaded: false,
+    /** Remappable in-app action combos. */
+    hotkeys: { ...DEFAULT_APP_HOTKEYS } as Record<AppHotkeyAction, string>,
+    /** When true, sound-trigger combos register as OS-global shortcuts. */
+    soundTriggersGlobal: false,
   }),
 
   getters: {
@@ -92,6 +101,12 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
       this.klipyApiKey = s.klipyApiKey || ''
+      try {
+        this.hotkeys = parseAppHotkeys(s.hotkeys ? JSON.parse(s.hotkeys) : null)
+      } catch {
+        this.hotkeys = { ...DEFAULT_APP_HOTKEYS }
+      }
+      this.soundTriggersGlobal = s.soundTriggersGlobal === '1' || s.soundTriggersGlobal === 'true'
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
         || s.inputSource != null || s.inputHost != null
@@ -235,6 +250,24 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.checkUpdatesOnStart = !!enabled
       const d = await this._db()
       await saveSetting(d, 'checkUpdatesOnStart', this.checkUpdatesOnStart ? '1' : '0')
+    },
+
+    async setHotkeys(hotkeys: Record<AppHotkeyAction, string>) {
+      this.hotkeys = { ...DEFAULT_APP_HOTKEYS, ...hotkeys }
+      const d = await this._db()
+      await saveSetting(d, 'hotkeys', JSON.stringify(this.hotkeys))
+    },
+
+    async setAppHotkey(action: AppHotkeyAction, combo: string) {
+      this.hotkeys = { ...this.hotkeys, [action]: combo }
+      const d = await this._db()
+      await saveSetting(d, 'hotkeys', JSON.stringify(this.hotkeys))
+    },
+
+    async setSoundTriggersGlobal(enabled: boolean) {
+      this.soundTriggersGlobal = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'soundTriggersGlobal', this.soundTriggersGlobal ? '1' : '0')
     },
 
     async setKlipyApiKey(key: string) {

@@ -5,6 +5,8 @@ pub mod menu;
 pub mod paths;
 pub mod fsx;
 pub mod httpx;
+pub mod soundboard;
+pub mod hotkeys;
 
 #[tauri::command]
 fn get_system_fonts() -> Vec<String> {
@@ -94,6 +96,7 @@ fn main() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             // On macOS keep native decorations (traffic lights) — the custom
             // HTML title bar in TitleBar.vue only renders on Windows/Linux.
@@ -194,7 +197,11 @@ fn main() {
             httpx::http_get_text,
             gpu::has_dedicated_gpu,
             gpu::set_gpu_audio,
-            gpu::get_gpu_audio_enabled
+            gpu::get_gpu_audio_enabled,
+            soundboard::make_temp_dir,
+            soundboard::export_soundboard_zip,
+            soundboard::import_soundboard_zip,
+            hotkeys::set_global_sound_hotkeys
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

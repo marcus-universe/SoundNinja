@@ -12,6 +12,8 @@
     "saveAs": "另存为…",
     "importAudio": "导入音频文件",
     "importFolders": "导入文件夹",
+    "exportSoundboard": "导出声音板",
+    "importSoundboard": "导入声音板",
     "quit": "退出",
     "undo": "撤销",
     "redo": "重做",
@@ -46,6 +48,7 @@
       "main": "常规",
       "behavior": "行为",
       "audio": "音频",
+      "hotkeys": "快捷键",
       "performance": "性能",
       "theme": "主题",
       "about": "关于"
@@ -56,6 +59,29 @@
       "controls": "控件",
       "ui": "界面",
       "gifs": "GIF"
+    },
+    "hotkeys": {
+      "actions": "应用操作",
+      "actionsHint": "点击绑定后按键。Esc 取消。Backspace 清除。",
+      "triggers": "声音触发",
+      "triggersHint": "用 ID 添加声音（多选模式可复制）。不会自动列出全部声音。",
+      "globalTriggers": "全局声音触发",
+      "globalTriggersHint": "即使 Sound Ninja 在后台也能触发。单个字母会抢走其他应用的键盘输入。",
+      "addTrigger": "添加声音触发",
+      "remove": "移除",
+      "pressKey": "请按键…",
+      "unset": "无",
+      "soundIdPlaceholder": "声音 ID",
+      "unknownId": "未知 ID",
+      "conflict": "已释放 {combo} 的旧绑定",
+      "action": {
+        "save": "保存",
+        "saveAs": "另存为",
+        "undo": "撤销",
+        "redo": "重做",
+        "search": "搜索",
+        "stopAll": "停止全部声音"
+      }
     },
     "main": {
       "title": "常规",
@@ -395,7 +421,11 @@
     "colorBorder": "边框",
     "colorBorderHover": "边框悬停",
     "resetColor": "恢复默认",
-    "resetAllColors": "重置所有颜色"
+    "resetAllColors": "重置所有颜色",
+    "copyId": "复制 ID",
+    "copyIdDesc": "复制此声音的唯一 ID",
+    "assignHotkey": "分配快捷键",
+    "assignHotkeyDesc": "在设置中为此声音添加播放触发"
   },
   "gifPicker": {
     "title": "GIF 背景",
@@ -514,5 +544,13 @@
     "unsavedHint": "你有未保存的录音、编辑或暂存片段。仍要关闭吗？",
     "discard": "丢弃",
     "cancel": "取消"
+  },
+  "soundboard": {
+    "exportTitle": "导出声音板",
+    "importTitle": "导入声音板",
+    "exporting": "正在打包声音…",
+    "importing": "正在解压声音板…",
+    "exportFailed": "导出声音板失败",
+    "importFailed": "导入声音板失败"
   }
 }

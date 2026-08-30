@@ -417,6 +417,80 @@
   transition: width 0.12s linear;
 }
 
+.settings-hotkeys__hint {
+  padding-left: 4rem;
+  margin: 0 0 0.8rem;
+}
+
+.settings-hotkeys__row {
+  align-items: center;
+}
+
+.settings-hotkeys__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.4rem 4rem;
+  flex-wrap: wrap;
+}
+
+.settings-hotkeys__id {
+  width: 10rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+}
+
+.settings-hotkeys__name {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  font-size: 1.15rem;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.is-missing {
+    font-style: italic;
+    opacity: 0.65;
+  }
+}
+
+.settings-hotkeys__capture {
+  min-width: 12rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.48rem;
+  border: 0.16rem solid var(--btn-border, var(--primary_color));
+  background: transparent;
+  color: var(--color-text, #{$white});
+  font-family: inherit;
+  font-size: 1.15rem;
+  cursor: pointer;
+
+  &.is-capturing {
+    border-color: var(--primary_color);
+    background: color-mix(in srgb, var(--primary_color) 18%, transparent);
+  }
+}
+
+.settings-hotkeys__remove {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
+  cursor: pointer;
+  font-family: inherit;
+
+  &:hover {
+    color: var(--color-text, #{$white});
+  }
+}
+
+.settings-hotkeys__conflict {
+  padding-left: 4rem;
+  color: var(--primary_color);
+}
+
 .settings-section-divider {
   font-family: $fontBold;
   font-size: 1.15rem;

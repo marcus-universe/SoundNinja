@@ -34,11 +34,11 @@ The core mission was to build a soundboard that empowers you to organize massive
 | **Custom Profiles**          | Create multiple Soundboards with different settings       | ✅     |
 | **Recorder**                 | Record your PC-Audio directly in Sound Ninja              | ✅     |
 | **Gifs & Images**            | Give your Sounds an Image/Gif                             | ✅     |
+| **Customizable Hotkeys**     | Customize the Hotkeys to your needs                       | ✅     |
+| **Soundboard Sharing**       | Share your Soundboard with your friends                   | ✅     |
+| **Soundboard Import/Export** | Import and Export your Soundboard                         | ✅     |
 | **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
 | **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
-| **Customizable Hotkeys**     | Customize the Hotkeys to your needs                       | ⛔     |
-| **Soundboard Sharing**       | Share your Soundboard with your friends                   | ⛔     |
-| **Soundboard Import/Export** | Import and Export your Soundboard                         | ⛔     |
 | **Websocket**                | Control your Soundboard with your Smartphone              | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |

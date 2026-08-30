@@ -12,6 +12,8 @@
     "saveAs": "名前を付けて保存…",
     "importAudio": "音声ファイルを読み込む",
     "importFolders": "フォルダーを読み込む",
+    "exportSoundboard": "サウンドボードを書き出す",
+    "importSoundboard": "サウンドボードを読み込む",
     "quit": "終了",
     "undo": "元に戻す",
     "redo": "やり直す",
@@ -46,6 +48,7 @@
       "main": "一般",
       "behavior": "動作",
       "audio": "オーディオ",
+      "hotkeys": "ホットキー",
       "performance": "パフォーマンス",
       "theme": "テーマ",
       "about": "情報"
@@ -56,6 +59,29 @@
       "controls": "操作",
       "ui": "UI",
       "gifs": "GIF"
+    },
+    "hotkeys": {
+      "actions": "アプリ操作",
+      "actionsHint": "割り当てをクリックしてキーを押す。Esc で中止。Backspace で解除。",
+      "triggers": "サウンドトリガー",
+      "triggersHint": "ID でサウンドを追加（複数選択でコピー）。全サウンドは自動では出ない。",
+      "globalTriggers": "グローバルサウンドトリガー",
+      "globalTriggersHint": "Sound Ninja が非アクティブでも再生。単一文字は他アプリの入力を奪う。",
+      "addTrigger": "トリガーを追加",
+      "remove": "削除",
+      "pressKey": "キーを押す…",
+      "unset": "なし",
+      "soundIdPlaceholder": "サウンド ID",
+      "unknownId": "不明な ID",
+      "conflict": "{combo} の以前の割り当てを解除した",
+      "action": {
+        "save": "保存",
+        "saveAs": "名前を付けて保存",
+        "undo": "元に戻す",
+        "redo": "やり直す",
+        "search": "検索",
+        "stopAll": "すべて停止"
+      }
     },
     "main": {
       "title": "一般",
@@ -395,7 +421,11 @@
     "colorBorder": "枠",
     "colorBorderHover": "枠（ホバー）",
     "resetColor": "初期値に戻す",
-    "resetAllColors": "すべての色をリセット"
+    "resetAllColors": "すべての色をリセット",
+    "copyId": "ID をコピー",
+    "copyIdDesc": "このサウンドの一意な ID をコピー",
+    "assignHotkey": "ホットキーを割り当て",
+    "assignHotkeyDesc": "設定でこのサウンドの再生トリガーを追加"
   },
   "gifPicker": {
     "title": "GIF 背景",
@@ -514,5 +544,13 @@
     "unsavedHint": "保存していない録音、編集、またはステージ済みクリップがあります。それでも閉じますか？",
     "discard": "破棄",
     "cancel": "キャンセル"
+  },
+  "soundboard": {
+    "exportTitle": "サウンドボードを書き出す",
+    "importTitle": "サウンドボードを読み込む",
+    "exporting": "サウンドをパックしています…",
+    "importing": "サウンドボードを展開しています…",
+    "exportFailed": "サウンドボードの書き出しに失敗",
+    "importFailed": "サウンドボードの読み込みに失敗"
   }
 }

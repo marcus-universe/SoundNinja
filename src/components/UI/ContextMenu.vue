@@ -93,6 +93,36 @@
             <span v-if="hoveredItem === 'group'" class="context-menu__desc">{{ $t('contextMenu.addGroupDesc') }}</span>
           </Transition>
         </li>
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="copySoundId"
+          @mouseenter="hoveredItem = 'copyId'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="rename" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.copyId') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'copyId'" class="context-menu__desc">{{ $t('contextMenu.copyIdDesc') }}</span>
+          </Transition>
+        </li>
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="assignHotkey"
+          @mouseenter="hoveredItem = 'assignHotkey'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="settings" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.assignHotkey') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'assignHotkey'" class="context-menu__desc">{{ $t('contextMenu.assignHotkeyDesc') }}</span>
+          </Transition>
+        </li>
 
         <!-- Tab button alignment -->
         <li
@@ -233,6 +263,7 @@ import {
   overrideSwatch,
   resolveEffectiveColors,
 } from '~/utils/colorOverride'
+import { copyText } from '~/utils/clipboard'
 
 const { t: $t } = useI18n()
 const appStore = useAppStore()
@@ -482,6 +513,25 @@ function resetPanels() {
 function close() {
   appStore.closeContextMenu()
   resetPanels()
+}
+
+function currentSound() {
+  const { targetIndex } = appStore.contextMenu
+  return jsonStore.configFile.files[targetIndex] ?? null
+}
+
+async function copySoundId() {
+  const sound = currentSound()
+  close()
+  if (sound?.id) await copyText(sound.id)
+}
+
+function assignHotkey() {
+  const sound = currentSound()
+  close()
+  if (!sound?.id) return
+  appStore.pendingHotkeySoundId = sound.id
+  appStore.openSettingsTab('hotkeys')
 }
 
 function openGifPicker() {

@@ -12,6 +12,8 @@
     "saveAs": "Enregistrer sous…",
     "importAudio": "Importer des fichiers audio",
     "importFolders": "Importer des dossiers",
+    "exportSoundboard": "Exporter le soundboard",
+    "importSoundboard": "Importer un soundboard",
     "quit": "Quitter",
     "undo": "Annuler",
     "redo": "Rétablir",
@@ -46,6 +48,7 @@
       "main": "Général",
       "behavior": "Comportement",
       "audio": "Audio",
+      "hotkeys": "Raccourcis",
       "performance": "Performances",
       "theme": "Thème",
       "about": "À propos"
@@ -56,6 +59,29 @@
       "controls": "Contrôles",
       "ui": "Interface",
       "gifs": "GIFs"
+    },
+    "hotkeys": {
+      "actions": "Actions de l’app",
+      "actionsHint": "Clique un raccourci, puis appuie sur une touche. Échap annule. Retour arrière efface.",
+      "triggers": "Déclencheurs son",
+      "triggersHint": "Ajoute des sons par ID (copie en sélection multiple). Tous les sons ne sont pas listés.",
+      "globalTriggers": "Déclencheurs globaux",
+      "globalTriggersHint": "Joue les sons même si Sound Ninja est en arrière-plan. Les lettres seules volent le clavier des autres apps.",
+      "addTrigger": "Ajouter un déclencheur",
+      "remove": "Retirer",
+      "pressKey": "Appuie sur une touche…",
+      "unset": "Aucun",
+      "soundIdPlaceholder": "ID du son",
+      "unknownId": "ID inconnue",
+      "conflict": "Ancien raccourci libéré pour {combo}",
+      "action": {
+        "save": "Enregistrer",
+        "saveAs": "Enregistrer sous",
+        "undo": "Annuler",
+        "redo": "Rétablir",
+        "search": "Recherche",
+        "stopAll": "Arrêter tous les sons"
+      }
     },
     "main": {
       "title": "Général",
@@ -395,7 +421,11 @@
     "colorBorder": "Bordure",
     "colorBorderHover": "Bordure au survol",
     "resetColor": "Réinitialiser",
-    "resetAllColors": "Réinitialiser toutes les couleurs"
+    "resetAllColors": "Réinitialiser toutes les couleurs",
+    "copyId": "Copier l’ID",
+    "copyIdDesc": "Copier l’ID unique de ce son",
+    "assignHotkey": "Assigner un raccourci",
+    "assignHotkeyDesc": "Ajouter un déclencheur de lecture dans les paramètres"
   },
   "gifPicker": {
     "title": "Fond GIF",
@@ -514,5 +544,13 @@
     "unsavedHint": "Tu as des enregistrements, modifications ou clips en préparation non enregistrés. Fermer quand même ?",
     "discard": "Abandonner",
     "cancel": "Annuler"
+  },
+  "soundboard": {
+    "exportTitle": "Exporter le soundboard",
+    "importTitle": "Importer un soundboard",
+    "exporting": "Empaquetage des sons…",
+    "importing": "Extraction du soundboard…",
+    "exportFailed": "Échec de l’export du soundboard",
+    "importFailed": "Échec de l’import du soundboard"
   }
 }

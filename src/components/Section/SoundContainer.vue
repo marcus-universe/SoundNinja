@@ -33,6 +33,7 @@
                     :btnStyle="getBtnStyle(sound)"
                     :loading="loadingPaths.has(sound.path)"
                     :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
+                    :multi-select="appStore.multiSelectActive"
                     :gifSrc="gifSrcFor(sound)"
                     :gifPosX="sound.gifPosX ?? 50"
                     :gifPosY="sound.gifPosY ?? 50"
@@ -71,6 +72,7 @@
                             :btnStyle="getBtnStyle(sound)"
                             :loading="loadingPaths.has(sound.path)"
                             :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
+                            :multi-select="appStore.multiSelectActive"
                             :gifSrc="gifSrcFor(sound)"
                             :gifPosX="sound.gifPosX ?? 50"
                             :gifPosY="sound.gifPosY ?? 50"
@@ -702,6 +704,8 @@ onMounted(async () => {
   unlistenPlaying = await listen('playing_changed', (event) => {
     syncProgressPauseState(event.payload ?? [])
   })
+  window.addEventListener('sn:play-sound-id', onPlaySoundId)
+  window.addEventListener('sn:stop-all', onHotkeyStopAll)
 })
 
 onUnmounted(() => {
@@ -711,7 +715,29 @@ onUnmounted(() => {
   window.removeEventListener('blur', syncWindowFocus)
   if (unlistenFinished) unlistenFinished()
   if (unlistenPlaying) unlistenPlaying()
+  window.removeEventListener('sn:play-sound-id', onPlaySoundId)
+  window.removeEventListener('sn:stop-all', onHotkeyStopAll)
 })
+
+function playSoundById(soundId) {
+  const sound = jsonStore.configFile.files.find((f) => f.id === soundId)
+  if (!sound) return
+  if (jsonStore.missingPaths.includes(sound.path)) {
+    appStore.setRelinkActive(true)
+    return
+  }
+  setActiveSound(sound)
+}
+
+function onPlaySoundId(e) {
+  const id = e?.detail
+  if (typeof id === 'string' && id) playSoundById(id)
+}
+
+function onHotkeyStopAll() {
+  stopAllProgress()
+  jsonStore.ReturnStatusAll()
+}
 
 function onSoundClick(sound) {
   if (appStore.multiSelectActive) {

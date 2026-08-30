@@ -18,16 +18,25 @@
             :style="{ objectPosition: gifPosX + '% ' + gifPosY + '%' }"
         />
         <span class="sound-label">{{ sound.name }}</span>
+        <span
+          v-if="multiSelect && sound.id"
+          class="sound-id-chip"
+          :title="sound.id"
+          @contextmenu.prevent.stop="copyId"
+        >{{ sound.id }}</span>
         <span v-if="loading" class="sound-spinner" aria-hidden="true" />
     </div>
 </template>
 
 <script setup>
-defineProps({
+import { copyText } from '~/utils/clipboard'
+
+const props = defineProps({
   sound: { type: Object, required: true },
   btnStyle: { type: Object, default: () => ({}) },
   loading: { type: Boolean, default: false },
   selected: { type: Boolean, default: false },
+  multiSelect: { type: Boolean, default: false },
   gifSrc: { type: String, default: '' },
   gifPosX: { type: Number, default: 50 },
   gifPosY: { type: Number, default: 50 },
@@ -36,4 +45,8 @@ defineProps({
   missing: { type: Boolean, default: false },
 })
 defineEmits(['play', 'contextmenu', 'gifhover'])
+
+function copyId() {
+  copyText(props.sound.id)
+}
 </script>

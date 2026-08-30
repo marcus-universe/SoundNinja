@@ -8,6 +8,8 @@ export const MAX_GIF_BYTES = 8 * 1024 * 1024
 export interface SoundFile {
   name: string
   path: string
+  /** Stable 8-char `[a-z0-9]` id. Assigned on create / load migration. */
+  id: string
   volume: number
   tabs: string[]
   active: boolean
@@ -117,6 +119,8 @@ export interface Settings {
   gifPlayOnHover?: boolean
   /** Board animation when switching tabs. Unknown/missing → slide. */
   tabTransition?: TabTransition
+  /** User-added sound trigger bindings (travel with the project). */
+  soundHotkeys?: { id: string; soundId: string; combo: string }[]
 }
 
 export interface ProjectConfig {
@@ -158,6 +162,7 @@ export function defaultSettings(): Settings {
     playerLarge: false,
     gifPlayOnHover: true,
     tabTransition: 'slide',
+    soundHotkeys: [],
   }
 }
 
@@ -384,6 +389,7 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'separators', 'name_color', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
+  await addColumnIfMissing(d, 'sounds', 'id', 'TEXT')
 }
 
 async function addColumnIfMissing(
@@ -416,6 +422,9 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'playerLarge': settings.playerLarge = value === 'true'; break
       case 'gifPlayOnHover': settings.gifPlayOnHover = value !== 'false'; break
       case 'tabTransition': settings.tabTransition = normalizeTabTransition(value); break
+      case 'soundHotkeys':
+        try { settings.soundHotkeys = JSON.parse(value) } catch { settings.soundHotkeys = [] }
+        break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -475,6 +484,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
   const soundRows = await d.select<
     {
       path: string
+      id: string | null
       name: string
       volume: number
       color: string | null
@@ -484,7 +494,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       gif_pos_x: number | null
       gif_pos_y: number | null
     }[]
-  >('SELECT path, name, volume, color, global_index, active, gif_id, gif_pos_x, gif_pos_y FROM sounds ORDER BY global_index ASC')
+  >('SELECT path, id, name, volume, color, global_index, active, gif_id, gif_pos_x, gif_pos_y FROM sounds ORDER BY global_index ASC')
 
   const tabLinks = await d.select<{ sound_path: string; tab: string; tab_index: number }[]>(
     'SELECT sound_path, tab, tab_index FROM sound_tabs'
@@ -505,6 +515,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
     return {
       path: s.path,
+      id: s.id || '',
       name: s.name,
       volume: s.volume,
       index: s.global_index,
@@ -602,6 +613,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['allowReorder', String(s.allowReorder ?? true)],
     ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
     ['tabTransition', normalizeTabTransition(s.tabTransition)],
+    ['soundHotkeys', JSON.stringify(s.soundHotkeys ?? [])],
     ['primaryColor', s.primaryColor ?? '#00d4ff'],
     ['primaryHover', s.primaryHover ?? '#33ddff'],
     ['bg', s.bg ?? '#222831'],
@@ -635,6 +647,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   for (const f of config.files) {
     soundRows.push([
       f.path,
+      f.id || '',
       f.name,
       f.volume ?? 0.4,
       f.color ?? null,
@@ -652,7 +665,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await batchInsert(
     d,
     'sounds',
-    ['path', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
+    ['path', 'id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
     soundRows
   )
   await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)

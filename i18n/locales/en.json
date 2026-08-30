@@ -12,6 +12,8 @@
     "saveAs": "Save As...",
     "importAudio": "Import Audio Files",
     "importFolders": "Import Folders",
+    "exportSoundboard": "Export Soundboard",
+    "importSoundboard": "Import Soundboard",
     "quit": "Quit",
     "undo": "Undo",
     "redo": "Redo",
@@ -46,6 +48,7 @@
       "main": "Main",
       "behavior": "Behavior",
       "audio": "Audio",
+      "hotkeys": "Hotkeys",
       "performance": "Performance",
       "theme": "Theme",
       "about": "About"
@@ -56,6 +59,29 @@
       "controls": "Controls",
       "ui": "UI",
       "gifs": "Gifs"
+    },
+    "hotkeys": {
+      "actions": "App actions",
+      "actionsHint": "Click a binding, then press a key. Escape cancels. Backspace clears.",
+      "triggers": "Sound triggers",
+      "triggersHint": "Add sounds by ID (copy from multi-select). Not every sound is listed automatically.",
+      "globalTriggers": "Global sound triggers",
+      "globalTriggersHint": "Fire sound triggers even when Sound Ninja is in the background. Single letters will steal typing in other apps.",
+      "addTrigger": "Add sound trigger",
+      "remove": "Remove",
+      "pressKey": "Press a key…",
+      "unset": "None",
+      "soundIdPlaceholder": "Sound ID",
+      "unknownId": "Unknown ID",
+      "conflict": "Freed previous binding for {combo}",
+      "action": {
+        "save": "Save",
+        "saveAs": "Save As",
+        "undo": "Undo",
+        "redo": "Redo",
+        "search": "Search",
+        "stopAll": "Stop all sounds"
+      }
     },
     "main": {
       "title": "Main",
@@ -395,7 +421,11 @@
     "colorBorder": "Border",
     "colorBorderHover": "Border Hover",
     "resetColor": "Reset to default",
-    "resetAllColors": "Reset all colors"
+    "resetAllColors": "Reset all colors",
+    "copyId": "Copy ID",
+    "copyIdDesc": "Copy this sound's unique ID",
+    "assignHotkey": "Assign hotkey",
+    "assignHotkeyDesc": "Add a play trigger for this sound in Settings"
   },
   "gifPicker": {
     "title": "GIF background",
@@ -514,5 +544,13 @@
     "unsavedHint": "You have unsaved recordings, edits, or staged clips. Close anyway?",
     "discard": "Discard",
     "cancel": "Cancel"
+  },
+  "soundboard": {
+    "exportTitle": "Export Soundboard",
+    "importTitle": "Import Soundboard",
+    "exporting": "Packing sounds…",
+    "importing": "Unpacking soundboard…",
+    "exportFailed": "Failed to export soundboard",
+    "importFailed": "Failed to import soundboard"
   }
 }

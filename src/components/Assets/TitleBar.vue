@@ -149,6 +149,8 @@ const menus: MenuGroup[] = [
       { id: 'sep2', sep: true },
       { id: 'import_audio',   labelKey: 'menu.importAudio',   event: 'menu_import_audio' },
       { id: 'import_folders', labelKey: 'menu.importFolders', event: 'menu_import_folders' },
+      { id: 'export_soundboard', labelKey: 'menu.exportSoundboard', event: 'menu_export_soundboard' },
+      { id: 'import_soundboard', labelKey: 'menu.importSoundboard', event: 'menu_import_soundboard' },
       { id: 'sep3', sep: true },
       { id: 'quit',           labelKey: 'menu.quit',          event: 'menu_quit' },
     ],

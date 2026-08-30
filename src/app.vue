@@ -44,6 +44,18 @@
           <p class="dialog-text">{{ savePopup === 'saved' ? $t('common.saved') : $t('common.saving') }}</p>
         </div>
       </DialogField>
+      <DialogField
+        v-if="transferPopup"
+        :title="transferPopup.title"
+        @close="() => {}"
+      >
+        <div class="stems-progress">
+          <p class="dialog-text">{{ transferPopup.label }}</p>
+          <div class="stems-progress__bar">
+            <div class="stems-progress__fill" :style="{ width: transferPopup.percent + '%' }" />
+          </div>
+        </div>
+      </DialogField>
     </template>
     <NuxtPage v-if="isMain" v-slot="{ Component }">
       <transition name="fade" mode="out-in">
@@ -66,12 +78,18 @@
 
 <script setup>
 import { readTextFile, rename, BaseDirectory } from '@tauri-apps/plugin-fs'
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { emit, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
-import { defaultSettings } from '~/utils/db'
+import { defaultSettings, saveConfig, loadGifBlobsByIds, upsertGifBlob, withProjectDb, reopenDb } from '~/utils/db'
+import { eventToCombo } from '~/utils/hotkeys'
+import {
+  buildPortableExport,
+  resolveImportedPaths,
+  uniqueProjectFolderName,
+} from '~/utils/soundboardZip'
 import { getPreset, normalizeThemeId } from '~/utils/themePresets'
 import {
   applyThemeTokens,
@@ -88,6 +106,7 @@ import {
   pickProjectFile,
   pickSaveProjectFile,
   projectNameFromDbPath,
+  parentDir,
   safeProjectName,
 } from '~/utils/projects'
 import { resolveAppLocale } from '~/utils/locales'
@@ -100,6 +119,7 @@ const { t, setLocale } = useI18n()
 const updateDialogRef = ref(null)
 const savePopup = ref(null)
 let savePopupTimer = null
+const transferPopup = ref(null)
 
 // Secondary windows (e.g. the Theme Creator) reuse the same SPA bundle. Only the
 // main window owns the project/menu lifecycle; others just render their page.
@@ -143,25 +163,55 @@ function runHistoryAction(fn) {
   fn()
 }
 
-function onUndoRedoKeydown(e) {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+function runAppHotkey(action) {
+  if (action === 'save') handleMenuSave()
+  else if (action === 'saveAs') handleMenuSaveAs()
+  else if (action === 'undo') jsonStore.undo()
+  else if (action === 'redo') jsonStore.redo()
+  else if (action === 'search') window.dispatchEvent(new CustomEvent('sn:activate-search'))
+  else if (action === 'stopAll') {
+    invoke('stop_all').catch(() => {})
+    window.dispatchEvent(new CustomEvent('sn:stop-all'))
+  }
+}
+
+function playSoundById(soundId) {
+  if (!soundId) return
+  window.dispatchEvent(new CustomEvent('sn:play-sound-id', { detail: soundId }))
+}
+
+function onHotkeyKeydown(e) {
   if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
-  const key = e.key.toLowerCase()
-  if (key === 'z' && e.shiftKey) {
+  const combo = eventToCombo(e)
+  if (!combo) return
+  const map = appSettings.hotkeys || {}
+  for (const action of Object.keys(map)) {
+    if (map[action] && map[action] === combo) {
+      e.preventDefault()
+      runHistoryAction(() => runAppHotkey(action))
+      return
+    }
+  }
+  if (appSettings.soundTriggersGlobal) return
+  const triggers = jsonStore.configFile?.settings?.soundHotkeys || []
+  const hit = triggers.find((row) => row.combo && row.combo === combo && row.soundId)
+  if (hit) {
     e.preventDefault()
-    runHistoryAction(() => jsonStore.redo())
-  } else if (key === 'z') {
-    e.preventDefault()
-    runHistoryAction(() => jsonStore.undo())
-  } else if (key === 'y' && !e.shiftKey) {
-    e.preventDefault()
-    runHistoryAction(() => jsonStore.redo())
-  } else if (key === 's' && e.shiftKey) {
-    e.preventDefault()
-    runHistoryAction(() => { handleMenuSaveAs() })
-  } else if (key === 's') {
-    e.preventDefault()
-    runHistoryAction(() => { handleMenuSave() })
+    playSoundById(hit.soundId)
+  }
+}
+
+async function syncGlobalSoundHotkeys() {
+  const bindings = (jsonStore.configFile?.settings?.soundHotkeys || [])
+    .filter((row) => row.combo && row.soundId)
+    .map((row) => ({ combo: row.combo, soundId: row.soundId }))
+  try {
+    await invoke('set_global_sound_hotkeys', {
+      enabled: !!appSettings.soundTriggersGlobal,
+      bindings,
+    })
+  } catch (e) {
+    console.error('Failed to sync global sound hotkeys', e)
   }
 }
 
@@ -371,6 +421,98 @@ async function handleMenuImportAudio() {
   jsonStore.addFiles(soundlist)
 }
 
+function joinOsPath(base, ...parts) {
+  const sep = base.includes('\\') ? '\\' : '/'
+  return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
+}
+
+async function handleMenuExportSoundboard() {
+  const zipPath = await saveDialog({
+    title: t('soundboard.exportTitle'),
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    defaultPath: `${projectNameFromDbPath(jsonStore.currentProjectPath || 'soundboard')}.zip`,
+  })
+  if (!zipPath) return
+  transferPopup.value = { title: t('soundboard.exportTitle'), label: t('soundboard.exporting'), percent: 0 }
+  const unlisten = await listen('soundboard_export_progress', (e) => {
+    const pct = Number(e?.payload?.percent)
+    if (Number.isFinite(pct)) transferPopup.value = { ...transferPopup.value, percent: pct }
+  })
+  let tempDir = null
+  const livePath = jsonStore.currentProjectPath
+  try {
+    if (jsonStore.dirty) await jsonStore.persistNow()
+    const { portable, entries } = buildPortableExport(jsonStore.configFile)
+    tempDir = await invoke('make_temp_dir')
+    const tempDb = joinOsPath(tempDir, 'project.sninja')
+    const gifIds = [...new Set(portable.files.map((f) => f.gifId).filter(Boolean))]
+    let blobs = []
+    if (livePath && gifIds.length) {
+      blobs = await withProjectDb(livePath, (d) => loadGifBlobsByIds(d, gifIds))
+    }
+    await withProjectDb(tempDb, async (d) => {
+      await saveConfig(d, portable)
+      for (const row of blobs) await upsertGifBlob(d, row)
+    })
+    const allEntries = [{ src: tempDb, destRel: 'project.sninja' }, ...entries]
+    await invoke('export_soundboard_zip', { zipPath, entries: allEntries })
+  } catch (e) {
+    console.error('Export soundboard failed', e)
+    appStore.setErrorActive(`${t('soundboard.exportFailed')}\n\n${formatError(e)}`)
+  } finally {
+    unlisten()
+    transferPopup.value = null
+    if (livePath) {
+      try { await reopenDb(livePath) } catch { /* restore best-effort */ }
+    }
+    if (tempDir) {
+      try { await invoke('delete_dir_abs', { path: tempDir }) } catch { /* ignore */ }
+    }
+  }
+}
+
+async function handleMenuImportSoundboard() {
+  const choice = await confirmUnsaved()
+  if (choice === 'cancel') return
+  if (choice === 'save' && !(await persistOrReport())) return
+
+  const selected = await openDialog({
+    title: t('soundboard.importTitle'),
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    multiple: false,
+  })
+  const zipPath = Array.isArray(selected) ? selected[0] : selected
+  if (!zipPath) return
+
+  transferPopup.value = { title: t('soundboard.importTitle'), label: t('soundboard.importing'), percent: 0 }
+  const unlisten = await listen('soundboard_import_progress', (e) => {
+    const pct = Number(e?.payload?.percent)
+    if (Number.isFinite(pct)) transferPopup.value = { ...transferPopup.value, percent: pct }
+  })
+  try {
+    const zipBase = String(zipPath).replace(/^.*[\\/]/, '').replace(/\.zip$/i, '')
+    const existing = await listProjects(appSettings.projectsPath)
+    const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
+    const folder = uniqueProjectFolderName(names, zipBase || t('common.newProject'))
+    const destDir = joinOsPath(appSettings.projectsPath, folder)
+    const dbPath = await invoke('import_soundboard_zip', { zipPath, destDir })
+    await jsonStore.openProject(dbPath)
+    resolveImportedPaths(jsonStore.configFile, parentDir(dbPath))
+    await jsonStore.persistNow()
+    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
+    await jsonStore.validateSoundPaths()
+    if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
+    await applyPersistedTheme(jsonStore.configFile)
+    await syncGlobalSoundHotkeys()
+  } catch (e) {
+    console.error('Import soundboard failed', e)
+    appStore.setErrorActive(`${t('soundboard.importFailed')}\n\n${formatError(e)}`)
+  } finally {
+    unlisten()
+    transferPopup.value = null
+  }
+}
+
 // ── Theme application ─────────────────────────────────────────────────────────
 function injectThemeCss(css) {
   let tag = document.getElementById('sn-custom-theme')
@@ -546,11 +688,26 @@ onMounted(async () => {
   listen('menu_save_as', handleMenuSaveAs)
   listen('menu_import_audio', handleMenuImportAudio)
   listen('menu_import_folders', () => appStore.setImportFoldersActive(true))
+  listen('menu_export_soundboard', handleMenuExportSoundboard)
+  listen('menu_import_soundboard', handleMenuImportSoundboard)
   listen('menu_select_project', () => appStore.setSelectProjectActive(true))
+  listen('global_sound_hotkey', (e) => {
+    const id = e?.payload
+    if (typeof id === 'string') playSoundById(id)
+  })
   listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
   listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
 
-  window.addEventListener('keydown', onUndoRedoKeydown)
+  window.addEventListener('keydown', onHotkeyKeydown)
+  await syncGlobalSoundHotkeys()
+  watch(
+    () => [
+      appSettings.soundTriggersGlobal,
+      jsonStore.currentProjectPath,
+      JSON.stringify(jsonStore.configFile?.settings?.soundHotkeys || []),
+    ],
+    () => { syncGlobalSoundHotkeys() },
+  )
 
   // Prompt to save unsaved changes before the window closes.
   const mainWindow = getCurrentWindow()
@@ -647,7 +804,7 @@ onUnmounted(() => {
     unlistenChrome = null
   }
   if (isMain.value) {
-    window.removeEventListener('keydown', onUndoRedoKeydown)
+    window.removeEventListener('keydown', onHotkeyKeydown)
   }
 })
 </script>

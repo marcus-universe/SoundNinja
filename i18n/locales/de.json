@@ -12,6 +12,8 @@
     "saveAs": "Speichern unter…",
     "importAudio": "Audiodateien importieren",
     "importFolders": "Ordner importieren",
+    "exportSoundboard": "Soundboard exportieren",
+    "importSoundboard": "Soundboard importieren",
     "quit": "Beenden",
     "undo": "Rückgängig",
     "redo": "Wiederholen",
@@ -46,6 +48,7 @@
       "main": "Allgemein",
       "behavior": "Verhalten",
       "audio": "Audio",
+      "hotkeys": "Hotkeys",
       "performance": "Leistung",
       "theme": "Theme",
       "about": "Info"
@@ -56,6 +59,29 @@
       "controls": "Steuerung",
       "ui": "Oberfläche",
       "gifs": "Gifs"
+    },
+    "hotkeys": {
+      "actions": "App-Aktionen",
+      "actionsHint": "Bindung klicken, dann Taste drücken. Escape bricht ab. Backspace löscht.",
+      "triggers": "Sound-Trigger",
+      "triggersHint": "Sounds per ID hinzufügen (in der Mehrfachauswahl kopieren). Nicht jeder Sound erscheint automatisch.",
+      "globalTriggers": "Globale Sound-Trigger",
+      "globalTriggersHint": "Sound-Trigger auch, wenn Sound Ninja im Hintergrund ist. Einzelne Buchstaben stehlen die Tastatur in anderen Apps.",
+      "addTrigger": "Sound-Trigger hinzufügen",
+      "remove": "Entfernen",
+      "pressKey": "Taste drücken…",
+      "unset": "Keine",
+      "soundIdPlaceholder": "Sound-ID",
+      "unknownId": "Unbekannte ID",
+      "conflict": "Vorherige Bindung für {combo} freigegeben",
+      "action": {
+        "save": "Speichern",
+        "saveAs": "Speichern unter",
+        "undo": "Rückgängig",
+        "redo": "Wiederholen",
+        "search": "Suche",
+        "stopAll": "Alle Sounds stoppen"
+      }
     },
     "main": {
       "title": "Allgemein",
@@ -395,7 +421,11 @@
     "colorBorder": "Rahmen",
     "colorBorderHover": "Rahmen Hover",
     "resetColor": "Auf Standard zurücksetzen",
-    "resetAllColors": "Alle Farben zurücksetzen"
+    "resetAllColors": "Alle Farben zurücksetzen",
+    "copyId": "ID kopieren",
+    "copyIdDesc": "Eindeutige Sound-ID kopieren",
+    "assignHotkey": "Hotkey zuweisen",
+    "assignHotkeyDesc": "Play-Trigger für diesen Sound in den Einstellungen anlegen"
   },
   "gifPicker": {
     "title": "GIF-Hintergrund",
@@ -514,5 +544,13 @@
     "unsavedHint": "Du hast ungespeicherte Aufnahmen, Änderungen oder Clips in der Warteliste. Trotzdem schließen?",
     "discard": "Verwerfen",
     "cancel": "Abbrechen"
+  },
+  "soundboard": {
+    "exportTitle": "Soundboard exportieren",
+    "importTitle": "Soundboard importieren",
+    "exporting": "Sounds werden gepackt…",
+    "importing": "Soundboard wird entpackt…",
+    "exportFailed": "Soundboard-Export fehlgeschlagen",
+    "importFailed": "Soundboard-Import fehlgeschlagen"
   }
 }

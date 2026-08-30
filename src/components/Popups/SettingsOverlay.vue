@@ -45,6 +45,7 @@
         <main class="settings-content">
           <SettingsMain v-if="activeTab === 'main'" />
           <SettingsBehavior v-else-if="activeTab === 'behavior'" />
+          <SettingsHotkeys v-else-if="activeTab === 'hotkeys'" />
           <SettingsAudio v-else-if="activeTab === 'audio'" />
           <SettingsPerformance v-else-if="activeTab === 'performance'" />
           <SettingsAbout v-else-if="activeTab === 'about'" />
@@ -74,6 +75,11 @@ const tabs = computed(() => [
     id: 'behavior',
     label: t('settings.tabs.behavior'),
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+  },
+  {
+    id: 'hotkeys',
+    label: t('settings.tabs.hotkeys'),
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h12"/></svg>`,
   },
   {
     id: 'audio',

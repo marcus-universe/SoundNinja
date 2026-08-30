@@ -5,6 +5,7 @@ import {
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
 } from '~/utils/db'
+import { ensureSoundIds, newSoundId } from '~/utils/soundId'
 import { revokeAllGifUrls } from '~/utils/gifCache'
 
 /** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
@@ -100,6 +101,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.dirty = false
       this.missingPaths = []
       this.clearHistory()
+      if (ensureSoundIds(this.configFile.files)) {
+        await this.persistNow()
+      }
     },
 
     async validateSoundPaths() {
@@ -125,6 +129,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       }
       mergeTabsFromUsage(this.configFile)
       healFolderTabMembership(this.configFile)
+      ensureSoundIds(this.configFile.files)
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.openingSnapshot = clone(this.configFile)
@@ -347,7 +352,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
       this.pushBeforeChange()
-      this.configFile.files = [...this.configFile.files, ...files]
+      const used = new Set(this.configFile.files.map((f) => f.id).filter(Boolean))
+      const withIds = files.map((f) => {
+        if (f.id) {
+          used.add(f.id)
+          return f
+        }
+        const id = newSoundId(used)
+        used.add(id)
+        return { ...f, id }
+      })
+      this.configFile.files = [...this.configFile.files, ...withIds]
       this.normalizeIndexes()
       this.writeConfig()
     },
