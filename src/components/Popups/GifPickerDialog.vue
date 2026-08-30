@@ -30,7 +30,7 @@
           :title="g.title"
           @click="selectRemote(g)"
         >
-          <img :src="g.thumbUrl" :alt="g.title" draggable="false" />
+          <img :src="g.previewUrl || g.thumbUrl" :alt="g.title" loading="lazy" draggable="false" />
         </button>
         <div
           v-if="canLoadMore"
@@ -250,20 +250,55 @@ function bindSentinel() {
   io.observe(target)
 }
 
+function isSizeLimitError(err) {
+  const msg = String(err ?? '')
+  return msg.includes('exceeds') && msg.includes('byte limit')
+}
+
+async function downloadFirstFit(urls) {
+  const list = (urls || []).filter(Boolean)
+  let lastErr = null
+  let hitLimit = false
+  for (const url of list) {
+    try {
+      const b64 = await invoke('download_url_bytes', { url })
+      const bytes = b64ToBytes(b64)
+      if (bytes.length > MAX_GIF_BYTES) {
+        hitLimit = true
+        continue
+      }
+      return bytes
+    } catch (e) {
+      lastErr = e
+      if (isSizeLimitError(e)) {
+        hitLimit = true
+        continue
+      }
+      throw e
+    }
+  }
+  if (hitLimit) {
+    const err = new Error('TOO_LARGE')
+    err.code = 'TOO_LARGE'
+    throw err
+  }
+  throw lastErr || new Error('download failed')
+}
+
 async function selectRemote(g) {
   error.value = ''
   loading.value = true
   try {
-    const b64 = await invoke('download_url_bytes', { url: g.gifUrl })
-    const bytes = b64ToBytes(b64)
-    if (bytes.length > MAX_GIF_BYTES) {
-      error.value = t('gifPicker.tooLarge')
-      return
-    }
+    const urls = (g.downloadUrls && g.downloadUrls.length) ? g.downloadUrls : [g.gifUrl]
+    const bytes = await downloadFirstFit(urls)
     const mime = detectImageMime(bytes) || 'image/gif'
     beginPosition(bytes, mime)
   } catch (e) {
-    error.value = t('gifPicker.downloadFailed') + ' ' + String(e)
+    if (e?.code === 'TOO_LARGE' || e?.message === 'TOO_LARGE') {
+      error.value = t('gifPicker.tooLarge')
+    } else {
+      error.value = t('gifPicker.downloadFailed') + ' ' + String(e)
+    }
   } finally {
     loading.value = false
   }

@@ -4,7 +4,11 @@ export type KlipyGif = {
   id: string
   title: string
   thumbUrl: string
+  /** Small animated GIF/WebP for the search grid (loops in <img>). */
+  previewUrl: string
   gifUrl: string
+  /** Animated slots, small first — picker tries next if one exceeds 8 MiB. */
+  downloadUrls: string[]
 }
 
 type KlipyFileSlot = {
@@ -23,6 +27,17 @@ type KlipyItem = {
 function slotUrl(item: KlipyItem, size: string, kind: 'jpg' | 'gif' | 'webp'): string {
   const url = item.file?.[size]?.[kind]?.url
   return typeof url === 'string' ? url : ''
+}
+
+function uniqueUrls(urls: string[]): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const url of urls) {
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    out.push(url)
+  }
+  return out
 }
 
 function parseItems(json: unknown): KlipyGif[] {
@@ -45,17 +60,31 @@ function parseItems(json: unknown): KlipyGif[] {
       slotUrl(item, 'xs', 'jpg') ||
       slotUrl(item, 'sm', 'gif') ||
       slotUrl(item, 'md', 'gif')
-    const gif =
-      slotUrl(item, 'md', 'gif') ||
+    const preview =
+      slotUrl(item, 'xs', 'webp') ||
+      slotUrl(item, 'sm', 'webp') ||
+      slotUrl(item, 'xs', 'gif') ||
       slotUrl(item, 'sm', 'gif') ||
-      slotUrl(item, 'hd', 'gif') ||
-      slotUrl(item, 'md', 'webp')
-    if (!thumb || !gif) continue
+      slotUrl(item, 'md', 'webp') ||
+      slotUrl(item, 'md', 'gif') ||
+      thumb
+    const downloadUrls = uniqueUrls([
+      slotUrl(item, 'sm', 'webp'),
+      slotUrl(item, 'sm', 'gif'),
+      slotUrl(item, 'md', 'webp'),
+      slotUrl(item, 'md', 'gif'),
+      slotUrl(item, 'hd', 'webp'),
+      slotUrl(item, 'hd', 'gif'),
+    ])
+    const gif = downloadUrls[0] || ''
+    if (!preview || !gif) continue
     out.push({
       id: String(item.id ?? item.slug ?? gif),
       title: item.title || '',
-      thumbUrl: thumb,
+      thumbUrl: thumb || preview,
+      previewUrl: preview,
       gifUrl: gif,
+      downloadUrls,
     })
   }
   return out

@@ -128,8 +128,6 @@ import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/util
 import { withProjectDb, loadGifBlobsByIds, normalizeTabTransition } from '~/utils/db'
 import { cacheGifRow, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
 
-const MAX_ANIM_GIFS = 8
-
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
@@ -434,7 +432,6 @@ const animatingPaths = computed(() => {
   for (const sound of allDisplaySounds.value) {
     if (!shouldAnimate(sound)) continue
     paths.push(sound.path)
-    if (paths.length >= MAX_ANIM_GIFS) break
   }
   return new Set(paths)
 })
