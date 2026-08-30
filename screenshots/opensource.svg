@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img">
+  <rect width="1280" height="720" fill="#222831"/>
+  <rect x="80" y="80" width="1120" height="560" rx="24" fill="#363f4d"/>
+  <circle cx="640" cy="300" r="100" fill="none" stroke="hsl(189,100%,58%)" stroke-width="8"/>
+  <path d="M600 300 l30 30 l50 -60" fill="none" stroke="hsl(189,100%,58%)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="640" y="460" text-anchor="middle" font-family="Nunito,sans-serif" font-size="36" font-weight="800" fill="#eee">GPL-3.0</text>
+  <text x="640" y="510" text-anchor="middle" font-family="Nunito,sans-serif" font-size="20" font-weight="600" fill="#eee" opacity="0.6">Free � Open Source � Forkable</text>
+  <text x="640" y="640" text-anchor="middle" font-family="Nunito,sans-serif" font-size="28" font-weight="700" fill="#eee" opacity="0.6">Screenshot: Open Source</text>
+</svg>
