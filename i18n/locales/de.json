@@ -1,0 +1,121 @@
+{
+  "nav": {
+    "home": "Start",
+    "docs": "Doku",
+    "features": "Features",
+    "download": "Download",
+    "github": "GitHub",
+    "language": "Sprache"
+  },
+  "hero": {
+    "title": "SoundNinja",
+    "logoAlt": "SoundNinja Logo",
+    "subtitle": "Modernes, anpassbares, Open-Source-Soundboard",
+    "download": "Download",
+    "downloadVersion": "Download {version}",
+    "contribute": "Mitmachen auf GitHub"
+  },
+  "features": {
+    "heading": "Kernfunktionen",
+    "items": {
+      "themes": {
+        "title": "Themes & Anpassung",
+        "description": "Gestalte dein Soundboard nach deinen Regeln. Eigene Farben, Layouts und Profile — für Desktop, Stream-Overlay oder VR."
+      },
+      "tabs": {
+        "title": "Organisation mit Tabs & Farben",
+        "description": "Gruppiere Sounds in farbige Tabs. Finde blitzschnell, was du brauchst — auch bei riesigen Bibliotheken."
+      },
+      "recording": {
+        "title": "Einfach & schnell aufnehmen",
+        "description": "PC-Audio direkt in SoundNinja aufnehmen mit dem Record Editor. Zuschneiden, benennen und aufs Board legen in Sekunden."
+      },
+      "performance": {
+        "title": "Performance & Leichtgewicht",
+        "description": "Rust-Kern über Tauri v2. Wenig RAM, kleiner Footprint und vorgecachte Sounds für sofortige Wiedergabe."
+      },
+      "opensource": {
+        "title": "Kostenlos & Open Source",
+        "description": "Lizenziert unter GPL-3.0. Forken, verbessern, teilen — ohne Paywalls, ohne Telemetrie-Steuer.",
+        "licenseLink": "LICENSE ansehen"
+      }
+    }
+  },
+  "cta": {
+    "title": "Bereit zum Loslegen?",
+    "subtitle": "Lade SoundNinja kostenlos — oder mach auf GitHub mit."
+  },
+  "footer": {
+    "tagline": "Open-Source-Soundboard für Streamer, Freunde & Podcasts.",
+    "license": "GPL-3.0 Lizenz",
+    "github": "GitHub",
+    "impressum": "Impressum",
+    "copyright": "© {year} SoundNinja"
+  },
+  "downloadPage": {
+    "title": "Download",
+    "subtitle": "Wähle deine Plattform und lade den neuesten SoundNinja-Build herunter.",
+    "back": "Zurück zur Startseite",
+    "latest": "Aktuelle Version",
+    "releaseNotes": "Versionshinweise",
+    "version": "Version {version}",
+    "published": "Veröffentlicht {date}",
+    "loading": "Releases werden geladen…",
+    "error": "Releases konnten gerade nicht geladen werden.",
+    "viewOnGithub": "Auf GitHub ansehen",
+    "noAsset": "Noch kein Build für diese Plattform.",
+    "older": "Ältere Versionen",
+    "olderEmpty": "Noch keine älteren Releases.",
+    "prerelease": "Vorabversion",
+    "selectFormat": "Download-Format wählen",
+    "platforms": {
+      "windows": "Windows",
+      "mac": "macOS",
+      "linux": "Linux"
+    },
+    "platformHint": {
+      "windows": "10+",
+      "mac": "10.14+",
+      "linux": "Getestet unter Ubuntu 20.04"
+    },
+    "assets": {
+      "exe": "Installer (.exe)",
+      "msi": "Installer (.msi)",
+      "dmg": "Disk-Image (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Debian (.deb)",
+      "other": "{name}"
+    },
+    "assetsShort": {
+      "exe": "Installer 64bit",
+      "msi": "MSI 64bit",
+      "dmg": ".dmg",
+      "appimage": "AppImage",
+      "deb": ".deb",
+      "other": "{name}"
+    }
+  },
+  "docsPage": {
+    "title": "Doku",
+    "notFound": "Diese Seite ist noch nicht verfügbar.",
+    "onThisPage": "Themen"
+  },
+  "impressum": {
+    "title": "Impressum",
+    "back": "Zurück zur Startseite",
+    "nameHeading": "Maintainer",
+    "placeholder": "Marcus-Universe",
+    "contactHeading": "Kontakt",
+    "contactLabel": "E-Mail",
+    "contactEmail": "contact{'@'}marcus-universe.de",
+    "repoHeading": "Projekt",
+    "repoText": "SoundNinja ist ein Open-Source-Projekt auf GitHub.",
+    "licenseHeading": "Lizenz",
+    "licenseText": "SoundNinja steht unter der GNU General Public License v3.0 (GPL-3.0).",
+    "licenseLink": "GPL-3.0 Lizenz ansehen"
+  },
+  "meta": {
+    "title": "SoundNinja — Open-Source-Soundboard",
+    "description": "Modernes, anpassbares, Open-Source-Soundboard. Gebaut mit Tauri + Nuxt."
+  }
+}

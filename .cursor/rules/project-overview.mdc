@@ -1,0 +1,37 @@
+---
+description: SoundNinja landing page project overview — always apply
+alwaysApply: true
+---
+
+# Project overview
+
+Static Nuxt 4 landing page for SoundNinja soundboard.
+Branch: `landing-page` (orphan). Deploy target: GitHub Pages (`gh-pages`).
+Live URL: `https://marcus-universe.github.io/SoundNinja/` (`app.baseURL = '/SoundNinja/'`).
+
+## Stack
+
+- Nuxt 4 + `nuxt generate` (SSG)
+- Tailwind v4 (`@tailwindcss/vite`) — CSS `@theme` only
+- `@nuxtjs/i18n` — en default; de/fr/es/ja/zh via `/de` `/fr` `/es` `/ja` `/zh`
+- `@nuxt/content` — docs markdown in `content/{locale}/*.md`
+- `@nuxt/fonts` — Nunito
+
+## Structure
+
+- `app/components/` — SiteNav, SiteBackdrop (fixed animated wave background), HeroSection, DownloadButton, FeatureSections, CtaSection, SiteFooter, DocsSidebar
+- `app/composables/useReleases.ts` — client fetch GitHub releases (latest + older)
+- `app/pages/` — index, download, impressum, docs
+- `content/{en,de,fr,es,ja,zh}/` — docs markdown (overview, install, sounds, theme, record, remote, support)
+- `i18n/locales/` — en.json, de.json, fr.json, es.json, ja.json, zh.json
+- `public/screenshots/` — placeholder SVGs (replace with real PNGs later)
+- `.github/workflows/deploy-landing.yml` — push `landing-page` → deploy `gh-pages`
+
+## Deploy
+
+Push to `landing-page` triggers Actions. Or `npm run deploy` locally.
+Repo Settings → Pages → branch `gh-pages` / root (one-time manual).
+
+## Agent style
+
+Caveman-terse per AGENTS.md. Code/commits normal English.

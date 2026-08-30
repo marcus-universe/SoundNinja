@@ -1,0 +1,121 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "docs": "Docs",
+    "features": "Fonctionnalités",
+    "download": "Télécharger",
+    "github": "GitHub",
+    "language": "Langue"
+  },
+  "hero": {
+    "title": "SoundNinja",
+    "logoAlt": "Logo SoundNinja",
+    "subtitle": "Soundboard moderne, personnalisable et open source",
+    "download": "Télécharger",
+    "downloadVersion": "Télécharger {version}",
+    "contribute": "Contribuer sur GitHub"
+  },
+  "features": {
+    "heading": "Fonctionnalités principales",
+    "items": {
+      "themes": {
+        "title": "Thèmes & personnalisation",
+        "description": "Conçois ton soundboard à ta façon. Couleurs, dispositions et profils personnalisés pour coller à ton setup — bureau, overlay de stream ou VR."
+      },
+      "tabs": {
+        "title": "Organisation par onglets et couleurs",
+        "description": "Regroupe tes sons dans des onglets colorés. Trouve ce qu’il te faut en quelques millisecondes — même avec d’énormes bibliothèques."
+      },
+      "recording": {
+        "title": "Enregistrement simple et rapide",
+        "description": "Capture l’audio du PC directement dans SoundNinja avec l’éditeur d’enregistrement. Coupe, nomme et dépose sur ton board en quelques secondes."
+      },
+      "performance": {
+        "title": "Performance & légèreté",
+        "description": "Cœur Rust via Tauri v2. Peu de RAM, empreinte minimale et sons préchargés pour une lecture instantanée."
+      },
+      "opensource": {
+        "title": "Gratuit & open source",
+        "description": "Sous licence GPL-3.0. Forke, améliore, partage — sans paywall, sans télémétrie.",
+        "licenseLink": "Voir la LICENSE"
+      }
+    }
+  },
+  "cta": {
+    "title": "Prêt à lancer le son ?",
+    "subtitle": "Télécharge SoundNinja gratuitement — ou contribue sur GitHub."
+  },
+  "footer": {
+    "tagline": "Soundboard open source pour streamers, amis et podcasts.",
+    "license": "Licence GPL-3.0",
+    "github": "GitHub",
+    "impressum": "Mentions légales",
+    "copyright": "© {year} SoundNinja"
+  },
+  "downloadPage": {
+    "title": "Télécharger",
+    "subtitle": "Choisis ta plateforme et récupère le dernier build SoundNinja.",
+    "back": "Retour à l’accueil",
+    "latest": "Dernière version",
+    "releaseNotes": "Notes de version",
+    "version": "Version {version}",
+    "published": "Publié le {date}",
+    "loading": "Chargement des versions…",
+    "error": "Impossible de charger les versions pour le moment.",
+    "viewOnGithub": "Voir sur GitHub",
+    "noAsset": "Pas encore de build pour cette plateforme.",
+    "older": "Versions précédentes",
+    "olderEmpty": "Aucune version précédente pour l’instant.",
+    "prerelease": "Préversion",
+    "selectFormat": "Choisir le format de téléchargement",
+    "platforms": {
+      "windows": "Windows",
+      "mac": "macOS",
+      "linux": "Linux"
+    },
+    "platformHint": {
+      "windows": "10+",
+      "mac": "10.14+",
+      "linux": "Testé sur Ubuntu 20.04"
+    },
+    "assets": {
+      "exe": "Installateur (.exe)",
+      "msi": "Installateur (.msi)",
+      "dmg": "Image disque (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Debian (.deb)",
+      "other": "{name}"
+    },
+    "assetsShort": {
+      "exe": "Installateur 64bit",
+      "msi": "MSI 64bit",
+      "dmg": ".dmg",
+      "appimage": "AppImage",
+      "deb": ".deb",
+      "other": "{name}"
+    }
+  },
+  "docsPage": {
+    "title": "Docs",
+    "notFound": "Cette page n’est pas encore disponible.",
+    "onThisPage": "Sujets"
+  },
+  "impressum": {
+    "title": "Mentions légales",
+    "back": "Retour à l’accueil",
+    "nameHeading": "Mainteneur",
+    "placeholder": "Marcus-Universe",
+    "contactHeading": "Contact",
+    "contactLabel": "E-mail",
+    "contactEmail": "contact{'@'}marcus-universe.de",
+    "repoHeading": "Projet",
+    "repoText": "SoundNinja est un projet open source hébergé sur GitHub.",
+    "licenseHeading": "Licence",
+    "licenseText": "SoundNinja est sous licence GNU General Public License v3.0 (GPL-3.0).",
+    "licenseLink": "Voir la licence GPL-3.0"
+  },
+  "meta": {
+    "title": "SoundNinja — Soundboard open source",
+    "description": "Soundboard moderne, personnalisable et open source. Conçu avec Tauri + Nuxt."
+  }
+}

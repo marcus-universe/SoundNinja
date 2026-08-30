@@ -1,0 +1,121 @@
+{
+  "nav": {
+    "home": "ホーム",
+    "docs": "ドキュメント",
+    "features": "機能",
+    "download": "ダウンロード",
+    "github": "GitHub",
+    "language": "言語"
+  },
+  "hero": {
+    "title": "SoundNinja",
+    "logoAlt": "SoundNinjaロゴ",
+    "subtitle": "モダンでカスタマイズ可能なオープンソースサウンドボード",
+    "download": "ダウンロード",
+    "downloadVersion": "{version} をダウンロード",
+    "contribute": "GitHubでコントリビュート"
+  },
+  "features": {
+    "heading": "主な機能",
+    "items": {
+      "themes": {
+        "title": "テーマとカスタマイズ",
+        "description": "自分好みにサウンドボードをデザイン。カスタムカラー、レイアウト、プロファイルで、デスクトップ、配信オーバーレイ、VRに合わせられます。"
+      },
+      "tabs": {
+        "title": "タブと色で整理",
+        "description": "サウンドを色付きタブにグループ化。巨大なライブラリでも、ミリ秒単位で目的の音が見つかります。"
+      },
+      "recording": {
+        "title": "かんたん高速録音",
+        "description": "Record EditorでPCオーディオを直接SoundNinjaに取り込み。トリム、命名、ボードへの配置まで数秒。"
+      },
+      "performance": {
+        "title": "高性能で軽量",
+        "description": "Tauri v2経由のRustコア。低RAM、小さなフットプリント、事前キャッシュで即座に再生。"
+      },
+      "opensource": {
+        "title": "無料＆オープンソース",
+        "description": "GPL-3.0ライセンス。フォーク、改善、共有 — ペイウォールもテレメトリもなし。",
+        "licenseLink": "LICENSEを見る"
+      }
+    }
+  },
+  "cta": {
+    "title": "準備はできた？",
+    "subtitle": "SoundNinjaを無料でダウンロード — またはGitHubで参加。"
+  },
+  "footer": {
+    "tagline": "ストリーマー、仲間、ポッドキャスト向けのオープンソースサウンドボード。",
+    "license": "GPL-3.0 ライセンス",
+    "github": "GitHub",
+    "impressum": "インプリント",
+    "copyright": "© {year} SoundNinja"
+  },
+  "downloadPage": {
+    "title": "ダウンロード",
+    "subtitle": "プラットフォームを選んで、最新のSoundNinjaビルドを入手。",
+    "back": "ホームに戻る",
+    "latest": "最新リリース",
+    "releaseNotes": "リリースノート",
+    "version": "バージョン {version}",
+    "published": "{date} 公開",
+    "loading": "リリースを読み込み中…",
+    "error": "ただいまリリースを読み込めません。",
+    "viewOnGithub": "GitHubで見る",
+    "noAsset": "このプラットフォーム用のビルドはまだありません。",
+    "older": "過去のバージョン",
+    "olderEmpty": "まだ過去のリリースはありません。",
+    "prerelease": "プレリリース",
+    "selectFormat": "ダウンロード形式を選択",
+    "platforms": {
+      "windows": "Windows",
+      "mac": "macOS",
+      "linux": "Linux"
+    },
+    "platformHint": {
+      "windows": "10+",
+      "mac": "10.14+",
+      "linux": "Ubuntu 20.04でテスト済み"
+    },
+    "assets": {
+      "exe": "インストーラー (.exe)",
+      "msi": "インストーラー (.msi)",
+      "dmg": "ディスクイメージ (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Debian (.deb)",
+      "other": "{name}"
+    },
+    "assetsShort": {
+      "exe": "インストーラー 64bit",
+      "msi": "MSI 64bit",
+      "dmg": ".dmg",
+      "appimage": "AppImage",
+      "deb": ".deb",
+      "other": "{name}"
+    }
+  },
+  "docsPage": {
+    "title": "ドキュメント",
+    "notFound": "このページはまだありません。",
+    "onThisPage": "トピック"
+  },
+  "impressum": {
+    "title": "インプリント",
+    "back": "ホームに戻る",
+    "nameHeading": "メンテナー",
+    "placeholder": "Marcus-Universe",
+    "contactHeading": "お問い合わせ",
+    "contactLabel": "メール",
+    "contactEmail": "contact{'@'}marcus-universe.de",
+    "repoHeading": "プロジェクト",
+    "repoText": "SoundNinjaはGitHubでホストされているオープンソースプロジェクトです。",
+    "licenseHeading": "ライセンス",
+    "licenseText": "SoundNinjaはGNU General Public License v3.0 (GPL-3.0) の下でライセンスされています。",
+    "licenseLink": "GPL-3.0ライセンスを見る"
+  },
+  "meta": {
+    "title": "SoundNinja — オープンソースサウンドボード",
+    "description": "モダンでカスタマイズ可能なオープンソースサウンドボード。Tauri + Nuxtで構築。"
+  }
+}

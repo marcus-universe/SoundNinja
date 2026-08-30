@@ -1,0 +1,29 @@
+---
+description: i18n content rules for landing page
+globs: "i18n/**,**/*.vue"
+alwaysApply: false
+---
+
+# i18n content
+
+## Config
+
+- Default: `en` at `/`
+- Others: `de` `/de`, `fr` `/fr`, `es` `/es`, `ja` `/ja`, `zh` `/zh` (`prefix_except_default`)
+- `detectBrowserLanguage: false` — SSG-safe on GitHub Pages
+- Switcher: `switchLocalePath()` so current route preserved
+
+## Rules
+
+1. Zero hardcoded user-facing strings in components — use `t('key')`.
+2. Edit all six locale files in the same change. Keys must match.
+3. Key nesting mirrors UI: `nav.*`, `hero.*`, `features.*`, `cta.*`, `footer.*`, `docsPage.*`, `impressum.*`, `meta.*`.
+4. Docs article bodies live in `content/{locale}/*.md` — not in locale JSON. Translate all six folders together; keep slugs identical.
+5. Interpolation: `{version}`, `{year}`, `{n}`, `{current}`, `{total}` — keep placeholders identical across locales.
+6. Impressum TODO placeholders stay until owner supplies real legal data. Do not invent.
+
+## Adding a string
+
+1. Add key to `i18n/locales/en.json`
+2. Add matching translations to `de.json`, `fr.json`, `es.json`, `ja.json`, `zh.json`
+3. Consume via `const { t } = useI18n()` / `$t` in template

@@ -1,0 +1,121 @@
+{
+  "nav": {
+    "home": "Home",
+    "docs": "Docs",
+    "features": "Features",
+    "download": "Download",
+    "github": "GitHub",
+    "language": "Language"
+  },
+  "hero": {
+    "title": "SoundNinja",
+    "logoAlt": "SoundNinja logo",
+    "subtitle": "Modern, customizable, open source soundboard",
+    "download": "Download",
+    "downloadVersion": "Download {version}",
+    "contribute": "Contribute on GitHub"
+  },
+  "features": {
+    "heading": "Core Features",
+    "items": {
+      "themes": {
+        "title": "Themes & Customization",
+        "description": "Design your soundboard your way. Custom colors, layouts, and profiles so the UI fits your setup — desktop, stream overlay, or VR."
+      },
+      "tabs": {
+        "title": "Organize with Tabs & Colors",
+        "description": "Group sounds into colored tabs. Find what you need in milliseconds — even with huge libraries."
+      },
+      "recording": {
+        "title": "Easy & Fast Recording",
+        "description": "Capture PC audio straight into SoundNinja with the Record Editor. Trim, name, and drop onto your board in seconds."
+      },
+      "performance": {
+        "title": "Performance & Lightweight",
+        "description": "Rust core via Tauri v2. Low RAM, tiny footprint, and pre-cached sounds for instant playback."
+      },
+      "opensource": {
+        "title": "Free & Open Source",
+        "description": "Licensed under GPL-3.0. Fork it, improve it, share it — no paywalls, no telemetry tax.",
+        "licenseLink": "View LICENSE"
+      }
+    }
+  },
+  "cta": {
+    "title": "Ready to sound off?",
+    "subtitle": "Download SoundNinja free — or contribute on GitHub."
+  },
+  "footer": {
+    "tagline": "Open source soundboard for streamers, friends & podcasts.",
+    "license": "GPL-3.0 License",
+    "github": "GitHub",
+    "impressum": "Imprint",
+    "copyright": "© {year} SoundNinja"
+  },
+  "downloadPage": {
+    "title": "Download",
+    "subtitle": "Pick your platform and grab the latest SoundNinja build.",
+    "back": "Back to home",
+    "latest": "Latest release",
+    "releaseNotes": "Release notes",
+    "version": "Version {version}",
+    "published": "Published {date}",
+    "loading": "Loading releases…",
+    "error": "Could not load releases right now.",
+    "viewOnGithub": "View on GitHub",
+    "noAsset": "No build for this platform yet.",
+    "older": "Older versions",
+    "olderEmpty": "No older releases yet.",
+    "prerelease": "Pre-release",
+    "selectFormat": "Select download format",
+    "platforms": {
+      "windows": "Windows",
+      "mac": "macOS",
+      "linux": "Linux"
+    },
+    "platformHint": {
+      "windows": "10+",
+      "mac": "10.14+",
+      "linux": "Tested on Ubuntu 20.04"
+    },
+    "assets": {
+      "exe": "Installer (.exe)",
+      "msi": "Installer (.msi)",
+      "dmg": "Disk image (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Debian (.deb)",
+      "other": "{name}"
+    },
+    "assetsShort": {
+      "exe": "Installer 64bit",
+      "msi": "MSI 64bit",
+      "dmg": ".dmg",
+      "appimage": "AppImage",
+      "deb": ".deb",
+      "other": "{name}"
+    }
+  },
+  "docsPage": {
+    "title": "Docs",
+    "notFound": "This page is not available yet.",
+    "onThisPage": "Topics"
+  },
+  "impressum": {
+    "title": "Imprint",
+    "back": "Back to home",
+    "nameHeading": "Maintainer",
+    "placeholder": "Marcus-Universe",
+    "contactHeading": "Contact",
+    "contactLabel": "Email",
+    "contactEmail": "contact{'@'}marcus-universe.de",
+    "repoHeading": "Project",
+    "repoText": "SoundNinja is an open source project hosted on GitHub.",
+    "licenseHeading": "License",
+    "licenseText": "SoundNinja is licensed under the GNU General Public License v3.0 (GPL-3.0).",
+    "licenseLink": "View GPL-3.0 License"
+  },
+  "meta": {
+    "title": "SoundNinja — Open Source Soundboard",
+    "description": "Modern, customizable, open source soundboard. Built with Tauri + Nuxt."
+  }
+}

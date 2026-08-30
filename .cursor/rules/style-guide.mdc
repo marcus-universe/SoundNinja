@@ -1,0 +1,40 @@
+---
+description: Visual style guide for landing page Vue/CSS
+globs: "**/*.vue,**/*.css"
+alwaysApply: false
+---
+
+# Style guide
+
+## Colors (Tailwind utilities from `@theme`)
+
+- `bg-bg` / `text-ink` — page background `#222831`, text `#eee`
+- `bg-surface` / `hover:bg-surface-hover` — cards/buttons `#363f4d` / `#434e5f`
+- `bg-primary` / `text-primary` — accent `hsl(189 100% 58%)`
+
+## Typography
+
+- Font: Nunito (`font-sans`) via `@nuxt/fonts`
+- Headings: `font-extrabold` / `font-black`
+- Body: `font-semibold` for UI labels, regular for long copy
+
+## Shape & motion
+
+- Cards: `rounded-3xl` (token `--radius-card`)
+- Buttons: `rounded-full` pills
+- Primary CTA: soft glow `shadow-[0_0_24px_hsl(189_100%_58%/0.35)]`
+- Transitions: `duration-200`
+- Focus: primary outline (`*:focus-visible` in main.css)
+
+## Layout
+
+- Mobile-first. Breakpoints: default < sm < md
+- Content width: `max-w-6xl mx-auto px-4 sm:px-6`
+- Nav height: account for `pt-20` / `pt-24` under fixed header
+
+## A11y
+
+- Focus-visible rings required on interactive elements
+- Slideshow: `aria-roledescription`, live region, keyboard arrows, pause on hover/focus
+- Respect `prefers-reduced-motion` (disable autoplay)
+- External links: `rel="noopener noreferrer"`

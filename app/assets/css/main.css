@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: hsl(189 100% 58%);
+  --color-bg: #222831;
+  --color-surface: #363f4d;
+  --color-surface-hover: #434e5f;
+  --color-ink: #eee;
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 1.5rem;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  *:focus-visible {
+    outline: 2px solid hsl(189 100% 58%);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-semibold transition-all duration-200 bg-primary text-bg shadow-[0_0_24px_hsl(189_100%_58%/0.35)] hover:brightness-110 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-semibold transition-all duration-200 bg-surface text-ink hover:bg-surface-hover active:scale-[0.98];
+  }
+
+  .btn-download {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-primary px-6 py-3 font-semibold transition-all duration-200 bg-surface text-ink hover:bg-surface-hover active:scale-[0.98];
+  }
+
+  .card {
+    @apply rounded-3xl bg-surface shadow-lg;
+  }
+
+  .docs-prose {
+    @apply text-ink/80;
+  }
+
+  .docs-prose :where(h1) {
+    @apply text-3xl font-extrabold text-ink sm:text-4xl;
+  }
+
+  .docs-prose :where(h2) {
+    @apply mt-8 text-lg font-bold text-primary;
+  }
+
+  .docs-prose :where(h3) {
+    @apply mt-6 text-base font-bold text-ink;
+  }
+
+  .docs-prose :where(p) {
+    @apply mt-3 leading-relaxed;
+  }
+
+  .docs-prose :where(ul, ol) {
+    @apply mt-3 space-y-1.5 pl-5;
+  }
+
+  .docs-prose :where(ul) {
+    @apply list-disc;
+  }
+
+  .docs-prose :where(ol) {
+    @apply list-decimal;
+  }
+
+  .docs-prose :where(li) {
+    @apply leading-relaxed;
+  }
+
+  .docs-prose :where(a) {
+    @apply font-semibold text-primary hover:underline;
+  }
+
+  .docs-prose :where(strong) {
+    @apply font-bold text-ink;
+  }
+
+  .docs-prose :where(code) {
+    @apply rounded-md bg-bg px-1.5 py-0.5 text-sm font-semibold text-primary;
+  }
+
+  .docs-prose :where(pre) {
+    @apply mt-4 overflow-x-auto rounded-2xl bg-bg p-4;
+  }
+
+  .docs-prose :where(pre code) {
+    @apply bg-transparent p-0 text-ink;
+  }
+
+  .docs-prose :where(hr) {
+    @apply my-8 border-white/10;
+  }
+}

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img">
+  <rect width="1280" height="720" fill="#222831"/>
+  <rect x="80" y="80" width="1120" height="560" rx="24" fill="#363f4d"/>
+  <rect x="120" y="120" width="160" height="40" rx="12" fill="hsl(189,100%,58%)"/>
+  <rect x="300" y="120" width="160" height="40" rx="12" fill="#434e5f"/>
+  <rect x="480" y="120" width="160" height="40" rx="12" fill="#f86d6d" opacity="0.8"/>
+  <rect x="660" y="120" width="160" height="40" rx="12" fill="#a78bfa" opacity="0.7"/>
+  <g>
+    <rect x="120" y="200" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="320" y="200" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="520" y="200" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="720" y="200" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="920" y="200" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="120" y="320" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="320" y="320" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="520" y="320" width="180" height="100" rx="16" fill="hsl(189,100%,58%)" opacity="0.3"/>
+    <rect x="720" y="320" width="180" height="100" rx="16" fill="#222831"/>
+    <rect x="920" y="320" width="180" height="100" rx="16" fill="#222831"/>
+  </g>
+  <text x="640" y="640" text-anchor="middle" font-family="Nunito,sans-serif" font-size="28" font-weight="700" fill="#eee" opacity="0.6">Screenshot: Tabs &amp; Colors</text>
+</svg>
