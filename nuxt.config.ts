@@ -1,6 +1,33 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { defineNuxtConfig } from 'nuxt/config'
 
+/** Tauri WebView + leftover HMR clients drop sockets. Nuxt 4 treats that as fatal. */
+function isTransientSocketError(reason: unknown): boolean {
+  const err = reason as { code?: string; message?: string } | undefined
+  const msg = String(err?.message || reason || '')
+  return err?.code === 'ECONNRESET' || err?.code === 'EPIPE' || msg.includes('ECONNRESET') || msg.includes('EPIPE')
+}
+
+function swallowSockErr(err: unknown) {
+  if (isTransientSocketError(err)) return
+}
+
+function hardenHttpServer(server: { on: Function; __snHardened?: boolean } | undefined) {
+  if (!server || server.__snHardened) return
+  server.__snHardened = true
+  server.on('connection', (socket: { on: Function }) => {
+    socket.on('error', swallowSockErr)
+  })
+  server.on('error', (err: unknown) => {
+    if (isTransientSocketError(err)) return
+    console.error('[http]', err)
+  })
+  server.on('clientError', (err: unknown, socket: { writable?: boolean; end: (s: string) => void }) => {
+    if (isTransientSocketError(err) || !socket.writable) return
+    try { socket.end('HTTP/1.1 400 Bad Request\r\n\r\n') } catch { /* closed */ }
+  })
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   srcDir: 'src/',
@@ -16,10 +43,37 @@ export default defineNuxtConfig({
     },
   },
 
+  // Pin IPv4 so Tauri WebView2 does not hit ::1 / localhost and reset the socket.
+  devServer: {
+    host: '127.0.0.1',
+    port: 3000,
+  },
+
   nitro: {
     preset: 'static',
     output: {
       publicDir: 'dist',
+    },
+  },
+
+  hooks: {
+    listen(server) {
+      hardenHttpServer(server)
+    },
+    'vite:extendConfig'(config) {
+      const server = (config.server || {}) as Record<string, unknown>
+      server.host = '127.0.0.1'
+      server.port = 3000
+      server.strictPort = true
+      // No hmr.port — Vite would open a second WS bind on 3000 and collide with HTTP.
+      server.hmr = { protocol: 'ws', host: '127.0.0.1' }
+      Object.assign(config, { server })
+    },
+    'vite:serverCreated'(viteServer: { httpServer?: { on: Function }; ws?: { on?: Function } }) {
+      hardenHttpServer(viteServer.httpServer)
+      viteServer.ws?.on?.('connection', (socket: { on: Function }) => {
+        socket.on('error', swallowSockErr)
+      })
     },
   },
 

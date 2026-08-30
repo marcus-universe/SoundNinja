@@ -197,13 +197,27 @@
           <span class="context-menu__chevron">{{ groupColorsOpen ? '▲' : '▼' }}</span>
         </li>
         <li v-if="groupColorsOpen && appStore.contextMenu.type === 'separator'" class="context-menu__color-panel" @click.stop>
+          <div class="context-menu__hue" :title="$t('contextMenu.colorHueHint')">
+            <div class="context-menu__hue-head">
+              <span>{{ $t('contextMenu.colorHue') }}</span>
+              <span>{{ groupHue }}°</span>
+            </div>
+            <HueSlider
+              :model-value="groupHue"
+              :hint="$t('contextMenu.colorHueHint')"
+              :aria-label="$t('contextMenu.colorHue')"
+              @drag-start="beginGroupHue"
+              @update:model-value="onGroupHue"
+              @drag-end="endGroupHue"
+            />
+          </div>
           <label class="context-menu__color-row">
             <span>{{ $t('contextMenu.groupBorderColor') }}</span>
-            <input type="color" :value="activeGroup?.borderColor || '#888888'" @input="onGroupBorderColor" />
+            <input type="color" :value="activeGroup?.borderColor || groupFallback.border" @input="onGroupBorderColor" />
           </label>
           <label class="context-menu__color-row">
             <span>{{ $t('contextMenu.groupNameColor') }}</span>
-            <input type="color" :value="activeGroup?.nameColor || '#ffffff'" @input="onGroupNameColor" />
+            <input type="color" :value="activeGroup?.nameColor || groupFallback.name" @input="onGroupNameColor" />
           </label>
           <button type="button" class="context-menu__reset-colors" @click="resetGroupColors">
             {{ $t('contextMenu.resetColor') }}
@@ -262,8 +276,10 @@ import {
   serializeOverride,
   overrideSwatch,
   resolveEffectiveColors,
+  themeButtonColors,
 } from '~/utils/colorOverride'
 import { copyText } from '~/utils/clipboard'
+import { leadHue, shiftColorRecord } from '~/utils/hue'
 
 const { t: $t } = useI18n()
 const appStore = useAppStore()
@@ -330,6 +346,50 @@ function setTabAlign(align) {
 function setGroupAlign(align) {
   const id = appStore.contextMenu.targetName
   jsonStore.updateSeparator(id, { buttonAlign: align })
+}
+
+const groupFallback = computed(() => {
+  const btn = themeButtonColors()
+  return { border: btn.border, name: btn.text }
+})
+
+const groupEffective = computed(() => ({
+  border: activeGroup.value?.borderColor || groupFallback.value.border,
+  name: activeGroup.value?.nameColor || groupFallback.value.name,
+}))
+
+const groupHueDragging = ref(false)
+const groupHueDragValue = ref(0)
+const groupHue = computed(() =>
+  groupHueDragging.value
+    ? groupHueDragValue.value
+    : leadHue([groupEffective.value.border, groupEffective.value.name]),
+)
+
+let groupHueSnap = null
+let groupHueSnapHue = 0
+
+function beginGroupHue() {
+  groupHueSnap = { ...groupEffective.value }
+  groupHueSnapHue = leadHue([groupHueSnap.border, groupHueSnap.name])
+  groupHueDragValue.value = groupHueSnapHue
+  groupHueDragging.value = true
+}
+
+function endGroupHue() {
+  groupHueSnap = null
+  groupHueDragging.value = false
+}
+
+function onGroupHue(next) {
+  if (!groupHueSnap) beginGroupHue()
+  groupHueDragging.value = true
+  groupHueDragValue.value = next
+  const shifted = shiftColorRecord(groupHueSnap, next - groupHueSnapHue)
+  jsonStore.updateSeparator(appStore.contextMenu.targetName, {
+    borderColor: shifted.border,
+    nameColor: shifted.name,
+  })
 }
 
 function onGroupBorderColor(e) {
