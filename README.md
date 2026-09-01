@@ -45,28 +45,34 @@ The core mission was to build a soundboard that empowers you to organize massive
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |
 | **AI Assistant**             | Recommends you sounds that works in the current situation | ⛔     |
 
+## Downloads
+
+<div align="center">
+
+<img src="./designs/download.png" alt="Downloads" width="800" />
+
+[![Windows NSIS](https://img.shields.io/badge/Windows-NSIS-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64-setup.exe)
+[![Windows MSI](https://img.shields.io/badge/Windows-MSI-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64.msi)
+[![macOS](https://img.shields.io/badge/macOS-Universal_DMG-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-universal.dmg)
+[![Linux deb](https://img.shields.io/badge/Linux-.deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.deb)
+[![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.AppImage)
+[![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz)
+
+</div>
+
+Stable `/releases/latest/download/…` names are uploaded by the next published release. Until then, grab the versioned files from [Releases](https://github.com/marcus-universe/SoundNinja/releases/latest).
+
 ## Platforms
 
-Sound Ninja currently supports theoretically the following platforms:
+Official builds (x86_64 unless noted):
 
-| Platform | Versions        |
-| :------- | :-------------- |
-| Windows  | 8 and above     |
-| macOS    | 10.15 and above |
-| Linux    | See below       |
+| Platform | Support |
+| :------- | :------ |
+| Windows 10+ | NSIS / MSI (WebView2) |
+| macOS 10.15+ | Universal DMG (Apple Silicon + Intel) |
+| Linux x86_64 | `.deb` (Debian/Ubuntu, WebKitGTK 4.1) or AppImage. PipeWire or PulseAudio for sound. |
 
-**Linux Support**
-
-- Debian (Ubuntu 18.04 and above or equivalent) with the following packages installed:
-  - `libwebkit2gtk-4.0-37`, `libgtk-3-0`, `libayatana-appindicator3-1`<sup>1</sup>
-- Arch with the following packages installed:
-  - `webkit2gtk`, `gtk3`, `libayatana-appindicator`<sup>1</sup>, `libpipewire` (audio device enumeration)
-- Fedora (latest 2 versions) with the following packages installed:
-  - `webkit2gtk3`, `gtk3`, `libappindicator-gtk3`<sup>1</sup>
-
-```diff
--   Be aware that Sound Ninja is in a early development stage and so its not tested on all platforms yet.
-```
+Early development — not tested on every distro.
 
 ## Project setup
 
@@ -134,7 +140,9 @@ Sound Ninja can expose a local HTTP + WebSocket API so [Bitfocus Companion](http
 
 1. Open **Settings → Remote** and enable the server (default port `7331`).
 2. Copy the `http://IP:PORT` URL from that tab, or copy the system IP from **Settings → About**.
-3. Load the module in [`companion-module-soundninja/`](./companion-module-soundninja) as a Companion developer module and paste the IP + port into the connection.
+3. Download the latest [Companion module `.tgz`](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz) and load it in Companion (**Modules → Load module package**). Paste the IP + port into the connection.
+
+Source for the module lives in [`companion-module-soundninja/`](./companion-module-soundninja).
 
 Optional token: set one in Remote settings. Clients send `Authorization: Bearer <token>` or `?token=`.
 

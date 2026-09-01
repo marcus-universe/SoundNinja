@@ -113,13 +113,98 @@ jobs:
             - Windows: `.exe` / `.msi` installer
             - macOS: universal `.dmg` (Apple Silicon + Intel)
             - Linux: `.deb` (Ubuntu/Debian) and `.AppImage`
-            - Arch: install via AUR (`soundninja-bin`) after this release is published
+            - Companion: `companion-module-soundninja.tgz`
 
             In-app updates use signed updater artifacts + `latest.json` (see `docs/updater.md`).
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           args: ${{ matrix.args }}
+
+  companion:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VER="${{ inputs.version }}"
+            VER="${VER#v}"
+            TAG="v${VER}"
+          else
+            VER="$(jq -r .version src-tauri/tauri.conf.json)"
+            TAG="v${VER}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag=$TAG"
+
+      - name: Package Companion module
+        working-directory: companion-module-soundninja
+        run: |
+          npm install
+          npm run package
+          ls -la *.tgz
+
+      - name: Upload Companion .tgz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          TGZ=$(ls companion-module-soundninja/companion-module-soundninja-*.tgz | head -1)
+          if [ -z "$TGZ" ]; then
+            echo "::error::No companion .tgz produced"
+            exit 1
+          fi
+          cp "$TGZ" companion-module-soundninja.tgz
+          gh release upload "$TAG" "$TGZ" companion-module-soundninja.tgz --clobber
+
+      - name: Upload stable installer aliases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p aliases
+          cd aliases
+          gh release download "$TAG" --pattern "soundninja_*" || true
+          shopt -s nullglob
+          upload=()
+          for f in *_x64-setup.exe; do
+            cp "$f" soundninja-windows-x64-setup.exe
+            upload+=(soundninja-windows-x64-setup.exe)
+          done
+          for f in *_x64_en-US.msi; do
+            cp "$f" soundninja-windows-x64.msi
+            upload+=(soundninja-windows-x64.msi)
+          done
+          for f in *_universal.dmg; do
+            cp "$f" soundninja-macos-universal.dmg
+            upload+=(soundninja-macos-universal.dmg)
+          done
+          for f in *_amd64.deb; do
+            cp "$f" soundninja-linux-amd64.deb
+            upload+=(soundninja-linux-amd64.deb)
+          done
+          for f in *_amd64.AppImage; do
+            cp "$f" soundninja-linux-amd64.AppImage
+            upload+=(soundninja-linux-amd64.AppImage)
+          done
+          if [ ${#upload[@]} -eq 0 ]; then
+            echo "::warning::No installer assets found to alias"
+            exit 0
+          fi
+          gh release upload "$TAG" "${upload[@]}" --clobber
 
   # AUR deploy disabled — maintainer not registered on AUR yet.
   # Re-enable when AUR_USERNAME / AUR_EMAIL / AUR_SSH_PRIVATE_KEY secrets exist:
