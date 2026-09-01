@@ -1,4 +1,7 @@
-use rodio::{self, Player, MixerDeviceSink, DeviceSinkBuilder, Source};
+use rodio::buffer::SamplesBuffer;
+use rodio::{
+    self, ChannelCount, DeviceSinkBuilder, MixerDeviceSink, Player, SampleRate, Source,
+};
 use serde::Serialize;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
@@ -7,7 +10,8 @@ use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
 
-use super::devices::{device_display_name, get_output_devices_for_host_name};
+use super::devices::{is_default_name, resolve_output_device};
+use super::stream::PumpHandle;
 
 // --- Global output volume (stored as f32 bits in an atomic) ---
 
@@ -17,64 +21,52 @@ fn current_volume() -> f32 {
     f32::from_bits(OUTPUT_VOLUME.load(Ordering::Relaxed))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_output_volume(volume: f32) {
-    OUTPUT_VOLUME.store(volume.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+    let volume = volume.clamp(0.0, 1.0);
+    OUTPUT_VOLUME.store(volume.to_bits(), Ordering::Relaxed);
+    // Best effort: sounds already running follow the slider too.
+    let _ = send_msg(AudioMsg::SetVolume(volume));
 }
 
 // --- Duration query ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
     probe_duration(&sound_path)
 }
 
+/// Track length from container metadata. Builds a decoder but never pulls
+/// samples through it, so this only parses headers.
 fn probe_duration(sound_path: &str) -> Result<f64, String> {
-    use std::fs::File;
-    use symphonia::core::formats::FormatOptions;
-    use symphonia::core::formats::probe::Hint;
-    use symphonia::core::io::MediaSourceStream;
-    use symphonia::core::meta::MetadataOptions;
-
     if let Some(secs) = super::cache::cached_duration(sound_path) {
         return Ok(secs);
     }
-
-    let file = File::open(sound_path)
-        .map_err(|e| format!("Failed to open '{}': {}", sound_path, e))?;
-    let mss = MediaSourceStream::new(Box::new(file), Default::default());
-
-    let mut hint = Hint::new();
-    if let Some(ext) = std::path::Path::new(sound_path)
-        .extension()
-        .and_then(|e| e.to_str())
-    {
-        hint.with_extension(ext);
-    }
-
-    let probe_result = symphonia::default::get_probe().probe(
-        &hint,
-        mss,
-        FormatOptions::default(),
-        MetadataOptions::default(),
-    );
-    if let Ok(format) = probe_result {
-        for track in format.tracks() {
-            if let (Some(n_frames), Some(tb)) = (track.num_frames, track.time_base) {
-                let secs = n_frames as f64 * tb.numer.get() as f64 / tb.denom.get() as f64;
-                if secs > 0.0 {
-                    super::cache::store_duration(sound_path, secs);
-                    return Ok(secs);
-                }
-            }
-        }
-    }
-
     let cursor = super::cache::open_cursor(sound_path)?;
     let decoder = rodio::Decoder::new(cursor).map_err(|e| e.to_string())?;
     let secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
-    super::cache::store_duration(sound_path, secs);
+    if secs > 0.0 {
+        super::cache::store_duration(sound_path, secs);
+    }
     Ok(secs)
+}
+
+// --- Output format (what PCM buffers are pre-converted to) ---
+
+static OUTPUT_RATE: AtomicU32 = AtomicU32::new(0);
+static OUTPUT_CHANNELS: AtomicU32 = AtomicU32::new(0);
+
+fn publish_output_format(rate: SampleRate, channels: ChannelCount) {
+    OUTPUT_RATE.store(rate.get(), Ordering::Relaxed);
+    OUTPUT_CHANNELS.store(channels.get() as u32, Ordering::Relaxed);
+}
+
+/// Format of the currently open stream, if one has ever been opened.
+/// Callers that need it before first playback fall back to querying the device.
+pub fn output_format() -> Option<(SampleRate, ChannelCount)> {
+    let rate = SampleRate::new(OUTPUT_RATE.load(Ordering::Relaxed))?;
+    let channels = ChannelCount::new(OUTPUT_CHANNELS.load(Ordering::Relaxed) as u16)?;
+    Some((rate, channels))
 }
 
 // --- Playing list snapshot (shared with frontend) ---
@@ -86,6 +78,7 @@ pub struct PlayingInfo {
     pub paused: bool,
     pub position_secs: f64,
     pub looping: bool,
+    pub duration_secs: f64,
 }
 
 static PLAYING_LIST: OnceLock<Mutex<Vec<PlayingInfo>>> = OnceLock::new();
@@ -104,6 +97,7 @@ fn sync_playing_list(app: &tauri::AppHandle, playing: &[PlayingSound]) {
             // seek rebuilds, that starts at 0 — add origin for absolute time.
             position_secs: s.position_origin_secs + s.player.get_pos().as_secs_f64(),
             looping: s.looping,
+            duration_secs: s.duration_secs,
         })
         .collect();
     if let Ok(mut guard) = playing_list().lock() {
@@ -122,6 +116,8 @@ pub enum AudioMsg {
         /// Optional audio host name (e.g. "WASAPI", "ASIO"). None = search all hosts.
         host_name: Option<String>,
         overlap: bool,
+        ready: Ready,
+        duration_secs: f64,
     },
     /// Stop a single playing sound matched by its file path.
     StopOne {
@@ -147,6 +143,8 @@ pub enum AudioMsg {
         path: Option<String>,
         looping: bool,
     },
+    /// Apply the master volume to sounds that are already running.
+    SetVolume(f32),
 }
 
 // --- Global audio sender ---
@@ -171,23 +169,31 @@ struct AudioStream {
     device_sink: MixerDeviceSink,
     device_name: String,
     host_name: Option<String>,
+    /// Output format sources are pre-converted to, so the mixer never resamples.
+    #[allow(dead_code)]
+    sample_rate: SampleRate,
+    #[allow(dead_code)]
+    channels: ChannelCount,
 }
 
 impl AudioStream {
     fn open(device_name: &str, host_name: Option<&str>) -> Result<Self, String> {
-        let device = get_output_devices_for_host_name(host_name)
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .find(|d| device_display_name(d).as_deref() == Some(device_name))
-            .ok_or_else(|| format!("Device '{}' not found", device_name))?;
+        let device = resolve_output_device(device_name, host_name).map_err(|e| e.to_string())?;
+        let resolved_name = super::devices::device_display_name(&device)
+            .unwrap_or_else(|| device_name.to_owned());
         let device_sink = DeviceSinkBuilder::from_device(device)
             .map_err(|e| e.to_string())?
             .open_stream()
             .map_err(|e| e.to_string())?;
+        let sample_rate = device_sink.config().sample_rate();
+        let channels = device_sink.config().channel_count();
+        publish_output_format(sample_rate, channels);
         Ok(Self {
             device_sink,
-            device_name: device_name.to_owned(),
+            device_name: resolved_name,
             host_name: host_name.map(str::to_owned),
+            sample_rate,
+            channels,
         })
     }
 }
@@ -204,13 +210,60 @@ struct PlayingSound {
     duration_secs: f64,
     /// Absolute file offset corresponding to player position 0 (set on seek).
     position_origin_secs: f64,
+    ready: Ready,
+}
+
+/// Fully cached PCM, or a live progressive pump.
+#[derive(Clone)]
+pub enum Ready {
+    Cached(SamplesBuffer),
+    Growing(PumpHandle),
+}
+
+impl Ready {
+    fn cancel(&self) {
+        if let Self::Growing(h) = self {
+            h.cancel();
+        }
+    }
+
+    fn append_to(&self, player: &Player) {
+        match self {
+            Self::Cached(buf) => player.append(buf.clone()),
+            Self::Growing(h) => {
+                if let Some(buf) = h.snapshot() {
+                    player.append(buf);
+                } else {
+                    player.append(h.source());
+                }
+            }
+        }
+    }
 }
 
 // --- Helpers ---
 
-fn load_source(path: &str) -> Result<rodio::Decoder<super::cache::AudioCursor>, String> {
-    let cursor = super::cache::open_cursor(path)?;
-    rodio::Decoder::new(cursor).map_err(|e| e.to_string())
+/// Cache hit is instant. Miss starts a pump and waits only for preroll (~300 ms).
+pub fn prepare_play(
+    path: &str,
+    device_name: &str,
+    host_name: Option<&str>,
+) -> Result<(Ready, f64), String> {
+    let (rate, channels) = super::devices::default_output_format(device_name, host_name)
+        .or_else(output_format)
+        .ok_or_else(|| "Cannot resolve output format".to_string())?;
+    if let Some((buffer, duration)) = super::pcm::peek(path, rate, channels) {
+        if duration > 0.0 {
+            super::cache::store_duration(path, duration);
+        }
+        return Ok((Ready::Cached(buffer), duration));
+    }
+    let handle = super::stream::start(path.to_owned(), rate, channels)?;
+    let duration = handle.duration_secs();
+    if duration > 0.0 {
+        super::cache::store_duration(path, duration);
+    }
+    Ok((Ready::Growing(handle), duration))
 }
 
 /// Ensures the stream targets `device_name`/`host_name`, reopening only when they changed.
@@ -221,7 +274,11 @@ fn ensure_stream(
 ) -> Result<(), String> {
     let needs_new = stream
         .as_ref()
-        .map(|s| s.device_name != device_name || s.host_name.as_deref() != host_name)
+        .map(|s| {
+            let host_changed = s.host_name.as_deref() != host_name;
+            let device_changed = s.device_name != device_name && !is_default_name(device_name);
+            host_changed || device_changed
+        })
         .unwrap_or(true);
 
     if !needs_new {
@@ -315,50 +372,51 @@ fn seek_playing_slot(
         }
     }
 
-    // 2) Rebuild decoder and demuxer-seek before append (no eager skip_duration).
-    //    New Player get_pos starts at 0, so origin must equal the seek offset.
+    // 2) Rebuild from the cached buffer or the live pump. Never full-decode here.
     let file_path = playing[i].path.clone();
     let looping = playing[i].looping;
-    let Ok(mut source) = load_source(&file_path) else {
-        eprintln!("Seek reload failed for '{file_path}'");
-        return;
-    };
+    let ready = playing[i].ready.clone();
     if duration_secs <= 0.0 {
-        duration_secs = source
-            .total_duration()
-            .map(|d| d.as_secs_f64())
-            .unwrap_or(0.0);
+        duration_secs = match &ready {
+            Ready::Cached(b) => b.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0),
+            Ready::Growing(h) => h.duration_secs().max(h.ready_secs()),
+        };
     }
-    let clamped = clamp_seek_pos(position_secs, duration_secs);
+    let max_pos = match &ready {
+        Ready::Growing(h) if !h.is_done() => h.ready_secs(),
+        _ => duration_secs,
+    };
+    let clamped = clamp_seek_pos(position_secs, max_pos);
     let target = Duration::from_secs_f64(clamped);
 
     let new_player = Player::connect_new(stream.device_sink.mixer());
-    let origin = match source.try_seek(target) {
-        Ok(()) => {
-            new_player.append(source.amplify(current_volume()));
-            // Decoder already advanced; player clock starts at 0.
-            clamped
+    new_player.set_volume(current_volume());
+    let origin = match &ready {
+        Ready::Cached(buf) => {
+            let mut source = buf.clone();
+            match source.try_seek(target) {
+                Ok(()) => {
+                    new_player.append(source);
+                    clamped
+                }
+                Err(_) if clamped < 2.0 => {
+                    new_player.append(buf.clone().skip_duration(Duration::from_secs_f64(clamped)));
+                    clamped
+                }
+                Err(e) => {
+                    eprintln!("Seek unsupported at {clamped:.2}s for '{file_path}': {e}");
+                    return;
+                }
+            }
         }
-        Err(_) if clamped < 2.0 => {
-            // try_seek may leave the decoder dirty — reload before short skip.
-            let Ok(fresh) = load_source(&file_path) else {
-                eprintln!("Seek reload failed for '{file_path}'");
-                return;
-            };
-            new_player.append(
-                fresh
-                    .skip_duration(Duration::from_secs_f64(clamped))
-                    .amplify(current_volume()),
-            );
+        Ready::Growing(h) => {
+            let mut source = h.source();
+            let _ = source.try_seek(target);
+            new_player.append(source);
             clamped
-        }
-        Err(e) => {
-            eprintln!("Seek unsupported at {clamped:.2}s for '{file_path}': {e}");
-            return;
         }
     };
 
-    // Pause before swap so the new source never audibly starts if we were paused.
     if was_paused {
         new_player.pause();
     }
@@ -370,6 +428,7 @@ fn seek_playing_slot(
             looping,
             duration_secs,
             position_origin_secs: origin,
+            ready,
         },
     );
     old.player.stop();
@@ -392,29 +451,15 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
             while i < playing.len() {
                 if playing[i].player.empty() {
                     if playing[i].looping {
-                        let path = playing[i].path.clone();
                         let was_paused = playing[i].player.is_paused();
-                        match load_source(&path) {
-                            Ok(source) => {
-                                // Sink::get_pos is cumulative across appended
-                                // sources. Offset origin so absolute position
-                                // restarts at 0 and the UI playhead/progress
-                                // can loop with the audio.
-                                let sink_pos = playing[i].player.get_pos().as_secs_f64();
-                                playing[i].position_origin_secs = -sink_pos;
-                                playing[i].player.append(source.amplify(current_volume()));
-                                if was_paused {
-                                    playing[i].player.pause();
-                                }
-                                finished_any = true; // refresh position → 0
-                                i += 1;
-                            }
-                            Err(_) => {
-                                let finished = playing.remove(i);
-                                let _ = app_handle.emit("sound_finished", finished.path);
-                                finished_any = true;
-                            }
+                        let sink_pos = playing[i].player.get_pos().as_secs_f64();
+                        playing[i].position_origin_secs = -sink_pos;
+                        playing[i].ready.append_to(&playing[i].player);
+                        if was_paused {
+                            playing[i].player.pause();
                         }
+                        finished_any = true;
+                        i += 1;
                     } else {
                         let finished = playing.remove(i);
                         let _ = app_handle.emit("sound_finished", finished.path);
@@ -422,6 +467,15 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     }
                 } else {
                     i += 1;
+                }
+            }
+            for s in &mut playing {
+                if let Ready::Growing(h) = &s.ready {
+                    let d = h.duration_secs();
+                    if d > s.duration_secs {
+                        s.duration_secs = d;
+                        finished_any = true;
+                    }
                 }
             }
             if finished_any {
@@ -446,6 +500,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
             match msg {
                 AudioMsg::Stop => {
                     for s in playing.drain(..) {
+                        s.ready.cancel();
                         s.player.stop();
                         let _ = app_handle.emit("sound_finished", s.path);
                     }
@@ -455,6 +510,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                 AudioMsg::StopOne { path } => {
                     if let Some(pos) = playing.iter().position(|s| s.path == path) {
                         let s = playing.remove(pos);
+                        s.ready.cancel();
                         s.player.stop();
                         let _ = app_handle.emit("sound_finished", s.path);
                         sync_playing_list(&app_handle, &playing);
@@ -489,53 +545,46 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     sync_playing_list(&app_handle, &playing);
                 }
 
-                AudioMsg::Play { path, device_name, host_name, overlap } => {
+                AudioMsg::Play {
+                    path,
+                    device_name,
+                    host_name,
+                    overlap,
+                    ready,
+                    duration_secs,
+                } => {
                     if !overlap {
-                        // Stop all currently playing sounds before starting the new one.
                         for s in playing.drain(..) {
+                            s.ready.cancel();
                             s.player.stop();
                             let _ = app_handle.emit("sound_finished", s.path);
                         }
-                        // Allow WASAPI callbacks to drain before reusing the device.
                         thread::sleep(Duration::from_millis(50));
                     }
 
                     if let Err(e) = ensure_stream(&mut stream, &device_name, host_name.as_deref()) {
                         eprintln!("Failed to open audio device: {}", e);
+                        ready.cancel();
                         let _ = app_handle.emit("sound_error", e);
                         continue;
                     }
 
                     let st = stream.as_ref().expect("ensure_stream guarantees Some on Ok");
-                    // Each Player connects to the shared MixerDeviceSink — sounds mix.
                     let new_player = Player::connect_new(st.device_sink.mixer());
-
-                    match load_source(&path) {
-                        Ok(source) => {
-                            let duration_secs = source
-                                .total_duration()
-                                .map(|d| d.as_secs_f64())
-                                .unwrap_or(0.0);
-                            new_player.append(source.amplify(current_volume()));
-                            playing.push(PlayingSound {
-                                player: new_player,
-                                path: path.clone(),
-                                looping: false,
-                                duration_secs,
-                                position_origin_secs: 0.0,
-                            });
-                            if duration_secs > 0.0 {
-                                super::cache::store_duration(&path, duration_secs);
-                            }
-                            let keep: Vec<String> = playing.iter().map(|s| s.path.clone()).collect();
-                            super::cache::evict_idle(&keep);
-                            sync_playing_list(&app_handle, &playing);
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to decode audio: {}", e);
-                            let _ = app_handle.emit("sound_error", e);
-                        }
-                    }
+                    new_player.set_volume(current_volume());
+                    ready.append_to(&new_player);
+                    playing.push(PlayingSound {
+                        player: new_player,
+                        path: path.clone(),
+                        looping: false,
+                        duration_secs,
+                        position_origin_secs: 0.0,
+                        ready,
+                    });
+                    let keep: Vec<String> = playing.iter().map(|s| s.path.clone()).collect();
+                    super::cache::evict_idle(&keep);
+                    super::pcm::evict_idle(&keep);
+                    sync_playing_list(&app_handle, &playing);
                 }
 
                 AudioMsg::Seek {
@@ -549,6 +598,12 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     if let (Some(i), Some(st)) = (idx, stream.as_ref()) {
                         seek_playing_slot(&mut playing, i, st, position_secs);
                         sync_playing_list(&app_handle, &playing);
+                    }
+                }
+
+                AudioMsg::SetVolume(volume) => {
+                    for s in &playing {
+                        s.player.set_volume(volume);
                     }
                 }
 
@@ -575,8 +630,28 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 
 // --- Tauri commands ---
 
+/// Decode on the calling thread, then hand a ready buffer to the audio thread.
+/// Used by the record-editor preview (already on a worker) and by [`play_sound`].
+pub fn enqueue_play(
+    sound_path: String,
+    device_name: String,
+    host_name: Option<String>,
+    overlap: bool,
+) -> Result<f64, String> {
+    let (ready, duration) = prepare_play(&sound_path, &device_name, host_name.as_deref())?;
+    send_msg(AudioMsg::Play {
+        path: sound_path,
+        device_name,
+        host_name,
+        overlap,
+        ready,
+        duration_secs: duration,
+    })?;
+    Ok(duration)
+}
+
 #[tauri::command]
-pub fn play_sound(
+pub async fn play_sound(
     sound_path: String,
     device_name: String,
     host_name: Option<String>,
@@ -585,45 +660,38 @@ pub fn play_sound(
 ) -> Result<f64, String> {
     if active {
         send_msg(AudioMsg::StopOne { path: sound_path })?;
-        Ok(0.0)
-    } else {
-        let duration = probe_duration(&sound_path).unwrap_or(0.0);
-        send_msg(AudioMsg::Play {
-            path: sound_path,
-            device_name,
-            host_name,
-            overlap,
-        })?;
-        Ok(duration)
+        return Ok(0.0);
     }
+    crate::task::run_blocking(move || enqueue_play(sound_path, device_name, host_name, overlap))
+        .await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pause_sound(sound_path: String) -> Result<(), String> {
     send_msg(AudioMsg::PauseOne { path: sound_path })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resume_sound(sound_path: String) -> Result<(), String> {
     send_msg(AudioMsg::ResumeOne { path: sound_path })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pause_all() -> Result<(), String> {
     send_msg(AudioMsg::PauseAll)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resume_all() -> Result<(), String> {
     send_msg(AudioMsg::ResumeAll)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stop_all() -> Result<(), String> {
     send_msg(AudioMsg::Stop)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_playing_sounds() -> Vec<PlayingInfo> {
     playing_list()
         .lock()
@@ -631,7 +699,7 @@ pub fn get_playing_sounds() -> Vec<PlayingInfo> {
         .unwrap_or_default()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn seek_playing(position_secs: f64, sound_path: Option<String>) -> Result<(), String> {
     send_msg(AudioMsg::Seek {
         path: sound_path,
@@ -639,7 +707,7 @@ pub fn seek_playing(position_secs: f64, sound_path: Option<String>) -> Result<()
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_playing_loop(looping: bool, sound_path: Option<String>) -> Result<(), String> {
     send_msg(AudioMsg::SetLoop {
         path: sound_path,

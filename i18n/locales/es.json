@@ -160,8 +160,6 @@
       "cacheStatus": "Estado de la caché",
       "cacheStatsText": "{count} sonido(s) en caché \u00b7 {size} MiB usados",
       "clearCache": "Vaciar caché",
-      "gpuAudio": "DSP acelerado por GPU (experimental)",
-      "gpuAudioHint": "Usa la GPU dedicada para el procesamiento de señal de audio. Por defecto es la CPU. Requiere reinicio para aplicarse por completo.",
       "stemsSection": "Separación de stems",
       "stemsModel": "Modelo de stems IA",
       "stemsInstall": "Descargar modelo",

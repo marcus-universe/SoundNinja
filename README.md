@@ -52,8 +52,8 @@ The core mission was to build a soundboard that empowers you to organize massive
 <img src="./designs/download.png" alt="Downloads" width="800" />
 
 [![Windows NSIS](https://img.shields.io/badge/Windows-NSIS-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64-setup.exe)
-[![Windows MSI](https://img.shields.io/badge/Windows-MSI-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64.msi)
-[![macOS](https://img.shields.io/badge/macOS-Universal_DMG-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-universal.dmg)
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-arm64.dmg)
+[![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-x64.dmg)
 [![Linux deb](https://img.shields.io/badge/Linux-.deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.deb)
 [![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.AppImage)
 [![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz)
@@ -68,8 +68,8 @@ Official builds (x86_64 unless noted):
 
 | Platform | Support |
 | :------- | :------ |
-| Windows 10+ | NSIS / MSI (WebView2) |
-| macOS 10.15+ | Universal DMG (Apple Silicon + Intel) |
+| Windows 10+ | NSIS installer (WebView2) |
+| macOS 10.15+ | DMG per architecture (Apple Silicon, Intel) |
 | Linux x86_64 | `.deb` (Debian/Ubuntu, WebKitGTK 4.1) or AppImage. PipeWire or PulseAudio for sound. |
 
 Early development — not tested on every distro.

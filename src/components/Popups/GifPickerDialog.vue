@@ -391,7 +391,7 @@ async function applyGif() {
       byteLen: bytes.length,
     }
     await withProjectDb(path, (d) => upsertGifBlob(d, row))
-    cacheGifRow(row)
+    await cacheGifRow(row)
     jsonStore.setSoundGif(i, id, posX.value, posY.value)
     close()
   } catch (e) {

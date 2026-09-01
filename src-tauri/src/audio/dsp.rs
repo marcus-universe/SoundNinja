@@ -2,10 +2,8 @@
 
 use hound::{WavSpec, WavWriter};
 use nnnoiseless::DenoiseState;
+use rayon::prelude::*;
 use rodio::Source;
-use rubato::{
-    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
-};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -15,7 +13,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
-use super::playback::{pause_all, play_sound, resume_all, stop_all};
+use super::playback::{pause_all, resume_all, stop_all};
 
 #[derive(Clone)]
 pub struct EditSession {
@@ -70,46 +68,7 @@ fn fastrand() -> u32 {
     (h.finish() as u32) ^ std::process::id()
 }
 
-fn decode_file(path: &str) -> Result<(Vec<f32>, u32, u16), String> {
-    // Prefer hound for WAV (exact PCM). Fall back to rodio for other formats.
-    if path.to_lowercase().ends_with(".wav") {
-        if let Ok(mut reader) = hound::WavReader::open(path) {
-            let spec = reader.spec();
-            let samples: Result<Vec<f32>, _> = match spec.sample_format {
-                hound::SampleFormat::Float => reader.samples::<f32>().collect(),
-                hound::SampleFormat::Int => match spec.bits_per_sample {
-                    16 => reader
-                        .samples::<i16>()
-                        .map(|r| r.map(|s| s as f32 / i16::MAX as f32))
-                        .collect(),
-                    24 | 32 => reader
-                        .samples::<i32>()
-                        .map(|r| r.map(|s| s as f32 / i32::MAX as f32))
-                        .collect(),
-                    _ => reader
-                        .samples::<i16>()
-                        .map(|r| r.map(|s| s as f32 / i16::MAX as f32))
-                        .collect(),
-                },
-            };
-            if let Ok(s) = samples {
-                if !s.is_empty() {
-                    return Ok((s, spec.sample_rate, spec.channels));
-                }
-            }
-        }
-    }
-
-    let file = File::open(path).map_err(|e| e.to_string())?;
-    let decoder = rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
-    let sample_rate: u32 = decoder.sample_rate().into();
-    let channels: u16 = decoder.channels().into();
-    let samples: Vec<f32> = decoder.collect();
-    if samples.is_empty() {
-        return Err("Decoded zero samples".into());
-    }
-    Ok((samples, sample_rate, channels))
-}
+use super::pcm::{decode_file, resample_mono};
 
 fn with_session_mut<F, R>(session_id: &str, f: F) -> Result<R, String>
 where
@@ -178,41 +137,6 @@ fn temp_preview_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join(format!("preview_{ts}.wav")))
 }
 
-fn resample_mono(input: &[f32], from: u32, to: u32) -> Result<Vec<f32>, String> {
-    if from == to {
-        return Ok(input.to_vec());
-    }
-    let params = SincInterpolationParameters {
-        sinc_len: 64,
-        f_cutoff: 0.95,
-        interpolation: SincInterpolationType::Linear,
-        oversampling_factor: 256,
-        window: WindowFunction::BlackmanHarris2,
-    };
-    let mut resampler =
-        SincFixedIn::<f32>::new(to as f64 / from as f64, 2.0, params, 1024, 1)
-            .map_err(|e| e.to_string())?;
-
-    let mut out = Vec::new();
-    let mut pos = 0;
-    let chunk = resampler.input_frames_next();
-    while pos + chunk <= input.len() {
-        let waves_in = vec![input[pos..pos + chunk].to_vec()];
-        let waves_out = resampler.process(&waves_in, None).map_err(|e| e.to_string())?;
-        out.extend_from_slice(&waves_out[0]);
-        pos += chunk;
-    }
-    if pos < input.len() {
-        let mut tail = input[pos..].to_vec();
-        tail.resize(chunk, 0.0);
-        let waves_in = vec![tail];
-        if let Ok(waves_out) = resampler.process(&waves_in, None) {
-            out.extend_from_slice(&waves_out[0]);
-        }
-    }
-    Ok(out)
-}
-
 fn denoise_channel(mono: &[f32], sample_rate: u32) -> Result<Vec<f32>, String> {
     let at_48k = resample_mono(mono, sample_rate, 48_000)?;
     let mut scaled: Vec<f32> = at_48k.iter().map(|&s| s * i16::MAX as f32).collect();
@@ -260,10 +184,18 @@ fn interleave(planes: &[Vec<f32>]) -> Vec<f32> {
     out
 }
 
+use crate::task::run_blocking;
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
+/// Full-file decode; can take seconds on long recordings, so it runs on the
+/// blocking pool rather than a tokio worker.
 #[tauri::command]
-pub fn load_edit_session(path: String) -> Result<SessionInfo, String> {
+pub async fn load_edit_session(path: String) -> Result<SessionInfo, String> {
+    run_blocking(move || load_edit_session_blocking(path)).await
+}
+
+fn load_edit_session_blocking(path: String) -> Result<SessionInfo, String> {
     let (samples, sample_rate, channels) = decode_file(&path)?;
     let duration_secs = samples.len() as f64 / (sample_rate as f64 * channels.max(1) as f64);
     let session_id = new_session_id();
@@ -308,11 +240,6 @@ fn peaks_from_samples(
         .min(frames)
         .max(start_frame + 1);
     let span = end_frame - start_frame;
-    if start_sec.is_none() && end_sec.is_none() {
-        if let Some(gpu) = crate::gpu::bucket_peaks(&samples[..frames * ch], buckets) {
-            return gpu;
-        }
-    }
     let mut peaks = Vec::with_capacity(buckets * 2);
     for b in 0..buckets {
         let start = start_frame + b * span / buckets;
@@ -336,7 +263,7 @@ fn peaks_from_samples(
     peaks
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_waveform_peaks(
     session_id: String,
     buckets: usize,
@@ -419,68 +346,27 @@ fn peaks_from_wav_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, Stri
             let iter = reader.samples::<f32>().map(|r| r.unwrap_or(0.0));
             Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
         }
-        hound::SampleFormat::Int => match spec.bits_per_sample {
-            24 | 32 => {
-                let iter = reader
-                    .samples::<i32>()
-                    .map(|r| r.map(|s| s as f32 / i32::MAX as f32).unwrap_or(0.0));
-                Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
-            }
-            _ => {
-                let iter = reader
-                    .samples::<i16>()
-                    .map(|r| r.map(|s| s as f32 / i16::MAX as f32).unwrap_or(0.0));
-                Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
-            }
-        },
-    }
-}
-
-/// Probe frame count via symphonia (no full PCM decode).
-fn probe_total_frames(path: &str) -> Option<usize> {
-    use std::io::Cursor;
-    use symphonia::core::formats::FormatOptions;
-    use symphonia::core::formats::probe::Hint;
-    use symphonia::core::io::MediaSourceStream;
-    use symphonia::core::meta::MetadataOptions;
-
-    let bytes = super::cache::load_bytes(path).ok()?;
-    let mss = MediaSourceStream::new(Box::new(Cursor::new(bytes.clone())), Default::default());
-    let mut hint = Hint::new();
-    if let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str()) {
-        hint.with_extension(ext);
-    }
-    let format = symphonia::default::get_probe()
-        .probe(
-            &hint,
-            mss,
-            FormatOptions::default(),
-            MetadataOptions::default(),
-        )
-        .ok()?;
-    for track in format.tracks() {
-        if let Some(n_frames) = track.num_frames {
-            if n_frames > 0 {
-                return Some(n_frames as usize);
-            }
+        hound::SampleFormat::Int => {
+            let bits = spec.bits_per_sample;
+            let iter = reader
+                .samples::<i32>()
+                .map(|r| r.map(|s| super::pcm::int_sample_to_f32(s, bits)).unwrap_or(0.0));
+            Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
         }
     }
-    None
 }
 
 fn peaks_from_rodio_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
     let open = || {
         let file = File::open(path).map_err(|e| e.to_string())?;
-        rodio::Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())
+        rodio::Decoder::new(BufReader::with_capacity(64 * 1024, file)).map_err(|e| e.to_string())
     };
 
     let decoder = open()?;
     let sample_rate: u32 = decoder.sample_rate().into();
     let channels: u16 = decoder.channels().into();
 
-    let total_frames = if let Some(frames) = probe_total_frames(path) {
-        frames
-    } else if let Some(dur) = decoder.total_duration() {
+    let total_frames = if let Some(dur) = decoder.total_duration() {
         (dur.as_secs_f64() * sample_rate as f64).round().max(1.0) as usize
     } else {
         // Unknown length: count frames in a streaming pass (O(1) memory), then fold.
@@ -523,6 +409,12 @@ pub async fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec
 
     let path_for_worker = path.clone();
     let peaks = tauri::async_runtime::spawn_blocking(move || {
+        if super::stream::is_pumping(&path_for_worker) {
+            std::thread::sleep(std::time::Duration::from_millis(350));
+            if let Some(p) = super::stream::active_peaks(&path_for_worker, buckets) {
+                return Ok(p);
+            }
+        }
         peaks_from_file_streaming(&path_for_worker, buckets)
     })
     .await
@@ -537,7 +429,7 @@ pub async fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec
     Ok(peaks)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn trim_session(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let start = sec_to_frame(start_sec, sess.sample_rate, sess.channels);
@@ -556,7 +448,7 @@ pub fn trim_session(session_id: String, start_sec: f64, end_sec: f64) -> Result<
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_range(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let start = sec_to_frame(start_sec, sess.sample_rate, sess.channels);
@@ -578,7 +470,7 @@ pub fn delete_range(session_id: String, start_sec: f64, end_sec: f64) -> Result<
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn normalize_session(
     session_id: String,
     target_peak_db: Option<f32>,
@@ -598,11 +490,9 @@ pub fn normalize_session(
             .fold(0.0f32, f32::max);
         if peak > 1e-9 {
             push_undo(sess);
-            if !crate::gpu::normalize_range(&mut sess.samples[start..end], target) {
-                let gain = target / peak;
-                for s in &mut sess.samples[start..end] {
-                    *s = (*s * gain).clamp(-1.0, 1.0);
-                }
+            let gain = target / peak;
+            for s in &mut sess.samples[start..end] {
+                *s = (*s * gain).clamp(-1.0, 1.0);
             }
         }
         Ok(SessionInfo {
@@ -615,8 +505,17 @@ pub fn normalize_session(
     })
 }
 
+/// RNNoise over every channel; the slowest edit operation by far.
 #[tauri::command]
-pub fn denoise_session(
+pub async fn denoise_session(
+    session_id: String,
+    start_sec: Option<f64>,
+    end_sec: Option<f64>,
+) -> Result<SessionInfo, String> {
+    run_blocking(move || denoise_session_blocking(session_id, start_sec, end_sec)).await
+}
+
+fn denoise_session_blocking(
     session_id: String,
     start_sec: Option<f64>,
     end_sec: Option<f64>,
@@ -627,12 +526,14 @@ pub fn denoise_session(
             return Err("Denoise range is empty".into());
         }
         push_undo(sess);
-        let slice = sess.samples[start..end].to_vec();
-        let planes = deinterleave(&slice, sess.channels);
-        let mut out_planes = Vec::with_capacity(planes.len());
-        for plane in planes {
-            out_planes.push(denoise_channel(&plane, sess.sample_rate)?);
-        }
+        let slice = &sess.samples[start..end];
+        let planes = deinterleave(slice, sess.channels);
+        let sample_rate = sess.sample_rate;
+        // One RNNoise pass per channel; they are independent, so run them in parallel.
+        let mut out_planes = planes
+            .par_iter()
+            .map(|plane| denoise_channel(plane, sample_rate))
+            .collect::<Result<Vec<_>, String>>()?;
         let min_len = out_planes.iter().map(|p| p.len()).min().unwrap_or(0);
         for p in &mut out_planes {
             p.truncate(min_len);
@@ -658,7 +559,7 @@ pub fn denoise_session(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn undo_session(session_id: String) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let (samples, sr, ch) = sess.undo.take().ok_or("Nothing to undo")?;
@@ -676,7 +577,7 @@ pub fn undo_session(session_id: String) -> Result<SessionInfo, String> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn redo_session(session_id: String) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let (samples, sr, ch) = sess.redo.take().ok_or("Nothing to redo")?;
@@ -695,7 +596,11 @@ pub fn redo_session(session_id: String) -> Result<SessionInfo, String> {
 }
 
 #[tauri::command]
-pub fn export_session(session_id: String, out_path: String) -> Result<(), String> {
+pub async fn export_session(session_id: String, out_path: String) -> Result<(), String> {
+    run_blocking(move || export_session_blocking(session_id, out_path)).await
+}
+
+fn export_session_blocking(session_id: String, out_path: String) -> Result<(), String> {
     with_session_mut(&session_id, |sess| {
         write_wav(
             Path::new(&out_path),
@@ -713,7 +618,7 @@ pub struct StagedClipInfo {
 }
 
 /// Export a full session or a time range into a temp staged WAV for the batch list.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stage_session_clip(
     app: AppHandle,
     session_id: String,
@@ -756,7 +661,7 @@ pub fn stage_session_clip(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn preview_session(
     app: AppHandle,
     session_id: String,
@@ -778,21 +683,21 @@ pub fn preview_session(
     let path_str = path.to_string_lossy().to_string();
     super::cache::invalidate_path(&path_str);
     let _ = stop_all();
-    play_sound(path_str, device_name, host_name, false, true)?;
+    super::playback::enqueue_play(path_str, device_name, host_name, true)?;
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stop_preview() -> Result<(), String> {
     stop_all()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pause_preview() -> Result<(), String> {
     pause_all()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resume_preview() -> Result<(), String> {
     resume_all()
 }

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -50,8 +50,6 @@ struct CacheEntry {
 
 pub struct SoundCache {
     entries: HashMap<String, CacheEntry>,
-    /// Access order — front = most recently used, back = least recently used.
-    order: VecDeque<String>,
     total_size: usize,
     pub max_size: usize,
     max_entry: usize,
@@ -61,7 +59,6 @@ impl SoundCache {
     pub fn new() -> Self {
         Self {
             entries: HashMap::new(),
-            order: VecDeque::new(),
             total_size: 0,
             max_size: MAX_CACHE_SIZE,
             max_entry: MAX_FILE_ENTRY,
@@ -72,25 +69,18 @@ impl SoundCache {
         self.entries.get(path).map(|e| e.data.clone())
     }
 
-    /// Return cached bytes and promote entry to MRU position.
+    /// Return cached bytes and refresh the entry's LRU stamp. `O(1)` — the
+    /// recency lives in the entry, so there is no access-order list to rewrite.
     pub fn get(&mut self, path: &str) -> Option<Arc<[u8]>> {
-        if self.entries.contains_key(path) {
-            self.order.retain(|p| p != path);
-            self.order.push_front(path.to_string());
-            if let Some(e) = self.entries.get_mut(path) {
-                e.last_used = Instant::now();
-                return Some(e.data.clone());
-            }
-        }
-        None
+        let entry = self.entries.get_mut(path)?;
+        entry.last_used = Instant::now();
+        Some(entry.data.clone())
     }
 
     /// Store bytes in the cache (LRU eviction when full).
     /// Files exceeding `max_entry` are returned as an `Arc` but never stored.
     pub fn insert(&mut self, path: String, data: Vec<u8>) -> Arc<[u8]> {
         if let Some(existing) = self.entries.get_mut(&path) {
-            self.order.retain(|p| p != &path);
-            self.order.push_front(path);
             existing.last_used = Instant::now();
             return existing.data.clone();
         }
@@ -103,17 +93,17 @@ impl SoundCache {
         }
 
         while self.total_size + size > self.max_size {
-            match self.order.pop_back() {
-                Some(lru) => {
-                    if let Some(evicted) = self.entries.remove(&lru) {
-                        self.total_size = self.total_size.saturating_sub(evicted.data.len());
-                    }
-                }
+            let lru = self
+                .entries
+                .iter()
+                .min_by_key(|(_, e)| e.last_used)
+                .map(|(p, _)| p.clone());
+            match lru {
+                Some(path) => self.invalidate(&path),
                 None => break,
             }
         }
 
-        self.order.push_front(path.clone());
         self.total_size += size;
         self.entries.insert(
             path,
@@ -127,7 +117,6 @@ impl SoundCache {
 
     pub fn clear(&mut self) {
         self.entries.clear();
-        self.order.clear();
         self.total_size = 0;
     }
 
@@ -135,7 +124,6 @@ impl SoundCache {
     pub fn invalidate(&mut self, path: &str) {
         if let Some(evicted) = self.entries.remove(path) {
             self.total_size = self.total_size.saturating_sub(evicted.data.len());
-            self.order.retain(|p| p != path);
         }
     }
 
@@ -157,12 +145,13 @@ impl SoundCache {
         self.max_size = max_size;
         self.max_entry = max_entry;
         while self.total_size > self.max_size {
-            match self.order.pop_back() {
-                Some(lru) => {
-                    if let Some(evicted) = self.entries.remove(&lru) {
-                        self.total_size = self.total_size.saturating_sub(evicted.data.len());
-                    }
-                }
+            let lru = self
+                .entries
+                .iter()
+                .min_by_key(|(_, e)| e.last_used)
+                .map(|(p, _)| p.clone());
+            match lru {
+                Some(path) => self.invalidate(&path),
                 None => break,
             }
         }
@@ -187,11 +176,12 @@ pub fn sound_cache() -> &'static Mutex<SoundCache> {
     SOUND_CACHE.get_or_init(|| Mutex::new(SoundCache::new()))
 }
 
-/// Evict a single cached path (e.g. rewritten preview WAV).
+/// Evict a single path from both caches (e.g. a rewritten preview WAV).
 pub fn invalidate_path(path: &str) {
     if let Ok(mut cache) = sound_cache().lock() {
         cache.invalidate(path);
     }
+    super::pcm::invalidate(path);
 }
 
 pub fn peek_bytes(path: &str) -> Option<Arc<[u8]>> {
@@ -295,42 +285,62 @@ pub struct CacheStats {
     pub max_size_bytes: usize,
 }
 
-/// Pre-load a list of sound files into RAM in the background.
-#[tauri::command]
-pub fn warm_sound_cache(paths: Vec<String>) {
-    std::thread::spawn(move || {
-        for path in paths {
-            if let Err(e) = load_bytes(&path) {
-                eprintln!("[cache] warm failed '{}': {}", path, e);
+/// Pre-decode a list of sound files so the first press is instant and the audio
+/// callback never has to decode. Runs across the rayon pool; returns immediately.
+///
+/// `device_name` / `host_name` decide the target format. When they cannot be
+/// resolved the files are only warmed as raw bytes.
+#[tauri::command(async)]
+pub fn warm_sound_cache(paths: Vec<String>, device_name: Option<String>, host_name: Option<String>) {
+    let format = super::playback::output_format().or_else(|| {
+        let name = device_name.as_deref()?;
+        super::devices::default_output_format(name, host_name.as_deref())
+    });
+
+    std::thread::spawn(move || match format {
+        Some((rate, channels)) => super::pcm::prefetch(&paths, rate, channels),
+        None => {
+            for path in &paths {
+                if let Err(e) = load_bytes(path) {
+                    eprintln!("[cache] warm failed '{path}': {e}");
+                }
             }
         }
     });
 }
 
-/// Evict all cached sounds, freeing RAM immediately.
-#[tauri::command]
+/// Evict every cached sound, freeing RAM immediately.
+#[tauri::command(async)]
 pub fn clear_sound_cache() -> Result<(), String> {
     sound_cache().lock().map_err(|e| e.to_string())?.clear();
+    super::pcm::clear();
     Ok(())
 }
 
-/// Return current cache usage statistics.
-#[tauri::command]
+/// Return current cache usage statistics (decoded PCM, the dominant consumer).
+#[tauri::command(async)]
 pub fn get_cache_stats() -> Result<CacheStats, String> {
-    let cache = sound_cache().lock().map_err(|e| e.to_string())?;
-    Ok(cache.stats())
+    let (cached_count, total_size_bytes, max_size_bytes) = super::pcm::stats();
+    Ok(CacheStats {
+        cached_count,
+        total_size_bytes,
+        max_size_bytes,
+    })
 }
 
 /// Update the cache size limits at runtime.
 /// `max_size_mib`  – total RAM limit in MiB (min 32, max 4096).
-/// `max_entry_mib` – per-file limit in MiB; files above this are never cached.
-#[tauri::command]
+/// `max_entry_mib` – per-file limit in MiB; files above this stream from disk.
+#[tauri::command(async)]
 pub fn set_cache_config(max_size_mib: u64, max_entry_mib: u64) -> Result<(), String> {
     let max_size = (max_size_mib as usize).saturating_mul(1024 * 1024);
     let max_entry = (max_entry_mib as usize).saturating_mul(1024 * 1024);
+    super::pcm::set_limits(max_size, max_entry);
+    // The byte cache only backs the streaming fallback, so it keeps a small
+    // slice of the budget instead of competing with decoded PCM for RAM.
     sound_cache()
         .lock()
         .map_err(|e| e.to_string())?
-        .set_limits(max_size, max_entry);
+        .set_limits(max_size / 4, max_entry);
     Ok(())
 }

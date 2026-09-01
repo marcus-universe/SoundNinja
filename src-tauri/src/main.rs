@@ -1,15 +1,16 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 pub mod audio;
-pub mod gpu;
 pub mod menu;
 pub mod paths;
 pub mod fsx;
+pub mod gifcache;
 pub mod httpx;
 pub mod soundboard;
 pub mod hotkeys;
 pub mod remote;
+pub mod task;
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_system_fonts() -> Vec<String> {
     get_system_fonts_platform()
 }
@@ -87,11 +88,31 @@ fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Release everything the app holds outside the webview: audio device streams,
+/// decoded PCM, the remote server and OS-level hotkey registrations. Without
+/// this the process can linger with a live output stream after the last window
+/// is gone.
+fn shutdown(app: &tauri::AppHandle) {
+    let _ = audio::playback::stop_all();
+    audio::record::abort_recording();
+    let _ = audio::cache::clear_sound_cache();
+
+    {
+        use tauri_plugin_global_shortcut::GlobalShortcutExt;
+        let _ = app.global_shortcut().unregister_all();
+    }
+
+    // The remote server owns a tokio task; give it a bounded moment to close
+    // its listener so the port is free if the app is restarted right away.
+    let _ = tauri::async_runtime::block_on(async {
+        tokio::time::timeout(std::time::Duration::from_secs(2), remote::remote_stop()).await
+    });
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -118,6 +139,15 @@ fn main() {
             let _ = scope.allow_directory(base.join("projects"), true);
             let _ = scope.allow_directory(base.join("themes"), true);
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            use tauri::{Manager, WindowEvent};
+            // Only the main window owns the shared audio/network state; tool
+            // windows come and go without touching it.
+            if !matches!(event, WindowEvent::Destroyed) || window.label() != "main" {
+                return;
+            }
+            shutdown(window.app_handle());
         })
         .invoke_handler(tauri::generate_handler![
             audio::devices::get_out_devices,
@@ -196,9 +226,9 @@ fn main() {
             fsx::collect_audio_buckets_abs,
             httpx::download_url_bytes,
             httpx::http_get_text,
-            gpu::has_dedicated_gpu,
-            gpu::set_gpu_audio,
-            gpu::get_gpu_audio_enabled,
+            gifcache::gif_cache_paths,
+            gifcache::gif_cache_put,
+            gifcache::gif_cache_clear,
             soundboard::make_temp_dir,
             soundboard::export_soundboard_zip,
             soundboard::import_soundboard_zip,

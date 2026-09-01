@@ -128,7 +128,7 @@ fn model_ready_status(app: &AppHandle) -> bool {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_stems_status(app: AppHandle) -> StemsStatus {
     let available = cfg!(feature = "stems");
     let model_ready = model_ready_status(&app);
@@ -167,25 +167,44 @@ pub fn get_stems_status(app: AppHandle) -> StemsStatus {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn dismiss_stems_intent(app: AppHandle) -> Result<(), String> {
     mark_asked(&app)?;
     clear_windows_install_intent();
     Ok(())
 }
 
+/// Downloads ~158 MB — blocking pool, not an async worker.
 #[cfg(feature = "stems")]
 #[tauri::command]
-pub fn ensure_stems_model(app: AppHandle) -> Result<(), String> {
-    crate::audio::roformer::download_model(&app)?;
-    mark_asked(&app)?;
-    clear_windows_install_intent();
-    Ok(())
+pub async fn ensure_stems_model(app: AppHandle) -> Result<(), String> {
+    crate::task::run_blocking(move || {
+        crate::audio::roformer::download_model(&app)?;
+        mark_asked(&app)?;
+        clear_windows_install_intent();
+        Ok(())
+    })
+    .await
+}
+
+/// ONNX inference runs for minutes on long clips — strictly blocking pool.
+#[cfg(feature = "stems")]
+#[tauri::command]
+pub async fn split_session(
+    app: AppHandle,
+    session_id: String,
+    mode: String,
+    start_sec: Option<f64>,
+    end_sec: Option<f64>,
+) -> Result<SessionInfo, String> {
+    crate::task::run_blocking(move || {
+        split_session_blocking(app, session_id, mode, start_sec, end_sec)
+    })
+    .await
 }
 
 #[cfg(feature = "stems")]
-#[tauri::command]
-pub fn split_session(
+fn split_session_blocking(
     app: AppHandle,
     session_id: String,
     mode: String,
@@ -229,19 +248,19 @@ pub fn split_session(
 }
 
 #[cfg(feature = "stems")]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stems_busy() -> bool {
     BUSY.load(Ordering::SeqCst)
 }
 
 #[cfg(feature = "stems")]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cancel_stems_model_download() {
     crate::audio::roformer::cancel_download();
 }
 
 #[cfg(not(feature = "stems"))]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ensure_stems_model(_app: AppHandle) -> Result<(), String> {
     Err(
         "STEMS_ENGINE_UNAVAILABLE: Stem separation engine is not compiled into this build. \
@@ -251,7 +270,7 @@ Rebuild with --features stems."
 }
 
 #[cfg(not(feature = "stems"))]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn split_session(
     _app: AppHandle,
     _session_id: String,
@@ -267,11 +286,11 @@ Rebuild with --features stems."
 }
 
 #[cfg(not(feature = "stems"))]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stems_busy() -> bool {
     false
 }
 
 #[cfg(not(feature = "stems"))]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cancel_stems_model_download() {}

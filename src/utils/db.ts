@@ -110,8 +110,6 @@ export interface Settings {
   asioLeftChannel?: number
   /** ASIO right-channel index (0-based). Only used when outputHost === 'ASIO'. */
   asioRightChannel?: number
-  /** Enable GPU-accelerated DSP (experimental; only shown when discrete GPU detected). */
-  gpuAudioEnabled?: boolean
   /** Show the floating player on the soundboard. */
   showPlayer?: boolean
   /** Enlarge floating player controls / waveform. */
@@ -165,6 +163,8 @@ export function defaultSettings(): Settings {
     playerLarge: false,
     gifPlayOnHover: true,
     preloadGifs: false,
+    cacheMaxSizeMib: 256,
+    cacheMaxEntryMib: 128,
     tabTransition: 'slide',
     soundHotkeys: [],
   }
@@ -522,6 +522,13 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
   }
 
+  // Old factory cache (64/16 MiB) forced 1–3 min clips onto the streaming
+  // decoder. Bump only that exact pair so a user-chosen small cache stays.
+  if (settings.cacheMaxSizeMib === 64 && settings.cacheMaxEntryMib === 16) {
+    settings.cacheMaxSizeMib = 256
+    settings.cacheMaxEntryMib = 128
+  }
+
   // Migrate legacy dark-* theme ids and pair fields → flat tokens.
   settings.theme = normalizeThemeId(settings.theme)
   if (!settings.bg && !settings.btnBg) {
@@ -671,8 +678,8 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['overlapSounds', String(s.overlapSounds ?? false)],
     ['showPlayer', String(s.showPlayer ?? true)],
     ['playerLarge', String(s.playerLarge ?? false)],
-    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 64)],
-    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 16)],
+    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
+    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 128)],
     ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
     ['allowReorder', String(s.allowReorder ?? true)],
     ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],

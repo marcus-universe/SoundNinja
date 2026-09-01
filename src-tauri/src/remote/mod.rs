@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{broadcast, oneshot};
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_local_ips() -> Vec<netif::LocalIpInfo> {
     netif::list_local_ips()
 }
@@ -187,7 +187,7 @@ fn status_now(handle: &RemoteCtl) -> RemoteStatus {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remote_publish_state(sounds: Vec<RemoteSound>, playing: Vec<String>) -> Result<(), String> {
     let handle = ctl();
     {

@@ -48,14 +48,6 @@
       <UICheckbox :modelValue="preloadGifs" @update:modelValue="onPreloadGifs" />
     </div>
 
-    <div v-if="hasDedicatedGpu" class="settings-group settings-group--toggle">
-      <div class="settings-toggle-text">
-        <span class="settings-label">{{ $t('settings.main.gpuAudio') }}</span>
-        <span class="settings-hint">{{ $t('settings.main.gpuAudioHint') }}</span>
-      </div>
-      <UICheckbox :modelValue="gpuAudioEnabled" @update:modelValue="onGpuAudio" />
-    </div>
-
     <div class="settings-section-divider">{{ $t('settings.main.stemsSection') }}</div>
 
     <div class="settings-group settings-group--stacked">
@@ -98,12 +90,10 @@ const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
 
-const cacheMaxSizeMib = ref(64)
-const cacheMaxEntryMib = ref(16)
+const cacheMaxSizeMib = ref(256)
+const cacheMaxEntryMib = ref(128)
 const preloadGifs = ref(false)
 const cacheStatsText = ref('')
-const hasDedicatedGpu = ref(false)
-const gpuAudioEnabled = ref(false)
 const stemsAvailable = ref(false)
 const stemsModelReady = ref(false)
 const stemsModelLabel = ref('BS-RoFormer')
@@ -181,8 +171,8 @@ async function refreshCacheStats() {
 }
 
 async function onCacheConfig() {
-  const maxSize = Math.max(32, Math.min(4096, Number(cacheMaxSizeMib.value) || 64))
-  const maxEntry = Math.max(1, Math.min(500, Number(cacheMaxEntryMib.value) || 16))
+  const maxSize = Math.max(32, Math.min(4096, Number(cacheMaxSizeMib.value) || 256))
+  const maxEntry = Math.max(1, Math.min(500, Number(cacheMaxEntryMib.value) || 128))
   cacheMaxSizeMib.value = maxSize
   cacheMaxEntryMib.value = maxEntry
   jsonStore.setCacheConfig(maxSize, maxEntry)
@@ -208,20 +198,10 @@ function onPreloadGifs(val: boolean) {
   jsonStore.setPreloadGifs(val)
 }
 
-async function onGpuAudio(val: boolean) {
-  gpuAudioEnabled.value = val
-  jsonStore.setSetting('gpuAudioEnabled', val)
-  try {
-    await invoke('set_gpu_audio', { enabled: val })
-  } catch (e) {
-    console.error('set_gpu_audio failed', e)
-  }
-}
-
 async function syncFromStore() {
   if (!appSettings.loaded) await appSettings.load()
-  cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 64
-  cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 16
+  cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
+  cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 128
   preloadGifs.value = jsonStore.configFile?.settings?.preloadGifs === true
   try {
     await invoke('set_cache_config', {
@@ -230,14 +210,6 @@ async function syncFromStore() {
     })
   } catch { /* not critical */ }
   await refreshCacheStats()
-  if (!hasDedicatedGpu.value) {
-    try {
-      hasDedicatedGpu.value = await invoke<boolean>('has_dedicated_gpu')
-    } catch { /* ignore */ }
-  }
-  if (hasDedicatedGpu.value) {
-    gpuAudioEnabled.value = jsonStore.configFile?.settings?.gpuAudioEnabled ?? false
-  }
   await refreshStemsStatus()
 }
 

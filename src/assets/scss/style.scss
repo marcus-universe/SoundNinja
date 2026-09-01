@@ -540,6 +540,8 @@
   border-radius: 0 0 0.9rem 0.9rem;
   box-shadow: 0 0.3rem 1rem color-mix(in srgb, var(--color-bg, #000) 45%, transparent);
   backdrop-filter: blur(6px);
+  contain: paint;
+  will-change: backdrop-filter;
   flex-wrap: wrap;
   gap: 0.8rem;
   font-size: 1.44rem;
@@ -733,7 +735,7 @@
   color: var(--primary_color);
   font-family: $fontRegular;
   font-size: var(--font-size-sm);
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   box-sizing: border-box;
 
   &:focus {
@@ -796,7 +798,7 @@
   right: 1.6rem;
   top: 1.6rem;
   border-radius: 0.48rem;
-  transition: all 0.2s ease;
+  transition: fill 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 
   &:hover {
     fill: var(--color-bg, #{$color-bg});

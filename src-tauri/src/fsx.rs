@@ -11,21 +11,21 @@ use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use serde::Serialize;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_text_file_abs(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
 /// Reads a binary file and returns its base64-encoded contents. Used to load
 /// uploaded font files into the frontend as `@font-face` data URLs.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_file_base64_abs(path: String) -> Result<String, String> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     let bytes = fs::read(&path).map_err(|e| e.to_string())?;
     Ok(STANDARD.encode(bytes))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_text_file_abs(path: String, contents: String) -> Result<(), String> {
     if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -33,19 +33,19 @@ pub fn write_text_file_abs(path: String, contents: String) -> Result<(), String>
     fs::write(&path, contents).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn path_exists_abs(path: String) -> bool {
     Path::new(&path).exists()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn make_dir_abs(path: String) -> Result<(), String> {
     fs::create_dir_all(&path).map_err(|e| e.to_string())
 }
 
 /// Lists file names in `dir` whose extension is in `exts` (case-insensitive).
 /// Pass an empty `exts` to list every file. Non-existent dir → empty list.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_dir_files_abs(dir: String, exts: Vec<String>) -> Result<Vec<String>, String> {
     let path = Path::new(&dir);
     if !path.exists() {
@@ -76,7 +76,7 @@ pub fn list_dir_files_abs(dir: String, exts: Vec<String>) -> Result<Vec<String>,
 }
 
 /// Copies `src` to an exact destination path (creates parent dirs).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn copy_file_to_abs(src: String, dst: String) -> Result<String, String> {
     let src_path = PathBuf::from(&src);
     let dst_path = PathBuf::from(&dst);
@@ -89,7 +89,7 @@ pub fn copy_file_to_abs(src: String, dst: String) -> Result<String, String> {
 
 /// Copies `src` into `dst_dir`, keeping the original file name.
 /// Returns the destination absolute path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn copy_file_abs(src: String, dst_dir: String) -> Result<String, String> {
     let src_path = PathBuf::from(&src);
     let name = src_path
@@ -102,7 +102,7 @@ pub fn copy_file_abs(src: String, dst_dir: String) -> Result<String, String> {
 }
 
 /// Deletes a file if it exists. No error when already absent.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_file_abs(path: String) -> Result<(), String> {
     let p = Path::new(&path);
     if p.exists() {
@@ -112,7 +112,7 @@ pub fn delete_file_abs(path: String) -> Result<(), String> {
 }
 
 /// Deletes a directory recursively if it exists. No error when already absent.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_dir_abs(path: String) -> Result<(), String> {
     let p = Path::new(&path);
     if p.exists() {
@@ -131,7 +131,7 @@ pub struct FolderAudioBucket {
 
 /// Scans each root directory for audio files and includes subfolders up to
 /// `max_depth` levels deep (0 = root only).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn collect_audio_buckets_abs(
     roots: Vec<String>,
     max_depth: usize,
@@ -203,7 +203,7 @@ pub fn collect_audio_buckets_abs(
     Ok(out)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn paths_exist_abs(paths: Vec<String>) -> Vec<bool> {
     paths.into_iter().map(|p| Path::new(&p).exists()).collect()
 }
@@ -215,7 +215,7 @@ pub struct FileNameMatch {
 }
 
 /// BFS scan of `roots` up to `max_depth` for files whose basename is in `names`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn find_files_by_names(
     roots: Vec<String>,
     names: Vec<String>,

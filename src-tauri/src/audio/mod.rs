@@ -1,7 +1,9 @@
 pub mod cache;
 pub mod devices;
 pub mod dsp;
+pub mod pcm;
 pub mod playback;
+pub mod stream;
 pub mod record;
 #[cfg(feature = "stems")]
 pub mod roformer;

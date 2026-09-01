@@ -12,6 +12,7 @@
   padding: calc(var(--topbar_height) + #{$padding_1}) 2rem 2rem;
   backdrop-filter: blur(0.4rem);
   background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
+  contain: paint;
 }
 
 .dialog-panel {

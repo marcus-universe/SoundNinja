@@ -1,6 +1,15 @@
 <template>
   <div class="splash" role="status" :aria-label="label">
-    <img src="/designs/Logo_Animated.gif" alt="Sound Ninja" class="splash__logo" />
+    <!-- Animated WebP at display resolution: a third of the GIF's bytes and a
+         quarter of its per-frame decode work, right when the app is booting. -->
+    <img
+      src="/designs/Logo_Animated.webp"
+      width="700"
+      height="250"
+      alt="Sound Ninja"
+      class="splash__logo"
+      decoding="async"
+    />
     <div class="splash__bar-wrap">
       <span class="splash__label">{{ label }}</span>
       <div class="splash__bar" role="progressbar" :aria-valuenow="percent" aria-valuemin="0" aria-valuemax="100">

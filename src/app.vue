@@ -16,10 +16,12 @@
     <template v-if="isMain">
       <NavBar />
       <ErrorAlert />
-      <SettingsOverlay />
-      <ImportFolders v-if="appStore.importFoldersActive" />
+      <!-- Lazy* keeps these panels out of the first paint; the inner v-if plus
+           its transition stays intact because the wrapper latches on first use. -->
+      <LazySettingsOverlay v-if="settingsEverOpened" />
+      <LazyImportFolders v-if="appStore.importFoldersActive" />
       <ContextMenu />
-      <GifPickerDialog v-if="appStore.gifPickerIndex != null" />
+      <LazyGifPickerDialog v-if="appStore.gifPickerIndex != null" />
       <UpdateDialog ref="updateDialogRef" />
       <DialogField
         v-if="unsavedPrompt"
@@ -33,7 +35,7 @@
           <UIButton @click="resolveUnsaved('cancel')">{{ $t('dialog.cancel') }}</UIButton>
         </div>
       </DialogField>
-      <RelinkDialog v-if="appStore.relinkActive" />
+      <LazyRelinkDialog v-if="appStore.relinkActive" />
       <DialogField
         v-if="savePopup"
         :title="savePopup === 'saved' ? $t('common.savedTitle') : $t('common.saving')"
@@ -79,7 +81,7 @@
 <script setup>
 import { readTextFile, rename, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
-import { emit, listen } from '@tauri-apps/api/event'
+import { emit, listen as tauriListen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
@@ -117,7 +119,25 @@ const appStore = useAppStore()
 const appSettings = useAppSettingsStore()
 const { t, setLocale } = useI18n()
 
+/**
+ * Everything registered outside Vue's own bookkeeping (Tauri event handles,
+ * watchers created after an `await`, timers). The root component only unmounts
+ * when the window goes away, but leaving these dangling kept handlers alive
+ * across window recreation.
+ */
+const teardown = []
+
+/** `listen()` whose handle is released automatically on unmount. */
+function listen(event, handler) {
+  const p = tauriListen(event, handler)
+  p.then((unlisten) => teardown.push(unlisten)).catch(() => {})
+  return p
+}
+
 const updateDialogRef = ref(null)
+// Latches on the first open so the settings chunk is fetched once and the
+// overlay's own enter/leave transition keeps working afterwards.
+const settingsEverOpened = ref(false)
 const savePopup = ref(null)
 let savePopupTimer = null
 const transferPopup = ref(null)
@@ -285,9 +305,6 @@ async function openProjectPath(dbPath) {
   }
   await jsonStore.validateSoundPaths()
   if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
-  if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
-    invoke('set_gpu_audio', { enabled: true }).catch(() => {})
-  }
 }
 
 async function bootstrapProject() {
@@ -680,12 +697,14 @@ onMounted(async () => {
   splashLabel.value = t('splash.theme')
   splashPercent.value = 88
   await applyPersistedTheme(jsonStore.configFile)
-  if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
-    invoke('set_gpu_audio', { enabled: true }).catch(() => {})
-  }
   splashLabel.value = t('splash.ready')
   splashPercent.value = 100
   setTimeout(() => { booting.value = false }, 280)
+
+  // Fetch the settings chunk once the board is up. Opening settings is then
+  // instant, and first paint never waited for it.
+  const whenIdle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 1500))
+  whenIdle(() => { settingsEverOpened.value = true })
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
@@ -735,28 +754,30 @@ onMounted(async () => {
 
   window.addEventListener('keydown', onHotkeyKeydown)
   await syncGlobalSoundHotkeys()
-  watch(
+  // Created after an await, so Vue no longer binds them to this instance —
+  // their stop handles have to be collected by hand.
+  teardown.push(watch(
     () => [
       appSettings.soundTriggersGlobal,
       jsonStore.currentProjectPath,
       JSON.stringify(jsonStore.configFile?.settings?.soundHotkeys || []),
     ],
     () => { syncGlobalSoundHotkeys() },
-  )
+  ))
 
   if (appSettings.remoteEnabled) {
     try { await appSettings.applyRemote() } catch { /* remoteError set in store */ }
     scheduleRemotePublish()
   }
-  watch(
+  teardown.push(watch(
     () => jsonStore.configFile?.files,
     () => { scheduleRemotePublish() },
     { deep: true },
-  )
-  watch(
+  ))
+  teardown.push(watch(
     () => appSettings.remoteEnabled,
     (on) => { if (on) scheduleRemotePublish() },
-  )
+  ))
 
   // Prompt to save unsaved changes before the window closes.
   const mainWindow = getCurrentWindow()
@@ -855,6 +876,13 @@ onUnmounted(() => {
   if (isMain.value) {
     window.removeEventListener('keydown', onHotkeyKeydown)
   }
+  for (const release of teardown.splice(0)) {
+    try { release() } catch { /* already gone */ }
+  }
+  clearTimeout(savePopupTimer)
+  savePopupTimer = null
+  clearTimeout(remotePublishTimer)
+  remotePublishTimer = null
 })
 </script>
 

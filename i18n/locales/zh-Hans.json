@@ -160,8 +160,6 @@
       "cacheStatus": "缓存状态",
       "cacheStatsText": "已缓存 {count} 个声音 \u00b7 已用 {size} MiB",
       "clearCache": "清空缓存",
-      "gpuAudio": "GPU 加速 DSP（实验性）",
-      "gpuAudioHint": "使用独立 GPU 进行音频信号处理。默认使用 CPU。需重启才能完全生效。",
       "stemsSection": "音轨分离",
       "stemsModel": "AI 分轨模型",
       "stemsInstall": "下载模型",

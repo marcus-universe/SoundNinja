@@ -3,7 +3,14 @@
     <h2 class="settings-content__title">{{ $t('settings.about.title') }}</h2>
 
     <div class="about-logo">
-      <img src="/designs/Logo_Animated.gif" alt="Sound Ninja" class="about-logo__img" loop autoplay />
+      <img
+        src="/designs/Logo_Animated.webp"
+        width="700"
+        height="250"
+        alt="Sound Ninja"
+        class="about-logo__img"
+        decoding="async"
+      />
     </div>
 
     <div class="about-version">

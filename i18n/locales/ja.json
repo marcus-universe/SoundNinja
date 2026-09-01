@@ -160,8 +160,6 @@
       "cacheStatus": "キャッシュの状態",
       "cacheStatsText": "{count} 件キャッシュ済み \u00b7 {size} MiB 使用中",
       "clearCache": "キャッシュを消去",
-      "gpuAudio": "GPU 加速 DSP（実験的）",
-      "gpuAudioHint": "音声信号処理に専用 GPU を使います。既定は CPU です。完全に反映するには再起動が必要です。",
       "stemsSection": "ステム分離",
       "stemsModel": "AI ステムモデル",
       "stemsInstall": "モデルをダウンロード",

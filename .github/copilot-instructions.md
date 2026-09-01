@@ -97,8 +97,9 @@ src-tauri/                  # Tauri / Rust backend
 ### Audio Playback
 - Playback is Rust-only via **rodio** + **cpal** (`src-tauri/src/audio/`). The frontend never decodes or plays audio itself.
 - A persistent `MixerDeviceSink` / `AudioStream` is kept on the audio thread (no global `SINK`).
-- Sound cache holds raw file bytes (lazy LRU). Playback streams from disk on cache miss.
-- Optional GPU DSP (`src-tauri/src/gpu.rs`) is for offline work (peaks, normalize, STFT windowing), not realtime mix.
+- Decoded PCM is cached (`src-tauri/src/audio/pcm.rs`, LRU) and pre-converted to the output device's sample rate and channel count, so the cpal callback never decodes or resamples. Oversized files fall back to the streaming decoder over the raw byte cache (`audio/cache.rs`).
+- Tauri runs a `#[tauri::command]` on the main thread unless it is `async` or `#[tauri::command(async)]`. Anything touching the filesystem, a device or a codec must be one of those; jobs that can run for seconds go through `crate::task::run_blocking`.
+- Large binary payloads never cross IPC. Write them to a file in Rust and hand the frontend a path for `convertFileSrc` — see `src-tauri/src/gifcache.rs` and `src/utils/gifCache.ts`.
 
 ---
 
@@ -205,7 +206,7 @@ The following features are on the roadmap. Check the [GitHub Project Board](http
 - [tauri-plugin-sql](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/sql)
 - [rodio (Rust audio)](https://docs.rs/rodio)
 - [cpal (Rust audio I/O)](https://docs.rs/cpal)
-- [wgpu](https://docs.rs/wgpu) (optional offline GPU DSP)
+- [rayon (data parallelism)](https://docs.rs/rayon)
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
 

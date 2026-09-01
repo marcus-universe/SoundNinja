@@ -9,6 +9,8 @@ use tauri::{AppHandle, Emitter};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
+use crate::task::run_blocking;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ZipCopyEntry {
@@ -63,7 +65,7 @@ fn safe_extract_path(dest: &Path, rel: &str) -> Result<PathBuf, String> {
     Ok(out)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn make_temp_dir() -> Result<String, String> {
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -75,7 +77,15 @@ pub fn make_temp_dir() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn export_soundboard_zip(
+pub async fn export_soundboard_zip(
+    app: AppHandle,
+    zip_path: String,
+    entries: Vec<ZipCopyEntry>,
+) -> Result<(), String> {
+    run_blocking(move || export_soundboard_zip_blocking(app, zip_path, entries)).await
+}
+
+fn export_soundboard_zip_blocking(
     app: AppHandle,
     zip_path: String,
     entries: Vec<ZipCopyEntry>,
@@ -107,7 +117,15 @@ pub fn export_soundboard_zip(
 }
 
 #[tauri::command]
-pub fn import_soundboard_zip(
+pub async fn import_soundboard_zip(
+    app: AppHandle,
+    zip_path: String,
+    dest_dir: String,
+) -> Result<String, String> {
+    run_blocking(move || import_soundboard_zip_blocking(app, zip_path, dest_dir)).await
+}
+
+fn import_soundboard_zip_blocking(
     app: AppHandle,
     zip_path: String,
     dest_dir: String,

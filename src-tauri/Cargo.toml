@@ -30,23 +30,30 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 base64 = "0.22"
-tauri = { version = "2.11.3", features = [] }
+# protocol-asset backs convertFileSrc, which is how GIF/image buttons load their
+# files instead of pushing base64 through IPC.
+tauri = { version = "2.11.3", features = ["protocol-asset"] }
 tauri-plugin-fs = "2.5.1"
 tauri-plugin-dialog = "2.7.1"
-tauri-plugin-shell = "2.3.5"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-os = "2.3.2"
 tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
+# Same version tauri-plugin-sql already pulls — reused to read GIF blobs out of
+# a project DB without shipping them through IPC.
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
 # Git pin: crates.io rodio 0.22.2 still on cpal 0.17 (ALSA-only Linux).
 # Master brings cpal 0.18 + PipeWire/PulseAudio hosts so Arch/PipeWire sinks
 # (interfaces, HDMI, virtual sinks) appear in Audio Settings.
-rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "pipewire", "pulseaudio"] }
+# rodio brings its own symphonia; decoding goes through it so the tree holds a
+# single codec stack instead of two.
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4"] }
 anyhow = "1.0.102"
-# Keep in lockstep with rodio's cpal; asio / pipewire features forwarded below.
-cpal = { version = "0.18", features = ["pipewire", "pulseaudio"] }
-symphonia = { version = "0.6.0", features = ["mp3", "wav", "ogg", "flac"] }
-# GPU detection — only adapter enumeration, no compute usage yet.
-wgpu = { version = "22", default-features = false, features = ["wgsl"] }
+# Work-stealing pool for decode/resample/prefetch — keeps CPU-heavy audio prep
+# off both the main thread and the cpal callback.
+rayon = "1.11"
+# Keep in lockstep with rodio's cpal; asio is forwarded via the `asio` feature,
+# the Linux sound servers via the linux target table below.
+cpal = "0.18"
 hound = "3.5"
 nnnoiseless = "0.5"
 rubato = "0.16"
@@ -57,12 +64,14 @@ directories = "5"
 ort = { version = "2.0.0-rc.11", optional = true, default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "copy-dylibs", "load-dynamic", "tls-rustls"] }
 rustfft = { version = "6.2", optional = true }
 realfft = { version = "3.4", optional = true }
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "stream"] }
+# reqwest / zip versions match what tauri and tauri-plugin-updater already pull,
+# so the build compiles one HTTP stack and one zip implementation, not two.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "stream"] }
 sha2 = { version = "0.10", optional = true }
 tauri-plugin-updater = "2.10"
 tauri-plugin-process = "2.3"
-zip = { version = "2", default-features = false, features = ["deflate"] }
-axum = { version = "0.8", features = ["ws"] }
+zip = { version = "4", default-features = false, features = ["deflate"] }
+axum = { version = "0.8", default-features = false, features = ["ws", "json", "query", "http1", "tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros", "time"] }
 local-ip-address = "0.6"
 
@@ -71,3 +80,26 @@ tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.56"
+
+# PipeWire / PulseAudio hosts only exist on Linux; declaring them globally made
+# every platform build the libspa bindings.
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { version = "0.18", features = ["pipewire", "pulseaudio"] }
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", features = ["pipewire", "pulseaudio"] }
+
+[profile.release]
+opt-level = 3
+# Whole-program optimisation across crate boundaries. Costs link time, bought
+# back by the CI cache and the linker settings in .cargo/config.toml.
+lto = true
+codegen-units = 1
+# No unwinding: smaller code, and it makes Mutex poisoning impossible, which is
+# what every `.lock().unwrap()` in this crate relies on.
+panic = "abort"
+strip = "symbols"
+incremental = false
+
+# Dependencies are optimised even in debug builds — audio decode and resampling
+# are unusably slow at opt-level 0.
+[profile.dev.package."*"]
+opt-level = 2

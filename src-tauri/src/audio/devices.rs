@@ -132,6 +132,45 @@ pub fn get_output_devices() -> Result<Vec<cpal::Device>> {
     get_output_devices_for_host_name(None)
 }
 
+pub fn is_default_name(name: &str) -> bool {
+    name.is_empty() || name.eq_ignore_ascii_case("default")
+}
+
+/// Resolve a playback device. `"default"` / empty uses the host's default
+/// output — the frontend stores that sentinel before the user picks a device.
+pub fn resolve_output_device(device_name: &str, host_name: Option<&str>) -> Result<cpal::Device> {
+    if is_default_name(device_name) {
+        if let Some(host_id) = resolve_host_id(host_name)? {
+            let host = cpal::host_from_id(host_id)?;
+            if let Some(d) = host.default_output_device() {
+                return Ok(d);
+            }
+        }
+        return cpal::default_host()
+            .default_output_device()
+            .ok_or_else(|| anyhow::anyhow!("No default output device"));
+    }
+    get_output_devices_for_host_name(host_name)?
+        .into_iter()
+        .find(|d| device_display_name(d).as_deref() == Some(device_name))
+        .ok_or_else(|| anyhow::anyhow!("Device '{}' not found", device_name))
+}
+
+/// Sample rate and channel count a device would be opened with, without
+/// actually opening a stream. Used to pre-decode PCM into the right format
+/// before the first sound plays.
+pub fn default_output_format(
+    device_name: &str,
+    host_name: Option<&str>,
+) -> Option<(rodio::SampleRate, rodio::ChannelCount)> {
+    let device = resolve_output_device(device_name, host_name).ok()?;
+    let config = device.default_output_config().ok()?;
+    Some((
+        std::num::NonZero::new(config.sample_rate())?,
+        std::num::NonZero::new(config.channels())?,
+    ))
+}
+
 /// Find a device by display name among input or output devices.
 /// `device_name` of `"default"` / empty → platform default input (or default output for loopback).
 pub fn find_device_by_name(
@@ -180,7 +219,7 @@ pub fn find_device_by_name(
 
 /// Returns the names of all audio hosts available on this platform
 /// (e.g. "PipeWire"/"Alsa" on Linux; "Wasapi"; "ASIO" only with `--features asio`).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_audio_hosts() -> Vec<String> {
     let mut hosts: Vec<String> = cpal::available_hosts()
         .into_iter()
@@ -191,7 +230,7 @@ pub fn get_audio_hosts() -> Vec<String> {
 }
 
 /// Returns output-device names across all hosts (backward-compat: no params).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_out_devices() -> Vec<String> {
     unique_preserve_order(
         get_output_devices_for_host_name(None)
@@ -204,7 +243,7 @@ pub fn get_out_devices() -> Vec<String> {
 }
 
 /// Returns output-device names for a specific driver/host.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_out_devices_host(host: String) -> Vec<String> {
     unique_preserve_order(
         get_output_devices_for_host_name(Some(&host))
@@ -224,7 +263,7 @@ fn unique_preserve_order(names: Vec<String>) -> Vec<String> {
 }
 
 /// Returns input-device names across all hosts.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_in_devices() -> Vec<String> {
     get_input_devices_for_host_name(None)
         .unwrap_or_default()
@@ -234,7 +273,7 @@ pub fn get_in_devices() -> Vec<String> {
 }
 
 /// Returns input-device names for a specific driver/host.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_in_devices_host(host: String) -> Vec<String> {
     get_input_devices_for_host_name(Some(&host))
         .unwrap_or_default()
@@ -250,7 +289,7 @@ pub struct CaptureDeviceInfo {
 }
 
 /// Returns capture sources: real mics + loopback (PC Audio) outputs.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_loopback_devices(host: Option<String>) -> Vec<CaptureDeviceInfo> {
     let host_ref = host.as_deref();
     let mut out = Vec::new();
@@ -282,7 +321,7 @@ pub fn get_loopback_devices(host: Option<String>) -> Vec<CaptureDeviceInfo> {
 
 /// Returns mono output channel names for an ASIO device.
 /// Always returns an empty list on non-ASIO builds (no `--features asio`).
-#[tauri::command]
+#[tauri::command(async)]
 #[allow(unused_variables)]
 pub fn get_asio_device_channels(device_name: String) -> Vec<String> {
     #[cfg(feature = "asio")]

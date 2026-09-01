@@ -97,7 +97,7 @@ pub struct DefaultPaths {
 
 /// Resolves the portable-first default data paths plus the fixed app-config DB
 /// location. The frontend uses these as defaults and to locate `app-config.db`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_default_paths(app: tauri::AppHandle) -> Result<DefaultPaths, String> {
     let base = default_base_dir(&app);
     ensure_default_dirs(&base);
@@ -113,7 +113,7 @@ pub fn get_default_paths(app: tauri::AppHandle) -> Result<DefaultPaths, String> 
 /// Relocates a data folder from `oldPath` to `target`.
 /// `mode` = "copy" | "blank". Returns the new absolute path. The caller is
 /// responsible for persisting the new path in `app-config.db`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn relocate_data(
     old_path: String,
     target: String,
@@ -140,7 +140,7 @@ pub struct ProjectInfo {
 
 /// Lists all projects (sub-folders of `projects_path` containing a project file).
 /// Prefers `project.sninja`; falls back to legacy `project.db`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_projects(projects_path: String) -> Result<Vec<ProjectInfo>, String> {
     let root = Path::new(&projects_path);
     if !root.exists() {
@@ -172,7 +172,7 @@ pub fn list_projects(projects_path: String) -> Result<Vec<ProjectInfo>, String> 
 }
 
 /// Windows installer language: HKCU\Software\com.soundninja.dev\DefaultLanguage
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_install_language() -> Option<String> {
     #[cfg(target_os = "windows")]
     {

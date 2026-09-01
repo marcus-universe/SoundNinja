@@ -13,6 +13,7 @@
   padding: calc(var(--topbar_height) + 2rem) 0 2rem;
   backdrop-filter: blur(0.4rem);
   background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
+  contain: paint;
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
@@ -1091,6 +1092,7 @@
   justify-content: center;
   backdrop-filter: blur(0.4rem);
   background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
+  contain: paint;
 }
 
 .project-dialog {

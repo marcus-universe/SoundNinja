@@ -272,7 +272,7 @@ body {
 // ########################################
 .fade-enter-active,
 .fade-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .fade-enter-from,
@@ -282,7 +282,7 @@ body {
 
 .slideIn-enter-active,
 .slideIn-leave-active {
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .slideIn-enter-from,

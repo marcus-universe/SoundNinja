@@ -160,8 +160,6 @@
       "cacheStatus": "Cache-Status",
       "cacheStatsText": "{count} Sound(s) gecacht \u00b7 {size} MiB belegt",
       "clearCache": "Cache leeren",
-      "gpuAudio": "GPU-beschleunigte DSP (Experimentell)",
-      "gpuAudioHint": "Dedizierte GPU für Audio-Signalverarbeitung nutzen. Standard: CPU. Neustart empfohlen.",
       "stemsSection": "Stem-Separation",
       "stemsModel": "KI-Stem-Modell",
       "stemsInstall": "Modell laden",

@@ -20,11 +20,18 @@
         "minHeight": 600,
         "minWidth": 650,
         "decorations": false,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,MsEdgeSidebar,EdgeCollections,TranslateUI,StorageServiceOutOfProcess --enable-features=NetworkServiceInProcess,NetworkServiceInProcess2 --process-per-site --renderer-process-limit=1 --enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding"
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost; media-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost https: ws: wss:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": ["$APPCACHE/gif-cache/**"]
+        }
+      }
     }
   },
   "bundle": {
@@ -32,11 +39,9 @@
     "createUpdaterArtifacts": false,
     "targets": [
       "nsis",
-      "msi",
       "deb",
       "appimage",
-      "dmg",
-      "app"
+      "dmg"
     ],
     "category": "DeveloperTool",
     "copyright": "",

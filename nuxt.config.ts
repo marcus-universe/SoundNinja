@@ -82,6 +82,8 @@ export default defineNuxtConfig({
   i18n: {
     strategy: 'no_prefix',
     defaultLocale: 'en',
+    // @nuxtjs/i18n v10 always code-splits file-based locales, so each of the six
+    // JSON files is its own chunk and only the active one is fetched.
     locales: [
       { code: 'en', name: 'English', file: 'en.json' },
       { code: 'de', name: 'Deutsch', file: 'de.json' },
@@ -151,6 +153,11 @@ export default defineNuxtConfig({
     },
     build: {
       sourcemap: false,
+      // Only ever runs inside an up-to-date WebView2/WebKit, so no downlevel
+      // transpilation and no polyfills.
+      target: 'esnext',
+      cssCodeSplit: true,
+      reportCompressedSize: false,
       rollupOptions: {
         onwarn(warning, warn) {
           // Known Nuxt 4.4 noise: transform plugins skip sourcemap output.
@@ -164,6 +171,13 @@ export default defineNuxtConfig({
           manualChunks(id) {
             if (id.includes('SettingsThemeCreator')) return 'chunk-theme-creator'
             if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsBehavior') || id.includes('SettingsPerformance') || id.includes('SettingsOverlay')) return 'chunk-settings'
+            if (!id.includes('node_modules')) return
+            if (id.includes('sortablejs')) return 'vendor-sortable'
+            if (id.includes('@tauri-apps')) return 'vendor-tauri'
+            if (id.includes('vue-i18n') || id.includes('@intlify')) return 'vendor-i18n'
+            if (id.includes('/vue/') || id.includes('@vue/') || id.includes('vue-router') || id.includes('pinia')) {
+              return 'vendor-vue'
+            }
           },
         },
       },
