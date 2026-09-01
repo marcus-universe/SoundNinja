@@ -83,6 +83,21 @@
         <template v-else-if="activeTab === 'buttons'">
           <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
 
+          <div class="settings-group settings-group--stacked" :title="$t('settings.themeCreator.hueHint')">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.hueHint')">{{ $t('settings.themeCreator.hue') }}</SettingsTipLabel>
+              <span class="hue-slider__value">{{ buttonHue }}°</span>
+            </div>
+            <HueSlider
+              :model-value="buttonHue"
+              :hint="$t('settings.themeCreator.hueHint')"
+              :aria-label="$t('settings.themeCreator.hue')"
+              @drag-start="beginThemeHue('buttons')"
+              @update:model-value="(h) => onThemeHue('buttons', h)"
+              @drag-end="endThemeHue"
+            />
+          </div>
+
           <div
             v-for="row in buttonColorRows"
             :key="row.key"
@@ -221,6 +236,21 @@
         <template v-else-if="activeTab === 'tabs'">
           <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
 
+          <div class="settings-group settings-group--stacked" :title="$t('settings.themeCreator.hueHint')">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.hueHint')">{{ $t('settings.themeCreator.hue') }}</SettingsTipLabel>
+              <span class="hue-slider__value">{{ tabHue }}°</span>
+            </div>
+            <HueSlider
+              :model-value="tabHue"
+              :hint="$t('settings.themeCreator.hueHint')"
+              :aria-label="$t('settings.themeCreator.hue')"
+              @drag-start="beginThemeHue('tabs')"
+              @update:model-value="(h) => onThemeHue('tabs', h)"
+              @drag-end="endThemeHue"
+            />
+          </div>
+
           <div
             v-for="row in tabColorRows"
             :key="row.key"
@@ -317,6 +347,7 @@ import {
   type ThemeTokenKey,
   type ThemeTokens,
 } from '~/utils/themeTokens'
+import { leadHue, shiftColorRecord } from '~/utils/hue'
 
 const { t } = useI18n()
 const appSettings = useAppSettingsStore()
@@ -394,6 +425,56 @@ const tabColorRows: { key: ThemeTokenKey; labelKey: string }[] = [
   { key: 'tabBorder', labelKey: 'settings.themeCreator.tabBorder' },
   { key: 'tabBorderHover', labelKey: 'settings.themeCreator.tabBorderHover' },
 ]
+
+const BUTTON_HUE_LEAD: ThemeTokenKey[] = ['btnBorder', 'btnBg', 'btnBgHover', 'btnBorderHover', 'btnTextHover', 'btnText']
+const TAB_HUE_LEAD: ThemeTokenKey[] = ['tabBorder', 'tabBg', 'tabBgHover', 'tabBorderHover', 'tabTextHover', 'tabText']
+
+function snapshotThemeColors(rows: { key: ThemeTokenKey }[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const row of rows) out[row.key] = themeCreator[row.key]
+  return out
+}
+
+const themeHueDragging = ref<'buttons' | 'tabs' | null>(null)
+const themeHueDragValue = ref(0)
+
+const buttonHue = computed(() =>
+  themeHueDragging.value === 'buttons'
+    ? themeHueDragValue.value
+    : leadHue(BUTTON_HUE_LEAD.map((k) => themeCreator[k])),
+)
+const tabHue = computed(() =>
+  themeHueDragging.value === 'tabs'
+    ? themeHueDragValue.value
+    : leadHue(TAB_HUE_LEAD.map((k) => themeCreator[k])),
+)
+
+let themeHueSnap: Record<string, string> | null = null
+let themeHueSnapHue = 0
+let themeHueKind: 'buttons' | 'tabs' | null = null
+
+function beginThemeHue(kind: 'buttons' | 'tabs') {
+  const rows = kind === 'buttons' ? buttonColorRows : tabColorRows
+  const lead = kind === 'buttons' ? BUTTON_HUE_LEAD : TAB_HUE_LEAD
+  themeHueKind = kind
+  themeHueSnap = snapshotThemeColors(rows)
+  themeHueSnapHue = leadHue(lead.map((k) => themeHueSnap![k]))
+  themeHueDragValue.value = themeHueSnapHue
+  themeHueDragging.value = kind
+}
+
+function endThemeHue() {
+  themeHueSnap = null
+  themeHueKind = null
+  themeHueDragging.value = null
+}
+
+function onThemeHue(kind: 'buttons' | 'tabs', next: number) {
+  if (!themeHueSnap || themeHueKind !== kind) beginThemeHue(kind)
+  themeHueDragging.value = kind
+  themeHueDragValue.value = next
+  Object.assign(themeCreator, shiftColorRecord(themeHueSnap!, next - themeHueSnapHue))
+}
 
 const themeCreator = reactive({
   name: 'My Theme',

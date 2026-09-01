@@ -16,7 +16,7 @@
 | State     | [Pinia](https://pinia.vuejs.org/) (auto-imported stores)                   |
 | Persistence | [SQLite](https://www.sqlite.org/) via [tauri-plugin-sql](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/sql) (one `project.db` per project) |
 | Styling   | [SCSS](https://sass-lang.com/) (`.scss` syntax)                            |
-| i18n      | [@nuxtjs/i18n](https://i18n.nuxtjs.org/) (`en`/`de`, strategy `no_prefix`) |
+| i18n      | [@nuxtjs/i18n](https://i18n.nuxtjs.org/) (`en`/`de`/`es`/`fr`/`ja`/`zh-Hans`, strategy `no_prefix`) |
 | Audio     | [rodio](https://github.com/RustAudio/rodio) + [symphonia](https://github.com/pdeljanov/Symphonia) + [cpal](https://github.com/RustAudio/cpal) (Rust backend) |
 | Desktop   | [Tauri v2](https://tauri.app/) — Rust backend, WebView frontend            |
 | Utilities | [VueUse](https://vueuse.org/), [SortableJS](https://sortablejs.github.io/Sortable/) |
@@ -97,8 +97,9 @@ src-tauri/                  # Tauri / Rust backend
 ### Audio Playback
 - Playback is Rust-only via **rodio** + **cpal** (`src-tauri/src/audio/`). The frontend never decodes or plays audio itself.
 - A persistent `MixerDeviceSink` / `AudioStream` is kept on the audio thread (no global `SINK`).
-- Sound cache holds raw file bytes (lazy LRU). Playback streams from disk on cache miss.
-- Optional GPU DSP (`src-tauri/src/gpu.rs`) is for offline work (peaks, normalize, STFT windowing), not realtime mix.
+- Decoded PCM is cached (`src-tauri/src/audio/pcm.rs`, LRU) and pre-converted to the output device's sample rate and channel count, so the cpal callback never decodes or resamples. Oversized files fall back to the streaming decoder over the raw byte cache (`audio/cache.rs`).
+- Tauri runs a `#[tauri::command]` on the main thread unless it is `async` or `#[tauri::command(async)]`. Anything touching the filesystem, a device or a codec must be one of those; jobs that can run for seconds go through `crate::task::run_blocking`.
+- Large binary payloads never cross IPC. Write them to a file in Rust and hand the frontend a path for `convertFileSrc` — see `src-tauri/src/gifcache.rs` and `src/utils/gifCache.ts`.
 
 ---
 
@@ -165,7 +166,20 @@ npm run prettier-rust
 - ✅ **Theme Creator (separate window)** — `src/pages/theme-creator.vue`; sliders (button gap, border width, radius, font sizes), color pickers, font selector + font upload, live preview via cross-window events, export `.css` / save to `themes/`
 - ✅ **Project Management** — portable-first `themes/`/`projects/` folders; folder icon opens Select Project dialog; File > New Project with unsaved-changes prompt
 - ✅ **Custom Themes & Fonts** — load `.css` themes (with embedded name), built-in + saved themes selectable; upload `.ttf`/`.otf` into `themes/fonts/`, registered at runtime
-- ✅ **Navbar Side** — left/right runtime toggle in Settings → Main (CSS vars + html class)
+- ✅ **Navbar Side** — left/right runtime toggle in Settings → Behavior (CSS vars + html class)
+
+---
+
+## i18n Conventions
+
+Supported locales: **en, de, es, fr, ja, zh-Hans**. Default is English.
+
+- Every new user-facing string (labels, tooltips, `aria-label`, dialogs, errors) must be added to **all six** files in `i18n/locales/` in the same change.
+- Keys: nested camelCase (`settings.main.stopOnRetrigger`). ICU placeholders: `{count}`, `{name}`, `{latest}`, `{current}`, `{model}`, `{size}`, `{version}`.
+- Two translation surfaces:
+  1. Vue UI via `$t()` / `useI18n()` and JSON locale files
+  2. Native OS menu labels in `src-tauri/src/menu/mod.rs` (`labels_for()`)
+- Installer language: NSIS page writes `HKCU\Software\com.soundninja.dev\DefaultLanguage`. Applied on first launch only when `app-config.db` has no locale. Linux / fallback: in-app first-run picker.
 - ✅ **Tab Separators** — right-click a sound → Add Separator; full-width horizontal divider, drag-movable, persisted per tab
 - ✅ **Save-on-close** — dirty-check prompt (Save/Discard/Cancel) on New Project and window close
 
@@ -192,7 +206,7 @@ The following features are on the roadmap. Check the [GitHub Project Board](http
 - [tauri-plugin-sql](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/sql)
 - [rodio (Rust audio)](https://docs.rs/rodio)
 - [cpal (Rust audio I/O)](https://docs.rs/cpal)
-- [wgpu](https://docs.rs/wgpu) (optional offline GPU DSP)
+- [rayon (data parallelism)](https://docs.rs/rayon)
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
 

@@ -21,7 +21,7 @@
         />
         <UIButton :disabled="!hasKey || loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
       </div>
-      <div class="gif-picker__grid" v-if="items.length">
+      <div v-if="items.length" ref="gridRef" class="gif-picker__grid">
         <button
           v-for="g in items"
           :key="g.id"
@@ -30,11 +30,16 @@
           :title="g.title"
           @click="selectRemote(g)"
         >
-          <img :src="g.thumbUrl" :alt="g.title" draggable="false" />
+          <img :src="g.previewUrl || g.thumbUrl" :alt="g.title" loading="lazy" draggable="false" />
         </button>
+        <div
+          v-if="canLoadMore"
+          ref="sentinelRef"
+          class="gif-picker__sentinel"
+        >{{ loadingMore ? $t('gifPicker.loadingMore') : '' }}</div>
       </div>
       <p v-else-if="!loading && searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
-      <p v-if="loading" class="gif-picker__hint">…</p>
+      <p v-if="loading && !items.length" class="gif-picker__hint">…</p>
       <button type="button" class="gif-picker__attr" @click="openKlipy">{{ $t('gifPicker.poweredBy') }}</button>
     </template>
 
@@ -94,8 +99,16 @@ const step = ref('browse')
 const query = ref('')
 const items = ref([])
 const loading = ref(false)
+const loadingMore = ref(false)
 const searched = ref(false)
+const page = ref(1)
+const hasMore = ref(false)
+const searchActive = ref(false)
+const gridRef = ref(null)
+const sentinelRef = ref(null)
 const error = ref('')
+let searchGen = 0
+let io = null
 const posX = ref(50)
 const posY = ref(50)
 const previewUrl = ref('')
@@ -105,6 +118,7 @@ let pendingBytes = null
 let drag = null
 
 const hasKey = computed(() => !!appSettings.klipyApiKey?.trim())
+const canLoadMore = computed(() => searchActive.value && hasMore.value)
 const targetIndex = computed(() => appStore.gifPickerIndex)
 const existingGif = computed(() => {
   const i = targetIndex.value
@@ -132,53 +146,159 @@ async function openPartner() {
   await openInSystemBrowser(KLIPY_PARTNER_URL)
 }
 
+function applyPage(result, append) {
+  const next = result.items || []
+  let added = next.length
+  if (!append) {
+    items.value = next
+  } else {
+    const seen = new Set(items.value.map((g) => g.id))
+    added = 0
+    for (const g of next) {
+      if (!seen.has(g.id)) {
+        seen.add(g.id)
+        items.value.push(g)
+        added++
+      }
+    }
+  }
+  page.value = result.page || page.value
+  hasMore.value = !!result.hasNext && next.length > 0 && added > 0
+}
+
 async function loadTrending() {
   if (!hasKey.value) return
+  const gen = ++searchGen
   loading.value = true
   error.value = ''
+  searchActive.value = false
+  hasMore.value = false
+  page.value = 1
   try {
-    items.value = await trendingKlipy(appSettings.klipyApiKey)
+    const result = await trendingKlipy(appSettings.klipyApiKey, 1)
+    if (gen !== searchGen) return
+    applyPage(result, false)
     searched.value = true
   } catch (e) {
+    if (gen !== searchGen) return
     error.value = String(e)
     items.value = []
   } finally {
-    loading.value = false
+    if (gen === searchGen) loading.value = false
   }
 }
 
 async function runSearch() {
   if (!hasKey.value) return
   const q = query.value.trim()
+  if (!q) {
+    await loadTrending()
+    return
+  }
+  const gen = ++searchGen
   loading.value = true
+  loadingMore.value = false
   error.value = ''
+  searchActive.value = true
+  page.value = 1
   try {
-    items.value = q
-      ? await searchKlipy(appSettings.klipyApiKey, q)
-      : await trendingKlipy(appSettings.klipyApiKey)
+    const result = await searchKlipy(appSettings.klipyApiKey, q, 1)
+    if (gen !== searchGen) return
+    applyPage(result, false)
     searched.value = true
   } catch (e) {
+    if (gen !== searchGen) return
     error.value = String(e)
     items.value = []
+    hasMore.value = false
   } finally {
-    loading.value = false
+    if (gen === searchGen) loading.value = false
   }
+}
+
+async function loadMore() {
+  if (!canLoadMore.value || loading.value || loadingMore.value || !hasKey.value) return
+  const q = query.value.trim()
+  if (!q) return
+  const gen = searchGen
+  const nextPage = page.value + 1
+  loadingMore.value = true
+  try {
+    const result = await searchKlipy(appSettings.klipyApiKey, q, nextPage)
+    if (gen !== searchGen) return
+    applyPage(result, true)
+    page.value = nextPage
+  } catch (e) {
+    if (gen !== searchGen) return
+    hasMore.value = false
+    error.value = String(e)
+  } finally {
+    if (gen === searchGen) loadingMore.value = false
+  }
+}
+
+function bindSentinel() {
+  if (typeof IntersectionObserver === 'undefined') return
+  io?.disconnect()
+  io = null
+  const root = gridRef.value
+  const target = sentinelRef.value
+  if (!root || !target || !canLoadMore.value) return
+  io = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) loadMore()
+  }, { root, rootMargin: '120px', threshold: 0 })
+  io.observe(target)
+}
+
+function isSizeLimitError(err) {
+  const msg = String(err ?? '')
+  return msg.includes('exceeds') && msg.includes('byte limit')
+}
+
+async function downloadFirstFit(urls) {
+  const list = (urls || []).filter(Boolean)
+  let lastErr = null
+  let hitLimit = false
+  for (const url of list) {
+    try {
+      const b64 = await invoke('download_url_bytes', { url })
+      const bytes = b64ToBytes(b64)
+      if (bytes.length > MAX_GIF_BYTES) {
+        hitLimit = true
+        continue
+      }
+      return bytes
+    } catch (e) {
+      lastErr = e
+      if (isSizeLimitError(e)) {
+        hitLimit = true
+        continue
+      }
+      throw e
+    }
+  }
+  if (hitLimit) {
+    const err = new Error('TOO_LARGE')
+    err.code = 'TOO_LARGE'
+    throw err
+  }
+  throw lastErr || new Error('download failed')
 }
 
 async function selectRemote(g) {
   error.value = ''
   loading.value = true
   try {
-    const b64 = await invoke('download_url_bytes', { url: g.gifUrl })
-    const bytes = b64ToBytes(b64)
-    if (bytes.length > MAX_GIF_BYTES) {
-      error.value = t('gifPicker.tooLarge')
-      return
-    }
+    const urls = (g.downloadUrls && g.downloadUrls.length) ? g.downloadUrls : [g.gifUrl]
+    const bytes = await downloadFirstFit(urls)
     const mime = detectImageMime(bytes) || 'image/gif'
     beginPosition(bytes, mime)
   } catch (e) {
-    error.value = t('gifPicker.downloadFailed') + ' ' + String(e)
+    if (e?.code === 'TOO_LARGE' || e?.message === 'TOO_LARGE') {
+      error.value = t('gifPicker.tooLarge')
+    } else {
+      error.value = t('gifPicker.downloadFailed') + ' ' + String(e)
+    }
   } finally {
     loading.value = false
   }
@@ -271,7 +391,7 @@ async function applyGif() {
       byteLen: bytes.length,
     }
     await withProjectDb(path, (d) => upsertGifBlob(d, row))
-    cacheGifRow(row)
+    await cacheGifRow(row)
     jsonStore.setSoundGif(i, id, posX.value, posY.value)
     close()
   } catch (e) {
@@ -288,6 +408,10 @@ function removeGif() {
   close()
 }
 
+watch([sentinelRef, gridRef, canLoadMore, () => items.value.length], () => {
+  nextTick(bindSentinel)
+})
+
 onMounted(() => {
   const i = targetIndex.value
   const file = i != null ? jsonStore.configFile.files[i] : null
@@ -299,6 +423,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  io?.disconnect()
+  io = null
   revokePreview()
   pendingBytes = null
 })

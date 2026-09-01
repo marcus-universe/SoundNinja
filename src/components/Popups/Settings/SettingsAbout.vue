@@ -3,11 +3,35 @@
     <h2 class="settings-content__title">{{ $t('settings.about.title') }}</h2>
 
     <div class="about-logo">
-      <img src="/designs/Logo_Animated.gif" alt="Sound Ninja" class="about-logo__img" loop autoplay />
+      <img
+        src="/designs/Logo_Animated.webp"
+        width="700"
+        height="250"
+        alt="Sound Ninja"
+        class="about-logo__img"
+        decoding="async"
+      />
     </div>
 
     <div class="about-version">
       <span class="about-version__num">v{{ appVersion }}</span>
+    </div>
+
+    <div v-if="primaryIp" class="about-ip">
+      <span class="about-ip__label">{{ $t('settings.about.ipAddress') }}</span>
+      <span class="about-ip__value">{{ primaryIp }}</span>
+      <button
+        type="button"
+        class="about-ip__copy"
+        :title="$t('settings.about.copy')"
+        @click="copyIp"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="about-ip__icon">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        {{ ipCopied ? $t('settings.about.copied') : $t('settings.about.copy') }}
+      </button>
     </div>
 
     <div class="about-links">
@@ -22,6 +46,15 @@
         </svg>
         {{ $t('settings.about.githubLink') }}
       </a>
+      <button type="button" class="about-link" @click="openReleaseNotes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="about-link__icon">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        {{ $t('settings.about.releaseNotes') }}
+      </button>
       <a
         href="https://github.com/marcus-universe/SoundNinja/blob/Sound-Ninja-Tauri/LICENSE"
         target="_blank"
@@ -43,8 +76,14 @@
 
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app'
+import { openInSystemBrowser } from '~/utils/openExternal'
+import { copyText } from '~/utils/clipboard'
+import { getLocalIps } from '~/utils/remote'
 
 const appVersion = ref('')
+const primaryIp = ref('')
+const ipCopied = ref(false)
+let ipCopiedTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   try {
@@ -52,5 +91,42 @@ onMounted(async () => {
   } catch {
     appVersion.value = ''
   }
+  try {
+    const ips = await getLocalIps()
+    primaryIp.value = ips.find((row) => row.primary)?.ip || ips[0]?.ip || ''
+  } catch {
+    primaryIp.value = ''
+  }
 })
+
+onUnmounted(() => {
+  if (ipCopiedTimer) clearTimeout(ipCopiedTimer)
+})
+
+async function copyIp() {
+  if (!primaryIp.value) return
+  const ok = await copyText(primaryIp.value)
+  if (!ok) return
+  ipCopied.value = true
+  if (ipCopiedTimer) clearTimeout(ipCopiedTimer)
+  ipCopiedTimer = setTimeout(() => { ipCopied.value = false }, 1600)
+}
+
+async function openReleaseNotes() {
+  const version = appVersion.value.replace(/^v/i, '')
+  const tagUrl = `https://github.com/marcus-universe/SoundNinja/releases/tag/v${version}`
+  const latestUrl = 'https://github.com/marcus-universe/SoundNinja/releases/latest'
+  if (!version) {
+    await openInSystemBrowser(latestUrl)
+    return
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/marcus-universe/SoundNinja/releases/tags/v${version}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
+    await openInSystemBrowser(res.ok ? tagUrl : latestUrl)
+  } catch {
+    await openInSystemBrowser(latestUrl)
+  }
+}
 </script>

@@ -200,6 +200,81 @@
     background: color-mix(in srgb, var(--color-text, #{$white}) 4%, transparent);
     border-top: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
   }
+
+  &__hue {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 10%, transparent);
+  }
+
+  &__hue-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-family: $fontRegular;
+    font-size: 0.95em;
+    color: color-mix(in srgb, var(--color-text, #{$white}) 90%, transparent);
+  }
+}
+
+.hue-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    hsl(0, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+  outline: none;
+  cursor: pointer;
+  border: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 18%, transparent);
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background: #fff;
+    border: 0.18rem solid #1a1a1a;
+    box-shadow: 0 0 0 0.08rem color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
+    cursor: pointer;
+  }
+
+  &::-moz-range-thumb {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background: #fff;
+    border: 0.18rem solid #1a1a1a;
+    box-shadow: 0 0 0 0.08rem color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
+    cursor: pointer;
+  }
+
+  &::-moz-range-track {
+    height: 0.75rem;
+    border-radius: 999px;
+    background: transparent;
+  }
+}
+
+.hue-slider__value {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+  text-align: right;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 80%, transparent);
 }
 
 // ── ColorGroupPicker ──────────────────────────────────────────────────────────
@@ -246,8 +321,28 @@
     column-gap: 0.55rem;
     row-gap: 0.7rem;
     width: max-content;
-    min-width: 0;
+    min-width: 12rem;
     align-items: center;
+  }
+
+  &__hue {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 0.1rem solid color-mix(in srgb, var(--color-text, #{$white}) 10%, transparent);
+  }
+
+  &__hue-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-family: $fontRegular;
+    font-size: 0.95em;
+    color: color-mix(in srgb, var(--color-text, #{$white}) 90%, transparent);
   }
 
   &__panel--floating {

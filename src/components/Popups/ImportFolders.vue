@@ -1,7 +1,7 @@
 <template>
-  <DialogField v-if="selectedFolders.length" title="Import Folders" @close="close">
+  <DialogField v-if="selectedFolders.length" :title="$t('importFolders.title')" @close="close">
     <div v-if="selectedFolders.length" class="import-folders-toolbar flex_c gap1 w100 flex_wrap">
-      <UIButton class="import-folders-select" @click="selectFolders()">Add Folders</UIButton>
+      <UIButton class="import-folders-select" @click="selectFolders()">{{ $t('importFolders.addFolders') }}</UIButton>
     </div>
 
     <ul
@@ -16,8 +16,8 @@
       >
         <span
           class="import-folder-item__drag"
-          title="Drag to reorder"
-          aria-label="Drag to reorder"
+          :title="$t('importFolders.dragReorder')"
+          :aria-label="$t('importFolders.dragReorder')"
         >
           <Icons :icon="'drag'" :customClass="'icon import-folder-item__drag-icon'" />
         </span>
@@ -34,10 +34,10 @@
 
     <div v-if="selectedFolders.length" class="import-folders-actions flex_c gap1 w100">
       <UIButton class="import-folders-submit" :full-width="true" @click="doImport('tabs')">
-        Import as Tabs
+        {{ $t('importFolders.importAsTabs') }}
       </UIButton>
       <UIButton class="import-folders-submit" :full-width="true" @click="doImport('current')">
-        Import to current Tab
+        {{ $t('importFolders.importToCurrent') }}
       </UIButton>
     </div>
   </DialogField>
@@ -49,6 +49,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import Sortable from 'sortablejs'
 
+const { t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 
@@ -131,7 +132,7 @@ onMounted(() => {
 
 async function selectFolders(options = {}) {
   const { closeIfEmpty = false } = options
-  const result = await open({ directory: true, multiple: true, title: 'Select Folders' })
+  const result = await open({ directory: true, multiple: true, title: t('importFolders.selectFolders') })
   // Restore WebView focus after native dialog closes (Tauri/Windows focus loss bug)
   try { await getCurrentWindow().setFocus() } catch { /* non-tauri */ }
   if (!result) {

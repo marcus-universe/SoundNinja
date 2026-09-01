@@ -12,6 +12,8 @@
     "saveAs": "Save As...",
     "importAudio": "Import Audio Files",
     "importFolders": "Import Folders",
+    "exportSoundboard": "Export Soundboard",
+    "importSoundboard": "Import Soundboard",
     "quit": "Quit",
     "undo": "Undo",
     "redo": "Redo",
@@ -44,9 +46,43 @@
     "expand": "Expand",
     "tabs": {
       "main": "Main",
+      "behavior": "Behavior",
       "audio": "Audio",
+      "hotkeys": "Hotkeys",
+      "performance": "Performance",
+      "remote": "Remote",
       "theme": "Theme",
       "about": "About"
+    },
+    "behavior": {
+      "playback": "Playback",
+      "window": "Window",
+      "controls": "Controls",
+      "ui": "UI",
+      "gifs": "Gifs"
+    },
+    "hotkeys": {
+      "actions": "App actions",
+      "actionsHint": "Click a binding, then press a key. Escape cancels. Backspace clears.",
+      "triggers": "Sound triggers",
+      "triggersHint": "Add sounds by ID (copy from multi-select). Not every sound is listed automatically.",
+      "globalTriggers": "Global sound triggers",
+      "globalTriggersHint": "Fire sound triggers even when Sound Ninja is in the background. Single letters will steal typing in other apps.",
+      "addTrigger": "Add sound trigger",
+      "remove": "Remove",
+      "pressKey": "Press a key…",
+      "unset": "None",
+      "soundIdPlaceholder": "Sound ID",
+      "unknownId": "Unknown ID",
+      "conflict": "Freed previous binding for {combo}",
+      "action": {
+        "save": "Save",
+        "saveAs": "Save As",
+        "undo": "Undo",
+        "redo": "Redo",
+        "search": "Search",
+        "stopAll": "Stop all sounds"
+      }
     },
     "main": {
       "title": "Main",
@@ -92,9 +128,13 @@
       "tabTransitionStagger": "Buttons one by one",
       "tabTransitionNone": "None",
       "klipyApiKey": "Klipy API key",
-      "klipyApiKeyHint": "Klipy search needs your own free API key. Local PNG, JPEG, GIF, and WebP files work without a key and are stored in the project file.",
+      "klipyApiKeyHint": "Klipy search needs your own free API key. The key is stored app-wide and is never written into project files. Only PNG, JPEG, GIF, and WebP files are saved in the project.",
       "klipyApiKeyPlaceholder": "Paste API key…",
       "klipyGetKey": "Get API key / docs",
+      "klipyDocs": "Docs",
+      "klipyCreateKey": "Create API Key",
+      "klipyShowKey": "Show API key",
+      "klipyHideKey": "Hide API key",
       "navbarTooltips": "Sidebar tooltips",
       "navbarTooltipsHint": "Show a label next to each sidebar button on hover",
       "checkUpdatesOnStart": "Check for updates on start",
@@ -115,14 +155,15 @@
       "cacheMaxSizeHint": "Total RAM reserved for sound caching. Least-recently-used sounds are evicted when the limit is reached.",
       "cacheMaxEntry": "Max file size per entry",
       "cacheMaxEntryHint": "Files larger than this limit are never cached and are always read directly from disk.",
+      "preloadGifs": "Preload GIFs / images",
+      "preloadGifsHint": "Keep all button GIFs and images in memory. Tab switches stay instant. Uses more RAM.",
       "cacheStatus": "Cache status",
       "cacheStatsText": "{count} sound(s) cached \u00b7 {size} MiB used",
       "clearCache": "Clear cache",
-      "gpuAudio": "GPU-accelerated DSP (Experimental)",
-      "gpuAudioHint": "Use the dedicated GPU for audio signal processing. Default is CPU. Requires restart to take full effect.",
       "stemsSection": "Stem Separation",
       "stemsModel": "AI stem model",
       "stemsInstall": "Download model",
+      "stemsCancel": "Cancel",
       "stemsInstalled": "Installed",
       "stemsUnavailable": "Not in this build",
       "stemsInstallHint": "Download {model} ({size}) to enable Keep Vocals / Keep Music in the Record Editor.",
@@ -166,6 +207,8 @@
       "themeNameHint": "Name written into the theme file header and used as the save filename.",
       "themeNamePlaceholder": "My Custom Theme",
       "colors": "Colors",
+      "hue": "Hue",
+      "hueHint": "Shift every color in this set. Saturation and lightness stay. You can still edit each color.",
       "primaryAccent": "Primary / Accent",
       "primaryAccentHint": "Main accent used for highlights, icons, and default accents across the UI.",
       "primaryHover": "Primary Hover",
@@ -259,10 +302,32 @@
         "SFX"
       ]
     },
+    "remote": {
+      "title": "Remote Control",
+      "enable": "Enable remote server",
+      "enableHint": "Let Bitfocus Companion and other clients trigger sounds over the network.",
+      "port": "Port",
+      "portInUse": "Port {port} is already in use",
+      "token": "Token",
+      "tokenHint": "Optional. Clients must send this as a Bearer token or ?token= query.",
+      "generate": "Generate",
+      "status": "Status",
+      "running": "Running",
+      "stopped": "Stopped",
+      "clients": "{count} connected",
+      "address": "Addresses",
+      "copy": "Copy",
+      "copied": "Copied",
+      "firewallHint": "Windows may ask to allow Sound Ninja through the firewall the first time the server starts."
+    },
     "about": {
       "title": "About",
       "githubLink": "Support development on GitHub",
-      "licenseLink": "License — GNU General Public License v3"
+      "licenseLink": "License — GNU General Public License v3",
+      "releaseNotes": "Release Notes",
+      "ipAddress": "System IP",
+      "copy": "Copy",
+      "copied": "Copied"
     }
   },
   "project": {
@@ -283,7 +348,46 @@
     "saving": "Saving…",
     "saved": "Project saved.",
     "savedTitle": "Saved",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "failedOpenProject": "Failed to open project",
+    "failedSaveProject": "Failed to save project.",
+    "failedCreateProject": "Failed to create project",
+    "projectGone": "Project no longer exists.",
+    "newProject": "New Project",
+    "unknownError": "Unknown error",
+    "importAudioFiles": "Import Audio Files",
+    "audioFiles": "Audio Files"
+  },
+  "tabs": {
+    "all": "All",
+    "addTab": "Add tab"
+  },
+  "splash": {
+    "loading": "Starting…",
+    "settings": "Loading settings…",
+    "fonts": "Loading fonts…",
+    "project": "Opening project…",
+    "theme": "Applying theme…",
+    "ready": "Ready"
+  },
+  "importFolders": {
+    "title": "Import Folders",
+    "addFolders": "Add Folders",
+    "dragReorder": "Drag to reorder",
+    "importAsTabs": "Import as Tabs",
+    "importToCurrent": "Import to current Tab",
+    "selectFolders": "Select Folders"
+  },
+  "titlebar": {
+    "minimize": "Minimize",
+    "restore": "Restore",
+    "maximize": "Maximize",
+    "close": "Close"
+  },
+  "firstRun": {
+    "title": "Choose language",
+    "message": "Select the language for Sound Ninja. You can change this later in Settings.",
+    "continue": "Continue"
   },
   "relink": {
     "title": "Missing sound files",
@@ -318,8 +422,9 @@
     "untitledGroup": "Group",
     "groupBorderColor": "Border color",
     "groupNameColor": "Name color",
+    "groupBgColor": "Background color",
     "groupColors": "Group colors",
-    "groupColorsDesc": "Border and name colors for this group",
+    "groupColorsDesc": "Background, border, and name colors for this group",
     "groupAlign": "Button alignment",
     "groupAlignDesc": "Align buttons in this group (or inherit from tab)",
     "tabButtonAlign": "Button alignment",
@@ -332,6 +437,8 @@
     "colorDesc": "Change the accent color of this item",
     "colors": "Colors",
     "colorsDesc": "Set background, text, border and hover colors",
+    "colorHue": "Hue",
+    "colorHueHint": "Shift every color in this set. Saturation and lightness stay. You can still edit each color.",
     "gifBg": "GIF background",
     "gifBgDesc": "Pick a Klipy or local GIF as this button's background",
     "colorBg": "BG",
@@ -341,17 +448,22 @@
     "colorBorder": "Border",
     "colorBorderHover": "Border Hover",
     "resetColor": "Reset to default",
-    "resetAllColors": "Reset all colors"
+    "resetAllColors": "Reset all colors",
+    "copyId": "Copy ID",
+    "copyIdDesc": "Copy this sound's unique ID",
+    "assignHotkey": "Assign hotkey",
+    "assignHotkeyDesc": "Add a play trigger for this sound in Settings"
   },
   "gifPicker": {
     "title": "GIF background",
     "searchPlaceholder": "Search KLIPY",
     "localFile": "Choose image / GIF",
     "poweredBy": "Powered by KLIPY",
-    "info": "Klipy search needs your own API key from partner.klipy.com (Main Settings). Local PNG, JPEG, GIF, and WebP files work without a key and are saved into this project for offline use.",
+    "info": "Klipy search needs your own API key (Settings → Behavior). The key is stored app-wide and is never written into project files. Only PNG, JPEG, GIF, and WebP files are saved in the project.",
     "getKey": "Get API key / docs",
-    "noKey": "Add a Klipy API key in Main Settings to search GIFs. Local files still work.",
+    "noKey": "Add a Klipy API key in Settings → Behavior to search GIFs. Local files still work.",
     "empty": "No GIFs found.",
+    "loadingMore": "Loading more…",
     "positionTitle": "Adjust position",
     "positionHint": "Drag to pan. The GIF fills the button and crops overflow.",
     "apply": "Apply",
@@ -456,10 +568,17 @@
     "importSpecificTab": "Import into Tab…",
     "import": "Import",
     "importSessionNow": "Import current session",
-    "import": "Import",
     "unsavedTitle": "Discard recording?",
     "unsavedHint": "You have unsaved recordings, edits, or staged clips. Close anyway?",
     "discard": "Discard",
     "cancel": "Cancel"
+  },
+  "soundboard": {
+    "exportTitle": "Export Soundboard",
+    "importTitle": "Import Soundboard",
+    "exporting": "Packing sounds…",
+    "importing": "Unpacking soundboard…",
+    "exportFailed": "Failed to export soundboard",
+    "importFailed": "Failed to import soundboard"
   }
 }

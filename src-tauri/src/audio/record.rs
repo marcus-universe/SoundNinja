@@ -340,6 +340,21 @@ pub fn stop_recording(app: AppHandle) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Tear down capture without writing a file. Used on shutdown, where the
+/// recorded audio is discarded anyway.
+pub fn abort_recording() {
+    let Ok(mut guard) = active().lock() else { return };
+    let Some(rec) = guard.take() else { return };
+    rec.stop_flag.store(true, Ordering::Relaxed);
+    if let Some(j) = rec._stream_join {
+        let _ = j.join();
+    }
+    if let Some(j) = rec._collector_join {
+        let _ = j.join();
+    }
+    write_level(0.0);
+}
+
 /// Live min/max peaks while recording: `[min0, max0, min1, max1, …]` plus duration.
 #[tauri::command]
 pub fn get_live_record_peaks(

@@ -16,6 +16,8 @@ export const useAppStore = defineStore('app', {
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
     pendingSettingsTab: null as string | null,
+    /** Prefill Settings → Hotkeys with this sound id (context-menu assign). */
+    pendingHotkeySoundId: null as string | null,
     PopupActive: { active: false, type: 'addTab' } as { active: boolean; type: string },
     RenameContent: '',
     ErrorMessage: '',
@@ -118,6 +120,12 @@ export const useAppStore = defineStore('app', {
       const t = this.pendingSettingsTab
       this.pendingSettingsTab = null
       return t
+    },
+
+    consumePendingHotkeySoundId(): string | null {
+      const id = this.pendingHotkeySoundId
+      this.pendingHotkeySoundId = null
+      return id
     },
 
     setImportFoldersActive(val: boolean) {

@@ -1,6 +1,33 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { defineNuxtConfig } from 'nuxt/config'
 
+/** Tauri WebView + leftover HMR clients drop sockets. Nuxt 4 treats that as fatal. */
+function isTransientSocketError(reason: unknown): boolean {
+  const err = reason as { code?: string; message?: string } | undefined
+  const msg = String(err?.message || reason || '')
+  return err?.code === 'ECONNRESET' || err?.code === 'EPIPE' || msg.includes('ECONNRESET') || msg.includes('EPIPE')
+}
+
+function swallowSockErr(err: unknown) {
+  if (isTransientSocketError(err)) return
+}
+
+function hardenHttpServer(server: { on: Function; __snHardened?: boolean } | undefined) {
+  if (!server || server.__snHardened) return
+  server.__snHardened = true
+  server.on('connection', (socket: { on: Function }) => {
+    socket.on('error', swallowSockErr)
+  })
+  server.on('error', (err: unknown) => {
+    if (isTransientSocketError(err)) return
+    console.error('[http]', err)
+  })
+  server.on('clientError', (err: unknown, socket: { writable?: boolean; end: (s: string) => void }) => {
+    if (isTransientSocketError(err) || !socket.writable) return
+    try { socket.end('HTTP/1.1 400 Bad Request\r\n\r\n') } catch { /* closed */ }
+  })
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   srcDir: 'src/',
@@ -16,10 +43,37 @@ export default defineNuxtConfig({
     },
   },
 
+  // Pin IPv4 so Tauri WebView2 does not hit ::1 / localhost and reset the socket.
+  devServer: {
+    host: '127.0.0.1',
+    port: 3000,
+  },
+
   nitro: {
     preset: 'static',
     output: {
       publicDir: 'dist',
+    },
+  },
+
+  hooks: {
+    listen(server) {
+      hardenHttpServer(server)
+    },
+    'vite:extendConfig'(config) {
+      const server = (config.server || {}) as Record<string, unknown>
+      server.host = '127.0.0.1'
+      server.port = 3000
+      server.strictPort = true
+      // No hmr.port — Vite would open a second WS bind on 3000 and collide with HTTP.
+      server.hmr = { protocol: 'ws', host: '127.0.0.1' }
+      Object.assign(config, { server })
+    },
+    'vite:serverCreated'(viteServer: { httpServer?: { on: Function }; ws?: { on?: Function } }) {
+      hardenHttpServer(viteServer.httpServer)
+      viteServer.ws?.on?.('connection', (socket: { on: Function }) => {
+        socket.on('error', swallowSockErr)
+      })
     },
   },
 
@@ -28,9 +82,15 @@ export default defineNuxtConfig({
   i18n: {
     strategy: 'no_prefix',
     defaultLocale: 'en',
+    // @nuxtjs/i18n v10 always code-splits file-based locales, so each of the six
+    // JSON files is its own chunk and only the active one is fetched.
     locales: [
       { code: 'en', name: 'English', file: 'en.json' },
       { code: 'de', name: 'Deutsch', file: 'de.json' },
+      { code: 'es', name: 'Español', file: 'es.json' },
+      { code: 'fr', name: 'Français', file: 'fr.json' },
+      { code: 'ja', name: '日本語', file: 'ja.json' },
+      { code: 'zh-Hans', name: '简体中文', file: 'zh-Hans.json' },
     ],
     langDir: 'locales/',
     detectBrowserLanguage: false,
@@ -58,6 +118,7 @@ export default defineNuxtConfig({
     '~/assets/scss/pages.scss',
     '~/assets/scss/settings-audio.scss',
     '~/assets/scss/player.scss',
+    '~/assets/scss/splash.scss',
   ],
 
   // Nuxt 4.4.x plugins often transform without emitting maps; keep them off for Tauri builds.
@@ -92,6 +153,11 @@ export default defineNuxtConfig({
     },
     build: {
       sourcemap: false,
+      // Only ever runs inside an up-to-date WebView2/WebKit, so no downlevel
+      // transpilation and no polyfills.
+      target: 'esnext',
+      cssCodeSplit: true,
+      reportCompressedSize: false,
       rollupOptions: {
         onwarn(warning, warn) {
           // Known Nuxt 4.4 noise: transform plugins skip sourcemap output.
@@ -104,7 +170,14 @@ export default defineNuxtConfig({
           // the main soundboard loads without waiting for them.
           manualChunks(id) {
             if (id.includes('SettingsThemeCreator')) return 'chunk-theme-creator'
-            if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsOverlay')) return 'chunk-settings'
+            if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsBehavior') || id.includes('SettingsPerformance') || id.includes('SettingsOverlay')) return 'chunk-settings'
+            if (!id.includes('node_modules')) return
+            if (id.includes('sortablejs')) return 'vendor-sortable'
+            if (id.includes('@tauri-apps')) return 'vendor-tauri'
+            if (id.includes('vue-i18n') || id.includes('@intlify')) return 'vendor-i18n'
+            if (id.includes('/vue/') || id.includes('@vue/') || id.includes('vue-router') || id.includes('pinia')) {
+              return 'vendor-vue'
+            }
           },
         },
       },

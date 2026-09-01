@@ -93,6 +93,36 @@
             <span v-if="hoveredItem === 'group'" class="context-menu__desc">{{ $t('contextMenu.addGroupDesc') }}</span>
           </Transition>
         </li>
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="copySoundId"
+          @mouseenter="hoveredItem = 'copyId'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="rename" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.copyId') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'copyId'" class="context-menu__desc">{{ $t('contextMenu.copyIdDesc') }}</span>
+          </Transition>
+        </li>
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          class="context-menu__item"
+          @click="assignHotkey"
+          @mouseenter="hoveredItem = 'assignHotkey'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="settings" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.assignHotkey') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'assignHotkey'" class="context-menu__desc">{{ $t('contextMenu.assignHotkeyDesc') }}</span>
+          </Transition>
+        </li>
 
         <!-- Tab button alignment -->
         <li
@@ -167,13 +197,31 @@
           <span class="context-menu__chevron">{{ groupColorsOpen ? '▲' : '▼' }}</span>
         </li>
         <li v-if="groupColorsOpen && appStore.contextMenu.type === 'separator'" class="context-menu__color-panel" @click.stop>
+          <div class="context-menu__hue" :title="$t('contextMenu.colorHueHint')">
+            <div class="context-menu__hue-head">
+              <span>{{ $t('contextMenu.colorHue') }}</span>
+              <span>{{ groupHue }}°</span>
+            </div>
+            <HueSlider
+              :model-value="groupHue"
+              :hint="$t('contextMenu.colorHueHint')"
+              :aria-label="$t('contextMenu.colorHue')"
+              @drag-start="beginGroupHue"
+              @update:model-value="onGroupHue"
+              @drag-end="endGroupHue"
+            />
+          </div>
+          <label class="context-menu__color-row">
+            <span>{{ $t('contextMenu.groupBgColor') }}</span>
+            <input type="color" :value="activeGroup?.bgColor || groupFallback.bg" @input="onGroupBgColor" />
+          </label>
           <label class="context-menu__color-row">
             <span>{{ $t('contextMenu.groupBorderColor') }}</span>
-            <input type="color" :value="activeGroup?.borderColor || '#888888'" @input="onGroupBorderColor" />
+            <input type="color" :value="activeGroup?.borderColor || groupFallback.border" @input="onGroupBorderColor" />
           </label>
           <label class="context-menu__color-row">
             <span>{{ $t('contextMenu.groupNameColor') }}</span>
-            <input type="color" :value="activeGroup?.nameColor || '#ffffff'" @input="onGroupNameColor" />
+            <input type="color" :value="activeGroup?.nameColor || groupFallback.name" @input="onGroupNameColor" />
           </label>
           <button type="button" class="context-menu__reset-colors" @click="resetGroupColors">
             {{ $t('contextMenu.resetColor') }}
@@ -232,7 +280,10 @@ import {
   serializeOverride,
   overrideSwatch,
   resolveEffectiveColors,
+  themeButtonColors,
 } from '~/utils/colorOverride'
+import { copyText } from '~/utils/clipboard'
+import { leadHue, shiftColorRecord } from '~/utils/hue'
 
 const { t: $t } = useI18n()
 const appStore = useAppStore()
@@ -301,6 +352,57 @@ function setGroupAlign(align) {
   jsonStore.updateSeparator(id, { buttonAlign: align })
 }
 
+const groupFallback = computed(() => {
+  const btn = themeButtonColors()
+  return { bg: btn.bg, border: btn.border, name: btn.text }
+})
+
+const groupEffective = computed(() => ({
+  bg: activeGroup.value?.bgColor || groupFallback.value.bg,
+  border: activeGroup.value?.borderColor || groupFallback.value.border,
+  name: activeGroup.value?.nameColor || groupFallback.value.name,
+}))
+
+const groupHueDragging = ref(false)
+const groupHueDragValue = ref(0)
+const groupHue = computed(() =>
+  groupHueDragging.value
+    ? groupHueDragValue.value
+    : leadHue([groupEffective.value.border, groupEffective.value.bg, groupEffective.value.name]),
+)
+
+let groupHueSnap = null
+let groupHueSnapHue = 0
+
+function beginGroupHue() {
+  groupHueSnap = { ...groupEffective.value }
+  groupHueSnapHue = leadHue([groupHueSnap.border, groupHueSnap.bg, groupHueSnap.name])
+  groupHueDragValue.value = groupHueSnapHue
+  groupHueDragging.value = true
+}
+
+function endGroupHue() {
+  groupHueSnap = null
+  groupHueDragging.value = false
+}
+
+function onGroupHue(next) {
+  if (!groupHueSnap) beginGroupHue()
+  groupHueDragging.value = true
+  groupHueDragValue.value = next
+  const shifted = shiftColorRecord(groupHueSnap, next - groupHueSnapHue)
+  jsonStore.updateSeparator(appStore.contextMenu.targetName, {
+    bgColor: shifted.bg,
+    borderColor: shifted.border,
+    nameColor: shifted.name,
+  })
+}
+
+function onGroupBgColor(e) {
+  const id = appStore.contextMenu.targetName
+  jsonStore.updateSeparator(id, { bgColor: e.target.value })
+}
+
 function onGroupBorderColor(e) {
   const id = appStore.contextMenu.targetName
   jsonStore.updateSeparator(id, { borderColor: e.target.value })
@@ -313,7 +415,7 @@ function onGroupNameColor(e) {
 
 function resetGroupColors() {
   const id = appStore.contextMenu.targetName
-  jsonStore.updateSeparator(id, { borderColor: undefined, nameColor: undefined })
+  jsonStore.updateSeparator(id, { borderColor: undefined, nameColor: undefined, bgColor: undefined })
 }
 
 function addGroup() {
@@ -482,6 +584,25 @@ function resetPanels() {
 function close() {
   appStore.closeContextMenu()
   resetPanels()
+}
+
+function currentSound() {
+  const { targetIndex } = appStore.contextMenu
+  return jsonStore.configFile.files[targetIndex] ?? null
+}
+
+async function copySoundId() {
+  const sound = currentSound()
+  close()
+  if (sound?.id) await copyText(sound.id)
+}
+
+function assignHotkey() {
+  const sound = currentSound()
+  close()
+  if (!sound?.id) return
+  appStore.pendingHotkeySoundId = sound.id
+  appStore.openSettingsTab('hotkeys')
 }
 
 function openGifPicker() {

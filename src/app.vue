@@ -5,13 +5,23 @@
   >
     <!-- Styled chrome for main + secondary (Record Editor / Theme Creator). -->
     <TitleBar />
+    <Transition name="splash-fade">
+      <Splash v-if="isMain && booting" :percent="splashPercent" :label="splashLabel" />
+    </Transition>
+    <LanguagePicker
+      v-if="isMain && languagePickerOpen"
+      :initial="languagePickerInitial"
+      @done="onFirstLanguage"
+    />
     <template v-if="isMain">
       <NavBar />
       <ErrorAlert />
-      <SettingsOverlay />
-      <ImportFolders v-if="appStore.importFoldersActive" />
+      <!-- Lazy* keeps these panels out of the first paint; the inner v-if plus
+           its transition stays intact because the wrapper latches on first use. -->
+      <LazySettingsOverlay v-if="settingsEverOpened" />
+      <LazyImportFolders v-if="appStore.importFoldersActive" />
       <ContextMenu />
-      <GifPickerDialog v-if="appStore.gifPickerIndex != null" />
+      <LazyGifPickerDialog v-if="appStore.gifPickerIndex != null" />
       <UpdateDialog ref="updateDialogRef" />
       <DialogField
         v-if="unsavedPrompt"
@@ -25,7 +35,7 @@
           <UIButton @click="resolveUnsaved('cancel')">{{ $t('dialog.cancel') }}</UIButton>
         </div>
       </DialogField>
-      <RelinkDialog v-if="appStore.relinkActive" />
+      <LazyRelinkDialog v-if="appStore.relinkActive" />
       <DialogField
         v-if="savePopup"
         :title="savePopup === 'saved' ? $t('common.savedTitle') : $t('common.saving')"
@@ -34,6 +44,18 @@
         <div class="flex_c_v align_c gap1 save-popup-body">
           <span v-if="savePopup === 'saving'" class="saving-indicator__spinner" aria-hidden="true" />
           <p class="dialog-text">{{ savePopup === 'saved' ? $t('common.saved') : $t('common.saving') }}</p>
+        </div>
+      </DialogField>
+      <DialogField
+        v-if="transferPopup"
+        :title="transferPopup.title"
+        @close="() => {}"
+      >
+        <div class="stems-progress">
+          <p class="dialog-text">{{ transferPopup.label }}</p>
+          <div class="stems-progress__bar">
+            <div class="stems-progress__fill" :style="{ width: transferPopup.percent + '%' }" />
+          </div>
         </div>
       </DialogField>
     </template>
@@ -59,12 +81,17 @@
 <script setup>
 import { readTextFile, rename, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
-import { listen } from '@tauri-apps/api/event'
-import { emit } from '@tauri-apps/api/event'
+import { emit, listen as tauriListen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
-import { defaultSettings } from '~/utils/db'
+import { defaultSettings, saveConfig, loadGifBlobsByIds, upsertGifBlob, withProjectDb, reopenDb } from '~/utils/db'
+import { eventToCombo } from '~/utils/hotkeys'
+import {
+  buildPortableExport,
+  resolveImportedPaths,
+  uniqueProjectFolderName,
+} from '~/utils/soundboardZip'
 import { getPreset, normalizeThemeId } from '~/utils/themePresets'
 import {
   applyThemeTokens,
@@ -76,27 +103,56 @@ import {
 } from '~/utils/themeTokens'
 import {
   createProjectFolder,
-  ensureSaveProjectPath,
   listProjects,
-  PROJECT_FILE_FILTER,
-  PROJECT_SAVE_FILTER,
+  pickOpenPaths,
+  pickProjectFile,
+  pickSaveProjectFile,
   projectNameFromDbPath,
+  parentDir,
   safeProjectName,
 } from '~/utils/projects'
+import { resolveAppLocale } from '~/utils/locales'
+import { publishRemoteState } from '~/utils/remote'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
 const appSettings = useAppSettingsStore()
-const { setLocale } = useI18n()
+const { t, setLocale } = useI18n()
+
+/**
+ * Everything registered outside Vue's own bookkeeping (Tauri event handles,
+ * watchers created after an `await`, timers). The root component only unmounts
+ * when the window goes away, but leaving these dangling kept handlers alive
+ * across window recreation.
+ */
+const teardown = []
+
+/** `listen()` whose handle is released automatically on unmount. */
+function listen(event, handler) {
+  const p = tauriListen(event, handler)
+  p.then((unlisten) => teardown.push(unlisten)).catch(() => {})
+  return p
+}
 
 const updateDialogRef = ref(null)
+// Latches on the first open so the settings chunk is fetched once and the
+// overlay's own enter/leave transition keeps working afterwards.
+const settingsEverOpened = ref(false)
 const savePopup = ref(null)
 let savePopupTimer = null
+const transferPopup = ref(null)
 
 // Secondary windows (e.g. the Theme Creator) reuse the same SPA bundle. Only the
 // main window owns the project/menu lifecycle; others just render their page.
 const isMain = ref(true)
 const toolReady = ref(false)
+const booting = ref(true)
+const splashPercent = ref(8)
+const splashLabel = ref('')
+const languagePickerOpen = ref(false)
+const languagePickerInitial = ref('en')
+let languagePickerResolve = null
+let unlistenChrome = null
 if (import.meta.client) {
   try { isMain.value = getCurrentWindow().label === 'main' } catch { /* non-tauri */ }
   if (!isMain.value) {
@@ -128,25 +184,86 @@ function runHistoryAction(fn) {
   fn()
 }
 
-function onUndoRedoKeydown(e) {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+function runAppHotkey(action) {
+  if (action === 'save') handleMenuSave()
+  else if (action === 'saveAs') handleMenuSaveAs()
+  else if (action === 'undo') jsonStore.undo()
+  else if (action === 'redo') jsonStore.redo()
+  else if (action === 'search') window.dispatchEvent(new CustomEvent('sn:activate-search'))
+  else if (action === 'stopAll') {
+    invoke('stop_all').catch(() => {})
+    window.dispatchEvent(new CustomEvent('sn:stop-all'))
+  }
+}
+
+function playSoundById(soundId) {
+  if (!soundId) return
+  window.dispatchEvent(new CustomEvent('sn:play-sound-id', { detail: soundId }))
+}
+
+function stopSoundById(soundId) {
+  if (!soundId) return
+  window.dispatchEvent(new CustomEvent('sn:stop-sound-id', { detail: soundId }))
+}
+
+function handleRemoteCommand(payload) {
+  const action = payload?.action
+  const id = typeof payload?.id === 'string' ? payload.id : ''
+  if (action === 'trigger') {
+    playSoundById(id)
+    return
+  }
+  if (action === 'stop') {
+    if (id) stopSoundById(id)
+    else {
+      invoke('stop_all').catch(() => {})
+      window.dispatchEvent(new CustomEvent('sn:stop-all'))
+    }
+  }
+}
+
+let remotePublishTimer = null
+function scheduleRemotePublish() {
+  if (remotePublishTimer) clearTimeout(remotePublishTimer)
+  remotePublishTimer = setTimeout(() => {
+    remotePublishTimer = null
+    if (!appSettings.remoteEnabled) return
+    publishRemoteState(jsonStore.configFile?.files).catch(() => {})
+  }, 150)
+}
+
+function onHotkeyKeydown(e) {
   if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
-  const key = e.key.toLowerCase()
-  if (key === 'z' && e.shiftKey) {
+  const combo = eventToCombo(e)
+  if (!combo) return
+  const map = appSettings.hotkeys || {}
+  for (const action of Object.keys(map)) {
+    if (map[action] && map[action] === combo) {
+      e.preventDefault()
+      runHistoryAction(() => runAppHotkey(action))
+      return
+    }
+  }
+  if (appSettings.soundTriggersGlobal) return
+  const triggers = jsonStore.configFile?.settings?.soundHotkeys || []
+  const hit = triggers.find((row) => row.combo && row.combo === combo && row.soundId)
+  if (hit) {
     e.preventDefault()
-    runHistoryAction(() => jsonStore.redo())
-  } else if (key === 'z') {
-    e.preventDefault()
-    runHistoryAction(() => jsonStore.undo())
-  } else if (key === 'y' && !e.shiftKey) {
-    e.preventDefault()
-    runHistoryAction(() => jsonStore.redo())
-  } else if (key === 's' && e.shiftKey) {
-    e.preventDefault()
-    runHistoryAction(() => { handleMenuSaveAs() })
-  } else if (key === 's') {
-    e.preventDefault()
-    runHistoryAction(() => { handleMenuSave() })
+    playSoundById(hit.soundId)
+  }
+}
+
+async function syncGlobalSoundHotkeys() {
+  const bindings = (jsonStore.configFile?.settings?.soundHotkeys || [])
+    .filter((row) => row.combo && row.soundId)
+    .map((row) => ({ combo: row.combo, soundId: row.soundId }))
+  try {
+    await invoke('set_global_sound_hotkeys', {
+      enabled: !!appSettings.soundTriggersGlobal,
+      bindings,
+    })
+  } catch (e) {
+    console.error('Failed to sync global sound hotkeys', e)
   }
 }
 
@@ -188,9 +305,6 @@ async function openProjectPath(dbPath) {
   }
   await jsonStore.validateSoundPaths()
   if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
-  if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
-    invoke('set_gpu_audio', { enabled: true }).catch(() => {})
-  }
 }
 
 async function bootstrapProject() {
@@ -264,7 +378,7 @@ async function withSavePopup(work) {
   } catch (e) {
     savePopup.value = null
     console.error('Failed to save project', e)
-    appStore.setErrorActive(`Failed to save project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedSaveProject')}\n\n${formatError(e)}`)
     return false
   }
 }
@@ -280,36 +394,36 @@ async function handleMenuNewProject() {
   try {
     const existing = await listProjects(appSettings.projectsPath)
     const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
-    let name = 'New Project'
+    let name = t('common.newProject')
     let n = 2
-    while (names.has(safeProjectName(name).toLowerCase())) name = `New Project ${n++}`
+    while (names.has(safeProjectName(name).toLowerCase())) name = `${t('common.newProject')} ${n++}`
     const dbPath = await createProjectFolder(appSettings.projectsPath, name)
     await openProjectPath(dbPath)
   } catch (e) {
     console.error('Failed to create project', e)
-    appStore.setErrorActive(`Failed to create project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedCreateProject')}\n\n${formatError(e)}`)
   }
 }
 
 function formatError(e) {
-  if (e == null) return 'Unknown error'
+  if (e == null) return t('common.unknownError')
   if (typeof e === 'string') return e
   if (e instanceof Error) return e.message || String(e)
   try { return JSON.stringify(e) } catch { return String(e) }
 }
 
 async function handleMenuOpenProject() {
-  const selected = await openDialog({
-    title: 'Open Project',
-    filters: [PROJECT_FILE_FILTER],
-    multiple: false,
-  })
-  if (!selected || Array.isArray(selected)) return
+  const dbPath = await pickProjectFile()
+  if (!dbPath) return
+  const choice = await confirmUnsaved()
+  if (choice === 'cancel') return
+  if (choice === 'save' && !(await persistOrReport())) return
   try {
-    await openProjectPath(selected)
+    await openProjectPath(dbPath)
+    await applyPersistedTheme(jsonStore.configFile)
   } catch (e) {
     console.error('Failed to open project', e)
-    appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(e)}`)
   }
 }
 
@@ -318,13 +432,8 @@ async function handleMenuSave() {
 }
 
 async function handleMenuSaveAs() {
-  const path = await saveDialog({
-    title: 'Save Project As',
-    filters: [PROJECT_SAVE_FILTER],
-    defaultPath: `project.${PROJECT_SAVE_FILTER.extensions[0]}`,
-  })
-  if (!path) return
-  const dbPath = ensureSaveProjectPath(path)
+  const dbPath = await pickSaveProjectFile()
+  if (!dbPath) return
   await withSavePopup(async () => {
     await jsonStore.saveAs(dbPath)
     await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
@@ -334,12 +443,13 @@ async function handleMenuSaveAs() {
 async function handleMenuImportAudio() {
   const selected = await openDialog({
     multiple: true,
-    title: 'Import Audio Files',
-    filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg'] }],
+    title: t('common.importAudioFiles'),
+    filters: [{ name: t('common.audioFiles'), extensions: ['mp3', 'wav', 'ogg'] }],
   })
-  if (!Array.isArray(selected)) return
+  const files = pickOpenPaths(selected)
+  if (!files.length) return
   const indexLength = jsonStore.configFile.files.length
-  const soundlist = selected.map((file, index) => {
+  const soundlist = files.map((file, index) => {
     const tabs = ['All']
     if (appStore.currentTab !== 'All') tabs.push(appStore.currentTab)
     return {
@@ -358,6 +468,98 @@ async function handleMenuImportAudio() {
     }
   })
   jsonStore.addFiles(soundlist)
+}
+
+function joinOsPath(base, ...parts) {
+  const sep = base.includes('\\') ? '\\' : '/'
+  return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
+}
+
+async function handleMenuExportSoundboard() {
+  const zipPath = await saveDialog({
+    title: t('soundboard.exportTitle'),
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    defaultPath: `${projectNameFromDbPath(jsonStore.currentProjectPath || 'soundboard')}.zip`,
+  })
+  if (!zipPath) return
+  transferPopup.value = { title: t('soundboard.exportTitle'), label: t('soundboard.exporting'), percent: 0 }
+  const unlisten = await listen('soundboard_export_progress', (e) => {
+    const pct = Number(e?.payload?.percent)
+    if (Number.isFinite(pct)) transferPopup.value = { ...transferPopup.value, percent: pct }
+  })
+  let tempDir = null
+  const livePath = jsonStore.currentProjectPath
+  try {
+    if (jsonStore.dirty) await jsonStore.persistNow()
+    const { portable, entries } = buildPortableExport(jsonStore.configFile)
+    tempDir = await invoke('make_temp_dir')
+    const tempDb = joinOsPath(tempDir, 'project.sninja')
+    const gifIds = [...new Set(portable.files.map((f) => f.gifId).filter(Boolean))]
+    let blobs = []
+    if (livePath && gifIds.length) {
+      blobs = await withProjectDb(livePath, (d) => loadGifBlobsByIds(d, gifIds))
+    }
+    await withProjectDb(tempDb, async (d) => {
+      await saveConfig(d, portable)
+      for (const row of blobs) await upsertGifBlob(d, row)
+    })
+    const allEntries = [{ src: tempDb, destRel: 'project.sninja' }, ...entries]
+    await invoke('export_soundboard_zip', { zipPath, entries: allEntries })
+  } catch (e) {
+    console.error('Export soundboard failed', e)
+    appStore.setErrorActive(`${t('soundboard.exportFailed')}\n\n${formatError(e)}`)
+  } finally {
+    unlisten()
+    transferPopup.value = null
+    if (livePath) {
+      try { await reopenDb(livePath) } catch { /* restore best-effort */ }
+    }
+    if (tempDir) {
+      try { await invoke('delete_dir_abs', { path: tempDir }) } catch { /* ignore */ }
+    }
+  }
+}
+
+async function handleMenuImportSoundboard() {
+  const choice = await confirmUnsaved()
+  if (choice === 'cancel') return
+  if (choice === 'save' && !(await persistOrReport())) return
+
+  const selected = await openDialog({
+    title: t('soundboard.importTitle'),
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    multiple: false,
+  })
+  const zipPath = Array.isArray(selected) ? selected[0] : selected
+  if (!zipPath) return
+
+  transferPopup.value = { title: t('soundboard.importTitle'), label: t('soundboard.importing'), percent: 0 }
+  const unlisten = await listen('soundboard_import_progress', (e) => {
+    const pct = Number(e?.payload?.percent)
+    if (Number.isFinite(pct)) transferPopup.value = { ...transferPopup.value, percent: pct }
+  })
+  try {
+    const zipBase = String(zipPath).replace(/^.*[\\/]/, '').replace(/\.zip$/i, '')
+    const existing = await listProjects(appSettings.projectsPath)
+    const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
+    const folder = uniqueProjectFolderName(names, zipBase || t('common.newProject'))
+    const destDir = joinOsPath(appSettings.projectsPath, folder)
+    const dbPath = await invoke('import_soundboard_zip', { zipPath, destDir })
+    await jsonStore.openProject(dbPath)
+    resolveImportedPaths(jsonStore.configFile, parentDir(dbPath))
+    await jsonStore.persistNow()
+    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
+    await jsonStore.validateSoundPaths()
+    if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
+    await applyPersistedTheme(jsonStore.configFile)
+    await syncGlobalSoundHotkeys()
+  } catch (e) {
+    console.error('Import soundboard failed', e)
+    appStore.setErrorActive(`${t('soundboard.importFailed')}\n\n${formatError(e)}`)
+  } finally {
+    unlisten()
+    transferPopup.value = null
+  }
 }
 
 // ── Theme application ─────────────────────────────────────────────────────────
@@ -390,6 +592,14 @@ function clearInlineThemeVars() {
   THEME_INLINE_VARS.forEach((v) => root.style.removeProperty(v))
 }
 
+watch(
+  () => jsonStore.currentProjectPath,
+  async (path, prev) => {
+    if (!isMain.value || !path || path === prev) return
+    await applyPersistedTheme(jsonStore.configFile)
+  },
+)
+
 async function applyPersistedTheme(config) {
   const s = config?.settings
   const theme = normalizeThemeId(s?.theme)
@@ -414,8 +624,40 @@ async function applyPersistedTheme(config) {
   applyThemeTokens(s, getPreset(theme)?.extras)
 }
 
+async function applyBootLocale(code) {
+  const next = resolveAppLocale(code)
+  await setLocale(next)
+  await appSettings.setLocale(next)
+  invoke('rebuild_menu', { lang: next }).catch(() => {})
+}
+
+function onFirstLanguage(code) {
+  languagePickerOpen.value = false
+  const resolve = languagePickerResolve
+  languagePickerResolve = null
+  if (resolve) resolve(code)
+}
+
+function waitForLanguagePick(initial) {
+  languagePickerInitial.value = initial
+  languagePickerOpen.value = true
+  return new Promise((resolve) => {
+    languagePickerResolve = resolve
+  })
+}
+
 onMounted(async () => {
+  splashLabel.value = t('splash.settings')
+  splashPercent.value = 12
   await appSettings.load()
+  splashPercent.value = 28
+
+  unlistenChrome = await listen('sn:chrome-changed', (e) => {
+    const payload = e?.payload
+    if (!payload || typeof payload !== 'object') return
+    appSettings.applyChromeFromEvent(payload)
+  })
+
   if (!isMain.value) {
     // Theme Creator / Record Editor: apply locale + chrome, skip project/menu ownership.
     // Tab list for Record Editor comes via `record_context` events from main.
@@ -424,24 +666,45 @@ onMounted(async () => {
     await appSettings.applyWindowChrome()
     return
   }
+
   if (appSettings.locale) {
-    setLocale(appSettings.locale)
-    invoke('rebuild_menu', { lang: appSettings.locale }).catch(() => {})
+    await applyBootLocale(appSettings.locale)
+  } else {
+    let installed = null
+    try { installed = await invoke('read_install_language') } catch { /* ignore */ }
+    const guessed = resolveAppLocale(installed || (typeof navigator !== 'undefined' ? navigator.language : 'en'))
+    if (installed) {
+      await applyBootLocale(guessed)
+    } else {
+      const picked = await waitForLanguagePick(guessed)
+      await applyBootLocale(picked)
+    }
   }
+  splashLabel.value = t('splash.fonts')
+  splashPercent.value = 48
   // Register any uploaded custom fonts so themed fonts render everywhere.
   loadCustomFonts(appSettings.fontsPath).catch(() => {})
+  splashLabel.value = t('splash.project')
+  splashPercent.value = 68
   try {
     await bootstrapProject()
   } catch (e) {
     console.error('Failed to bootstrap project', e)
-    appStore.setErrorActive(`Failed to open project.\n\n${formatError(e)}`)
+    appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(e)}`)
   }
   // One-time: pull audio device/volume prefs out of the project into app-config.db.
   await appSettings.migrateAudioFromProject(jsonStore.configFile?.settings)
+  splashLabel.value = t('splash.theme')
+  splashPercent.value = 88
   await applyPersistedTheme(jsonStore.configFile)
-  if (jsonStore.configFile?.settings?.gpuAudioEnabled) {
-    invoke('set_gpu_audio', { enabled: true }).catch(() => {})
-  }
+  splashLabel.value = t('splash.ready')
+  splashPercent.value = 100
+  setTimeout(() => { booting.value = false }, 280)
+
+  // Fetch the settings chunk once the board is up. Opening settings is then
+  // instant, and first paint never waited for it.
+  const whenIdle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 1500))
+  whenIdle(() => { settingsEverOpened.value = true })
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
@@ -461,7 +724,7 @@ onMounted(async () => {
     const stillExists = await invoke('path_exists_abs', { path })
     if (!stillExists) {
       await appSettings.removeRecentProject(path)
-      appStore.setErrorActive('Project no longer exists.')
+      appStore.setErrorActive(t('common.projectGone'))
       return
     }
     try {
@@ -469,18 +732,52 @@ onMounted(async () => {
       await applyPersistedTheme(jsonStore.configFile)
     } catch (err) {
       console.error('Failed to open project', err)
-      appStore.setErrorActive(`Failed to open project.\n\n${formatError(err)}`)
+      appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(err)}`)
     }
   })
   listen('menu_save', handleMenuSave)
   listen('menu_save_as', handleMenuSaveAs)
   listen('menu_import_audio', handleMenuImportAudio)
   listen('menu_import_folders', () => appStore.setImportFoldersActive(true))
+  listen('menu_export_soundboard', handleMenuExportSoundboard)
+  listen('menu_import_soundboard', handleMenuImportSoundboard)
   listen('menu_select_project', () => appStore.setSelectProjectActive(true))
+  listen('global_sound_hotkey', (e) => {
+    const id = e?.payload
+    if (typeof id === 'string') playSoundById(id)
+  })
+  listen('remote_command', (e) => {
+    handleRemoteCommand(e?.payload)
+  })
   listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
   listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
 
-  window.addEventListener('keydown', onUndoRedoKeydown)
+  window.addEventListener('keydown', onHotkeyKeydown)
+  await syncGlobalSoundHotkeys()
+  // Created after an await, so Vue no longer binds them to this instance —
+  // their stop handles have to be collected by hand.
+  teardown.push(watch(
+    () => [
+      appSettings.soundTriggersGlobal,
+      jsonStore.currentProjectPath,
+      JSON.stringify(jsonStore.configFile?.settings?.soundHotkeys || []),
+    ],
+    () => { syncGlobalSoundHotkeys() },
+  ))
+
+  if (appSettings.remoteEnabled) {
+    try { await appSettings.applyRemote() } catch { /* remoteError set in store */ }
+    scheduleRemotePublish()
+  }
+  teardown.push(watch(
+    () => jsonStore.configFile?.files,
+    () => { scheduleRemotePublish() },
+    { deep: true },
+  ))
+  teardown.push(watch(
+    () => appSettings.remoteEnabled,
+    (on) => { if (on) scheduleRemotePublish() },
+  ))
 
   // Prompt to save unsaved changes before the window closes.
   const mainWindow = getCurrentWindow()
@@ -572,9 +869,20 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (isMain.value) {
-    window.removeEventListener('keydown', onUndoRedoKeydown)
+  if (unlistenChrome) {
+    unlistenChrome()
+    unlistenChrome = null
   }
+  if (isMain.value) {
+    window.removeEventListener('keydown', onHotkeyKeydown)
+  }
+  for (const release of teardown.splice(0)) {
+    try { release() } catch { /* already gone */ }
+  }
+  clearTimeout(savePopupTimer)
+  savePopupTimer = null
+  clearTimeout(remotePublishTimer)
+  remotePublishTimer = null
 })
 </script>
 

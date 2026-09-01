@@ -15,14 +15,14 @@
         >
         <div :key="'tab:' + currentTab" class="SoundTab-wrap">
         <div
-            class="SoundTab flex_c_v flex_start button-gaps"
+            class="SoundTab flex_c_v flex_start"
             ref="boardRef"
             :style="uniformHeight ? { '--btn-min-height': uniformHeight + 'px' } : {}"
         >
             <!-- Orphan strip: sounds before first group -->
             <div
                 class="sound-orphans sound-section-body flex_c_h flex_start button-gaps flex_wrap"
-                :class="orphanAlignClass"
+                :class="[orphanAlignClass, { 'sound-orphans--empty': orphanSounds.length === 0 }]"
                 data-section-id="orphans"
                 ref="orphansRef"
             >
@@ -33,7 +33,11 @@
                     :btnStyle="getBtnStyle(sound)"
                     :loading="loadingPaths.has(sound.path)"
                     :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
-                    :gifSrc="gifSrcFor(sound)"
+                    :multi-select="appStore.multiSelectActive"
+                    :gifAnimSrc="gifAnimSrcFor(sound)"
+                    :gifPosterSrc="gifPosterSrcFor(sound)"
+                    :gifAnimate="animatesAlways(sound)"
+                    :gifAnimateOnHover="animatesOnHover(sound)"
                     :gifPosX="sound.gifPosX ?? 50"
                     :gifPosY="sound.gifPosY ?? 50"
                     :hasGif="!!sound.gifId"
@@ -42,7 +46,6 @@
                     :data-sound-path="sound.path"
                     @play="onSoundClick(sound)"
                     @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
-                    @gifhover="(on) => onGifHover(sound, on)"
                 />
             </div>
 
@@ -71,7 +74,11 @@
                             :btnStyle="getBtnStyle(sound)"
                             :loading="loadingPaths.has(sound.path)"
                             :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
-                            :gifSrc="gifSrcFor(sound)"
+                            :multi-select="appStore.multiSelectActive"
+                            :gifAnimSrc="gifAnimSrcFor(sound)"
+                            :gifPosterSrc="gifPosterSrcFor(sound)"
+                            :gifAnimate="animatesAlways(sound)"
+                            :gifAnimateOnHover="animatesOnHover(sound)"
                             :gifPosX="sound.gifPosX ?? 50"
                             :gifPosY="sound.gifPosY ?? 50"
                             :hasGif="!!sound.gifId"
@@ -80,7 +87,6 @@
                             :data-sound-path="sound.path"
                             @play="onSoundClick(sound)"
                             @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
-                            @gifhover="(on) => onGifHover(sound, on)"
                         />
                     </div>
                 </div>
@@ -118,14 +124,13 @@
 </template>
 
 <script setup>
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
 import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/utils/colorOverride'
-import { withProjectDb, loadGifBlobsByIds, normalizeTabTransition } from '~/utils/db'
-import { cacheGifRow, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
-
-const MAX_ANIM_GIFS = 8
+import { normalizeTabTransition } from '~/utils/db'
+import { ensureGifUrls, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -233,6 +238,7 @@ const orphanAlignClass = computed(() => alignClassFor(null))
 function groupCardStyle(sep) {
   const style = {}
   if (sep.borderColor) style['--group-border'] = sep.borderColor
+  if (sep.bgColor) style['--group-bg'] = sep.bgColor
   return style
 }
 
@@ -313,9 +319,14 @@ function destroySortables() {
 
 function revertDom(evt) {
   const { oldIndex, item, from } = evt
-  if (oldIndex == null) return
-  from.removeChild(item)
-  from.insertBefore(item, from.children[oldIndex] ?? null)
+  if (oldIndex == null || !item || !from) return
+  // Cross-list drops already reparented `item` onto `to`. Pull it from
+  // wherever it is now, then put it back in `from` at oldIndex.
+  try {
+    item.parentNode?.removeChild(item)
+  } catch { /* detached */ }
+  const anchor = from.children[oldIndex] ?? null
+  if (anchor !== item) from.insertBefore(item, anchor)
 }
 
 function layoutFromDom() {
@@ -363,14 +374,19 @@ function bindInnerSortable(el) {
     disabled: reorderDisabled(),
     draggable: '.Soundbtn',
     ghostClass: 'drag-over',
+    emptyInsertThreshold: 48,
+    swapThreshold: 0.65,
     onEnd: onInnerEnd,
   })
   innerSortables.push(s)
 }
 
-function setupSortables() {
+function setupSortables(retry = true) {
   destroySortables()
-  if (!groupsOuterRef.value || !orphansRef.value) return
+  if (!groupsOuterRef.value || !orphansRef.value) {
+    if (retry) nextTick(() => setupSortables(false))
+    return
+  }
 
   outerSortable = Sortable.create(groupsOuterRef.value, {
     animation: 180,
@@ -388,74 +404,116 @@ function setupSortables() {
 }
 
 onMounted(() => {
-  nextTick(() => setupSortables())
+  nextTick(() => {
+    setupSortables()
+    warmTabSounds()
+  })
 })
 
 onUnmounted(() => {
   destroySortables()
   gifObserver?.disconnect()
   gifObserver = null
+  clearTimeout(warmTimer)
+  warmTimer = null
 })
 
 const gifPlayOnHover = computed(() => Settings.value?.gifPlayOnHover !== false)
+const preloadGifs = computed(() => Settings.value?.preloadGifs === true)
 const visibleByPath = reactive({})
-const hoveredPath = ref(null)
 const gifUrls = reactive({})
 let gifObserver = null
 
-function onGifHover(sound, on) {
-  if (on) hoveredPath.value = sound.path
-  else if (hoveredPath.value === sound.path) hoveredPath.value = null
+/** A button may animate at all only while on screen and the window has focus. */
+function gifEligible(sound) {
+  return !!sound.gifId && windowFocused.value && !!visibleByPath[sound.path]
 }
 
-function shouldAnimate(sound) {
-  if (!sound.gifId) return false
-  if (!windowFocused.value) return false
-  if (!visibleByPath[sound.path]) return false
-  if (gifPlayOnHover.value) return hoveredPath.value === sound.path
-  return true
+function animatesAlways(sound) {
+  return gifEligible(sound) && !gifPlayOnHover.value
 }
 
-const animatingPaths = computed(() => {
-  const paths = []
-  for (const sound of allDisplaySounds.value) {
-    if (!shouldAnimate(sound)) continue
-    paths.push(sound.path)
-    if (paths.length >= MAX_ANIM_GIFS) break
+function animatesOnHover(sound) {
+  return gifEligible(sound) && gifPlayOnHover.value
+}
+
+function gifUrlsFor(sound) {
+  if (!sound.gifId) return null
+  return gifUrls[sound.gifId] || peekGifUrls(sound.gifId)
+}
+
+function gifAnimSrcFor(sound) {
+  return gifUrlsFor(sound)?.animUrl ?? ''
+}
+
+function gifPosterSrcFor(sound) {
+  return gifUrlsFor(sound)?.posterUrl ?? ''
+}
+
+async function loadGifIds(ids) {
+  const path = jsonStore.currentProjectPath
+  if (!path) return
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (!unique.length) return
+  // Rust extracts the blobs to files; only paths come back over IPC.
+  await ensureGifUrls(path, unique)
+  for (const id of unique) {
+    if (gifUrls[id]) continue
+    const urls = peekGifUrls(id)
+    if (urls) gifUrls[id] = urls
   }
-  return new Set(paths)
-})
-
-function gifSrcFor(sound) {
-  if (!sound.gifId) return ''
-  const urls = gifUrls[sound.gifId] || peekGifUrls(sound.gifId)
-  if (!urls) return ''
-  if (animatingPaths.value.has(sound.path)) return urls.animUrl
-  return urls.posterUrl
 }
 
 async function loadVisibleGifs() {
-  const path = jsonStore.currentProjectPath
-  if (!path) return
+  if (preloadGifs.value) {
+    await loadAllGifs()
+    return
+  }
   const ids = []
   for (const sound of allDisplaySounds.value) {
     if (!sound.gifId) continue
     if (!visibleByPath[sound.path]) continue
-    if (gifUrls[sound.gifId] || peekGifUrls(sound.gifId)) continue
     ids.push(sound.gifId)
   }
-  if (!ids.length) return
-  try {
-    const rows = await withProjectDb(path, (d) => loadGifBlobsByIds(d, ids))
-    for (const row of rows) {
-      gifUrls[row.id] = cacheGifRow(row)
-    }
-  } catch (e) {
-    console.error('Failed to load GIF blob', e)
-  }
+  await loadGifIds(ids)
+}
+
+async function loadAllGifs() {
+  const ids = (jsonStore.configFile?.files ?? []).map((f) => f.gifId).filter(Boolean)
+  await loadGifIds(ids)
+}
+
+/**
+ * Pre-decode the current tab so the first press is instant and the audio
+ * callback only ever copies samples. Rust caps RAM use itself, so the only
+ * reason to limit the list here is to avoid a decode burst on huge tabs.
+ */
+const WARM_LIMIT = 96
+let warmTimer = null
+let warmedSignature = ''
+
+function warmTabSounds() {
+  const paths = allDisplaySounds.value.map((s) => s.path).filter(Boolean).slice(0, WARM_LIMIT)
+  if (!paths.length) return
+  const signature = paths.join('|')
+  if (signature === warmedSignature) return
+  warmedSignature = signature
+
+  clearTimeout(warmTimer)
+  warmTimer = setTimeout(() => {
+    const maxSize = Settings.value?.cacheMaxSizeMib ?? 256
+    const maxEntry = Settings.value?.cacheMaxEntryMib ?? 128
+    invoke('set_cache_config', { maxSizeMib: maxSize, maxEntryMib: maxEntry }).catch(() => {})
+    invoke('warm_sound_cache', {
+      paths,
+      deviceName: appSettings.outputSource || 'default',
+      hostName: appSettings.outputHost || null,
+    }).catch((e) => console.error('Sound prewarm failed', e))
+  }, 400)
 }
 
 function releaseOffscreenGif(soundPath) {
+  if (preloadGifs.value) return
   const file = jsonStore.configFile?.files?.find((f) => f.path === soundPath)
   const id = file?.gifId
   if (!id) return
@@ -533,7 +591,7 @@ const boardSignature = computed(() => {
 watch(
   [
     boardSignature,
-    () => jsonStore.configFile.files.map((f) => f.gifId || '').join('|'),
+    () => (jsonStore.configFile?.files ?? []).map((f) => f.gifId || '').join('|'),
   ],
   () => {
     for (const f of jsonStore.configFile.files) {
@@ -541,10 +599,12 @@ watch(
       const urls = peekGifUrls(f.gifId)
       if (urls) gifUrls[f.gifId] = urls
     }
+    pruneBtnStyleCache()
     nextTick(() => {
       setupSortables()
       setupGifObserver()
       loadVisibleGifs()
+      warmTabSounds()
     })
   },
   { flush: 'post' },
@@ -559,7 +619,12 @@ watch(currentTab, () => {
     setupSortables()
     setupGifObserver()
     loadVisibleGifs()
+    warmTabSounds()
   })
+})
+
+watch(preloadGifs, (on) => {
+  if (on) loadAllGifs()
 })
 
 watch(
@@ -578,18 +643,38 @@ function openSeparatorMenu(event, sep) {
   })
 }
 
+/**
+ * Style objects are cached per sound. A fresh object on every render would be a
+ * changed prop for Vue even when nothing about the button moved, forcing the
+ * whole board to patch whenever anything in the container re-rendered.
+ */
+const btnStyleCache = new Map()
+
 function getBtnStyle(sound) {
-  const style = {}
   const si = staggerIndexByKey.value[sound.path]
-  if (si != null) style['--stagger-i'] = si
-  const info = playingSounds.get(sound.index)
-  if (sound.active && info && info.duration > 0) {
-    const elapsed = info.paused
+  const info = sound.active ? playingSounds.get(sound.index) : null
+  const running = info && info.duration > 0
+
+  // Progress advances with wall-clock time, so it is part of the identity.
+  const elapsed = running
+    ? info.paused
       ? (info.elapsedMs || 0) / 1000
       : Math.min(info.duration, (Date.now() - info.startTime) / 1000)
-    const from = Math.min(100, (elapsed / info.duration) * 100)
+    : 0
+  // Rounded: the CSS transition draws the sweep, this only sets its start.
+  const from = running ? Math.round(Math.min(100, (elapsed / info.duration) * 100) * 10) / 10 : 0
+  const frozen = running && (info.paused || !windowFocused.value)
+
+  const signature = [si, running ? 1 : 0, from, frozen ? 1 : 0, running ? info.duration : 0, sound.color]
+    .join('|')
+  const cached = btnStyleCache.get(sound.path)
+  if (cached && cached.signature === signature) return cached.style
+
+  const style = {}
+  if (si != null) style['--stagger-i'] = si
+  if (running) {
     style['--sound-progress-from'] = from + '%'
-    if (info.paused || !windowFocused.value) {
+    if (frozen) {
       style['--sound-progress'] = from + '%'
       style['--sound-progress-dur'] = '0s'
     } else {
@@ -604,7 +689,16 @@ function getBtnStyle(sound) {
   if (o.textHover) style['--btn-text-hover'] = o.textHover
   if (o.border) style['--btn-border'] = o.border
   if (o.borderHover) style['--btn-border-hover'] = o.borderHover
+
+  btnStyleCache.set(sound.path, { signature, style })
   return style
+}
+
+function pruneBtnStyleCache() {
+  const live = new Set((jsonStore.configFile?.files ?? []).map((f) => f.path))
+  for (const path of btnStyleCache.keys()) {
+    if (!live.has(path)) btnStyleCache.delete(path)
+  }
 }
 
 function openSoundMenu(event, sound) {
@@ -691,6 +785,9 @@ onMounted(async () => {
   unlistenPlaying = await listen('playing_changed', (event) => {
     syncProgressPauseState(event.payload ?? [])
   })
+  window.addEventListener('sn:play-sound-id', onPlaySoundId)
+  window.addEventListener('sn:stop-sound-id', onStopSoundId)
+  window.addEventListener('sn:stop-all', onHotkeyStopAll)
 })
 
 onUnmounted(() => {
@@ -700,7 +797,52 @@ onUnmounted(() => {
   window.removeEventListener('blur', syncWindowFocus)
   if (unlistenFinished) unlistenFinished()
   if (unlistenPlaying) unlistenPlaying()
+  window.removeEventListener('sn:play-sound-id', onPlaySoundId)
+  window.removeEventListener('sn:stop-sound-id', onStopSoundId)
+  window.removeEventListener('sn:stop-all', onHotkeyStopAll)
 })
+
+function playSoundById(soundId) {
+  const sound = jsonStore.configFile.files.find((f) => f.id === soundId)
+  if (!sound) return
+  if (jsonStore.missingPaths.includes(sound.path)) {
+    appStore.setRelinkActive(true)
+    return
+  }
+  setActiveSound(sound)
+}
+
+function onPlaySoundId(e) {
+  const id = e?.detail
+  if (typeof id === 'string' && id) playSoundById(id)
+}
+
+function stopSoundById(soundId) {
+  const sound = jsonStore.configFile.files.find((f) => f.id === soundId)
+  if (!sound || !sound.active) return
+  const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
+  const overlapSounds = Settings.value.overlapSounds ?? false
+  stopProgress(sound.index)
+  loadingPaths.delete(sound.path)
+  jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
+  invoke('play_sound', {
+    soundPath: sound.path,
+    deviceName: appSettings.outputSource,
+    hostName: appSettings.outputHost || null,
+    active: true,
+    overlap: overlapSounds,
+  }).catch((e) => console.error('Remote stop error', e))
+}
+
+function onStopSoundId(e) {
+  const id = e?.detail
+  if (typeof id === 'string' && id) stopSoundById(id)
+}
+
+function onHotkeyStopAll() {
+  stopAllProgress()
+  jsonStore.ReturnStatusAll()
+}
 
 function onSoundClick(sound) {
   if (appStore.multiSelectActive) {
@@ -735,6 +877,7 @@ function applyBulkDelete() {
 }
 
 async function setActiveSound(sound) {
+  if (loadingPaths.has(sound.path)) return
   const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
   const overlapSounds = Settings.value.overlapSounds ?? false
   const stopOnRetrigger = Settings.value.stopOnRetrigger ?? true
@@ -760,7 +903,11 @@ async function setActiveSound(sound) {
           startProgress(sound.index, duration)
         }
       })
-      .catch((e) => console.error('Sound playback error', e))
+      .catch((e) => {
+        console.error('Sound playback error', e)
+        stopProgress(sound.index)
+        jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
+      })
       .finally(() => loadingPaths.delete(sound.path))
   } else {
     if (!stopOnRetrigger) return

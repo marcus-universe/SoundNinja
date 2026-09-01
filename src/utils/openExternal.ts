@@ -3,6 +3,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 
 export const KLIPY_HOME_URL = 'https://klipy.com'
 export const KLIPY_PARTNER_URL = 'https://partner.klipy.com'
+export const KLIPY_DOCS_URL = 'https://docs.klipy.com/getting-started'
 
 /** Open https URL in the OS browser — never the app WebView. */
 export async function openInSystemBrowser(url: string): Promise<void> {

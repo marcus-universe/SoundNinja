@@ -1,10 +1,7 @@
 <template>
   <section class="record-editor">
-    <div class="record-editor__toolbar">
+    <div v-if="appSettings.hideTitlebar" class="record-editor__toolbar">
       <h2 class="record-editor__title">{{ $t('recordEditor.title') }}</h2>
-      <div class="record-editor__meta">
-        <span>{{ deviceLabel }}</span>
-      </div>
     </div>
 
     <SettingsAudio compact />
@@ -301,19 +298,32 @@
       <p v-if="!stemsStatus?.available" class="record-editor__queue-warn">
         {{ $t('recordEditor.stemsEngineMissing') }}
       </p>
-      <p v-if="stemsDownloadPct != null" class="settings-hint">
-        {{ $t('recordEditor.stemsDownloading') }}
-        {{ Math.round(stemsDownloadPct) }}%
-      </p>
+      <div v-if="stemsDownloading" class="stems-progress">
+        <div class="stems-progress__bar" role="progressbar" :aria-valuenow="Math.round(stemsDownloadPct ?? 0)" aria-valuemin="0" aria-valuemax="100">
+          <div class="stems-progress__fill" :style="{ width: `${Math.round(stemsDownloadPct ?? 0)}%` }" />
+        </div>
+        <p class="settings-hint">
+          {{ $t('recordEditor.stemsDownloading') }}
+          {{ Math.round(stemsDownloadPct ?? 0) }}%
+        </p>
+      </div>
       <div class="settings-row" style="margin-top: 1rem; gap: 0.6rem">
         <button
-          v-if="stemsStatus?.available"
+          v-if="stemsStatus?.available && !stemsDownloading"
           class="settings-btn"
           type="button"
-          :disabled="busy || stemsDownloading"
+          :disabled="busy"
           @click="confirmStemsDownload"
         >
           {{ $t('recordEditor.stemsYes') }}
+        </button>
+        <button
+          v-else-if="stemsDownloading"
+          class="settings-btn"
+          type="button"
+          @click="cancelStemsDownload"
+        >
+          {{ $t('settings.main.stemsCancel') }}
         </button>
         <button
           v-else
@@ -324,9 +334,9 @@
           {{ $t('recordEditor.stemsOpenModel') }}
         </button>
         <button
+          v-if="!stemsDownloading"
           class="settings-btn"
           type="button"
-          :disabled="stemsDownloading"
           @click="cancelStemsPrompt"
         >
           {{ stemsStatus?.available ? $t('recordEditor.stemsNo') : $t('recordEditor.cancel') }}
@@ -438,13 +448,6 @@ let unlistenStems: UnlistenFn | null = null
 let unlistenStemsPct: UnlistenFn | null = null
 let unlistenCtx: UnlistenFn | null = null
 let unlistenFinished: UnlistenFn | null = null
-
-const deviceLabel = computed(() => {
-  const name = appSettings.inputSource && appSettings.inputSource !== 'default'
-    ? appSettings.inputSource
-    : '—'
-  return `${name}`
-})
 
 const displayDuration = computed(() => {
   if (recording.value) return liveDuration.value
@@ -1136,6 +1139,14 @@ async function cancelStemsPrompt() {
   }
 }
 
+async function cancelStemsDownload() {
+  try {
+    await invoke('cancel_stems_model_download')
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 async function openStemsModelPage() {
   const url = stemsStatus.value?.modelPageUrl || 'https://huggingface.co/xycld/BS-RoFormer-ONNX'
   try {
@@ -1172,10 +1183,14 @@ async function confirmStemsDownload() {
     if (mode) await runStemsSplit(mode)
   } catch (e) {
     const msg = String(e)
-    statusText.value = msg.includes('STEMS_ENGINE_UNAVAILABLE')
-      ? msg.replace(/^STEMS_ENGINE_UNAVAILABLE:\s*/, '')
-      : msg
-    console.error(e)
+    if (msg.toLowerCase().includes('cancel')) {
+      statusText.value = ''
+    } else {
+      statusText.value = msg.includes('STEMS_ENGINE_UNAVAILABLE')
+        ? msg.replace(/^STEMS_ENGINE_UNAVAILABLE:\s*/, '')
+        : msg
+      console.error(e)
+    }
   } finally {
     stemsDownloading.value = false
   }

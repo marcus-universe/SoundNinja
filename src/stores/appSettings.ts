@@ -13,6 +13,11 @@ import {
   type RecentProject,
 } from '~/utils/appConfig'
 import type Database from '@tauri-apps/plugin-sql'
+import {
+  DEFAULT_APP_HOTKEYS,
+  parseAppHotkeys,
+  type AppHotkeyAction,
+} from '~/utils/hotkeys'
 
 const DEFAULT_RECENT_LIMIT = 30
 
@@ -56,6 +61,15 @@ export const useAppSettingsStore = defineStore('appSettings', {
     /** True once audio keys exist in app-config.db (or after one-time project migrate). */
     audioMigrated: false,
     loaded: false,
+    /** Remappable in-app action combos. */
+    hotkeys: { ...DEFAULT_APP_HOTKEYS } as Record<AppHotkeyAction, string>,
+    /** When true, sound-trigger combos register as OS-global shortcuts. */
+    soundTriggersGlobal: false,
+    /** HTTP+WS remote-control server (Companion). Off until the user enables it. */
+    remoteEnabled: false,
+    remotePort: 7331,
+    remoteToken: '',
+    remoteError: '',
   }),
 
   getters: {
@@ -92,6 +106,19 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
       this.klipyApiKey = s.klipyApiKey || ''
+      try {
+        this.hotkeys = parseAppHotkeys(s.hotkeys ? JSON.parse(s.hotkeys) : null)
+      } catch {
+        this.hotkeys = { ...DEFAULT_APP_HOTKEYS }
+      }
+      this.soundTriggersGlobal = s.soundTriggersGlobal === '1' || s.soundTriggersGlobal === 'true'
+      this.remoteEnabled = s.remoteEnabled === '1' || s.remoteEnabled === 'true'
+      const parsedPort = s.remotePort != null ? Number(s.remotePort) : 7331
+      this.remotePort = Number.isFinite(parsedPort) && parsedPort >= 1 && parsedPort <= 65535
+        ? Math.round(parsedPort)
+        : 7331
+      this.remoteToken = s.remoteToken || ''
+      this.remoteError = ''
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
         || s.inputSource != null || s.inputHost != null
@@ -237,24 +264,72 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await saveSetting(d, 'checkUpdatesOnStart', this.checkUpdatesOnStart ? '1' : '0')
     },
 
+    async setHotkeys(hotkeys: Record<AppHotkeyAction, string>) {
+      this.hotkeys = { ...DEFAULT_APP_HOTKEYS, ...hotkeys }
+      const d = await this._db()
+      await saveSetting(d, 'hotkeys', JSON.stringify(this.hotkeys))
+    },
+
+    async setAppHotkey(action: AppHotkeyAction, combo: string) {
+      this.hotkeys = { ...this.hotkeys, [action]: combo }
+      const d = await this._db()
+      await saveSetting(d, 'hotkeys', JSON.stringify(this.hotkeys))
+    },
+
+    async setSoundTriggersGlobal(enabled: boolean) {
+      this.soundTriggersGlobal = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'soundTriggersGlobal', this.soundTriggersGlobal ? '1' : '0')
+    },
+
+    async setRemoteEnabled(enabled: boolean) {
+      this.remoteEnabled = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'remoteEnabled', this.remoteEnabled ? '1' : '0')
+      await this.applyRemote()
+    },
+
+    async setRemotePort(port: number) {
+      const next = Number.isFinite(port) ? Math.max(1, Math.min(65535, Math.round(port))) : 7331
+      this.remotePort = next
+      const d = await this._db()
+      await saveSetting(d, 'remotePort', String(this.remotePort))
+      if (this.remoteEnabled) await this.applyRemote()
+    },
+
+    async setRemoteToken(token: string) {
+      this.remoteToken = (token || '').trim()
+      const d = await this._db()
+      await saveSetting(d, 'remoteToken', this.remoteToken)
+      if (this.remoteEnabled) await this.applyRemote()
+    },
+
+    /** Start or stop the Rust remote server to match stored prefs. */
+    async applyRemote() {
+      const { remoteStart, remoteStop } = await import('~/utils/remote')
+      this.remoteError = ''
+      try {
+        if (this.remoteEnabled) {
+          await remoteStart(this.remotePort, this.remoteToken)
+        } else {
+          await remoteStop()
+        }
+      } catch (e) {
+        this.remoteError = e instanceof Error ? e.message : String(e)
+        throw e
+      }
+    },
+
     async setKlipyApiKey(key: string) {
       this.klipyApiKey = (key || '').trim()
       const d = await this._db()
       await saveSetting(d, 'klipyApiKey', this.klipyApiKey)
     },
 
-    /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */
-    async applyWindowChrome() {
-      const nativeChrome = this.titlebarMode === 'system'
-      const hidden = this.hideTitlebar
-      try {
-        await invoke('set_window_chrome', { nativeChrome, hidden })
-      } catch (e) {
-        console.error('set_window_chrome failed', e)
-      }
+    /** CSS --topbar_height only. Does not touch OS decorations or emit events. */
+    async applyChromeCss() {
       if (typeof document === 'undefined') return
-      // Main styled bar: 3rem title + 2.6rem menubar ≈ 5.6rem.
-      // Secondary styled bar: title row only ≈ 3rem. System/hidden = 0.
+      const hidden = this.hideTitlebar
       const showStyled = !hidden && this.titlebarMode === 'styled'
       let topbar = '0px'
       if (showStyled) {
@@ -266,6 +341,36 @@ export const useAppSettingsStore = defineStore('appSettings', {
         topbar = isMain ? '5.6rem' : '3rem'
       }
       document.documentElement.style.setProperty('--topbar_height', topbar)
+    },
+
+    /** Apply chrome prefs received from another window (no OS re-invoke, no re-emit). */
+    async applyChromeFromEvent(payload: { titlebarMode?: TitlebarMode; hideTitlebar?: boolean }) {
+      if (payload.titlebarMode === 'system' || payload.titlebarMode === 'styled') {
+        this.titlebarMode = payload.titlebarMode
+      }
+      if (typeof payload.hideTitlebar === 'boolean') {
+        this.hideTitlebar = payload.hideTitlebar
+      }
+      await this.applyChromeCss()
+    },
+
+    /** Syncs OS decorations/native menu + CSS --topbar_height with stored chrome prefs. */
+    async applyWindowChrome() {
+      const nativeChrome = this.titlebarMode === 'system'
+      const hidden = this.hideTitlebar
+      try {
+        await invoke('set_window_chrome', { nativeChrome, hidden })
+      } catch (e) {
+        console.error('set_window_chrome failed', e)
+      }
+      await this.applyChromeCss()
+      try {
+        const { emit } = await import('@tauri-apps/api/event')
+        await emit('sn:chrome-changed', {
+          titlebarMode: this.titlebarMode,
+          hideTitlebar: this.hideTitlebar,
+        })
+      } catch { /* non-tauri */ }
     },
 
     /** Pushes master volume into the Rust audio engine. */

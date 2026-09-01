@@ -225,14 +225,6 @@ function IconClicked(icon) {
   }
 }
 
-function onGlobalKeydown(e) {
-  // Ctrl+F (Windows/Linux) or Cmd+F (macOS)
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f') {
-    e.preventDefault()
-    activateSearch()
-  }
-}
-
 watch(
   () => appStore.Searchbar.SearchbarActive,
   (active) => {
@@ -241,10 +233,10 @@ watch(
 )
 
 onMounted(() => {
-  window.addEventListener('keydown', onGlobalKeydown)
+  window.addEventListener('sn:activate-search', activateSearch)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('sn:activate-search', activateSearch)
 })
 </script>

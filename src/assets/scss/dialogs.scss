@@ -12,6 +12,7 @@
   padding: calc(var(--topbar_height) + #{$padding_1}) 2rem 2rem;
   backdrop-filter: blur(0.4rem);
   background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
+  contain: paint;
 }
 
 .dialog-panel {
@@ -250,6 +251,15 @@
   max-height: min(42vh, 36rem);
   overflow-y: auto;
   margin-top: 0.4rem;
+}
+
+.gif-picker__sentinel {
+  grid-column: 1 / -1;
+  min-height: 1.2rem;
+  padding: 0.35rem 0 0.15rem;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
+  font-size: var(--font-size-sm, 1.3rem);
 }
 
 .gif-picker__cell {

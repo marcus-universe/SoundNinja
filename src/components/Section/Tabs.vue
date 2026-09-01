@@ -2,6 +2,7 @@
     <div
         class="TabContainer flex_c_h flex_start"
         :class="{ searchMove: appStore.Searchbar.SearchbarActive }"
+        :style="activeTabUnderline ? { '--tab-list-underline': activeTabUnderline } : {}"
         ref="tabContainerRef"
         @wheel.prevent="onTabWheel"
     >
@@ -11,7 +12,7 @@
             :class="{ active: 'All' === appStore.currentTab }"
             @click="CheckTabContent('All')"
         >
-            All
+            {{ $t('tabs.all') }}
         </div>
 
         <div class="tab-list" ref="tabListRef">
@@ -26,7 +27,9 @@
             />
         </div>
 
-        <Icons :customClass="'addTab'" :icon="'plus'" @triggered="AddTab" />
+        <QuickInfo class="addTab-tip" :text="$t('tabs.addTab')" below fixed>
+          <Icons :customClass="'addTab icon'" :icon="'add'" @triggered="AddTab" />
+        </QuickInfo>
 
         <Transition name="fade">
             <RenameField v-if="appStore.PopupActive.active" />
@@ -36,6 +39,7 @@
 
 <script setup>
 import Sortable from 'sortablejs'
+import { parseOverride } from '~/utils/colorOverride'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -46,9 +50,17 @@ let sortable = null
 
 const allowReorder = computed(() => jsonStore.configFile?.settings?.allowReorder !== false)
 
+const activeTabUnderline = computed(() => {
+  const name = appStore.currentTab
+  if (!name || name === 'All') return ''
+  const tab = (jsonStore.configFile?.tabList ?? []).find((t) => t.name === name)
+  const o = parseOverride(tab?.color)
+  return o.border || o.bg || ''
+})
+
 function onTabWheel(e) {
-  if (tabContainerRef.value) {
-    tabContainerRef.value.scrollBy({ left: e.deltaY + e.deltaX, behavior: 'smooth' })
+  if (tabListRef.value) {
+    tabListRef.value.scrollBy({ left: e.deltaY + e.deltaX, behavior: 'smooth' })
   }
 }
 

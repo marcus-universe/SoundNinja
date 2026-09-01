@@ -64,6 +64,7 @@ export interface PlayingInfo {
   paused: boolean
   positionSecs?: number
   looping?: boolean
+  durationSecs?: number
 }
 
 const props = withDefaults(defineProps<{
@@ -123,11 +124,16 @@ function setCanvasRef(path: string, el: unknown) {
 
 async function ensureWaveform(path: string) {
   if (peaksByPath.has(path) && durationByPath.has(path)) return
-  try {
-    const dur = await invoke<number>('get_sound_duration', { soundPath: path })
-    durationByPath.set(path, dur || 0)
-  } catch {
-    durationByPath.set(path, 0)
+  const fromSnap = props.items.find((i) => i.path === path)?.durationSecs
+  if (fromSnap && fromSnap > 0) {
+    durationByPath.set(path, fromSnap)
+  } else {
+    try {
+      const dur = await invoke<number>('get_sound_duration', { soundPath: path })
+      durationByPath.set(path, dur || 0)
+    } catch {
+      durationByPath.set(path, 0)
+    }
   }
   try {
     const buckets = playerLarge.value ? 160 : 100
@@ -381,5 +387,10 @@ onMounted(() => {
 onUnmounted(() => {
   waveClock?.stop()
   waveClock = null
+  if (scrubDrawRaf) {
+    cancelAnimationFrame(scrubDrawRaf)
+    scrubDrawRaf = null
+    scrubDrawPath = null
+  }
 })
 </script>

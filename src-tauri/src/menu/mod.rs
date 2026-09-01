@@ -78,6 +78,8 @@ struct MenuLabels {
     save_as: &'static str,
     import_audio: &'static str,
     import_folders: &'static str,
+    export_soundboard: &'static str,
+    import_soundboard: &'static str,
     quit: &'static str,
     edit: &'static str,
     undo: &'static str,
@@ -103,6 +105,8 @@ fn labels_for(lang: &str) -> MenuLabels {
             save_as: "Speichern unter…",
             import_audio: "Audiodateien importieren",
             import_folders: "Ordner importieren",
+            export_soundboard: "Soundboard exportieren",
+            import_soundboard: "Soundboard importieren",
             quit: "Beenden",
             edit: "Bearbeiten",
             undo: "Rückgängig",
@@ -113,6 +117,102 @@ fn labels_for(lang: &str) -> MenuLabels {
             help: "Hilfe",
             check_updates: "Nach Updates suchen",
             about: "Über SoundNinja",
+        },
+        "es" => MenuLabels {
+            file: "Archivo",
+            new_project: "Nuevo proyecto",
+            open_project: "Abrir proyecto",
+            open_recent: "Abiertos recientemente",
+            no_recent: "No hay proyectos recientes",
+            select_project: "Seleccionar proyecto",
+            save: "Guardar",
+            save_as: "Guardar como…",
+            import_audio: "Importar archivos de audio",
+            import_folders: "Importar carpetas",
+            export_soundboard: "Exportar soundboard",
+            import_soundboard: "Importar soundboard",
+            quit: "Salir",
+            edit: "Editar",
+            undo: "Deshacer",
+            redo: "Rehacer",
+            settings: "Ajustes",
+            open_themes_folder: "Abrir carpeta de temas",
+            open_projects_folder: "Abrir carpeta de proyectos",
+            help: "Ayuda",
+            check_updates: "Buscar actualizaciones",
+            about: "Acerca de",
+        },
+        "fr" => MenuLabels {
+            file: "Fichier",
+            new_project: "Nouveau projet",
+            open_project: "Ouvrir le projet",
+            open_recent: "Ouverts récemment",
+            no_recent: "Aucun projet récent",
+            select_project: "Sélectionner un projet",
+            save: "Enregistrer",
+            save_as: "Enregistrer sous…",
+            import_audio: "Importer des fichiers audio",
+            import_folders: "Importer des dossiers",
+            export_soundboard: "Exporter le soundboard",
+            import_soundboard: "Importer un soundboard",
+            quit: "Quitter",
+            edit: "Édition",
+            undo: "Annuler",
+            redo: "Rétablir",
+            settings: "Paramètres",
+            open_themes_folder: "Ouvrir le dossier des thèmes",
+            open_projects_folder: "Ouvrir le dossier des projets",
+            help: "Aide",
+            check_updates: "Rechercher des mises à jour",
+            about: "À propos",
+        },
+        "ja" => MenuLabels {
+            file: "ファイル",
+            new_project: "新規プロジェクト",
+            open_project: "プロジェクトを開く",
+            open_recent: "最近開いた項目",
+            no_recent: "最近のプロジェクトはありません",
+            select_project: "プロジェクトを選択",
+            save: "保存",
+            save_as: "名前を付けて保存…",
+            import_audio: "音声ファイルを読み込む",
+            import_folders: "フォルダーを読み込む",
+            export_soundboard: "サウンドボードを書き出す",
+            import_soundboard: "サウンドボードを読み込む",
+            quit: "終了",
+            edit: "編集",
+            undo: "元に戻す",
+            redo: "やり直し",
+            settings: "設定",
+            open_themes_folder: "テーマフォルダーを開く",
+            open_projects_folder: "プロジェクトフォルダーを開く",
+            help: "ヘルプ",
+            check_updates: "更新を確認",
+            about: "SoundNinja について",
+        },
+        "zh-Hans" | "zh" => MenuLabels {
+            file: "文件",
+            new_project: "新建项目",
+            open_project: "打开项目",
+            open_recent: "最近打开",
+            no_recent: "没有最近的项目",
+            select_project: "选择项目",
+            save: "保存",
+            save_as: "另存为…",
+            import_audio: "导入音频文件",
+            import_folders: "导入文件夹",
+            export_soundboard: "导出声音板",
+            import_soundboard: "导入声音板",
+            quit: "退出",
+            edit: "编辑",
+            undo: "撤销",
+            redo: "重做",
+            settings: "设置",
+            open_themes_folder: "打开主题文件夹",
+            open_projects_folder: "打开项目文件夹",
+            help: "帮助",
+            check_updates: "检查更新",
+            about: "关于",
         },
         _ => MenuLabels {
             file: "File",
@@ -125,6 +225,8 @@ fn labels_for(lang: &str) -> MenuLabels {
             save_as: "Save As...",
             import_audio: "Import Audio Files",
             import_folders: "Import Folders",
+            export_soundboard: "Export Soundboard",
+            import_soundboard: "Import Soundboard",
             quit: "Quit",
             edit: "Edit",
             undo: "Undo",
@@ -170,6 +272,8 @@ fn build_menu(
         .separator()
         .item(&MenuItemBuilder::with_id("import_audio", l.import_audio).build(app)?)
         .item(&MenuItemBuilder::with_id("import_folders", l.import_folders).build(app)?)
+        .item(&MenuItemBuilder::with_id("export_soundboard", l.export_soundboard).build(app)?)
+        .item(&MenuItemBuilder::with_id("import_soundboard", l.import_soundboard).build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("quit", l.quit).build(app)?)
         .build()?;
@@ -255,6 +359,12 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
             }
             "import_folders" => {
                 app.emit("menu_import_folders", ()).unwrap_or_default();
+            }
+            "export_soundboard" => {
+                app.emit("menu_export_soundboard", ()).unwrap_or_default();
+            }
+            "import_soundboard" => {
+                app.emit("menu_import_soundboard", ()).unwrap_or_default();
             }
             "undo" => {
                 app.emit("menu_undo", ()).unwrap_or_default();

@@ -12,6 +12,8 @@
     "saveAs": "Speichern unter…",
     "importAudio": "Audiodateien importieren",
     "importFolders": "Ordner importieren",
+    "exportSoundboard": "Soundboard exportieren",
+    "importSoundboard": "Soundboard importieren",
     "quit": "Beenden",
     "undo": "Rückgängig",
     "redo": "Wiederholen",
@@ -44,9 +46,43 @@
     "expand": "Ausklappen",
     "tabs": {
       "main": "Allgemein",
+      "behavior": "Verhalten",
       "audio": "Audio",
+      "hotkeys": "Hotkeys",
+      "performance": "Leistung",
+      "remote": "Remote",
       "theme": "Theme",
       "about": "Info"
+    },
+    "behavior": {
+      "playback": "Wiedergabe",
+      "window": "Fenster",
+      "controls": "Steuerung",
+      "ui": "Oberfläche",
+      "gifs": "Gifs"
+    },
+    "hotkeys": {
+      "actions": "App-Aktionen",
+      "actionsHint": "Bindung klicken, dann Taste drücken. Escape bricht ab. Backspace löscht.",
+      "triggers": "Sound-Trigger",
+      "triggersHint": "Sounds per ID hinzufügen (in der Mehrfachauswahl kopieren). Nicht jeder Sound erscheint automatisch.",
+      "globalTriggers": "Globale Sound-Trigger",
+      "globalTriggersHint": "Sound-Trigger auch, wenn Sound Ninja im Hintergrund ist. Einzelne Buchstaben stehlen die Tastatur in anderen Apps.",
+      "addTrigger": "Sound-Trigger hinzufügen",
+      "remove": "Entfernen",
+      "pressKey": "Taste drücken…",
+      "unset": "Keine",
+      "soundIdPlaceholder": "Sound-ID",
+      "unknownId": "Unbekannte ID",
+      "conflict": "Vorherige Bindung für {combo} freigegeben",
+      "action": {
+        "save": "Speichern",
+        "saveAs": "Speichern unter",
+        "undo": "Rückgängig",
+        "redo": "Wiederholen",
+        "search": "Suche",
+        "stopAll": "Alle Sounds stoppen"
+      }
     },
     "main": {
       "title": "Allgemein",
@@ -92,9 +128,13 @@
       "tabTransitionStagger": "Buttons nacheinander",
       "tabTransitionNone": "Keine",
       "klipyApiKey": "Klipy-API-Schlüssel",
-      "klipyApiKeyHint": "Die Klipy-Suche braucht einen eigenen kostenlosen API-Schlüssel. Lokale PNG-, JPEG-, GIF- und WebP-Dateien gehen ohne Schlüssel und liegen in der Projektdatei.",
+      "klipyApiKeyHint": "Die Klipy-Suche braucht einen eigenen kostenlosen API-Schlüssel. Der Schlüssel wird app-weit gespeichert und nie in Projektdateien geschrieben. Nur PNG-, JPEG-, GIF- und WebP-Dateien liegen im Projekt.",
       "klipyApiKeyPlaceholder": "API-Schlüssel einfügen…",
       "klipyGetKey": "API-Schlüssel / Docs holen",
+      "klipyDocs": "Docs",
+      "klipyCreateKey": "API-Schlüssel erstellen",
+      "klipyShowKey": "API-Schlüssel anzeigen",
+      "klipyHideKey": "API-Schlüssel verbergen",
       "navbarTooltips": "Seitenleisten-Tooltips",
       "navbarTooltipsHint": "Beim Hover eine Beschriftung neben jedem Seitenleisten-Button zeigen",
       "checkUpdatesOnStart": "Beim Start nach Updates suchen",
@@ -115,14 +155,15 @@
       "cacheMaxSizeHint": "Gesamter RAM-Speicher f\u00fcr den Sound-Cache. Bei \u00dcberschreitung werden zuletzt-genutzte Sounds ausgelagert (LRU).",
       "cacheMaxEntry": "Max. Dateigr\u00f6\u00dfe pro Eintrag",
       "cacheMaxEntryHint": "Dateien \u00fcber diesem Limit werden nie gecacht und immer direkt von der Festplatte gelesen.",
+      "preloadGifs": "GIFs / Bilder vorladen",
+      "preloadGifsHint": "Alle Button-GIFs und -Bilder im Speicher behalten. Tabwechsel bleibt sofort. Mehr RAM.",
       "cacheStatus": "Cache-Status",
       "cacheStatsText": "{count} Sound(s) gecacht \u00b7 {size} MiB belegt",
       "clearCache": "Cache leeren",
-      "gpuAudio": "GPU-beschleunigte DSP (Experimentell)",
-      "gpuAudioHint": "Dedizierte GPU für Audio-Signalverarbeitung nutzen. Standard: CPU. Neustart empfohlen.",
       "stemsSection": "Stem-Separation",
       "stemsModel": "KI-Stem-Modell",
       "stemsInstall": "Modell laden",
+      "stemsCancel": "Abbrechen",
       "stemsInstalled": "Installiert",
       "stemsUnavailable": "Nicht in diesem Build",
       "stemsInstallHint": "{model} ({size}) herunterladen, um Stimme/Musik im Record Editor zu trennen.",
@@ -166,6 +207,8 @@
       "themeNameHint": "Name im Theme-Datei-Header und als Speicherdateiname.",
       "themeNamePlaceholder": "Mein eigenes Theme",
       "colors": "Farben",
+      "hue": "Farbton",
+      "hueHint": "Alle Farben dieses Satzes verschieben. Sättigung und Helligkeit bleiben. Einzelne Farben bleiben editierbar.",
       "primaryAccent": "Primär / Akzent",
       "primaryAccentHint": "Hauptakzent für Highlights, Icons und Standard-Akzente in der UI.",
       "primaryHover": "Primär Hover",
@@ -259,10 +302,32 @@
         "SFX"
       ]
     },
+    "remote": {
+      "title": "Remote-Steuerung",
+      "enable": "Remote-Server aktivieren",
+      "enableHint": "Bitfocus Companion und andere Clients können Sounds über das Netzwerk auslösen.",
+      "port": "Port",
+      "portInUse": "Port {port} ist bereits belegt",
+      "token": "Token",
+      "tokenHint": "Optional. Clients senden dies als Bearer-Token oder ?token=-Query.",
+      "generate": "Erzeugen",
+      "status": "Status",
+      "running": "Aktiv",
+      "stopped": "Gestoppt",
+      "clients": "{count} verbunden",
+      "address": "Adressen",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "firewallHint": "Windows fragt beim ersten Start möglicherweise, ob Sound Ninja die Firewall passieren darf."
+    },
     "about": {
       "title": "Info",
       "githubLink": "Entwicklung auf GitHub unterstützen",
-      "licenseLink": "Lizenz — GNU General Public License v3"
+      "licenseLink": "Lizenz — GNU General Public License v3",
+      "releaseNotes": "Release Notes",
+      "ipAddress": "System-IP",
+      "copy": "Kopieren",
+      "copied": "Kopiert"
     }
   },
   "project": {
@@ -283,7 +348,46 @@
     "saving": "Speichern…",
     "saved": "Projekt gespeichert.",
     "savedTitle": "Gespeichert",
-    "loading": "Laden…"
+    "loading": "Laden…",
+    "failedOpenProject": "Projekt konnte nicht geöffnet werden",
+    "failedSaveProject": "Projekt konnte nicht gespeichert werden.",
+    "failedCreateProject": "Projekt konnte nicht erstellt werden",
+    "projectGone": "Projekt existiert nicht mehr.",
+    "newProject": "Neues Projekt",
+    "unknownError": "Unbekannter Fehler",
+    "importAudioFiles": "Audiodateien importieren",
+    "audioFiles": "Audiodateien"
+  },
+  "tabs": {
+    "all": "Alle",
+    "addTab": "Tab hinzufügen"
+  },
+  "splash": {
+    "loading": "Startet…",
+    "settings": "Einstellungen werden geladen…",
+    "fonts": "Schriftarten werden geladen…",
+    "project": "Projekt wird geöffnet…",
+    "theme": "Theme wird angewendet…",
+    "ready": "Bereit"
+  },
+  "importFolders": {
+    "title": "Ordner importieren",
+    "addFolders": "Ordner hinzufügen",
+    "dragReorder": "Ziehen zum Sortieren",
+    "importAsTabs": "Als Tabs importieren",
+    "importToCurrent": "In aktuellen Tab importieren",
+    "selectFolders": "Ordner auswählen"
+  },
+  "titlebar": {
+    "minimize": "Minimieren",
+    "restore": "Wiederherstellen",
+    "maximize": "Maximieren",
+    "close": "Schließen"
+  },
+  "firstRun": {
+    "title": "Sprache wählen",
+    "message": "Wähle die Sprache für Sound Ninja. Du kannst das später in den Einstellungen ändern.",
+    "continue": "Weiter"
   },
   "relink": {
     "title": "Fehlende Sounddateien",
@@ -318,8 +422,9 @@
     "untitledGroup": "Gruppe",
     "groupBorderColor": "Rahmenfarbe",
     "groupNameColor": "Namensfarbe",
+    "groupBgColor": "Hintergrundfarbe",
     "groupColors": "Gruppenfarben",
-    "groupColorsDesc": "Rahmen- und Namensfarbe für diese Gruppe",
+    "groupColorsDesc": "Hintergrund-, Rahmen- und Namensfarbe für diese Gruppe",
     "groupAlign": "Button-Ausrichtung",
     "groupAlignDesc": "Buttons in dieser Gruppe ausrichten (oder Tab-Standard)",
     "tabButtonAlign": "Button-Ausrichtung",
@@ -332,6 +437,8 @@
     "colorDesc": "Akzentfarbe dieses Eintrags ändern",
     "colors": "Farben",
     "colorsDesc": "Hintergrund, Text, Rahmen und Hover-Farben setzen",
+    "colorHue": "Farbton",
+    "colorHueHint": "Alle Farben dieses Satzes verschieben. Sättigung und Helligkeit bleiben. Einzelne Farben bleiben editierbar.",
     "gifBg": "GIF-Hintergrund",
     "gifBgDesc": "Klipy- oder lokale GIF als Button-Hintergrund wählen",
     "colorBg": "Hintergrund",
@@ -341,17 +448,22 @@
     "colorBorder": "Rahmen",
     "colorBorderHover": "Rahmen Hover",
     "resetColor": "Auf Standard zurücksetzen",
-    "resetAllColors": "Alle Farben zurücksetzen"
+    "resetAllColors": "Alle Farben zurücksetzen",
+    "copyId": "ID kopieren",
+    "copyIdDesc": "Eindeutige Sound-ID kopieren",
+    "assignHotkey": "Hotkey zuweisen",
+    "assignHotkeyDesc": "Play-Trigger für diesen Sound in den Einstellungen anlegen"
   },
   "gifPicker": {
     "title": "GIF-Hintergrund",
-    "searchPlaceholder": "Search KLIPY",
+    "searchPlaceholder": "KLIPY durchsuchen",
     "localFile": "Bild / GIF wählen",
-    "poweredBy": "Powered by KLIPY",
-    "info": "Die Klipy-Suche braucht einen eigenen API-Schlüssel von partner.klipy.com (Einstellungen). Lokale PNG-, JPEG-, GIF- und WebP-Dateien gehen ohne Schlüssel und werden für Offline-Nutzung in dieses Projekt geschrieben.",
+    "poweredBy": "Bereitgestellt von KLIPY",
+    "info": "Die Klipy-Suche braucht einen eigenen API-Schlüssel (Einstellungen → Verhalten). Der Schlüssel wird app-weit gespeichert und nie in Projektdateien geschrieben. Nur PNG-, JPEG-, GIF- und WebP-Dateien liegen im Projekt.",
     "getKey": "API-Schlüssel / Docs holen",
-    "noKey": "Klipy-API-Schlüssel in den Einstellungen eintragen, um GIFs zu suchen. Lokale Dateien gehen trotzdem.",
+    "noKey": "Klipy-API-Schlüssel unter Einstellungen → Verhalten eintragen, um GIFs zu suchen. Lokale Dateien gehen trotzdem.",
     "empty": "Keine GIFs gefunden.",
+    "loadingMore": "Weitere werden geladen…",
     "positionTitle": "Position anpassen",
     "positionHint": "Ziehen zum Verschieben. Das GIF füllt den Button und schneidet Überstand ab.",
     "apply": "Übernehmen",
@@ -400,9 +512,9 @@
     "openReleases": "Releases öffnen"
   },
   "player": {
-    "play": "Play",
+    "play": "Abspielen",
     "pause": "Pause",
-    "stop": "Stop",
+    "stop": "Stopp",
     "record": "Aufnahme",
     "playlist": "Wiedergabeliste",
     "playlistEmpty": "Keine Sounds aktiv",
@@ -456,10 +568,17 @@
     "importSpecificTab": "In Tab importieren…",
     "import": "Importieren",
     "importSessionNow": "Aktuelle Session importieren",
-    "import": "Importieren",
     "unsavedTitle": "Aufnahme verwerfen?",
     "unsavedHint": "Du hast ungespeicherte Aufnahmen, Änderungen oder Clips in der Warteliste. Trotzdem schließen?",
     "discard": "Verwerfen",
     "cancel": "Abbrechen"
+  },
+  "soundboard": {
+    "exportTitle": "Soundboard exportieren",
+    "importTitle": "Soundboard importieren",
+    "exporting": "Sounds werden gepackt…",
+    "importing": "Soundboard wird entpackt…",
+    "exportFailed": "Soundboard-Export fehlgeschlagen",
+    "importFailed": "Soundboard-Import fehlgeschlagen"
   }
 }

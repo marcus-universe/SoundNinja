@@ -17,6 +17,20 @@
       class="color-group-picker__panel"
       @click.stop
     >
+      <div class="color-group-picker__hue" :title="$t('contextMenu.colorHueHint')">
+        <div class="color-group-picker__hue-head">
+          <span>{{ $t('contextMenu.colorHue') }}</span>
+          <span>{{ displayHue }}°</span>
+        </div>
+        <HueSlider
+          :model-value="displayHue"
+          :hint="$t('contextMenu.colorHueHint')"
+          :aria-label="$t('contextMenu.colorHue')"
+          @drag-start="beginHueDrag"
+          @update:model-value="onHue"
+          @drag-end="endHueDrag"
+        />
+      </div>
       <div
         v-for="row in rows"
         :key="row.key"
@@ -51,6 +65,20 @@
         :style="panelStyle"
         @click.stop
       >
+        <div class="color-group-picker__hue" :title="$t('contextMenu.colorHueHint')">
+          <div class="color-group-picker__hue-head">
+            <span>{{ $t('contextMenu.colorHue') }}</span>
+            <span>{{ displayHue }}°</span>
+          </div>
+          <HueSlider
+            :model-value="displayHue"
+            :hint="$t('contextMenu.colorHueHint')"
+            :aria-label="$t('contextMenu.colorHue')"
+            @drag-start="beginHueDrag"
+            @update:model-value="onHue"
+            @drag-end="endHueDrag"
+          />
+        </div>
         <div
           v-for="row in rows"
           :key="row.key"
@@ -86,6 +114,7 @@ import {
   isEmptyOverride,
   overrideSwatch,
 } from '~/utils/colorOverride'
+import { leadHue, shiftColorRecord } from '~/utils/hue'
 
 const props = withDefaults(defineProps<{
   modelValue?: ColorOverride
@@ -146,6 +175,51 @@ function wheelValue(key: keyof ColorOverride): string {
   const base = props.baseColors?.[key]
   if (base && /^#[0-9a-f]{6,8}$/i.test(base)) return base.slice(0, 7)
   return '#00d4ff'
+}
+
+function effectiveHex(key: keyof ColorOverride): string {
+  const v = local.value[key]
+  if (v && /^#[0-9a-f]{3,8}$/i.test(v)) return v
+  const base = props.baseColors?.[key]
+  if (base && /^#[0-9a-f]{3,8}$/i.test(base)) return base
+  return wheelValue(key)
+}
+
+function snapshotColors(): ColorOverride {
+  const out: ColorOverride = {}
+  for (const row of rows) out[row.key] = effectiveHex(row.key)
+  return out
+}
+
+const HUE_LEAD: (keyof ColorOverride)[] = ['border', 'bg', 'bgHover', 'borderHover', 'textHover', 'text']
+
+const hueDragging = ref(false)
+const hueDragValue = ref(0)
+
+const displayHue = computed(() =>
+  hueDragging.value ? hueDragValue.value : leadHue(HUE_LEAD.map((k) => effectiveHex(k))),
+)
+
+let hueSnap: ColorOverride | null = null
+let hueSnapHue = 0
+
+function beginHueDrag() {
+  hueSnap = snapshotColors()
+  hueSnapHue = leadHue(HUE_LEAD.map((k) => hueSnap![k]))
+  hueDragValue.value = hueSnapHue
+  hueDragging.value = true
+}
+
+function endHueDrag() {
+  hueSnap = null
+  hueDragging.value = false
+}
+
+function onHue(next: number) {
+  if (!hueSnap) beginHueDrag()
+  hueDragging.value = true
+  hueDragValue.value = next
+  emitValue(shiftColorRecord(hueSnap!, next - hueSnapHue))
 }
 
 function emitValue(next: ColorOverride) {

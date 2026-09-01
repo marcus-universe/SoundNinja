@@ -25,24 +25,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows x64 → NSIS installer (+ MSI if enabled in bundle targets)
+          # Windows x64 → NSIS installer
           # `--features stems` enables BS-RoFormer / ONNX Runtime stem engine
           - platform: windows-latest
             rust_targets: x86_64-pc-windows-msvc
-            args: "--target x86_64-pc-windows-msvc -- --features stems"
+            cache_key: windows-x64
+            args: "--target x86_64-pc-windows-msvc --bundles nsis -- --features stems"
 
           # Linux x64 → .deb + AppImage (AppImage feeds AUR package)
           # ubuntu-24.04: cpal/rodio pipewire → libspa 0.10 needs PipeWire ≥ 1.0
           # headers (22.04 ships 0.3.48 → E0425/E0560 on spa_meta_* / video flags).
           - platform: ubuntu-24.04
             rust_targets: x86_64-unknown-linux-gnu
-            args: "--target x86_64-unknown-linux-gnu -- --features stems"
+            cache_key: linux-x64
+            args: "--target x86_64-unknown-linux-gnu --bundles deb,appimage -- --features stems"
 
-          # macOS universal → DMG covering Apple Silicon + Intel
-          # rustup has no "universal-apple-darwin" target; install both arches, Tauri lipo merges them
+          # macOS: one leg per arch instead of `universal-apple-darwin`. The
+          # universal target compiles both arches back to back inside a single
+          # job, which made macOS the critical path; split, they run in parallel.
           - platform: macos-latest
-            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
-            args: "--target universal-apple-darwin --bundles dmg -- --features stems"
+            rust_targets: aarch64-apple-darwin
+            cache_key: macos-arm64
+            args: "--target aarch64-apple-darwin --bundles dmg -- --features stems"
+
+          - platform: macos-13
+            rust_targets: x86_64-apple-darwin
+            cache_key: macos-x64
+            args: "--target x86_64-apple-darwin --bundles dmg -- --features stems"
 
     runs-on: ${{ matrix.platform }}
 
@@ -61,6 +70,26 @@ jobs:
         with:
           targets: ${{ matrix.rust_targets }}
 
+      # Without this every release recompiled ~760 crates from scratch, which
+      # was the single biggest chunk of the 15-20 minute build.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.cache_key }}-stems
+          cache-on-failure: true
+
+      # Covers the case rust-cache cannot: a changed Cargo.lock invalidates the
+      # target directory, but individual crate compilations are still cache hits.
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Route rustc through sccache
+        shell: bash
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-24.04'
         run: |
@@ -72,7 +101,14 @@ jobs:
             patchelf \
             libasound2-dev \
             libpipewire-0.3-dev \
-            libpulse-dev
+            libpulse-dev \
+            mold
+
+      # `lto = true` makes linking the slow part of a release build; mold cuts
+      # it to a fraction. Windows/macOS use rust-lld via .cargo/config.toml.
+      - name: Use mold as linker
+        if: matrix.platform == 'ubuntu-24.04'
+        run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=mold" >> "$GITHUB_ENV"
 
       - name: Install frontend dependencies
         run: npm ci
@@ -110,16 +146,101 @@ jobs:
             Draft release — review assets below, then publish when ready.
 
             **Downloads**
-            - Windows: `.exe` / `.msi` installer
-            - macOS: universal `.dmg` (Apple Silicon + Intel)
+            - Windows: `.exe` installer
+            - macOS: `.dmg` for Apple Silicon and for Intel
             - Linux: `.deb` (Ubuntu/Debian) and `.AppImage`
-            - Arch: install via AUR (`soundninja-bin`) after this release is published
+            - Companion: `companion-module-soundninja.tgz`
 
             In-app updates use signed updater artifacts + `latest.json` (see `docs/updater.md`).
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           args: ${{ matrix.args }}
+
+  companion:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VER="${{ inputs.version }}"
+            VER="${VER#v}"
+            TAG="v${VER}"
+          else
+            VER="$(jq -r .version src-tauri/tauri.conf.json)"
+            TAG="v${VER}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag=$TAG"
+
+      - name: Package Companion module
+        working-directory: companion-module-soundninja
+        run: |
+          npm install
+          npm run package
+          ls -la *.tgz
+
+      - name: Upload Companion .tgz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          TGZ=$(ls companion-module-soundninja/companion-module-soundninja-*.tgz | head -1)
+          if [ -z "$TGZ" ]; then
+            echo "::error::No companion .tgz produced"
+            exit 1
+          fi
+          cp "$TGZ" companion-module-soundninja.tgz
+          gh release upload "$TAG" "$TGZ" companion-module-soundninja.tgz --clobber
+
+      - name: Upload stable installer aliases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p aliases
+          cd aliases
+          gh release download "$TAG" --pattern "soundninja_*" || true
+          shopt -s nullglob
+          upload=()
+          for f in *_x64-setup.exe; do
+            cp "$f" soundninja-windows-x64-setup.exe
+            upload+=(soundninja-windows-x64-setup.exe)
+          done
+          for f in *_aarch64.dmg; do
+            cp "$f" soundninja-macos-arm64.dmg
+            upload+=(soundninja-macos-arm64.dmg)
+          done
+          for f in *_x64.dmg; do
+            cp "$f" soundninja-macos-x64.dmg
+            upload+=(soundninja-macos-x64.dmg)
+          done
+          for f in *_amd64.deb; do
+            cp "$f" soundninja-linux-amd64.deb
+            upload+=(soundninja-linux-amd64.deb)
+          done
+          for f in *_amd64.AppImage; do
+            cp "$f" soundninja-linux-amd64.AppImage
+            upload+=(soundninja-linux-amd64.AppImage)
+          done
+          if [ ${#upload[@]} -eq 0 ]; then
+            echo "::warning::No installer assets found to alias"
+            exit 0
+          fi
+          gh release upload "$TAG" "${upload[@]}" --clobber
 
   # AUR deploy disabled — maintainer not registered on AUR yet.
   # Re-enable when AUR_USERNAME / AUR_EMAIL / AUR_SSH_PRIVATE_KEY secrets exist:

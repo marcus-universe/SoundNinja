@@ -32,40 +32,47 @@ The core mission was to build a soundboard that empowers you to organize massive
 | **Searchbar**                | Find your sounds quick and easy                           | ✅     |
 | **Themes**                   | Design your Soundboard how you like it                    | ✅     |
 | **Custom Profiles**          | Create multiple Soundboards with different settings       | ✅     |
+| **Recorder**                 | Record your PC-Audio directly in Sound Ninja              | ✅     |
+| **Gifs & Images**            | Give your Sounds an Image/Gif                             | ✅     |
+| **Customizable Hotkeys**     | Customize the Hotkeys to your needs                       | ✅     |
+| **Companion Remote**         | Trigger sounds from Bitfocus Companion over HTTP/WebSocket | ✅     |
+| **Soundboard Sharing**       | Share your Soundboard with your friends                   | ✅     |
+| **Soundboard Import/Export** | Import and Export your Soundboard                         | ✅     |
 | **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
 | **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
-| **Customizable Hotkeys**     | Customize the Hotkeys to your needs                       | ⛔     |
-| **Soundboard Sharing**       | Share your Soundboard with your friends                   | ⛔     |
-| **Soundboard Import/Export** | Import and Export your Soundboard                         | ⛔     |
 | **Websocket**                | Control your Soundboard with your Smartphone              | ⛔     |
-| **Recorder**                 | Record your PC-Audio directly in Sound Ninja              | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
-| **Gifs & Images**            | Give your Sounds an Image/Gif                             | ⛔     |
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |
 | **AI Assistant**             | Recommends you sounds that works in the current situation | ⛔     |
 
+## Downloads
+
+<div align="center">
+
+<img src="./designs/download.png" alt="Downloads" width="800" />
+
+[![Windows NSIS](https://img.shields.io/badge/Windows-NSIS-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64-setup.exe)
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-arm64.dmg)
+[![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-x64.dmg)
+[![Linux deb](https://img.shields.io/badge/Linux-.deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.deb)
+[![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.AppImage)
+[![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz)
+
+</div>
+
+Stable `/releases/latest/download/…` names are uploaded by the next published release. Until then, grab the versioned files from [Releases](https://github.com/marcus-universe/SoundNinja/releases/latest).
+
 ## Platforms
 
-Sound Ninja currently supports theoretically the following platforms:
+Official builds (x86_64 unless noted):
 
-| Platform | Versions        |
-| :------- | :-------------- |
-| Windows  | 8 and above     |
-| macOS    | 10.15 and above |
-| Linux    | See below       |
+| Platform | Support |
+| :------- | :------ |
+| Windows 10+ | NSIS installer (WebView2) |
+| macOS 10.15+ | DMG per architecture (Apple Silicon, Intel) |
+| Linux x86_64 | `.deb` (Debian/Ubuntu, WebKitGTK 4.1) or AppImage. PipeWire or PulseAudio for sound. |
 
-**Linux Support**
-
-- Debian (Ubuntu 18.04 and above or equivalent) with the following packages installed:
-  - `libwebkit2gtk-4.0-37`, `libgtk-3-0`, `libayatana-appindicator3-1`<sup>1</sup>
-- Arch with the following packages installed:
-  - `webkit2gtk`, `gtk3`, `libayatana-appindicator`<sup>1</sup>, `libpipewire` (audio device enumeration)
-- Fedora (latest 2 versions) with the following packages installed:
-  - `webkit2gtk3`, `gtk3`, `libappindicator-gtk3`<sup>1</sup>
-
-```diff
--   Be aware that Sound Ninja is in a early development stage and so its not tested on all platforms yet.
-```
+Early development — not tested on every distro.
 
 ## Project setup
 
@@ -126,6 +133,32 @@ bun run dev
 ### Customize configuration
 
 See [Nuxt Configuration](https://nuxt.com/docs/api/configuration/nuxt-config) and [Tauri Configuration](https://v2.tauri.app/reference/config/).
+
+## Remote control / Companion
+
+Sound Ninja can expose a local HTTP + WebSocket API so [Bitfocus Companion](https://bitfocus.io/companion) (or any HTTP client) can trigger sounds by ID and stop playback.
+
+1. Open **Settings → Remote** and enable the server (default port `7331`).
+2. Copy the `http://IP:PORT` URL from that tab, or copy the system IP from **Settings → About**.
+3. Download the latest [Companion module `.tgz`](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz) and load it in Companion (**Modules → Load module package**). Paste the IP + port into the connection.
+
+Source for the module lives in [`companion-module-soundninja/`](./companion-module-soundninja).
+
+Optional token: set one in Remote settings. Clients send `Authorization: Bearer <token>` or `?token=`.
+
+API (`/api/v1`):
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| GET | `/info` | no | App name, version, protocol, whether a token is required |
+| GET | `/sounds` | yes | Sound list (`id`, `name`, `tabs`, `active`) |
+| GET | `/state` | yes | Sounds + currently playing IDs |
+| POST | `/trigger` `{ "id" }` | yes | Play a sound |
+| GET | `/trigger/:id` | yes | Play a sound (browser-testable) |
+| POST | `/stop` `{ "id"? }` | yes | Stop one sound, or all if `id` omitted |
+| GET | `/ws` | yes | Live state push; inbound `{ "cmd": "trigger"\|"stop", "id"? }` |
+
+Windows may prompt to allow Sound Ninja through the firewall the first time the server starts.
 
 ## Credits
 

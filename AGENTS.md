@@ -13,3 +13,10 @@ Stop: "stop caveman" or "normal mode"
 Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
 
 Boundaries: code/commits/PRs written normal.
+
+i18n:
+- Locales: en, de, es, fr, ja, zh-Hans. Default English.
+- Every new user-facing string (labels, tooltips, aria-label, dialogs, errors) lands in ALL six `i18n/locales/*.json` files in the same change.
+- Keys: nested camelCase. ICU placeholders `{count}`, `{name}`, `{latest}`, `{current}`, `{model}`, `{size}`, `{version}`.
+- Two surfaces: JSON locales for Vue UI (`$t` / `useI18n`); native menu labels in `src-tauri/src/menu/mod.rs` `labels_for()`.
+- Installer default language: NSIS `DefaultLanguage` registry (Windows). First-run picker when no saved locale (Linux / fallback).

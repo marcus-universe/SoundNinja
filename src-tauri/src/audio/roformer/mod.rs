@@ -9,7 +9,9 @@ mod download;
 mod infer;
 mod stft;
 
-pub use download::{download_model, model_dir, model_file_path, model_ready};
+pub use download::{
+    cancel_download, download_model, model_dir, model_file_path, model_ready,
+};
 pub use infer::separate_vocals;
 
 /// Hugging Face resolve URL for the uint8 quantized ONNX graph (~158 MB).

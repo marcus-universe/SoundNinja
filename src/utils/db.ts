@@ -8,6 +8,8 @@ export const MAX_GIF_BYTES = 8 * 1024 * 1024
 export interface SoundFile {
   name: string
   path: string
+  /** Stable 8-char `[a-z0-9]` id. Assigned on create / load migration. */
+  id: string
   volume: number
   tabs: string[]
   active: boolean
@@ -55,6 +57,7 @@ export interface Separator {
   name?: string
   borderColor?: string
   nameColor?: string
+  bgColor?: string
   /** Undefined = inherit Tab.buttonAlign */
   buttonAlign?: ButtonAlign
 }
@@ -107,16 +110,18 @@ export interface Settings {
   asioLeftChannel?: number
   /** ASIO right-channel index (0-based). Only used when outputHost === 'ASIO'. */
   asioRightChannel?: number
-  /** Enable GPU-accelerated DSP (experimental; only shown when discrete GPU detected). */
-  gpuAudioEnabled?: boolean
   /** Show the floating player on the soundboard. */
   showPlayer?: boolean
   /** Enlarge floating player controls / waveform. */
   playerLarge?: boolean
   /** When true, GIF button backgrounds animate only while hovered. Default on. */
   gifPlayOnHover?: boolean
+  /** Keep GIF/image blobs in memory across tabs so switching does not reload them. */
+  preloadGifs?: boolean
   /** Board animation when switching tabs. Unknown/missing → slide. */
   tabTransition?: TabTransition
+  /** User-added sound trigger bindings (travel with the project). */
+  soundHotkeys?: { id: string; soundId: string; combo: string }[]
 }
 
 export interface ProjectConfig {
@@ -157,7 +162,11 @@ export function defaultSettings(): Settings {
     showPlayer: true,
     playerLarge: false,
     gifPlayOnHover: true,
+    preloadGifs: false,
+    cacheMaxSizeMib: 256,
+    cacheMaxEntryMib: 128,
     tabTransition: 'slide',
+    soundHotkeys: [],
   }
 }
 
@@ -193,7 +202,24 @@ export function mergeTabsFromUsage(config: ProjectConfig): number {
   }
   for (const s of config.separators ?? []) add(s.tab)
   for (const name of extra) list.push({ name })
+  dedupeTabList(config)
   return extra.length
+}
+
+/** Drop duplicate tab names so SQLite `tabs.name` PRIMARY KEY cannot fail. */
+export function dedupeTabList(config: ProjectConfig): number {
+  const list = config.tabList ?? []
+  const seen = new Set<string>()
+  const next = []
+  for (const t of list) {
+    const n = t?.name
+    if (!n || seen.has(n)) continue
+    seen.add(n)
+    next.push(t)
+  }
+  const removed = list.length - next.length
+  if (removed) config.tabList = next
+  return removed
 }
 
 export function healFolderTabMembership(config: ProjectConfig): number {
@@ -339,7 +365,8 @@ async function initSchema(d: Database): Promise<void> {
     volume REAL,
     color TEXT,
     global_index INTEGER,
-    active INTEGER
+    active INTEGER,
+    sound_id TEXT
   )`)
   await d.execute(`CREATE TABLE IF NOT EXISTS sound_tabs (
     sound_path TEXT,
@@ -365,8 +392,10 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'separators', 'name', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'border_color', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'name_color', 'TEXT')
+  await addColumnIfMissing(d, 'separators', 'bg_color', 'TEXT')
   await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
+  await addColumnIfMissing(d, 'sounds', 'sound_id', 'TEXT')
 }
 
 async function addColumnIfMissing(
@@ -379,6 +408,60 @@ async function addColumnIfMissing(
     await d.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`)
   } catch {
     /* column already exists on upgraded project files */
+  }
+}
+
+async function tableColumns(d: Database, table: string): Promise<Set<string>> {
+  try {
+    const rows = await d.select<{ name: string }[]>(`PRAGMA table_info(${table})`)
+    return new Set((rows ?? []).map((r) => r.name))
+  } catch {
+    return new Set()
+  }
+}
+
+/** Load sounds without requiring a specific id column (avoids empty board on migrate). */
+async function loadSoundRows(d: Database): Promise<{
+  path: string
+  sound_id?: string | null
+  name: string
+  volume: number
+  color: string | null
+  global_index: number
+  active: number
+  gif_id?: string | null
+  gif_pos_x?: number | null
+  gif_pos_y?: number | null
+}[]> {
+  const cols = await tableColumns(d, 'sounds')
+  const idSql = cols.has('sound_id')
+    ? 'sound_id'
+    : cols.has('id')
+      ? 'id'
+      : 'NULL'
+  const gifId = cols.has('gif_id') ? 'gif_id' : 'NULL'
+  const gifX = cols.has('gif_pos_x') ? 'gif_pos_x' : 'NULL'
+  const gifY = cols.has('gif_pos_y') ? 'gif_pos_y' : 'NULL'
+  try {
+    return await d.select(
+      `SELECT path, ${idSql} AS sound_id, name, volume, color, global_index, active, ${gifId} AS gif_id, ${gifX} AS gif_pos_x, ${gifY} AS gif_pos_y FROM sounds ORDER BY global_index ASC`,
+    )
+  } catch {
+    return await d.select(
+      'SELECT path, name, volume, color, global_index, active FROM sounds ORDER BY global_index ASC',
+    )
+  }
+}
+
+/** Write missing sound ids with UPDATE — never a full DELETE+INSERT resync. */
+export async function persistSoundIds(d: Database, files: SoundFile[]): Promise<void> {
+  const cols = await tableColumns(d, 'sounds')
+  if (!cols.has('sound_id')) {
+    await addColumnIfMissing(d, 'sounds', 'sound_id', 'TEXT')
+  }
+  for (const f of files) {
+    if (!f.id || !f.path) continue
+    await d.execute('UPDATE sounds SET sound_id = $1 WHERE path = $2', [f.id, f.path])
   }
 }
 
@@ -398,7 +481,11 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'showPlayer': settings.showPlayer = value === 'true'; break
       case 'playerLarge': settings.playerLarge = value === 'true'; break
       case 'gifPlayOnHover': settings.gifPlayOnHover = value !== 'false'; break
+      case 'preloadGifs': settings.preloadGifs = value === 'true'; break
       case 'tabTransition': settings.tabTransition = normalizeTabTransition(value); break
+      case 'soundHotkeys':
+        try { settings.soundHotkeys = JSON.parse(value) } catch { settings.soundHotkeys = [] }
+        break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -435,6 +522,13 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
   }
 
+  // Old factory cache (64/16 MiB) forced 1–3 min clips onto the streaming
+  // decoder. Bump only that exact pair so a user-chosen small cache stays.
+  if (settings.cacheMaxSizeMib === 64 && settings.cacheMaxEntryMib === 16) {
+    settings.cacheMaxSizeMib = 256
+    settings.cacheMaxEntryMib = 128
+  }
+
   // Migrate legacy dark-* theme ids and pair fields → flat tokens.
   settings.theme = normalizeThemeId(settings.theme)
   if (!settings.bg && !settings.btnBg) {
@@ -455,19 +549,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       : {}),
   }))
 
-  const soundRows = await d.select<
-    {
-      path: string
-      name: string
-      volume: number
-      color: string | null
-      global_index: number
-      active: number
-      gif_id: string | null
-      gif_pos_x: number | null
-      gif_pos_y: number | null
-    }[]
-  >('SELECT path, name, volume, color, global_index, active, gif_id, gif_pos_x, gif_pos_y FROM sounds ORDER BY global_index ASC')
+  const soundRows = await loadSoundRows(d)
 
   const tabLinks = await d.select<{ sound_path: string; tab: string; tab_index: number }[]>(
     'SELECT sound_path, tab, tab_index FROM sound_tabs'
@@ -488,6 +570,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     }
     return {
       path: s.path,
+      id: s.sound_id || '',
       name: s.name,
       volume: s.volume,
       index: s.global_index,
@@ -509,10 +592,11 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       name: string | null
       border_color: string | null
       name_color: string | null
+      bg_color: string | null
       button_align: string | null
     }[]
   >(
-    'SELECT id, tab, position, name, border_color, name_color, button_align FROM separators ORDER BY position ASC',
+    'SELECT id, tab, position, name, border_color, name_color, bg_color, button_align FROM separators ORDER BY position ASC',
   )
   const separators: Separator[] = sepRows.map((r) => ({
     id: r.id,
@@ -521,6 +605,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
     ...(r.name ? { name: r.name } : {}),
     ...(r.border_color ? { borderColor: r.border_color } : {}),
     ...(r.name_color ? { nameColor: r.name_color } : {}),
+    ...(r.bg_color ? { bgColor: r.bg_color } : {}),
     ...(r.button_align === 'left' || r.button_align === 'center' || r.button_align === 'right'
       ? { buttonAlign: r.button_align }
       : {}),
@@ -541,12 +626,14 @@ async function batchInsert(
   table: string,
   cols: string[],
   rows: unknown[][],
-  chunkRows = 100
+  chunkRows = 50
 ): Promise<void> {
   if (rows.length === 0) return
+  // SQLite default SQLITE_MAX_VARIABLE_NUMBER is 999. Keep a margin.
+  const maxRows = Math.max(1, Math.min(chunkRows, Math.floor(900 / Math.max(cols.length, 1))))
   const colSql = cols.join(', ')
-  for (let i = 0; i < rows.length; i += chunkRows) {
-    const chunk = rows.slice(i, i + chunkRows)
+  for (let i = 0; i < rows.length; i += maxRows) {
+    const chunk = rows.slice(i, i + maxRows)
     const placeholders: string[] = []
     const params: unknown[] = []
     let p = 1
@@ -563,6 +650,18 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   // each execute() may land on a different connection. BEGIN on conn A +
   // DELETE on conn B = SQLITE_BUSY ("database is locked"). An abandoned
   // BEGIN also poisons that pooled connection until the app restarts.
+  const incoming = config.files?.length ?? 0
+  if (incoming === 0) {
+    try {
+      const rows = await d.select<{ c: number }[]>('SELECT COUNT(*) AS c FROM sounds')
+      const existing = Number(rows?.[0]?.c ?? 0)
+      if (existing > 0) {
+        throw new Error(`Refusing to persist 0 sounds over ${existing} existing rows`)
+      }
+    } catch (e) {
+      if (String(e).includes('Refusing to persist')) throw e
+    }
+  }
   await d.execute('DELETE FROM settings')
   await d.execute('DELETE FROM tabs')
   await d.execute('DELETE FROM sounds')
@@ -579,12 +678,14 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['overlapSounds', String(s.overlapSounds ?? false)],
     ['showPlayer', String(s.showPlayer ?? true)],
     ['playerLarge', String(s.playerLarge ?? false)],
-    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 64)],
-    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 16)],
+    ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
+    ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 128)],
     ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],
     ['allowReorder', String(s.allowReorder ?? true)],
     ['gifPlayOnHover', String(s.gifPlayOnHover !== false)],
+    ['preloadGifs', String(s.preloadGifs === true)],
     ['tabTransition', normalizeTabTransition(s.tabTransition)],
+    ['soundHotkeys', JSON.stringify(s.soundHotkeys ?? [])],
     ['primaryColor', s.primaryColor ?? '#00d4ff'],
     ['primaryHover', s.primaryHover ?? '#33ddff'],
     ['bg', s.bg ?? '#222831'],
@@ -604,6 +705,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   ]
   await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
+  dedupeTabList(config)
   const tabRows = config.tabList.map((t, i) => [
     t.name,
     t.color ?? null,
@@ -617,6 +719,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   for (const f of config.files) {
     soundRows.push([
       f.path,
+      f.id || '',
       f.name,
       f.volume ?? 0.4,
       f.color ?? null,
@@ -626,7 +729,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       f.gifPosX ?? 50,
       f.gifPosY ?? 50,
     ])
-    for (const tab of f.tabs) {
+    for (const tab of f.tabs ?? ['All']) {
       const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
       soundTabRows.push([f.path, tab, tabIdx])
     }
@@ -634,7 +737,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await batchInsert(
     d,
     'sounds',
-    ['path', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
+    ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
     soundRows
   )
   await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
@@ -646,12 +749,13 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     sep.name ?? null,
     sep.borderColor ?? null,
     sep.nameColor ?? null,
+    sep.bgColor ?? null,
     sep.buttonAlign ?? null,
   ])
   await batchInsert(
     d,
     'separators',
-    ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'button_align'],
+    ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'bg_color', 'button_align'],
     sepRows,
   )
 }

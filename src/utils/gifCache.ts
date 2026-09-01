@@ -1,5 +1,6 @@
-import type Database from '@tauri-apps/plugin-sql'
-import { loadGifBlob, type GifBlobRow } from '~/utils/db'
+import { invoke } from '@tauri-apps/api/core'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import type { GifBlobRow } from '~/utils/db'
 
 export type GifUrls = {
   animUrl: string
@@ -7,70 +8,92 @@ export type GifUrls = {
   mime: string
 }
 
+/** What the Rust side hands back: real files on disk, not bytes. */
+type GifCacheEntry = {
+  id: string
+  mime: string
+  path: string
+  posterPath: string
+}
+
 const cache = new Map<string, GifUrls>()
-const inflight = new Map<string, Promise<GifUrls | null>>()
+const inflight = new Map<string, Promise<void>>()
+
+function entryToUrls(entry: GifCacheEntry): GifUrls {
+  return {
+    animUrl: convertFileSrc(entry.path),
+    posterUrl: convertFileSrc(entry.posterPath),
+    mime: entry.mime,
+  }
+}
 
 export function peekGifUrls(id: string): GifUrls | null {
   return cache.get(id) ?? null
 }
 
+/**
+ * Forget an id. The bytes live in files owned by Rust and in the project
+ * database, so nothing needs releasing here — dropping the entry only frees the
+ * webview's decoded-image memory once the `<img>` stops referencing it.
+ */
 export function revokeGifUrls(id: string): void {
-  const urls = cache.get(id)
-  if (!urls) return
-  URL.revokeObjectURL(urls.animUrl)
-  if (urls.posterUrl !== urls.animUrl) URL.revokeObjectURL(urls.posterUrl)
   cache.delete(id)
 }
 
 export function revokeAllGifUrls(): void {
-  for (const urls of cache.values()) {
-    URL.revokeObjectURL(urls.animUrl)
-    if (urls.posterUrl !== urls.animUrl) URL.revokeObjectURL(urls.posterUrl)
-  }
   cache.clear()
   inflight.clear()
 }
 
-export async function ensureGifUrls(d: Database, id: string): Promise<GifUrls | null> {
-  const hit = cache.get(id)
-  if (hit) return hit
-  const pending = inflight.get(id)
-  if (pending) return pending
-  const task = loadAndCache(d, id)
-  inflight.set(id, task)
-  try {
-    return await task
-  } finally {
-    inflight.delete(id)
+/**
+ * Resolve ids to file URLs, extracting anything still missing from the project
+ * database on the Rust side. Blobs never cross the IPC boundary.
+ */
+export async function ensureGifUrls(projectPath: string, ids: string[]): Promise<void> {
+  const wanted = [...new Set(ids.filter(Boolean))].filter((id) => !cache.has(id))
+  if (!wanted.length || !projectPath) return
+
+  const pending = wanted.filter((id) => inflight.has(id))
+  const fresh = wanted.filter((id) => !inflight.has(id))
+
+  if (fresh.length) {
+    const task = invoke<GifCacheEntry[]>('gif_cache_paths', { projectDb: projectPath, ids: fresh })
+      .then((entries) => {
+        for (const entry of entries) cache.set(entry.id, entryToUrls(entry))
+      })
+      .catch((e) => {
+        console.error('Failed to resolve GIF cache paths', e)
+      })
+      .finally(() => {
+        for (const id of fresh) inflight.delete(id)
+      })
+    for (const id of fresh) inflight.set(id, task)
   }
+
+  await Promise.all([...pending, ...fresh].map((id) => inflight.get(id)).filter(Boolean))
 }
 
-async function loadAndCache(d: Database, id: string): Promise<GifUrls | null> {
-  const row = await loadGifBlob(d, id)
-  if (!row) return null
-  const urls = urlsFromRow(row)
-  cache.set(id, urls)
-  return urls
-}
-
-export function cacheGifRow(row: GifBlobRow): GifUrls {
+/**
+ * Seed the cache for a freshly stored image so the button updates immediately
+ * instead of waiting for the next database read.
+ */
+export async function cacheGifRow(row: GifBlobRow): Promise<GifUrls | null> {
   const existing = cache.get(row.id)
   if (existing) return existing
-  const urls = urlsFromRow(row)
-  cache.set(row.id, urls)
-  return urls
-}
-
-function urlsFromRow(row: GifBlobRow): GifUrls {
-  const animBytes = b64ToBytes(row.data)
-  const animBlob = new Blob([animBytes], { type: row.mime || 'image/gif' })
-  const animUrl = URL.createObjectURL(animBlob)
-  let posterUrl = animUrl
-  if (row.poster) {
-    const posterBytes = b64ToBytes(row.poster)
-    posterUrl = URL.createObjectURL(new Blob([posterBytes], { type: 'image/png' }))
+  try {
+    const entry = await invoke<GifCacheEntry>('gif_cache_put', {
+      id: row.id,
+      mime: row.mime,
+      data: row.data,
+      poster: row.poster,
+    })
+    const urls = entryToUrls(entry)
+    cache.set(row.id, urls)
+    return urls
+  } catch (e) {
+    console.error('Failed to seed GIF cache', e)
+    return null
   }
-  return { animUrl, posterUrl, mime: row.mime }
 }
 
 export function b64ToBytes(b64: string): Uint8Array {

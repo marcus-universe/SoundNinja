@@ -19,9 +19,10 @@
   transition: margin-left 0.2s ease, margin-right 0.2s ease;
   overflow: hidden;
 
-  // Gap between tabs and soundboard. Collapses when multi-select bar
-  // hangs flush under tabs (scroll padding restores button spacing).
-  gap: 1rem;
+  // Gap between tabs and soundboard. Tight — empty orphan strip used
+  // to stack with this and look like a missing row. Collapses when
+  // multi-select bar hangs flush under tabs.
+  gap: 0.4rem;
 
   &--bulk {
     gap: 0;
@@ -29,24 +30,9 @@
 
   .TabContainer {
     flex-shrink: 0;
-    overflow-x: auto;
+    overflow: hidden;
     flex-wrap: nowrap;
-    scroll-behavior: smooth;
-    scrollbar-width: thin;
-    scrollbar-color: var(--primary_color) transparent;
-
-    &::-webkit-scrollbar {
-      height: 0.3rem;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: var(--primary_color);
-      border-radius: 0.2rem;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
+    align-items: center;
 
     .tab {
       flex-shrink: 0;
@@ -84,10 +70,22 @@
       }
     }
 
+    .addTab-tip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      align-self: center;
+      padding: 0 0.4rem;
+      z-index: 3;
+    }
+
     .addTab {
+      flex-shrink: 0;
+      display: block;
       fill: var(--primary_color);
-      width: calc(var(--icon_size) - 1.6rem);
-      border-radius: 0.48rem;
+      width: var(--icon_size);
+      height: var(--icon_size);
+      border-radius: 0.56rem;
       transition: fill 0.2s ease, transform 0.2s ease, background 0.2s ease;
 
       &:hover {
@@ -100,14 +98,30 @@
   }
 
   // Wrapper around the draggable tab list (SortableJS container).
-  // Real flex box so SortableJS can compute child positions; behaves like the
-  // surrounding tab row.
+  // Grows only as wide as tabs; shrinks + scrolls when the window is narrow
+  // so the + button stays on the trailing edge.
   .tab-list {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: stretch;
-    flex-shrink: 0;
+    align-self: center;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    // Overlay / hide native bar so it cannot lift the pills above All / +.
+    // Horizontal scroll still works via wheel (Tabs.vue onTabWheel).
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+      height: 0;
+      width: 0;
+    }
   }
 
   .SoundContainer {
@@ -221,11 +235,11 @@
         flex: 0 0 100%;
         width: 100%;
         box-sizing: border-box;
-        margin: 0.4rem 0;
+        margin: 0 0 0.4rem;
         padding: 0.6rem 0.8rem 0.8rem;
         border: 0.32rem solid var(--group-border, var(--btn-border, var(--primary_color)));
         border-radius: 0.6rem;
-        background: transparent;
+        background: var(--group-bg, transparent);
         cursor: grab;
 
         &:hover {
@@ -252,6 +266,21 @@
       .sound-orphans {
         width: 100%;
         min-height: 2.4rem;
+      }
+
+      // Empty orphan strip must not reserve a row + flex-gap under tabs.
+      // 1px keeps Sortable's empty-list hit box; emptyInsertThreshold covers drop.
+      .sound-orphans:not(.sound-orphans--empty) {
+        margin-bottom: var(--button-gap, #{$padding_1});
+      }
+
+      .sound-orphans--empty {
+        min-height: 1px;
+        height: 1px;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        border: 0;
       }
 
       .sound-align--left {
@@ -425,6 +454,24 @@
           background-color: transparent;
         }
 
+        .sound-id-chip {
+          position: absolute;
+          top: 0.36rem;
+          right: 0.36rem;
+          z-index: 3;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 0.85rem;
+          letter-spacing: 0.04em;
+          line-height: 1;
+          padding: 0.18rem 0.36rem;
+          border-radius: 0.32rem;
+          color: var(--btn-text, #eeeeee);
+          background: color-mix(in srgb, var(--color-bg, #222831) 72%, transparent);
+          border: 0.1rem solid color-mix(in srgb, var(--btn-border, var(--primary_color)) 55%, transparent);
+          pointer-events: auto;
+          user-select: none;
+        }
+
         .sound-spinner {
           position: absolute;
           top: 0.4rem;
@@ -493,6 +540,8 @@
   border-radius: 0 0 0.9rem 0.9rem;
   box-shadow: 0 0.3rem 1rem color-mix(in srgb, var(--color-bg, #000) 45%, transparent);
   backdrop-filter: blur(6px);
+  contain: paint;
+  will-change: backdrop-filter;
   flex-wrap: wrap;
   gap: 0.8rem;
   font-size: 1.44rem;
@@ -686,7 +735,7 @@
   color: var(--primary_color);
   font-family: $fontRegular;
   font-size: var(--font-size-sm);
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   box-sizing: border-box;
 
   &:focus {
@@ -749,7 +798,7 @@
   right: 1.6rem;
   top: 1.6rem;
   border-radius: 0.48rem;
-  transition: all 0.2s ease;
+  transition: fill 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 
   &:hover {
     fill: var(--color-bg, #{$color-bg});

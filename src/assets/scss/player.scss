@@ -74,6 +74,22 @@
   }
 }
 
+// Teleported tip (document.body) — escapes overflow:hidden ancestors.
+.qtip__tip--fixed {
+  position: fixed;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  z-index: 20000;
+  opacity: 0;
+  pointer-events: none;
+
+  &.is-open {
+    opacity: 1;
+  }
+}
+
 // ── Floating player (compact chip above sound buttons) ────────────────────────
 .player-float {
   position: absolute;
@@ -90,6 +106,10 @@
   border-radius: 1rem;
   box-shadow: 0 0.35rem 1.2rem rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
+  // The player sits above the board permanently. Without its own compositing
+  // layer, every hover repaint underneath forces the blur to be recomputed.
+  contain: paint;
+  will-change: backdrop-filter;
   display: flex;
   flex-direction: column;
   align-items: stretch;

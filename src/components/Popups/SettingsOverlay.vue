@@ -44,7 +44,11 @@
         <!-- Tab content -->
         <main class="settings-content">
           <SettingsMain v-if="activeTab === 'main'" />
+          <SettingsBehavior v-else-if="activeTab === 'behavior'" />
+          <SettingsHotkeys v-else-if="activeTab === 'hotkeys'" />
           <SettingsAudio v-else-if="activeTab === 'audio'" />
+          <SettingsPerformance v-else-if="activeTab === 'performance'" />
+          <SettingsRemote v-else-if="activeTab === 'remote'" />
           <SettingsAbout v-else-if="activeTab === 'about'" />
         </main>
 
@@ -56,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-const { t, locale, setLocale } = useI18n()
+const { t } = useI18n()
 const appStore = useAppStore()
 
 const activeTab = ref('main')
@@ -69,9 +73,29 @@ const tabs = computed(() => [
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`,
   },
   {
+    id: 'behavior',
+    label: t('settings.tabs.behavior'),
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+  },
+  {
+    id: 'hotkeys',
+    label: t('settings.tabs.hotkeys'),
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h12"/></svg>`,
+  },
+  {
     id: 'audio',
     label: t('settings.tabs.audio'),
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>`,
+  },
+  {
+    id: 'performance',
+    label: t('settings.tabs.performance'),
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  },
+  {
+    id: 'remote',
+    label: t('settings.tabs.remote'),
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 16.24a6 6 0 010-8.49M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/></svg>`,
   },
   {
     id: 'about',
@@ -79,15 +103,6 @@ const tabs = computed(() => [
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
   },
 ])
-
-onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('sn-locale')
-    if (saved && saved !== locale.value) {
-      await setLocale(saved as 'en' | 'de')
-    }
-  }
-})
 
 watch(() => appStore.activeOverlay, (val) => {
   if (val === 'settings') {

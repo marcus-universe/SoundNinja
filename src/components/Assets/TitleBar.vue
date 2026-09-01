@@ -4,7 +4,7 @@
     <div class="titlebar" data-tauri-drag-region>
       <span class="titlebar__title" data-tauri-drag-region>{{ windowTitle }}</span>
       <div class="titlebar__controls">
-        <button class="titlebar__btn titlebar__btn--min" @click="minimize" aria-label="Minimize">
+        <button class="titlebar__btn titlebar__btn--min" @click="minimize" :aria-label="$t('titlebar.minimize')">
           <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="1" y="5.5" width="10" height="1" rx="0.5" fill="currentColor"/>
           </svg>
@@ -12,7 +12,7 @@
         <button
           class="titlebar__btn titlebar__btn--max"
           @click="toggleMaximize"
-          :aria-label="isMaximized ? 'Restore' : 'Maximize'"
+          :aria-label="isMaximized ? $t('titlebar.restore') : $t('titlebar.maximize')"
         >
           <!-- Restore (two overlapping squares) when maximized -->
           <svg v-if="isMaximized" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -24,7 +24,7 @@
             <rect x="1.5" y="1.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
         </button>
-        <button class="titlebar__btn titlebar__btn--close" @click="closeWindow" aria-label="Close">
+        <button class="titlebar__btn titlebar__btn--close" @click="closeWindow" :aria-label="$t('titlebar.close')">
           <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
             <line x1="10.5" y1="1.5" x2="1.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
@@ -34,7 +34,12 @@
     </div>
 
     <!-- Second row: app menu bar (main window only) -->
-    <div v-if="showAppMenu" class="menubar" @mouseleave="closeMenu">
+    <div
+      v-if="showAppMenu"
+      class="menubar"
+      @mouseenter="cancelCloseMenu"
+      @mouseleave="scheduleCloseMenu"
+    >
       <div
         v-for="menu in menus"
         :key="menu.id"
@@ -50,10 +55,17 @@
             <div
               v-else-if="item.id === 'recent_sub'"
               class="menubar__entry menubar__entry--sub"
+              :class="{ 'is-open': recentOpen }"
+              @mouseenter="openRecentSub"
+              @mouseleave="scheduleCloseRecentSub"
             >
               <span>{{ $t(item.labelKey) }}</span>
               <span class="menubar__arrow">▶</span>
-              <div class="menubar__subdropdown">
+              <div
+                class="menubar__subdropdown"
+                @mouseenter="openRecentSub"
+                @mouseleave="scheduleCloseRecentSub"
+              >
                 <div
                   v-if="recentProjects.length === 0"
                   class="menubar__entry menubar__entry--disabled"
@@ -89,7 +101,10 @@ const isDesktopChrome = ref(false)
 const isMainWindow = ref(true)
 const windowTitle = ref('Sound Ninja')
 const openMenu = ref<string | null>(null)
+const recentOpen = ref(false)
 const isMaximized = ref(false)
+let menuCloseTimer: ReturnType<typeof setTimeout> | null = null
+let recentCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 const showCustomBar = computed(() =>
   isDesktopChrome.value
@@ -149,6 +164,8 @@ const menus: MenuGroup[] = [
       { id: 'sep2', sep: true },
       { id: 'import_audio',   labelKey: 'menu.importAudio',   event: 'menu_import_audio' },
       { id: 'import_folders', labelKey: 'menu.importFolders', event: 'menu_import_folders' },
+      { id: 'export_soundboard', labelKey: 'menu.exportSoundboard', event: 'menu_export_soundboard' },
+      { id: 'import_soundboard', labelKey: 'menu.importSoundboard', event: 'menu_import_soundboard' },
       { id: 'sep3', sep: true },
       { id: 'quit',           labelKey: 'menu.quit',          event: 'menu_quit' },
     ],
@@ -181,11 +198,47 @@ function isActionItem(item: MenuItem): item is MenuAction {
 }
 
 function toggleMenu(id: string) {
+  cancelCloseMenu()
   openMenu.value = openMenu.value === id ? null : id
+  if (!openMenu.value) recentOpen.value = false
 }
 
 function closeMenu() {
+  if (menuCloseTimer) {
+    clearTimeout(menuCloseTimer)
+    menuCloseTimer = null
+  }
+  if (recentCloseTimer) {
+    clearTimeout(recentCloseTimer)
+    recentCloseTimer = null
+  }
   openMenu.value = null
+  recentOpen.value = false
+}
+
+function cancelCloseMenu() {
+  if (menuCloseTimer) {
+    clearTimeout(menuCloseTimer)
+    menuCloseTimer = null
+  }
+}
+
+function scheduleCloseMenu() {
+  cancelCloseMenu()
+  menuCloseTimer = setTimeout(() => closeMenu(), 280)
+}
+
+function openRecentSub() {
+  if (recentCloseTimer) {
+    clearTimeout(recentCloseTimer)
+    recentCloseTimer = null
+  }
+  recentOpen.value = true
+}
+
+function scheduleCloseRecentSub() {
+  if (recentCloseTimer) clearTimeout(recentCloseTimer)
+  recentCloseTimer = setTimeout(() => { recentOpen.value = false }, 280)
 }
 
 async function emitEvent(event: string, payload?: unknown) {
@@ -237,5 +290,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (unlistenResized) unlistenResized()
+  if (menuCloseTimer) clearTimeout(menuCloseTimer)
+  if (recentCloseTimer) clearTimeout(recentCloseTimer)
 })
 </script>

@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
 import {
-  openDb, withProjectDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
-  loadGifBlobsByIds, upsertGifBlob, healFolderTabMembership, mergeTabsFromUsage,
+  openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
+  healFolderTabMembership, mergeTabsFromUsage,
+  persistSoundIds,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
 } from '~/utils/db'
+import { ensureSoundIds, newSoundId } from '~/utils/soundId'
 import { revokeAllGifUrls } from '~/utils/gifCache'
 
 /** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
@@ -91,7 +93,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
       revokeAllGifUrls()
-      const config = await withProjectDb(dbAbsPath, (d) => loadConfig(d))
+      let config = await withProjectDb(dbAbsPath, (d) => loadConfig(d))
+      if (!config.files.length) {
+        config = await this.tryRestoreFromBak(dbAbsPath, config)
+      }
       this.configFile = config
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
@@ -100,6 +105,44 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.dirty = false
       this.missingPaths = []
       this.clearHistory()
+      if (ensureSoundIds(this.configFile.files)) {
+        try {
+          await withProjectDb(dbAbsPath, (d) => persistSoundIds(d, this.configFile.files))
+        } catch (e) {
+          console.error('Failed to persist sound ids', e)
+        }
+      }
+    },
+
+    /** If a failed save emptied `sounds`, recover files from project.sninja.bak. */
+    async tryRestoreFromBak(dbAbsPath: string, current: ProjectConfig): Promise<ProjectConfig> {
+      const bak = dbAbsPath + '.bak'
+      const restored = dbAbsPath.replace(/\.sninja$/i, '.restored.sninja')
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const candidates: string[] = []
+        if (await invoke<boolean>('path_exists_abs', { path: bak })) candidates.push(bak)
+        if (await invoke<boolean>('path_exists_abs', { path: restored })) candidates.push(restored)
+        if (!candidates.length) return current
+        let bakConfig: ProjectConfig | null = null
+        for (const source of candidates) {
+          const loaded = await withProjectDb(source, (d) => loadConfig(d))
+          if (loaded.files.length) {
+            bakConfig = loaded
+            break
+          }
+        }
+        await reopenDb(dbAbsPath)
+        if (!bakConfig?.files.length) return current
+        this.configFile = bakConfig
+        this.currentProjectPath = dbAbsPath
+        await this.persistNow()
+        return this.configFile
+      } catch (e) {
+        console.error('Failed to restore project from backup', e)
+        try { await reopenDb(dbAbsPath) } catch { /* ignore */ }
+        return current
+      }
     },
 
     async validateSoundPaths() {
@@ -125,6 +168,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       }
       mergeTabsFromUsage(this.configFile)
       healFolderTabMembership(this.configFile)
+      ensureSoundIds(this.configFile.files)
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.openingSnapshot = clone(this.configFile)
@@ -174,6 +218,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         throw new Error('No project database is open.')
       }
       const path = this.currentProjectPath
+      const bak = path + '.bak'
+      const { invoke } = await import('@tauri-apps/api/core')
+      try {
+        await invoke('copy_file_to_abs', { src: path, dst: bak })
+      } catch { /* first save may have no file yet */ }
       this.saving = true
       try {
         await withProjectDb(path, async (d) => {
@@ -185,6 +234,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         this.dirty = false
       } catch (e) {
         console.error('Failed to persist project', e)
+        try {
+          await invoke('copy_file_to_abs', { src: bak, dst: path })
+          await reopenDb(path)
+        } catch { /* restore best-effort */ }
         throw e
       } finally {
         this.saving = false
@@ -192,42 +245,37 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     /**
-     * Saves the current in-memory project to a new file path (Save As).
-     * Handles empty Save-dialog placeholders that break SQLite open.
+     * Save As: flush live DB, then copy the SQLite file (gif_blobs included).
+     * Avoids pulling every GIF across IPC and rewriting the whole DB.
      */
     async saveAs(dbAbsPath: string) {
       const { ensureProjectParentDir, removeInvalidProjectPlaceholder } = await import('~/utils/projects')
+      const { invoke } = await import('@tauri-apps/api/core')
       await ensureProjectParentDir(dbAbsPath)
       await removeInvalidProjectPlaceholder(dbAbsPath)
-      const config = clone(this.configFile)
-      const gifIds = [...new Set(config.files.map((f) => f.gifId).filter((id): id is string => !!id))]
-      let blobs: Awaited<ReturnType<typeof loadGifBlobsByIds>> = []
-      if (this.currentProjectPath && gifIds.length) {
-        const oldPath = this.currentProjectPath
-        blobs = await withProjectDb(oldPath, (d) => loadGifBlobsByIds(d, gifIds))
+
+      const src = this.currentProjectPath
+      if (!src) {
+        await this.importConfig(clone(this.configFile), dbAbsPath)
+        return
       }
-      try {
-        await this.importConfig(config, dbAbsPath)
-        if (blobs.length) {
-          await withProjectDb(dbAbsPath, async (d) => {
-            for (const row of blobs) await upsertGifBlob(d, row)
-          })
-        }
-      } catch (e) {
-        // Retry once after deleting a non-SQLite placeholder the dialog may have created.
-        const msg = String(e)
-        if (/not a database|unable to open|file is encrypted|disk image/i.test(msg)) {
-          try { await (await import('@tauri-apps/api/core')).invoke('delete_file_abs', { path: dbAbsPath }) } catch { /* ignore */ }
-          await this.importConfig(config, dbAbsPath)
-          if (blobs.length) {
-            await withProjectDb(dbAbsPath, async (d) => {
-              for (const row of blobs) await upsertGifBlob(d, row)
-            })
-          }
-          return
-        }
-        throw e
+
+      const same = src.replace(/\\/g, '/').toLowerCase() === dbAbsPath.replace(/\\/g, '/').toLowerCase()
+      if (same) {
+        await this.persistNow()
+        return
       }
+
+      await this.persistNow()
+      await withProjectDb(src, async (d) => {
+        try { await d.execute('PRAGMA wal_checkpoint(TRUNCATE)') } catch { /* copy main file anyway */ }
+      })
+      await invoke('copy_file_to_abs', { src, dst: dbAbsPath })
+      await reopenDb(dbAbsPath)
+      this.currentProjectPath = dbAbsPath
+      this.openingSnapshot = clone(this.configFile)
+      this.dirty = false
+      this.clearHistory()
     },
 
     updateConfigFile(contents: ProjectConfig) {
@@ -244,30 +292,42 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     /**
-     * Ensure every sound has a compact global `index` and a `tabIndexes` entry
-     * for each tab it belongs to. Prunes stale tab entries and appends new ones.
+     * Fill missing tab/order keys, then densify each tab so group markers
+     * keep slots on the same number line as sounds. Sound-only compacting
+     * (0..n) steals those slots and shuffles group membership on load.
      */
     normalizeIndexes() {
       const files = this.configFile.files
       if (!files) return
 
-      const byGlobal = [...files].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-      byGlobal.forEach((f, i) => { f.index = i })
-
       for (const f of files) {
+        if (!Array.isArray(f.tabs)) f.tabs = ['All']
+        if (!f.tabs.includes('All')) f.tabs.unshift('All')
         if (!f.tabIndexes) f.tabIndexes = {}
         for (const key of Object.keys(f.tabIndexes)) {
           if (!f.tabs.includes(key)) delete f.tabIndexes[key]
         }
       }
-      for (const tab of (this.configFile.tabList ?? []).map((t) => t.name)) {
-        const inTab = files.filter((f) => f.tabs.includes(tab))
-        inTab.sort((a, b) => {
-          const av = a.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
-          const bv = b.tabIndexes[tab] ?? Number.MAX_SAFE_INTEGER
-          return av !== bv ? av - bv : a.index - b.index
-        })
-        inTab.forEach((f, i) => { f.tabIndexes[tab] = i })
+
+      const tabs = ['All', ...(this.configFile.tabList ?? []).map((t) => t.name)]
+      for (const tab of tabs) {
+        const inTab = files.filter((f) => f.tabs?.includes(tab))
+        const seps = (this.configFile.separators ?? []).filter((s) => s.tab === tab)
+        let max = -1
+        for (const f of inTab) {
+          const o = this.soundOrderOnTab(f, tab)
+          if (Number.isFinite(o)) max = Math.max(max, o)
+        }
+        for (const s of seps) {
+          if (Number.isFinite(s.position)) max = Math.max(max, s.position)
+        }
+        for (const f of inTab) {
+          const raw = tab === 'All' ? f.index : f.tabIndexes[tab]
+          if (raw == null || !Number.isFinite(Number(raw))) {
+            this.setSoundOrderOnTab(f, tab, ++max)
+          }
+        }
+        this.applyBoardLayoutSilent(tab, this.captureBoardLayout(tab))
       }
     },
 
@@ -324,6 +384,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.configFile.settings.gifPlayOnHover = val
       this.writeConfig()
     },
+    setPreloadGifs(val: boolean) {
+      this.configFile.settings.preloadGifs = val
+      this.writeConfig()
+    },
     // Generic single-setting update — avoids a dedicated action per field.
     setSetting(key: keyof Settings, val: unknown) {
       (this.configFile.settings as Record<string, unknown>)[key] = val
@@ -338,7 +402,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
       this.pushBeforeChange()
-      this.configFile.files = [...this.configFile.files, ...files]
+      const used = new Set(this.configFile.files.map((f) => f.id).filter(Boolean))
+      const withIds = files.map((f) => {
+        if (f.id) {
+          used.add(f.id)
+          return f
+        }
+        const id = newSoundId(used)
+        used.add(id)
+        return { ...f, id }
+      })
+      this.configFile.files = [...this.configFile.files, ...withIds]
       this.normalizeIndexes()
       this.writeConfig()
     },
@@ -461,8 +535,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Tabs ──────────────────────────────────────────────────────────────────
     addTab(name: string) {
+      const trimmed = String(name ?? '').trim()
+      if (!trimmed) return
+      if (this.configFile.tabList.some((t) => t.name === trimmed)) return
       this.pushBeforeChange()
-      this.configFile.tabList.push({ name })
+      this.configFile.tabList.push({ name: trimmed })
       this.writeConfig()
     },
 
@@ -476,18 +553,21 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     renameTab(oldName: string, newName: string) {
       const tab = this.configFile.tabList.find((t) => t.name === oldName)
       if (!tab) return
+      const trimmed = String(newName ?? '').trim()
+      if (!trimmed || trimmed === oldName) return
+      if (this.configFile.tabList.some((t) => t.name === trimmed)) return
       this.pushBeforeChange()
-      tab.name = newName
+      tab.name = trimmed
       this.configFile.files.forEach((f) => {
         const idx = f.tabs.indexOf(oldName)
-        if (idx !== -1) f.tabs[idx] = newName
+        if (idx !== -1) f.tabs[idx] = trimmed
         if (f.tabIndexes && oldName in f.tabIndexes) {
-          f.tabIndexes[newName] = f.tabIndexes[oldName]
+          f.tabIndexes[trimmed] = f.tabIndexes[oldName]
           delete f.tabIndexes[oldName]
         }
       })
       ;(this.configFile.separators ?? []).forEach((s) => {
-        if (s.tab === oldName) s.tab = newName
+        if (s.tab === oldName) s.tab = trimmed
       })
       this.writeConfig()
     },
@@ -558,6 +638,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         if (patch.nameColor) sep.nameColor = patch.nameColor
         else delete sep.nameColor
       }
+      if ('bgColor' in patch) {
+        if (patch.bgColor) sep.bgColor = patch.bgColor
+        else delete sep.bgColor
+      }
       if ('buttonAlign' in patch) {
         if (patch.buttonAlign) sep.buttonAlign = patch.buttonAlign
         else delete sep.buttonAlign
@@ -597,11 +681,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
      * Rewrite dense interleaved order for a tab: orphan sounds, then each
      * group marker + its members. Keeps relative membership from `layout`.
      */
-    applyBoardLayout(
+    applyBoardLayoutSilent(
       tab: string,
       layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
     ) {
-      this.pushBeforeChange()
       const byPath = new Map(this.configFile.files.map((f) => [f.path, f]))
       let seq = 0
       for (const path of layout.orphans) {
@@ -616,6 +699,14 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
           if (f) this.setSoundOrderOnTab(f, tab, seq++)
         }
       }
+    },
+
+    applyBoardLayout(
+      tab: string,
+      layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
+    ) {
+      this.pushBeforeChange()
+      this.applyBoardLayoutSilent(tab, layout)
       this.writeConfig()
     },
 

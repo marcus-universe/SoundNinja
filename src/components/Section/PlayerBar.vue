@@ -208,21 +208,28 @@ function applyPlayingSnapshot(list: PlayingInfo[]) {
   progressElapsedMs = posSec * 1000
   progressAnchorMs = Date.now() - progressElapsedMs
   playheadSec.value = posSec
+  if (first.durationSecs && first.durationSecs > 0) {
+    durationSec.value = first.durationSecs
+  }
   if (!progressPaused) startWaveClock()
   else stopWaveClock()
   if (first.path !== wavePath) {
-    void loadWaveform(first.path)
+    void loadWaveform(first.path, first.durationSecs)
   } else {
     drawWave()
   }
 }
 
-async function loadWaveform(path: string) {
+async function loadWaveform(path: string, knownDuration?: number) {
   wavePath = path
-  try {
-    durationSec.value = await invoke<number>('get_sound_duration', { soundPath: path })
-  } catch {
-    durationSec.value = 0
+  if (knownDuration && knownDuration > 0) {
+    durationSec.value = knownDuration
+  } else {
+    try {
+      durationSec.value = await invoke<number>('get_sound_duration', { soundPath: path })
+    } catch {
+      durationSec.value = 0
+    }
   }
   try {
     const buckets = playerLarge.value ? 220 : 100
@@ -363,6 +370,10 @@ onUnmounted(() => {
   if (unlisten) unlisten()
   stopWaveClock()
   window.removeEventListener('resize', drawWave)
+  if (scrubDrawRaf) {
+    cancelAnimationFrame(scrubDrawRaf)
+    scrubDrawRaf = null
+  }
 })
 
 watch(overlapSounds, () => {

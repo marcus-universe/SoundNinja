@@ -1,0 +1,28 @@
+{
+  "$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+  "type": "connection",
+  "id": "soundninja",
+  "name": "Sound Ninja",
+  "shortname": "soundninja",
+  "description": "Trigger Sound Ninja sounds by ID and stop playback over the local network.",
+  "version": "0.0.0",
+  "license": "GPL-3.0-or-later",
+  "repository": "git+https://github.com/marcus-universe/SoundNinja.git",
+  "bugs": "https://github.com/marcus-universe/SoundNinja/issues",
+  "maintainers": [
+    {
+      "name": "marcus-universe",
+      "email": ""
+    }
+  ],
+  "runtime": {
+    "type": "node22",
+    "api": "nodejs-ipc",
+    "apiVersion": "0.0.0",
+    "entrypoint": "../src/main.js"
+  },
+  "legacyIds": [],
+  "manufacturer": "Sound Ninja",
+  "products": ["Sound Ninja"],
+  "keywords": ["soundboard", "audio", "sound ninja"]
+}
