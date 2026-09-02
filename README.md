@@ -40,27 +40,25 @@ The core mission was to build a soundboard that empowers you to organize massive
 | **Soundboard Import/Export** | Import and Export your Soundboard                         | ✅     |
 | **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
 | **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
-| **Websocket**                | Control your Soundboard with your Smartphone              | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |
 | **AI Assistant**             | Recommends you sounds that works in the current situation | ⛔     |
 
 ## Downloads
 
-<div align="center">
-
-<img src="./designs/download.png" alt="Downloads" width="800" />
+<img src="./designs/download.png" alt="Downloads" width="300" />
 
 [![Windows NSIS](https://img.shields.io/badge/Windows-NSIS-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64-setup.exe)
+<br>
 [![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-arm64.dmg)
 [![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-x64.dmg)
+<br>
 [![Linux deb](https://img.shields.io/badge/Linux-.deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.deb)
 [![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.AppImage)
+<br>
 [![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz)
 
-</div>
-
-Stable `/releases/latest/download/…` names are uploaded by the next published release. Until then, grab the versioned files from [Releases](https://github.com/marcus-universe/SoundNinja/releases/latest).
+App installers and the Companion module `.tgz` both live on `/releases/latest/download/…`. The module is attached by the Companion Module action on the `companion-module` branch.
 
 ## Platforms
 
@@ -142,7 +140,7 @@ Sound Ninja can expose a local HTTP + WebSocket API so [Bitfocus Companion](http
 2. Copy the `http://IP:PORT` URL from that tab, or copy the system IP from **Settings → About**.
 3. Download the latest [Companion module `.tgz`](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz) and load it in Companion (**Modules → Load module package**). Paste the IP + port into the connection.
 
-Source for the module lives in [`companion-module-soundninja/`](./companion-module-soundninja).
+Source: [`companion-module` branch](https://github.com/marcus-universe/SoundNinja/tree/companion-module). The packaged `.tgz` is attached to [Latest](https://github.com/marcus-universe/SoundNinja/releases/latest).
 
 Optional token: set one in Remote settings. Clients send `Authorization: Bearer <token>` or `?token=`.
 
