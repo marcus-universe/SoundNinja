@@ -5,7 +5,10 @@
   "main": "src/main.js",
   "scripts": {
     "format": "prettier -w .",
-    "package": "companion-module-build"
+    "package": "companion-module-build",
+    "version:major": "node scripts/bump-version.mjs major",
+    "version:minor": "node scripts/bump-version.mjs minor",
+    "version:patch": "node scripts/bump-version.mjs patch"
   },
   "license": "MIT",
   "repository": {
