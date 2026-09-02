@@ -1,5 +1,9 @@
+<script setup lang="ts">
+const route = useRoute()
+</script>
+
 <template>
   <NuxtLayout>
-    <NuxtPage />
+    <NuxtPage :page-key="route.path" />
   </NuxtLayout>
 </template>

@@ -12,7 +12,7 @@ useHead(() => ({
   <div class="relative flex min-h-screen flex-col">
     <SiteBackdrop />
     <SiteNav />
-    <main class="relative z-10 flex-1">
+    <main class="relative z-10 flex-1 overflow-x-hidden">
       <slot />
     </main>
     <SiteFooter class="relative z-10" />

@@ -57,6 +57,7 @@ export default defineNuxtConfig({
   },
 
   app: {
+    pageTransition: { name: 'page', mode: 'out-in' },
     baseURL: '/SoundNinja/',
     head: {
       title: 'SoundNinja — Open Source Soundboard',
