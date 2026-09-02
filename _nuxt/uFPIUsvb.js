@@ -1,1 +1,0 @@
-import{_ as s,o,c as r,A as t}from"./wTgF_UuR.js";const n={};function c(e,a){return o(),r("td",null,[t(e.$slots,"default")])}const l=Object.assign(s(n,[["render",c]]),{__name:"ProseTd"});export{l as default};

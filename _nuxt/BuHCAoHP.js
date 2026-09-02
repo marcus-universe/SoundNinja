@@ -1,1 +1,0 @@
-import{_ as s,o,c as r,A as n}from"./wTgF_UuR.js";const t={};function c(e,a){return o(),r("em",null,[n(e.$slots,"default")])}const l=Object.assign(s(t,[["render",c]]),{__name:"ProseEm"});export{l as default};
