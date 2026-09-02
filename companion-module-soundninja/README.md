@@ -26,4 +26,4 @@ See [companion/HELP.md](companion/HELP.md) for actions, feedbacks, and variables
 npm run package
 ```
 
-Produces `companion-module-soundninja-1.0.0.tgz`. CI uploads that file plus a stable alias `companion-module-soundninja.tgz` on each app release.
+Produces `soundninja-1.0.0.tgz`. CI uploads that file plus a stable alias `companion-module-soundninja.tgz` on each app release.

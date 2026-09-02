@@ -1,12 +1,13 @@
 {
   "name": "companion-module-soundninja",
   "version": "1.0.0",
+  "type": "module",
   "main": "src/main.js",
   "scripts": {
     "format": "prettier -w .",
     "package": "companion-module-build"
   },
-  "license": "GPL-3.0-or-later",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/marcus-universe/SoundNinja.git"

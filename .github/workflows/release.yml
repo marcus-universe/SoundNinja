@@ -201,7 +201,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
-          TGZ=$(ls companion-module-soundninja/companion-module-soundninja-*.tgz | head -1)
+          TGZ=$(ls companion-module-soundninja/*.tgz | head -1)
           if [ -z "$TGZ" ]; then
             echo "::error::No companion .tgz produced"
             exit 1

@@ -3,8 +3,7 @@ import { combineRgb } from '@companion-module/base'
 export function updatePresets(self) {
 	const presets = {
 		stop_all: {
-			type: 'button',
-			category: 'Control',
+			type: 'simple',
 			name: 'Stop All',
 			style: {
 				text: 'Stop All',
@@ -22,11 +21,13 @@ export function updatePresets(self) {
 		},
 	}
 
+	const soundIds = []
 	for (const sound of self.sounds || []) {
 		if (!sound.id) continue
-		presets[`sound_${sound.id}`] = {
-			type: 'button',
-			category: 'Sounds',
+		const id = `sound_${sound.id}`
+		soundIds.push(id)
+		presets[id] = {
+			type: 'simple',
 			name: sound.name || sound.id,
 			style: {
 				text: sound.name || sound.id,
@@ -58,5 +59,20 @@ export function updatePresets(self) {
 		}
 	}
 
-	self.setPresetDefinitions(presets)
+	const structure = [
+		{
+			id: 'control',
+			name: 'Control',
+			definitions: ['stop_all'],
+		},
+	]
+	if (soundIds.length) {
+		structure.push({
+			id: 'sounds',
+			name: 'Sounds',
+			definitions: soundIds,
+		})
+	}
+
+	self.setPresetDefinitions(structure, presets)
 }

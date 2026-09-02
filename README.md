@@ -40,7 +40,6 @@ The core mission was to build a soundboard that empowers you to organize massive
 | **Soundboard Import/Export** | Import and Export your Soundboard                         | ✅     |
 | **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
 | **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
-| **Websocket**                | Control your Soundboard with your Smartphone              | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |
 | **AI Assistant**             | Recommends you sounds that works in the current situation | ⛔     |

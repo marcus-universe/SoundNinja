@@ -1,4 +1,4 @@
-import { InstanceBase, runEntrypoint, InstanceStatus } from '@companion-module/base'
+import { InstanceBase, InstanceStatus } from '@companion-module/base'
 import { getConfigFields } from './config.js'
 import { SoundNinjaApi } from './api.js'
 import { updateActions } from './actions.js'
@@ -7,7 +7,9 @@ import { updateVariables } from './variables.js'
 import { updatePresets } from './presets.js'
 import { UpgradeScripts } from './upgrades.js'
 
-class SoundNinjaInstance extends InstanceBase {
+export { UpgradeScripts }
+
+export default class SoundNinjaInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
 		this.sounds = []
@@ -82,5 +84,3 @@ class SoundNinjaInstance extends InstanceBase {
 		}
 	}
 }
-
-runEntrypoint(SoundNinjaInstance, UpgradeScripts)

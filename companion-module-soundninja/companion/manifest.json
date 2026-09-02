@@ -6,7 +6,7 @@
   "shortname": "soundninja",
   "description": "Trigger Sound Ninja sounds by ID and stop playback over the local network.",
   "version": "0.0.0",
-  "license": "GPL-3.0-or-later",
+  "license": "MIT",
   "repository": "git+https://github.com/marcus-universe/SoundNinja.git",
   "bugs": "https://github.com/marcus-universe/SoundNinja/issues",
   "maintainers": [

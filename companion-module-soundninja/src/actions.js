@@ -17,7 +17,7 @@ export function updateActions(self) {
 					label: 'Sound',
 					default: choices[0]?.id || '',
 					choices,
-					isVisible: (opts) => !opts.useCustom,
+					isVisibleExpression: '!$(options:useCustom)',
 				},
 				{
 					type: 'textinput',
@@ -26,13 +26,13 @@ export function updateActions(self) {
 					default: '',
 					useVariables: true,
 					tooltip: '8-character sound ID. Companion variables allowed.',
-					isVisible: (opts) => !!opts.useCustom,
+					isVisibleExpression: '!!$(options:useCustom)',
 				},
 			],
 			callback: async (action) => {
 				let id = action.options.soundId
 				if (action.options.useCustom) {
-					id = await self.parseVariablesInString(action.options.customId || '')
+					id = action.options.customId || ''
 				}
 				id = (id || '').trim()
 				if (!id) return
@@ -56,7 +56,7 @@ export function updateActions(self) {
 					label: 'Sound',
 					default: choices[0]?.id || '',
 					choices,
-					isVisible: (opts) => !opts.useCustom,
+					isVisibleExpression: '!$(options:useCustom)',
 				},
 				{
 					type: 'textinput',
@@ -64,13 +64,13 @@ export function updateActions(self) {
 					label: 'Sound ID',
 					default: '',
 					useVariables: true,
-					isVisible: (opts) => !!opts.useCustom,
+					isVisibleExpression: '!!$(options:useCustom)',
 				},
 			],
 			callback: async (action) => {
 				let id = action.options.soundId
 				if (action.options.useCustom) {
-					id = await self.parseVariablesInString(action.options.customId || '')
+					id = action.options.customId || ''
 				}
 				id = (id || '').trim()
 				if (!id) return
