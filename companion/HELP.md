@@ -4,7 +4,7 @@ Trigger sounds on a running [Sound Ninja](https://github.com/marcus-universe/Sou
 
 ## Setup
 
-1. Download [companion-module-soundninja.tgz](https://github.com/marcus-universe/SoundNinja/releases/download/companion-latest/companion-module-soundninja.tgz) and load it in Companion (**Modules → Load module package**).
+1. Download [companion-module-soundninja.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz) and load it in Companion (**Modules → Load module package**).
 2. In Sound Ninja open **Settings → Remote**.
 3. Enable the remote server. Default port is `7331`.
 4. Optional: set a token so only clients that know it can control playback.
