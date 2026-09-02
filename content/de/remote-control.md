@@ -20,10 +20,9 @@ Windows kann beim ersten Start eine Firewall-Abfrage zeigen. Zugriff im privaten
 ## Bitfocus Companion
 
 1. [Bitfocus Companion](https://bitfocus.io/companion) installieren.
-2. SoundNinja-Modul aus dem offiziellen Ordner laden: [companion-module-soundninja](https://github.com/marcus-universe/SoundNinja/tree/main/companion-module-soundninja). Es gibt noch kein Companion-Store-Paket — dieser Ordner ist der Download.
-3. In Companion **Developer → Modules** öffnen oder den Ordner in den Custom-Modules-Pfad legen.
-4. Im Modulordner `npm install` ausführen.
-5. Eine **Sound Ninja**-Verbindung anlegen. PC-IP, Port und Token eintragen.
+2. [companion-module-soundninja.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz) herunterladen. Es gibt noch kein Companion-Store-Paket.
+3. In Companion: **Modules → Load module package** und die `.tgz` wählen.
+4. Eine **Sound Ninja**-Verbindung anlegen. PC-IP, Port und Token eintragen.
 
 ## Aktionen
 

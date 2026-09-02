@@ -20,10 +20,9 @@ Windowsはサーバー初回起動時にファイアウォールの確認を出�
 ## Bitfocus Companion
 
 1. [Bitfocus Companion](https://bitfocus.io/companion)をインストールします。
-2. 公式フォルダからSoundNinjaモジュールをダウンロード：[companion-module-soundninja](https://github.com/marcus-universe/SoundNinja/tree/main/companion-module-soundninja)。Companion Storeのパッケージはまだありません — このフォルダがダウンロードです。
-3. Companionで **Developer → Modules** を開くか、フォルダをCompanionのカスタムモジュールパスに置きます。
-4. モジュールフォルダで `npm install` を実行します。
-5. **Sound Ninja** 接続を追加。PCのIP、ポート、設定したトークンを貼り付けます。
+2. [companion-module-soundninja.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz) をダウンロード。Companion Storeのパッケージはまだありません。
+3. Companionで **Modules → Load module package** を開き、`.tgz` を選びます。
+4. **Sound Ninja** 接続を追加。PCのIP、ポート、設定したトークンを貼り付けます。
 
 ## アクション
 
