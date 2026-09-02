@@ -47,18 +47,17 @@ The core mission was to build a soundboard that empowers you to organize massive
 
 ## Downloads
 
-<div align="center">
-
-<img src="./designs/download.png" alt="Downloads" width="800" />
+<img src="./designs/download.png" alt="Downloads" width="300" />
 
 [![Windows NSIS](https://img.shields.io/badge/Windows-NSIS-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-windows-x64-setup.exe)
+<br>
 [![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-arm64.dmg)
 [![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-macos-x64.dmg)
+<br>
 [![Linux deb](https://img.shields.io/badge/Linux-.deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.deb)
 [![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.AppImage)
+<br>
 [![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz)
-
-</div>
 
 Stable `/releases/latest/download/…` names are uploaded by the next published release. Until then, grab the versioned files from [Releases](https://github.com/marcus-universe/SoundNinja/releases/latest).
 
