@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../SoundNinja-landing"
+		},
+		{
+			"path": "../SoundNinja-Companion-Module"
+		}
+	],
+	"settings": {}
+}

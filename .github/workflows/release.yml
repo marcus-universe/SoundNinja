@@ -152,7 +152,6 @@ jobs:
             - Windows: `.exe` installer
             - macOS: `.dmg` for Apple Silicon and for Intel
             - Linux: `.deb` (Ubuntu/Debian) and `.AppImage`
-            - Companion: `companion-module-soundninja.tgz`
 
             In-app updates use signed updater artifacts + `latest.json` (see `docs/updater.md`).
           releaseDraft: true
@@ -160,17 +159,12 @@ jobs:
           uploadUpdaterJson: true
           args: ${{ matrix.args }}
 
-  companion:
+  aliases:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      - name: Install Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
 
       - name: Resolve release tag
         id: meta
@@ -188,26 +182,6 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Using tag=$TAG"
-
-      - name: Package Companion module
-        working-directory: companion-module-soundninja
-        run: |
-          npm install
-          npm run package
-          ls -la *.tgz
-
-      - name: Upload Companion .tgz
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ steps.meta.outputs.tag }}"
-          TGZ=$(ls companion-module-soundninja/*.tgz | head -1)
-          if [ -z "$TGZ" ]; then
-            echo "::error::No companion .tgz produced"
-            exit 1
-          fi
-          cp "$TGZ" companion-module-soundninja.tgz
-          gh release upload "$TAG" "$TGZ" companion-module-soundninja.tgz --clobber
 
       - name: Upload stable installer aliases
         env:
