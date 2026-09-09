@@ -190,14 +190,6 @@ function OpenSearch() {
   if (next) focusSearchInput()
 }
 
-/** Open search (or refocus if already open). Used by Ctrl/Cmd+F. */
-function activateSearch() {
-  if (!appStore.Searchbar.SearchbarActive) {
-    appStore.setSearchOpen(true)
-  }
-  focusSearchInput()
-}
-
 async function onImportChoice(mode) {
   await nextTick()
   if (mode === 'audio') {
@@ -233,10 +225,10 @@ watch(
 )
 
 onMounted(() => {
-  window.addEventListener('sn:activate-search', activateSearch)
+  window.addEventListener('sn:activate-search', OpenSearch)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('sn:activate-search', activateSearch)
+  window.removeEventListener('sn:activate-search', OpenSearch)
 })
 </script>

@@ -41,116 +41,46 @@ export const PLAYING_LIST: SecondaryWindowSpec = {
   minHeight: 320,
 }
 
-const inflight = new Map<string, Promise<WebviewWindow>>()
-
-function waitCreated(win: WebviewWindow): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Window '${win.label}' create timeout`))
-    }, 60_000)
-    win.once('tauri://created', () => {
-      clearTimeout(timer)
-      resolve()
-    })
-    win.once('tauri://error', (e) => {
-      clearTimeout(timer)
-      reject(e)
-    })
-  })
-}
+const inflight = new Map<string, Promise<void>>()
 
 /** Match main-window chrome prefs when spawning tool windows. */
-function chromeOptions(): { decorations: boolean; nativeChrome: boolean; hidden: boolean } {
+function chromeDecorations(): boolean {
   try {
     const s = useAppSettingsStore()
-    const hidden = !!s.hideTitlebar
-    const nativeChrome = s.titlebarMode === 'system'
-    return {
-      decorations: nativeChrome && !hidden,
-      nativeChrome,
-      hidden,
-    }
+    return s.titlebarMode === 'system' && !s.hideTitlebar
   } catch {
-    return { decorations: false, nativeChrome: false, hidden: false }
+    return false
   }
 }
 
-async function applyChromeToAll(nativeChrome: boolean, hidden: boolean) {
-  try {
-    await invoke('set_window_chrome', { nativeChrome, hidden })
-  } catch (e) {
-    console.warn('set_window_chrome failed', e)
-  }
-}
-
-async function stripMenu(label: string) {
-  try {
-    await invoke('strip_window_menu_for', { label })
-  } catch (e) {
-    console.warn('strip_window_menu_for failed', e)
-  }
-}
-
-/** Create if needed. Shown immediately so first-open is not a hidden SPA boot. */
-export async function ensureSecondaryWindow(spec: SecondaryWindowSpec): Promise<WebviewWindow> {
-  const existing = await WebviewWindow.getByLabel(spec.label)
-  if (existing) return existing
-
+/**
+ * Show + focus a tool window, creating it if needed.
+ *
+ * Creation happens in Rust (`open_tool_window`): a window built from JS gets
+ * wry's default WebView2 command line, which no longer matches the environment
+ * the main window created, and WebView2 then silently drops the window.
+ */
+export async function openSecondaryWindow(spec: SecondaryWindowSpec): Promise<void> {
   const pending = inflight.get(spec.label)
   if (pending) return pending
 
-  const create = (async () => {
-    try {
-      const again = await WebviewWindow.getByLabel(spec.label)
-      if (again) return again
+  const open = invoke('open_tool_window', {
+    spec: {
+      label: spec.label,
+      url: spec.url,
+      title: spec.title,
+      width: spec.width,
+      height: spec.height,
+      minWidth: spec.minWidth ?? null,
+      minHeight: spec.minHeight ?? null,
+      decorations: chromeDecorations(),
+    },
+  }).finally(() => {
+    inflight.delete(spec.label)
+  }) as Promise<void>
 
-      const chrome = chromeOptions()
-      const win = new WebviewWindow(spec.label, {
-        url: spec.url,
-        title: spec.title,
-        width: spec.width,
-        height: spec.height,
-        minWidth: spec.minWidth,
-        minHeight: spec.minHeight,
-        resizable: true,
-        visible: true,
-        focus: true,
-        decorations: chrome.decorations,
-      })
-      await waitCreated(win)
-      // Re-apply chrome so decorations/menu match main for every window.
-      await applyChromeToAll(chrome.nativeChrome, chrome.hidden)
-      await stripMenu(spec.label)
-      return win
-    } finally {
-      inflight.delete(spec.label)
-    }
-  })()
-
-  inflight.set(spec.label, create)
-  return create
-}
-
-/** Show + focus a secondary window (creates hidden first if missing). */
-export async function openSecondaryWindow(spec: SecondaryWindowSpec): Promise<WebviewWindow> {
-  const win = await ensureSecondaryWindow(spec)
-  const chrome = chromeOptions()
-  await applyChromeToAll(chrome.nativeChrome, chrome.hidden)
-  await stripMenu(spec.label)
-  try {
-    if (await win.isMinimized()) await win.unminimize()
-  } catch { /* permission / platform may lack unminimize */ }
-  await win.show()
-  await win.setFocus()
-  // Windows/Linux: force raise when caller still holds focus.
-  try {
-    if (!(await win.isFocused())) {
-      await win.setAlwaysOnTop(true)
-      await win.setFocus()
-      await win.setAlwaysOnTop(false)
-    }
-  } catch { /* best-effort */ }
-  return win
+  inflight.set(spec.label, open)
+  return open
 }
 
 /** Destroy a secondary window so its WebView2 process is released. */
