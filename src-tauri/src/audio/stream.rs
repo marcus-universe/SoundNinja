@@ -309,11 +309,15 @@ impl Source for GrowingSource {
     }
 
     fn channels(&self) -> ChannelCount {
-        ChannelCount::new(self.shared.channels).unwrap_or(ChannelCount::new(1).unwrap())
+        ChannelCount::new(self.shared.channels.max(1))
+            .or_else(|| ChannelCount::new(1))
+            .expect("ChannelCount 1 is always valid")
     }
 
     fn sample_rate(&self) -> SampleRate {
-        SampleRate::new(self.shared.sample_rate).unwrap_or(SampleRate::new(48_000).unwrap())
+        SampleRate::new(self.shared.sample_rate.max(1))
+            .or_else(|| SampleRate::new(48_000))
+            .expect("SampleRate 48000 is always valid")
     }
 
     fn total_duration(&self) -> Option<Duration> {

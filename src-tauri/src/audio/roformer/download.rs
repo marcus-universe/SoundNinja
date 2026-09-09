@@ -50,7 +50,7 @@ fn file_looks_ready(path: &Path) -> bool {
     verify_sha256(path, MODEL_SHA256).unwrap_or(false)
 }
 
-fn verify_sha256(path: &Path, expected_hex: &str) -> Result<bool, String> {
+pub(crate) fn verify_sha256(path: &Path, expected_hex: &str) -> Result<bool, String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 1024 * 256];
@@ -175,4 +175,29 @@ fn emit(app: &AppHandle, stage: &str, percent: f32, message: &str) {
             message: message.to_string(),
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify_sha256;
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+
+    #[test]
+    fn verify_sha256_accepts_matching_digest() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("m.bin");
+        let data = b"soundninja-model";
+        std::fs::write(&path, data).unwrap();
+        let hex = format!("{:x}", Sha256::digest(data));
+        assert!(verify_sha256(&path, &hex).unwrap());
+    }
+
+    #[test]
+    fn verify_sha256_rejects_mismatch() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("m.bin");
+        std::fs::File::create(&path).unwrap().write_all(b"x").unwrap();
+        assert!(!verify_sha256(&path, &"0".repeat(64)).unwrap());
+    }
 }

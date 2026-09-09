@@ -188,7 +188,9 @@
       "sliderResetHint": "ダブルクリックでリセット",
       "asioChannelMatrix": "ASIO チャンネルマトリックス",
       "asioChannelHint": "左と右の出力チャンネルをそれぞれ 1 つずつ選択してください。",
-      "asioChannel": "チャンネル"
+      "asioChannel": "チャンネル",
+      "left": "L",
+      "right": "R"
     },
     "themeCreator": {
       "title": "テーマ作成",
@@ -480,7 +482,25 @@
     "renameGroup": "グループ名を変更",
     "addTab": "タブを追加",
     "placeholder": "ここに名前を入力",
-    "confirm": "確定"
+    "confirm": "確定",
+    "emptyField": "欄が空です"
+  },
+  "native": {
+    "openProject": "プロジェクトを開く",
+    "saveProjectAs": "名前を付けてプロジェクトを保存",
+    "selectFilesToUpload": "アップロードするファイルを選択",
+    "addSounds": "サウンドを追加",
+    "importThemeCss": "テーマ CSS を読み込む",
+    "uploadFont": "フォントをアップロード",
+    "exportTheme": "テーマを書き出す",
+    "importFolder": "フォルダーを読み込む",
+    "findMissingSounds": "不足しているサウンドを探す"
+  },
+  "windows": {
+    "recordEditor": "録音エディター",
+    "themeCreator": "テーマ作成",
+    "playingList": "再生リスト",
+    "themeCreatorSections": "テーマ作成のセクション"
   },
   "navbar": {
     "search": "検索",

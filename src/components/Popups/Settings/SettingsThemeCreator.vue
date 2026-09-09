@@ -33,7 +33,7 @@
       </div>
     </div>
 
-    <nav class="theme-creator-tabs" aria-label="Theme Creator sections">
+    <nav class="theme-creator-tabs" :aria-label="t('windows.themeCreatorSections')">
       <button
         v-for="tab in creatorTabs"
         :key="tab.id"
@@ -668,7 +668,7 @@ async function uploadFont() {
   try {
     const selected = await open({
       multiple: true,
-      title: 'Upload Font',
+      title: t('native.uploadFont'),
       filters: [{ name: 'Fonts', extensions: ['ttf', 'otf'] }],
     })
     if (!selected) return
@@ -810,7 +810,7 @@ async function exportTheme() {
   const safeName = (themeCreator.name || 'theme').replace(/[^a-z0-9_-]/gi, '_')
   try {
     const filePath = await save({
-      title: 'Export Theme',
+      title: t('native.exportTheme'),
       defaultPath: `${safeName}.css`,
       filters: [{ name: 'CSS', extensions: ['css'] }],
     })
@@ -869,7 +869,7 @@ async function importThemeFromFile() {
   try {
     const filePath = await open({
       multiple: false,
-      title: 'Import Theme CSS',
+      title: t('native.importThemeCss'),
       filters: [{ name: 'CSS Files', extensions: ['css'] }],
     })
     if (!filePath) return

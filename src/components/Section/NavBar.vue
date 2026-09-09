@@ -137,10 +137,10 @@ async function focusSearchInput() {
 async function uploadFiles() {
   const selected = await open({
     multiple: true,
-    title: 'Select files to upload',
+    title: t('native.selectFilesToUpload'),
     filters: [
       {
-        name: 'Add Sounds',
+        name: t('native.addSounds'),
         extensions: ['mp3', 'wav', 'ogg'],
       },
     ],

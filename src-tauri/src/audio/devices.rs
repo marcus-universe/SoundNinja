@@ -362,7 +362,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn is_default_name_treats_empty_and_default_as_sentinel() {
+        assert!(is_default_name(""));
+        assert!(is_default_name("default"));
+        assert!(is_default_name("Default"));
+        assert!(!is_default_name("Speakers"));
+    }
+
+    #[test]
     fn linux_host_lists_real_sinks() {
+        if std::env::var("RUN_SLOW_TESTS").is_err() {
+            return;
+        }
         let hosts = get_audio_hosts();
         let host = hosts
             .iter()

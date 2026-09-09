@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 /// Returns true when a temp file can be created inside `dir` (i.e. writable).
-fn is_writable(dir: &Path) -> bool {
+pub(crate) fn is_writable(dir: &Path) -> bool {
     if fs::create_dir_all(dir).is_err() {
         return false;
     }
@@ -189,4 +189,26 @@ pub fn read_install_language() -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ensure_default_dirs, is_writable};
+    use std::fs;
+
+    #[test]
+    fn is_writable_accepts_temp_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(is_writable(dir.path()));
+    }
+
+    #[test]
+    fn ensure_default_dirs_creates_projects_and_themes() {
+        let dir = tempfile::tempdir().unwrap();
+        ensure_default_dirs(dir.path());
+        assert!(dir.path().join("projects").is_dir());
+        assert!(dir.path().join("themes").is_dir());
+        assert!(dir.path().join("themes").join("fonts").is_dir());
+        let _ = fs::remove_dir_all(dir.path().join("projects"));
+    }
 }

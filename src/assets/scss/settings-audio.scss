@@ -14,7 +14,7 @@
   justify-content: space-between;
   gap: 0.8rem;
   width: 100%;
-  height: var(--settings-control-h, calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2));
+  height: var(--settings-control-h, var(--control-h));
   box-sizing: border-box;
   padding: 0 1.2rem;
   background: rgba(255, 255, 255, 0.05);
@@ -22,7 +22,7 @@
   border-radius: 0.64rem;
   color: $white;
   font-family: $fontRegular;
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   line-height: 1.2;
   cursor: pointer;
   transition: border-color 0.15s;
@@ -99,7 +99,7 @@
   background: var(--color-bg, #{$color-bg});
   color: rgba(238, 238, 238, 0.75);
   font-family: $fontRegular;
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
@@ -140,7 +140,7 @@
 
 .settings-audio-compact {
   // Same tokens as .settings-content — without these, select/btn height vars are invalid.
-  --settings-control-h: calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2);
+  --settings-control-h: var(--control-h);
   --settings-label-w: auto;
   --settings-group-gap: 0.5rem;
 

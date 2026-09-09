@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
+import { tt } from '~/utils/tt'
 
 export interface ProjectInfo {
   name: string
@@ -72,7 +73,7 @@ export function pickOpenPaths(selected: string | string[] | null | undefined): s
 /** Native "Open Project" dialog. Lives here so Vue SFCs avoid TSX-generic parse bugs. */
 export async function pickProjectFile(): Promise<string | null> {
   const selected = await openDialog({
-    title: 'Open Project',
+    title: tt('native.openProject'),
     filters: [PROJECT_FILE_FILTER],
     multiple: false,
   })
@@ -82,7 +83,7 @@ export async function pickProjectFile(): Promise<string | null> {
 /** Native "Save Project As" dialog. Always returns a `.sninja` path or null. */
 export async function pickSaveProjectFile(): Promise<string | null> {
   const path = await saveDialog({
-    title: 'Save Project As',
+    title: tt('native.saveProjectAs'),
     filters: [PROJECT_SAVE_FILTER],
     defaultPath: `project.${PROJECT_EXT}`,
   })

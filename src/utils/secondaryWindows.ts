@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { tt } from '~/utils/tt'
 
 export type SecondaryWindowSpec = {
   label: string
@@ -64,11 +65,19 @@ export async function openSecondaryWindow(spec: SecondaryWindowSpec): Promise<vo
   const pending = inflight.get(spec.label)
   if (pending) return pending
 
+  const titleKey =
+    spec.label === 'record-editor'
+      ? 'windows.recordEditor'
+      : spec.label === 'theme-creator'
+        ? 'windows.themeCreator'
+        : spec.label === 'playing-list'
+          ? 'windows.playingList'
+          : ''
   const open = invoke('open_tool_window', {
     spec: {
       label: spec.label,
       url: spec.url,
-      title: spec.title,
+      title: titleKey ? tt(titleKey) : spec.title,
       width: spec.width,
       height: spec.height,
       minWidth: spec.minWidth ?? null,

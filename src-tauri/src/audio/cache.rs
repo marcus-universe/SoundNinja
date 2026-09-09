@@ -344,3 +344,27 @@ pub fn set_cache_config(max_size_mib: u64, max_entry_mib: u64) -> Result<(), Str
         .set_limits(max_size / 4, max_entry);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::SoundCache;
+
+    #[test]
+    fn insert_should_evict_when_over_budget() {
+        let mut cache = SoundCache::new();
+        cache.set_limits(6, 8);
+        cache.insert("a".into(), vec![1, 2, 3, 4]);
+        cache.insert("b".into(), vec![5, 6, 7, 8]);
+        assert!(cache.peek("a").is_none());
+        assert!(cache.peek("b").is_some());
+    }
+
+    #[test]
+    fn insert_should_skip_store_when_over_entry_limit() {
+        let mut cache = SoundCache::new();
+        cache.set_limits(1024, 2);
+        cache.insert("big".into(), vec![1, 2, 3, 4]);
+        assert!(cache.peek("big").is_none());
+        assert_eq!(cache.stats().cached_count, 0);
+    }
+}

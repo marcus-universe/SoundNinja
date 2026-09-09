@@ -195,7 +195,7 @@ async function importCustomCssFile() {
   try {
     const filePath = await open({
       multiple: false,
-      title: 'Import Theme CSS',
+      title: t('native.importThemeCss'),
       filters: [{ name: 'CSS Files', extensions: ['css'] }],
     })
     if (!filePath) return

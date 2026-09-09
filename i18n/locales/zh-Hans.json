@@ -188,7 +188,9 @@
       "sliderResetHint": "双击重置",
       "asioChannelMatrix": "ASIO 声道矩阵",
       "asioChannelHint": "请恰好选择一个左声道和一个右声道输出。",
-      "asioChannel": "声道"
+      "asioChannel": "声道",
+      "left": "L",
+      "right": "R"
     },
     "themeCreator": {
       "title": "主题创建器",
@@ -480,7 +482,25 @@
     "renameGroup": "重命名分组",
     "addTab": "添加标签页",
     "placeholder": "在此输入名称",
-    "confirm": "确认"
+    "confirm": "确认",
+    "emptyField": "字段为空"
+  },
+  "native": {
+    "openProject": "打开项目",
+    "saveProjectAs": "项目另存为",
+    "selectFilesToUpload": "选择要上传的文件",
+    "addSounds": "添加声音",
+    "importThemeCss": "导入主题 CSS",
+    "uploadFont": "上传字体",
+    "exportTheme": "导出主题",
+    "importFolder": "导入文件夹",
+    "findMissingSounds": "查找缺失的声音"
+  },
+  "windows": {
+    "recordEditor": "录音编辑器",
+    "themeCreator": "主题创建器",
+    "playingList": "播放列表",
+    "themeCreatorSections": "主题创建器分区"
   },
   "navbar": {
     "search": "搜索",

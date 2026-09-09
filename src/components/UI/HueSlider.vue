@@ -7,7 +7,7 @@
     step="1"
     :value="modelValue"
     :title="hint"
-    :aria-label="ariaLabel || hint || 'Hue'"
+    :aria-label="ariaLabel || hint || t('contextMenu.colorHue')"
     @pointerdown="$emit('dragStart')"
     @input="onInput"
     @change="$emit('dragEnd')"
@@ -15,6 +15,8 @@
 </template>
 
 <script setup lang="ts">
+const { t } = useI18n()
+
 defineProps<{
   modelValue: number
   hint?: string

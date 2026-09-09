@@ -806,3 +806,77 @@ pub fn session_info(session_id: &str) -> Result<SessionInfo, String> {
         })
     })
 }
+
+/// Insert an in-memory session for unit tests (no file decode).
+#[cfg(test)]
+pub(crate) fn insert_test_session(
+    samples: Vec<f32>,
+    sample_rate: u32,
+    channels: u16,
+) -> Result<String, String> {
+    let session_id = new_session_id();
+    sessions().lock().map_err(|e| e.to_string())?.insert(
+        session_id.clone(),
+        EditSession {
+            samples,
+            sample_rate,
+            channels,
+            undo: None,
+            redo: None,
+        },
+    );
+    Ok(session_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        delete_range, insert_test_session, normalize_session, session_info, trim_session,
+        undo_session,
+    };
+
+    fn sine_session() -> String {
+        let sr = 8_000u32;
+        let samples: Vec<f32> = (0..sr).map(|i| (i as f32 / sr as f32) * 0.5).collect();
+        insert_test_session(samples, sr, 1).unwrap()
+    }
+
+    #[test]
+    fn trim_session_should_keep_range() {
+        let id = sine_session();
+        let info = trim_session(id.clone(), 0.25, 0.75).unwrap();
+        assert!((info.duration_secs - 0.5).abs() < 0.02);
+    }
+
+    #[test]
+    fn delete_range_should_shorten_session() {
+        let id = sine_session();
+        let before = session_info(&id).unwrap().duration_secs;
+        let after = delete_range(id, 0.0, 0.25).unwrap().duration_secs;
+        assert!(after < before);
+        assert!((after - 0.75).abs() < 0.05);
+    }
+
+    #[test]
+    fn normalize_session_should_raise_peak() {
+        let samples = vec![0.1f32; 800];
+        let id = insert_test_session(samples, 8_000, 1).unwrap();
+        normalize_session(id.clone(), Some(-1.0), None, None).unwrap();
+        let peak = {
+            let map = super::sessions().lock().unwrap();
+            let sess = map.get(&id).unwrap();
+            sess.samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max)
+        };
+        assert!(peak > 0.8);
+    }
+
+    #[test]
+    fn undo_session_should_restore_samples() {
+        let id = sine_session();
+        let before = session_info(&id).unwrap().duration_secs;
+        trim_session(id.clone(), 0.0, 0.2).unwrap();
+        undo_session(id.clone()).unwrap();
+        let after = session_info(&id).unwrap().duration_secs;
+        assert!((after - before).abs() < 1e-6);
+    }
+}

@@ -2,7 +2,7 @@
 
 .ui-btn {
   padding: $padding_2 $padding_1;
-  border-radius: 0.8rem;
+  border-radius: var(--radius-lg, 0.8rem);
   border: 0.32rem solid var(--primary_color);
   background: transparent;
   color: var(--primary_color);
@@ -12,7 +12,7 @@
   transition: background 0.2s ease, color 0.2s ease;
 
   &:hover {
-    background: rgba($white, 0.1);
+    background: var(--surface-hover);
   }
 
   &.ui-btn--full {
@@ -43,7 +43,7 @@
     flex-shrink: 0;
     width: 1.8rem;
     height: 1.8rem;
-    border-radius: 0.4rem;
+    border-radius: var(--radius-sm, 0.4rem);
     border: 0.16rem solid var(--primary_color);
     background: var(--color-bg, #{$color-bg});
     display: flex;
@@ -81,7 +81,7 @@
 .ui-input {
   width: 100%;
   padding: $padding_2 $padding_1;
-  border-radius: 0.64rem;
+  border-radius: var(--radius-md, 0.64rem);
   min-height: var(--icon_size);
   border: 0.32rem solid var(--primary_color);
   background: var(--color-bg, #{$color-bg});
@@ -92,7 +92,7 @@
   box-sizing: border-box;
 
   &:focus {
-    background: color-mix(in srgb, var(--color-text, #{$white}) 10%, transparent);
+    background: var(--surface-hover);
     outline: none;
   }
 }
@@ -106,8 +106,8 @@
 
 .ui-listitem {
   padding: $padding_2 $padding_1;
-  border-radius: 0.64rem;
-  background: $color-btn;
+  border-radius: var(--radius-md, 0.64rem);
+  background: var(--color-btn, #{$color-btn});
   font-family: $fontRegular;
   font-size: var(--font-size-md);
   color: $white;

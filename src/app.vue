@@ -714,17 +714,6 @@ onMounted(async () => {
   const whenIdle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 1500))
   whenIdle(() => { settingsEverOpened.value = true })
 
-  setTimeout(() => {
-    import('~/utils/secondaryWindows').then((m) => {
-      m.openSecondaryWindow(m.RECORD_EDITOR)
-        .then(() => {
-          invoke('sn_dbg', { msg: 'js open resolved' }).catch(() => {})
-          setTimeout(() => { invoke('sn_dbg', { msg: 'js open +3s' }).catch(() => {}) }, 3000)
-        })
-        .catch((e) => invoke('sn_dbg', { msg: `js open failed: ${String(e)}` }).catch(() => {}))
-    })
-  }, 9000)
-
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
   listen('menu_check_updates', () => {

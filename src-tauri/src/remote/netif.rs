@@ -10,7 +10,7 @@ pub struct LocalIpInfo {
     pub primary: bool,
 }
 
-fn is_usable_ipv4(ip: &IpAddr) -> bool {
+pub(crate) fn is_usable_ipv4(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
             !v4.is_loopback() && !v4.is_link_local() && !v4.is_unspecified() && !v4.is_multicast()
@@ -41,4 +41,22 @@ pub fn list_local_ips() -> Vec<LocalIpInfo> {
     }
     out.sort_by(|a, b| b.primary.cmp(&a.primary).then(a.ip.cmp(&b.ip)));
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_usable_ipv4;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn is_usable_ipv4_rejects_loopback_and_link_local() {
+        assert!(!is_usable_ipv4(&IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert!(!is_usable_ipv4(&IpAddr::V4(Ipv4Addr::new(169, 254, 1, 1))));
+        assert!(!is_usable_ipv4(&IpAddr::V6(Ipv6Addr::LOCALHOST)));
+    }
+
+    #[test]
+    fn is_usable_ipv4_accepts_rfc1918() {
+        assert!(is_usable_ipv4(&IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10))));
+    }
 }

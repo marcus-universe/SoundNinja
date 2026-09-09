@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { tt } from '~/utils/tt'
 import { useJsonHandelingStore } from './jsonHandeling'
 
 interface ContextMenuState {
@@ -56,7 +57,7 @@ export const useAppStore = defineStore('app', {
       const jsonStore = useJsonHandelingStore()
       // Groups may clear the name (empty → untitled placeholder).
       if (name === '' && this.PopupActive.type !== 'renameGroup') {
-        this.ErrorMessage = 'Field is empty'
+        this.ErrorMessage = tt('rename.emptyField')
         return
       }
       this.RenameContent = name

@@ -5,7 +5,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEXT: usize = 2 * 1024 * 1024;
 
-fn host_allowed(host: &str) -> bool {
+pub(crate) fn host_allowed(host: &str) -> bool {
     let h = host.trim().trim_end_matches('.').to_ascii_lowercase();
     if h.parse::<std::net::IpAddr>().is_ok() {
         return false;
@@ -17,7 +17,7 @@ fn host_allowed(host: &str) -> bool {
         || (h.contains("klipy") && !h.contains("localhost"))
 }
 
-fn parse_https_url(url: &str) -> Result<reqwest::Url, String> {
+pub(crate) fn parse_https_url(url: &str) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url.trim()).map_err(|e| e.to_string())?;
     if parsed.scheme() != "https" {
         return Err("Only HTTPS URLs are allowed".into());
@@ -77,4 +77,35 @@ pub async fn download_url_bytes(url: String) -> Result<String, String> {
 pub async fn http_get_text(url: String) -> Result<String, String> {
     let bytes = fetch_limited(&url, MAX_TEXT).await?;
     String::from_utf8(bytes).map_err(|_| "Response is not UTF-8".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{host_allowed, parse_https_url};
+
+    #[test]
+    fn host_allowed_rejects_ip() {
+        assert!(!host_allowed("1.2.3.4"));
+    }
+
+    #[test]
+    fn host_allowed_accepts_klipy() {
+        assert!(host_allowed("klipy.com"));
+        assert!(host_allowed("cdn.klipy.com"));
+    }
+
+    #[test]
+    fn host_allowed_rejects_other_host() {
+        assert!(!host_allowed("example.com"));
+    }
+
+    #[test]
+    fn parse_https_url_rejects_http() {
+        assert!(parse_https_url("http://klipy.com/x").is_err());
+    }
+
+    #[test]
+    fn parse_https_url_rejects_unknown_host() {
+        assert!(parse_https_url("https://evil.example/x").is_err());
+    }
 }

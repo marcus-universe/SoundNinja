@@ -188,7 +188,9 @@
       "sliderResetHint": "Doble clic para restablecer",
       "asioChannelMatrix": "Matriz de canales ASIO",
       "asioChannelHint": "Selecciona exactamente un canal de salida izquierdo y uno derecho.",
-      "asioChannel": "Canal"
+      "asioChannel": "Canal",
+      "left": "L",
+      "right": "R"
     },
     "themeCreator": {
       "title": "Creador de temas",
@@ -480,7 +482,25 @@
     "renameGroup": "Renombrar grupo",
     "addTab": "Añadir pestaña",
     "placeholder": "Escribe un nombre aquí",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "emptyField": "El campo está vacío"
+  },
+  "native": {
+    "openProject": "Abrir proyecto",
+    "saveProjectAs": "Guardar proyecto como",
+    "selectFilesToUpload": "Seleccionar archivos para subir",
+    "addSounds": "Añadir sonidos",
+    "importThemeCss": "Importar CSS del tema",
+    "uploadFont": "Subir fuente",
+    "exportTheme": "Exportar tema",
+    "importFolder": "Importar carpeta",
+    "findMissingSounds": "Buscar sonidos faltantes"
+  },
+  "windows": {
+    "recordEditor": "Editor de grabación",
+    "themeCreator": "Creador de temas",
+    "playingList": "Lista de reproducción",
+    "themeCreatorSections": "Secciones del creador de temas"
   },
   "navbar": {
     "search": "Buscar",

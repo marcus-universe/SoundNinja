@@ -169,7 +169,7 @@
   transform-origin: center center;
 
   &:hover {
-    background: rgba($white, 0.1);
+    background: var(--surface-hover);
     transform: scale(1.12);
   }
 
