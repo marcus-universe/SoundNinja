@@ -1,6 +1,6 @@
 {
   "productName": "soundninja",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -21,7 +21,7 @@
         "minWidth": 650,
         "decorations": false,
         "dragDropEnabled": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,MsEdgeSidebar,EdgeCollections,TranslateUI,StorageServiceOutOfProcess --enable-features=NetworkServiceInProcess,NetworkServiceInProcess2 --process-per-site --renderer-process-limit=1 --enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,MsEdgeSidebar,EdgeCollections,TranslateUI,StorageServiceOutOfProcess --enable-features=NetworkServiceInProcess,NetworkServiceInProcess2 --process-per-site --enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding"
       }
     ],
     "security": {
@@ -29,7 +29,9 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$APPCACHE/gif-cache/**"]
+          "allow": [
+            "$APPCACHE/gif-cache/**"
+          ]
         }
       }
     }

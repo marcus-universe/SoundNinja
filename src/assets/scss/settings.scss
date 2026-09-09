@@ -897,10 +897,14 @@
   width: 100%;
   display: flex;
   justify-content: center;
+  align-items: center;
 
   &__img {
     max-width: 32rem;
     width: 100%;
+    height: auto;
+    object-fit: contain;
+    display: block;
     border-radius: 0.8rem;
   }
 }

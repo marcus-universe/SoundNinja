@@ -9,6 +9,7 @@ pub mod soundboard;
 pub mod hotkeys;
 pub mod remote;
 pub mod task;
+pub mod toolwin;
 
 #[tauri::command(async)]
 fn get_system_fonts() -> Vec<String> {
@@ -202,6 +203,7 @@ fn main() {
             audio::stems::stems_busy,
             get_system_fonts,
             open_external_url,
+            toolwin::open_tool_window,
             menu::rebuild_menu,
             menu::set_recent_projects,
             menu::set_window_chrome,

@@ -233,10 +233,17 @@ function scheduleRemotePublish() {
 }
 
 function onHotkeyKeydown(e) {
-  if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
   const combo = eventToCombo(e)
   if (!combo) return
   const map = appSettings.hotkeys || {}
+  const searchCombo = map.search
+  if (searchCombo && searchCombo === combo) {
+    e.preventDefault()
+    e.stopPropagation()
+    runHistoryAction(() => runAppHotkey('search'))
+    return
+  }
+  if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
   for (const action of Object.keys(map)) {
     if (map[action] && map[action] === combo) {
       e.preventDefault()
@@ -659,11 +666,12 @@ onMounted(async () => {
   })
 
   if (!isMain.value) {
-    // Theme Creator / Record Editor: apply locale + chrome, skip project/menu ownership.
+    // Theme Creator / Record Editor: apply locale + CSS chrome only.
+    // Do not call set_window_chrome — decorations on all windows recreate HWND on Windows.
     // Tab list for Record Editor comes via `record_context` events from main.
     if (appSettings.locale) setLocale(appSettings.locale)
     appSettings.applyNavbarSide()
-    await appSettings.applyWindowChrome()
+    await appSettings.applyChromeCss()
     return
   }
 
@@ -705,6 +713,17 @@ onMounted(async () => {
   // instant, and first paint never waited for it.
   const whenIdle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 1500))
   whenIdle(() => { settingsEverOpened.value = true })
+
+  setTimeout(() => {
+    import('~/utils/secondaryWindows').then((m) => {
+      m.openSecondaryWindow(m.RECORD_EDITOR)
+        .then(() => {
+          invoke('sn_dbg', { msg: 'js open resolved' }).catch(() => {})
+          setTimeout(() => { invoke('sn_dbg', { msg: 'js open +3s' }).catch(() => {}) }, 3000)
+        })
+        .catch((e) => invoke('sn_dbg', { msg: `js open failed: ${String(e)}` }).catch(() => {}))
+    })
+  }, 9000)
 
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
@@ -752,7 +771,7 @@ onMounted(async () => {
   listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
   listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
 
-  window.addEventListener('keydown', onHotkeyKeydown)
+  window.addEventListener('keydown', onHotkeyKeydown, true)
   await syncGlobalSoundHotkeys()
   // Created after an await, so Vue no longer binds them to this instance —
   // their stop handles have to be collected by hand.
@@ -874,7 +893,7 @@ onUnmounted(() => {
     unlistenChrome = null
   }
   if (isMain.value) {
-    window.removeEventListener('keydown', onHotkeyKeydown)
+    window.removeEventListener('keydown', onHotkeyKeydown, true)
   }
   for (const release of teardown.splice(0)) {
     try { release() } catch { /* already gone */ }

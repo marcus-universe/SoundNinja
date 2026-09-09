@@ -406,8 +406,11 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+// Window/menu commands must be `async`: a sync command runs on the main thread,
+// and dispatching a window message from there deadlocks WebView2 on Windows —
+// which leaves freshly created tool windows dead (`FailedToReceiveMessage`).
 #[tauri::command]
-pub fn rebuild_menu(app: tauri::AppHandle, lang: String) -> Result<(), String> {
+pub async fn rebuild_menu(app: tauri::AppHandle, lang: String) -> Result<(), String> {
     {
         let mut state = MENU_STATE.lock().unwrap();
         state.lang = lang;
@@ -418,7 +421,7 @@ pub fn rebuild_menu(app: tauri::AppHandle, lang: String) -> Result<(), String> {
 /// Replaces the recent-projects list and rebuilds the menu, keeping the
 /// currently active language.
 #[tauri::command]
-pub fn set_recent_projects(
+pub async fn set_recent_projects(
     app: tauri::AppHandle,
     recents: Vec<RecentProject>,
 ) -> Result<(), String> {
@@ -442,7 +445,7 @@ pub fn set_recent_projects(
 ///
 /// macOS always keeps its menu bar (platform convention).
 #[tauri::command]
-pub fn set_window_chrome(
+pub async fn set_window_chrome(
     app: tauri::AppHandle,
     native_chrome: bool,
     hidden: bool,
@@ -492,13 +495,16 @@ fn strip_secondary_window_menus(app: &tauri::AppHandle) {
 
 /// Give this window an empty menu so File/Edit/Help from the app menu do not show.
 #[tauri::command]
-pub fn strip_window_menu(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+pub async fn strip_window_menu(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
     strip_menu_on(&app, &window)
 }
 
 /// Strip menu on a window by label (call before show to avoid layout jitter).
 #[tauri::command]
-pub fn strip_window_menu_for(app: tauri::AppHandle, label: String) -> Result<(), String> {
+pub async fn strip_window_menu_for(app: tauri::AppHandle, label: String) -> Result<(), String> {
     use tauri::Manager;
     let window = app
         .get_webview_window(&label)
