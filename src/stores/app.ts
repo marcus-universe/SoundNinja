@@ -35,6 +35,8 @@ export const useAppStore = defineStore('app', {
     relinkActive: false,
     multiSelectActive: false,
     selectedSoundPaths: [] as string[],
+    /** Last non-shift click in multi-select; Shift+click ranges from here. */
+    selectionAnchorPath: null as string | null,
     draggingSoundIndex: null as number | null,
     draggingTabName: null as string | null,
     /** Sound array index whose GIF picker is open, or null. */
@@ -108,6 +110,7 @@ export const useAppStore = defineStore('app', {
 
     setCurrentTab(val: string) {
       this.currentTab = val
+      this.selectionAnchorPath = null
     },
 
     setActiveOverlay(val: 'settings' | 'about' | null) {
@@ -148,7 +151,10 @@ export const useAppStore = defineStore('app', {
 
     setMultiSelectActive(val: boolean) {
       this.multiSelectActive = val
-      if (!val) this.selectedSoundPaths = []
+      if (!val) {
+        this.selectedSoundPaths = []
+        this.selectionAnchorPath = null
+      }
     },
 
     toggleMultiSelectActive() {
@@ -159,10 +165,23 @@ export const useAppStore = defineStore('app', {
       const i = this.selectedSoundPaths.indexOf(path)
       if (i === -1) this.selectedSoundPaths.push(path)
       else this.selectedSoundPaths.splice(i, 1)
+      this.selectionAnchorPath = path
+    },
+
+    selectSoundRange(paths: string[]) {
+      if (!paths.length) return
+      const set = new Set(this.selectedSoundPaths)
+      for (const p of paths) set.add(p)
+      this.selectedSoundPaths = [...set]
+    },
+
+    setSelectionAnchor(path: string | null) {
+      this.selectionAnchorPath = path
     },
 
     clearSoundSelection() {
       this.selectedSoundPaths = []
+      this.selectionAnchorPath = null
     },
 
     setDraggingSoundIndex(idx: number | null) {
