@@ -145,6 +145,7 @@
 
     .SoundTab-wrap {
       width: 100%;
+      min-height: 100%;
     }
 
     // Tab-switch: slide (outgoing overlays; incoming stays in flow).
@@ -227,7 +228,7 @@
     }
 
     .SoundTab {
-      min-height: 10rem;
+      min-height: 100%;
 
       // Group card (legacy `.tab-separator` kept as alias class).
       .sound-group,

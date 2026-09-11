@@ -133,7 +133,7 @@
       <UICheckbox :modelValue="gifPlayOnHover" @update:modelValue="onGifPlayOnHover" />
     </div>
 
-    <div class="settings-group settings-group--stacked">
+    <div id="settings-klipy-api" class="settings-group settings-group--stacked">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.klipyApiKey') }}</span>
         <span class="settings-hint">{{ $t('settings.main.klipyApiKeyHint') }}</span>
@@ -333,7 +333,23 @@ async function syncFromStore() {
 watch(() => appStore.activeOverlay, async (val) => {
   if (val !== 'settings') return
   await syncFromStore()
+  consumeKlipySection()
 })
 
-onMounted(syncFromStore)
+watch(() => appStore.pendingSettingsSection, (section) => {
+  if (section === 'klipyApi' && appStore.activeOverlay === 'settings') consumeKlipySection()
+})
+
+onMounted(async () => {
+  await syncFromStore()
+  consumeKlipySection()
+})
+
+function consumeKlipySection() {
+  if (appStore.pendingSettingsSection !== 'klipyApi') return
+  appStore.consumePendingSettingsSection()
+  nextTick(() => {
+    document.getElementById('settings-klipy-api')?.scrollIntoView({ block: 'center' })
+  })
+}
 </script>

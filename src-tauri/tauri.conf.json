@@ -1,6 +1,7 @@
 {
-  "productName": "soundninja",
-  "version": "0.6.2",
+  "productName": "Sound Ninja",
+  "mainBinaryName": "soundninja",
+  "version": "0.7.0",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -64,13 +65,17 @@
       "signingIdentity": null
     },
     "resources": [],
-    "shortDescription": "",
+    "shortDescription": "Sound Ninja",
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "nsis": {
-        "template": "installer/installer.nsi"
+        "template": "installer/installer.nsi",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp"
       }
     }
   },

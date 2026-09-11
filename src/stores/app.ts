@@ -6,7 +6,7 @@ interface ContextMenuState {
   visible: boolean
   x: number
   y: number
-  type: 'tab' | 'sound' | 'separator' | null
+  type: 'tab' | 'sound' | 'separator' | 'board' | null
   targetName: string
   targetIndex: number
 }
@@ -17,6 +17,8 @@ export const useAppStore = defineStore('app', {
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
     pendingSettingsTab: null as string | null,
+    /** Scroll target inside a settings tab (e.g. 'klipyApi'). */
+    pendingSettingsSection: null as string | null,
     /** Prefill Settings → Hotkeys with this sound id (context-menu assign). */
     pendingHotkeySoundId: null as string | null,
     PopupActive: { active: false, type: 'addTab' } as { active: boolean; type: string },
@@ -112,15 +114,22 @@ export const useAppStore = defineStore('app', {
       this.activeOverlay = val
     },
 
-    openSettingsTab(tab: string) {
+    openSettingsTab(tab: string, section?: string) {
       this.activeOverlay = 'settings'
       this.pendingSettingsTab = tab
+      this.pendingSettingsSection = section ?? null
     },
 
     consumePendingSettingsTab(): string | null {
       const t = this.pendingSettingsTab
       this.pendingSettingsTab = null
       return t
+    },
+
+    consumePendingSettingsSection(): string | null {
+      const s = this.pendingSettingsSection
+      this.pendingSettingsSection = null
+      return s
     },
 
     consumePendingHotkeySoundId(): string | null {
@@ -166,7 +175,7 @@ export const useAppStore = defineStore('app', {
 
     openContextMenu({
       x, y, type, targetName, targetIndex,
-    }: { x: number; y: number; type: 'tab' | 'sound' | 'separator'; targetName: string; targetIndex: number }) {
+    }: { x: number; y: number; type: 'tab' | 'sound' | 'separator' | 'board'; targetName: string; targetIndex: number }) {
       this.contextMenu = { visible: true, x, y, type, targetName, targetIndex }
     },
 

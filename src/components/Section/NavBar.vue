@@ -163,7 +163,7 @@ async function uploadFiles() {
           .replace(/([A-Z])/g, ' $1')
           .trim(),
         path: file,
-        volume: 0.4,
+        volume: 1,
         tabs: tabs,
         active: false,
         index: index + indexLength,

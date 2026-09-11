@@ -6,7 +6,7 @@
           'SoundContainer--bulk': appStore.multiSelectActive,
         }"
     >
-        <div class="SoundContainer__scroll">
+        <div class="SoundContainer__scroll" @contextmenu.prevent="openBoardMenu">
         <Transition
             :name="tabTransitionName"
             :mode="tabTransitionMode"
@@ -57,7 +57,7 @@
                     class="sound-group tab-separator"
                     :data-sep-id="sec.sep.id"
                     :style="groupCardStyle(sec.sep)"
-                    @contextmenu.prevent="(e) => openSeparatorMenu(e, sec.sep)"
+                    @contextmenu.prevent.stop="(e) => openSeparatorMenu(e, sec.sep)"
                 >
                     <div class="sound-group__name" :style="groupNameStyle(sec.sep)">
                         {{ sec.sep.name?.trim() || $t('contextMenu.untitledGroup') }}
@@ -643,6 +643,16 @@ function openSeparatorMenu(event, sep) {
   })
 }
 
+function openBoardMenu(event) {
+  appStore.openContextMenu({
+    x: event.clientX,
+    y: event.clientY,
+    type: 'board',
+    targetName: appStore.currentTab,
+    targetIndex: -1,
+  })
+}
+
 /**
  * Style objects are cached per sound. A fresh object on every render would be a
  * changed prop for Vue even when nothing about the button moved, forcing the
@@ -896,6 +906,7 @@ async function setActiveSound(sound) {
       hostName: appSettings.outputHost || null,
       active: false,
       overlap: overlapSounds,
+      volume: sound.volume ?? 1,
     })
       .then((duration) => {
         if (!sound.active) return

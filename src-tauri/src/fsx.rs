@@ -75,6 +75,36 @@ pub fn list_dir_files_abs(dir: String, exts: Vec<String>) -> Result<Vec<String>,
     Ok(out)
 }
 
+const IMAGE_EXTS: &[&str] = &["gif", "webp", "png", "jpg", "jpeg"];
+
+/// Absolute paths of image files (gif/webp/png/jpg/jpeg) in `dir`.
+/// Direct children only. Missing dir → empty list.
+#[tauri::command(async)]
+pub fn list_image_files_abs(dir: String) -> Result<Vec<String>, String> {
+    let path = Path::new(&dir);
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let p = entry.path();
+        let ext = p
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if !IMAGE_EXTS.contains(&ext.as_str()) {
+            continue;
+        }
+        out.push(p.to_string_lossy().into_owned());
+    }
+    out.sort();
+    Ok(out)
+}
+
 /// Copies `src` to an exact destination path (creates parent dirs).
 #[tauri::command(async)]
 pub fn copy_file_to_abs(src: String, dst: String) -> Result<String, String> {
@@ -260,4 +290,31 @@ pub fn find_files_by_names(
         .into_iter()
         .map(|(name, paths)| FileNameMatch { name, paths })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::list_image_files_abs;
+    use std::fs;
+
+    #[test]
+    fn list_image_files_abs_returns_matching_full_paths() {
+        let dir = std::env::temp_dir().join(format!("sn-img-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("a.gif"), b"GIF89a").unwrap();
+        fs::write(dir.join("b.txt"), b"nope").unwrap();
+        fs::write(dir.join("c.PNG"), b"png").unwrap();
+        let listed = list_image_files_abs(dir.to_string_lossy().into_owned()).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(listed.len(), 2);
+        let lower: Vec<String> = listed.iter().map(|p| p.replace('\\', "/").to_lowercase()).collect();
+        assert!(lower.iter().any(|p| p.ends_with("/a.gif")));
+        assert!(lower.iter().any(|p| p.ends_with("/c.png")));
+    }
+
+    #[test]
+    fn list_image_files_abs_missing_dir_is_empty() {
+        let listed = list_image_files_abs(String::from("/this/path/does/not/exist-sn-test")).unwrap();
+        assert!(listed.is_empty());
+    }
 }

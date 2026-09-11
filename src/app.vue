@@ -138,6 +138,9 @@ const updateDialogRef = ref(null)
 // Latches on the first open so the settings chunk is fetched once and the
 // overlay's own enter/leave transition keeps working afterwards.
 const settingsEverOpened = ref(false)
+watch(() => appStore.activeOverlay, (val) => {
+  if (val === 'settings') settingsEverOpened.value = true
+})
 const savePopup = ref(null)
 let savePopupTimer = null
 const transferPopup = ref(null)
@@ -467,7 +470,7 @@ async function handleMenuImportAudio() {
         .replace(/([A-Z])/g, ' $1')
         .trim(),
       path: file,
-      volume: 0.4,
+      volume: 1,
       tabs,
       active: false,
       index: index + indexLength,
@@ -867,7 +870,7 @@ onMounted(async () => {
     jsonStore.addFiles([{
       name,
       path,
-      volume: 0.4,
+      volume: 1,
       tabs,
       active: false,
       index: indexLength,

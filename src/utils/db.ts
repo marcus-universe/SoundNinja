@@ -122,6 +122,11 @@ export interface Settings {
   tabTransition?: TabTransition
   /** User-added sound trigger bindings (travel with the project). */
   soundHotkeys?: { id: string; soundId: string; combo: string }[]
+  /**
+   * One-shot: unused legacy `volume: 0.4` (never applied in playback) was
+   * rewritten to 1.0. After this flag, user-set 40% stays 40%.
+   */
+  perSoundVolumeV1?: boolean
 }
 
 export interface ProjectConfig {
@@ -453,6 +458,21 @@ async function loadSoundRows(d: Database): Promise<{
   }
 }
 
+/** Unused default before per-sound volume was applied in playback. */
+const LEGACY_UNUSED_VOLUME = 0.4
+
+/** One-shot: unused 0.4 defaults become 1.0. Returns true if config changed. */
+export function ensurePerSoundVolume(config: ProjectConfig): boolean {
+  if (config.settings.perSoundVolumeV1) return false
+  for (const f of config.files) {
+    if (f.volume == null || Math.abs(Number(f.volume) - LEGACY_UNUSED_VOLUME) < 1e-6) {
+      f.volume = 1
+    }
+  }
+  config.settings.perSoundVolumeV1 = true
+  return true
+}
+
 /** Write missing sound ids with UPDATE — never a full DELETE+INSERT resync. */
 export async function persistSoundIds(d: Database, files: SoundFile[]): Promise<void> {
   const cols = await tableColumns(d, 'sounds')
@@ -486,6 +506,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'soundHotkeys':
         try { settings.soundHotkeys = JSON.parse(value) } catch { settings.soundHotkeys = [] }
         break
+      case 'perSoundVolumeV1': settings.perSoundVolumeV1 = value === 'true'; break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -572,7 +593,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       path: s.path,
       id: s.sound_id || '',
       name: s.name,
-      volume: s.volume,
+      volume: s.volume ?? 1,
       index: s.global_index,
       active: s.active === 1,
       tabs,
@@ -686,6 +707,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['preloadGifs', String(s.preloadGifs === true)],
     ['tabTransition', normalizeTabTransition(s.tabTransition)],
     ['soundHotkeys', JSON.stringify(s.soundHotkeys ?? [])],
+    ['perSoundVolumeV1', String(s.perSoundVolumeV1 === true)],
     ['primaryColor', s.primaryColor ?? '#00d4ff'],
     ['primaryHover', s.primaryHover ?? '#33ddff'],
     ['bg', s.bg ?? '#222831'],
@@ -721,7 +743,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       f.path,
       f.id || '',
       f.name,
-      f.volume ?? 0.4,
+      f.volume ?? 1,
       f.color ?? null,
       f.index ?? 0,
       f.active ? 1 : 0,

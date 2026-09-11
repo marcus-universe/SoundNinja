@@ -109,5 +109,5 @@ watch(() => appStore.activeOverlay, (val) => {
     const pending = appStore.consumePendingSettingsTab()
     if (pending) activeTab.value = pending
   }
-})
+}, { immediate: true })
 </script>
