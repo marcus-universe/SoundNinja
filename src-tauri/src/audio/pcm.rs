@@ -245,7 +245,7 @@ pub fn load(
         .unwrap_or(0.0);
 
     let mut guard = cache().lock().map_err(|e| e.to_string())?;
-    guard.insert(key.clone(), buffer.clone(), bytes, duration_secs);
+    guard.insert(key, buffer.clone(), bytes, duration_secs);
     Ok((buffer, duration_secs))
 }
 

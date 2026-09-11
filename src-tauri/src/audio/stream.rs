@@ -201,7 +201,7 @@ pub fn start(
         duration_bits: AtomicU64::new(0),
         sample_rate: dst_rate.get(),
         channels: dst_channels.get(),
-        path: path.clone(),
+        path,
     });
     register(&shared);
 
