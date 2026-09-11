@@ -1,0 +1,89 @@
+name: Companion Module
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (e.g. 1.0.1). Leave empty to use package.json."
+        required: false
+        type: string
+  push:
+    branches: [companion-module]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout companion module (SoundNinja branch)
+        if: github.repository == 'marcus-universe/SoundNinja'
+        uses: actions/checkout@v5
+        with:
+          ref: companion-module
+
+      - name: Checkout companion module
+        if: github.repository != 'marcus-universe/SoundNinja'
+        uses: actions/checkout@v5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Resolve version
+        id: meta
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VER="${{ inputs.version }}"
+            VER="${VER#v}"
+            VER="${VER#companion-v}"
+          else
+            VER="$(jq -r .version package.json)"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Using ${VER}"
+
+      - name: Package module
+        run: |
+          npm ci
+          npm run package
+          ls -la *.tgz
+
+      - name: Attach .tgz to latest SoundNinja release
+        env:
+          GH_TOKEN: ${{ secrets.SOUNDNINJA_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          TARGET_REPO: marcus-universe/SoundNinja
+        shell: bash
+        run: |
+          VER="${{ steps.meta.outputs.version }}"
+          if [ -z "$VER" ]; then
+            echo "::error::Version is empty"
+            exit 1
+          fi
+
+          TGZ=$(ls soundninja-*.tgz 2>/dev/null | head -1)
+          if [ -z "$TGZ" ]; then
+            TGZ=$(ls *.tgz 2>/dev/null | head -1)
+          fi
+          if [ -z "$TGZ" ]; then
+            echo "::error::No companion .tgz produced"
+            exit 1
+          fi
+
+          VERSIONED="SoundNinja-Companion-${VER}.tgz"
+          STABLE="SoundNinja-Companion.tgz"
+          cp "$TGZ" "$VERSIONED"
+          cp "$TGZ" "$STABLE"
+
+          LATEST=$(gh api "repos/${TARGET_REPO}/releases/latest" --jq .tag_name)
+          if [ -z "$LATEST" ]; then
+            echo "::error::No latest GitHub release on ${TARGET_REPO} to attach to"
+            exit 1
+          fi
+
+          echo "Uploading ${VERSIONED} and ${STABLE} to ${TARGET_REPO}@${LATEST}"
+          gh release upload "$LATEST" "$VERSIONED" "$STABLE" --repo "$TARGET_REPO" --clobber
