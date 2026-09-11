@@ -20,7 +20,7 @@ Windows peut afficher une invite pare-feu la première fois que le serveur déma
 ## Bitfocus Companion
 
 1. Installe [Bitfocus Companion](https://bitfocus.io/companion).
-2. Télécharge [companion-module-soundninja.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/companion-module-soundninja.tgz). Il n’y a pas encore de paquet Companion Store.
+2. Télécharge [SoundNinja-Companion.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/SoundNinja-Companion.tgz). Il n’y a pas encore de paquet Companion Store.
 3. Dans Companion : **Modules → Load module package** et choisis le `.tgz`.
 4. Ajoute une connexion **Sound Ninja**. Colle l’IP du PC, le port, et le token si tu en as défini un.
 
