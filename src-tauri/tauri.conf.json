@@ -1,7 +1,7 @@
 {
   "productName": "Sound Ninja",
   "mainBinaryName": "soundninja",
-  "version": "0.8.0",
+  "version": "0.7.0",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
