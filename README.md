@@ -75,7 +75,7 @@ The core mission was to build a soundboard that empowers you to organize massive
 
 App installers and the Companion module `.tgz` both live on `/releases/latest/download/…`.
 
-Create a GitHub Release **draft** first (`vX.Y.Z`, or `gh release create vX.Y.Z --draft`). Then run **Actions → Release** — it attaches only platforms that are not already on the draft. Rebuild one target with **Release Windows**, **Release Linux**, **Release macOS ARM**, **Release macOS Intel**, or **Release Companion**. Each action uploads the installer (plus a stable alias) onto that draft. Companion source: [`companion-module` branch](https://github.com/marcus-universe/SoundNinja/tree/companion-module) (`SoundNinja-Companion.tgz` and `SoundNinja-Companion-{Version}.tgz`).
+Run **Actions → Release** — it creates a GitHub Release **draft** (`vX.Y.Z`) if none exists, then attaches only platforms that are not already on the draft. Rebuild one target with **Release Windows**, **Release Linux**, **Release macOS ARM**, **Release macOS Intel**, or **Release Companion**. Each action uploads the installer (plus a stable alias) onto that draft. Companion source: [`companion-module` branch](https://github.com/marcus-universe/SoundNinja/tree/companion-module) (`SoundNinja-Companion.tgz` and `SoundNinja-Companion-{Version}.tgz`).
 
 ## Platforms
 

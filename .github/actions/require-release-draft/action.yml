@@ -1,5 +1,5 @@
 name: Require release draft
-description: Resolve tag, require an existing GitHub Release draft, optionally scan assets.
+description: Resolve tag, ensure a GitHub Release draft exists (create if missing), optionally scan assets.
 
 inputs:
   version:
@@ -61,10 +61,33 @@ runs:
         TAG="v${VER}"
         echo "Using tag=$TAG"
 
+        create_draft() {
+          echo "No release for ${TAG}; creating draft"
+          if gh release create "$TAG" \
+            --draft \
+            --title "SoundNinja ${TAG}" \
+            --notes "" \
+            --target "${GITHUB_SHA}"; then
+            return 0
+          fi
+          # Tag may already exist; create the release from that tag.
+          gh release create "$TAG" \
+            --draft \
+            --title "SoundNinja ${TAG}" \
+            --notes ""
+        }
+
         if ! REL_JSON="$(gh release view "$TAG" --json isDraft,id,assets 2>/tmp/gh-release.err)"; then
-          echo "::error::No GitHub release for ${TAG}. Create a draft first (GitHub Releases UI or: gh release create ${TAG} --draft)."
-          cat /tmp/gh-release.err >&2 || true
-          exit 1
+          if ! create_draft 2>/tmp/gh-release-create.err; then
+            if ! REL_JSON="$(gh release view "$TAG" --json isDraft,id,assets 2>/tmp/gh-release.err)"; then
+              echo "::error::Could not create or load release ${TAG}."
+              cat /tmp/gh-release-create.err >&2 || true
+              cat /tmp/gh-release.err >&2 || true
+              exit 1
+            fi
+          else
+            REL_JSON="$(gh release view "$TAG" --json isDraft,id,assets)"
+          fi
         fi
 
         IS_DRAFT="$(jq -r .isDraft <<<"$REL_JSON")"

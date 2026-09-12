@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version override (e.g. 0.7.0). Leave empty to use src-tauri/tauri.conf.json. Draft must already exist."
+        description: "Version override (e.g. 0.7.0). Leave empty to use src-tauri/tauri.conf.json. Creates a draft if none exists."
         required: false
         type: string
       update_aur:
