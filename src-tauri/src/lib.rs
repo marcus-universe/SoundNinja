@@ -16,6 +16,7 @@ fn get_system_fonts() -> Vec<String> {
 }
 
 /// Strip registry / OS font-name suffixes down to a family.
+#[cfg(any(target_os = "windows", test))]
 pub(crate) fn strip_font_family_name(name: &str) -> String {
     const TYPE_SUFFIXES: &[&str] = &[
         " (TrueType)",
