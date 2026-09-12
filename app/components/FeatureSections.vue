@@ -24,6 +24,7 @@ const features = computed(() =>
     description: t(`features.items.${key}.description`),
     image: `${base.value}screenshots/${key}.svg`,
     imageRight: index % 2 === 0,
+    imageLeft: index % 2 !== 0,
     licenseLink:
       key === 'opensource' ? t('features.items.opensource.licenseLink') : null,
   })),
@@ -33,27 +34,38 @@ const features = computed(() =>
 <template>
   <section
     id="features"
-    class="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24"
+    class="relative py-16 sm:py-24"
     :aria-label="t('features.heading')"
   >
-    <h2 class="mb-14 text-center text-3xl font-extrabold sm:mb-20 sm:text-4xl">
+    <h2
+      class="mx-auto mb-14 max-w-6xl px-4 text-center text-3xl font-extrabold sm:mb-20 sm:px-6 sm:text-4xl"
+    >
       {{ t('features.heading') }}
     </h2>
 
-    <div class="flex flex-col gap-16 sm:gap-24">
-      <article
-        v-for="feature in features"
-        :key="feature.key"
-        class="grid items-center gap-8 md:grid-cols-2 md:gap-12 lg:gap-16"
+    <article
+      v-for="feature in features"
+      :key="feature.key"
+      class="px-4 py-16 sm:px-6 sm:py-20"
+      :class="feature.imageLeft ? 'bg-primary text-on-primary' : ''"
+    >
+      <div
+        class="mx-auto grid max-w-6xl items-center gap-8 md:grid-cols-2 md:gap-12 lg:gap-16"
       >
         <div
           class="order-1"
           :class="feature.imageRight ? 'md:order-1' : 'md:order-2'"
         >
-          <h3 class="text-2xl font-extrabold text-primary sm:text-3xl">
+          <h3
+            class="text-2xl font-extrabold sm:text-3xl"
+            :class="feature.imageLeft ? 'text-on-primary' : 'text-primary'"
+          >
             {{ feature.title }}
           </h3>
-          <p class="mt-3 text-base text-ink/80 sm:text-lg">
+          <p
+            class="mt-3 text-base sm:text-lg"
+            :class="feature.imageLeft ? 'text-on-primary/80' : 'text-ink/80'"
+          >
             {{ feature.description }}
           </p>
           <a
@@ -69,7 +81,7 @@ const features = computed(() =>
         </div>
 
         <div
-          class="order-2 overflow-hidden rounded-3xl bg-surface/60 shadow-lg"
+          class="order-2 overflow-hidden rounded-3xl bg-surface shadow-lg"
           :class="feature.imageRight ? 'md:order-2' : 'md:order-1'"
         >
           <img
@@ -81,7 +93,7 @@ const features = computed(() =>
             loading="lazy"
           />
         </div>
-      </article>
-    </div>
+      </div>
+    </article>
   </section>
 </template>

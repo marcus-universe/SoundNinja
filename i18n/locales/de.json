@@ -8,9 +8,11 @@
     "language": "Sprache"
   },
   "hero": {
-    "title": "SoundNinja",
+    "title": "SOUND NINJA",
+    "titleSound": "SOUND",
+    "titleNinja": "NINJA",
     "logoAlt": "SoundNinja Logo",
-    "subtitle": "Modernes, anpassbares, Open-Source-Soundboard",
+    "subtitle": "Performant, modern, Open-Source-Soundboard",
     "download": "Download",
     "downloadVersion": "Download {version}",
     "contribute": "Mitmachen auf GitHub"

@@ -19,17 +19,15 @@ const base = computed(() => {
       class="relative z-10 mb-6 h-20 w-auto sm:mb-8 sm:h-24 md:h-28"
     />
 
-    <h1
-      class="relative z-10 text-5xl font-black tracking-tight text-ink sm:text-6xl md:text-7xl"
-    >
-      {{ t('hero.title') }}
-    </h1>
-
-    <p
-      class="relative z-10 mt-4 max-w-xl text-lg font-semibold text-ink/75 sm:text-xl md:text-2xl"
-    >
-      {{ t('hero.subtitle') }}
-    </p>
+    <div class="hero-lockup relative z-10">
+      <h1 class="hero-title">
+        <span class="text-ink">{{ t('hero.titleSound') }}</span>
+        <span class="hero-ninja">{{ t('hero.titleNinja') }}</span>
+      </h1>
+      <p class="hero-slogan">
+        {{ t('hero.subtitle') }}
+      </p>
+    </div>
 
     <div class="relative z-10 mt-10 flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
       <DownloadButton />
@@ -57,3 +55,77 @@ const base = computed(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+.hero-lockup {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  max-width: 100%;
+  font-size: clamp(1.65rem, 8.6vw, 4.75rem);
+}
+
+.hero-title {
+  display: flex;
+  justify-content: center;
+  gap: 0.28em;
+  font-size: 1em;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.hero-ninja {
+  background-image: linear-gradient(
+    90deg,
+    hsl(0 100% 58%),
+    hsl(40 100% 55%),
+    hsl(60 100% 52%),
+    hsl(120 80% 48%),
+    hsl(189 100% 58%),
+    hsl(260 100% 66%),
+    hsl(300 100% 60%),
+    hsl(0 100% 58%)
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hero-rainbow-shift 6s linear infinite;
+}
+
+@keyframes hero-rainbow-shift {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.hero-slogan {
+  margin-top: 0.42em;
+  color: hsl(189 100% 58%);
+  font-weight: 700;
+  font-size: max(0.8125rem, 0.38em);
+  line-height: 1.25;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+@media (min-width: 640px) {
+  .hero-slogan {
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-ninja {
+    animation: none;
+    background-image: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    color: hsl(189 100% 58%);
+  }
+}
+</style>

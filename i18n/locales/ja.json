@@ -8,9 +8,11 @@
     "language": "言語"
   },
   "hero": {
-    "title": "SoundNinja",
+    "title": "SOUND NINJA",
+    "titleSound": "SOUND",
+    "titleNinja": "NINJA",
     "logoAlt": "SoundNinjaロゴ",
-    "subtitle": "モダンでカスタマイズ可能なオープンソースサウンドボード",
+    "subtitle": "高性能でモダンなオープンソースサウンドボード",
     "download": "ダウンロード",
     "downloadVersion": "{version} をダウンロード",
     "contribute": "GitHubでコントリビュート"

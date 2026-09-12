@@ -8,9 +8,11 @@
     "language": "语言"
   },
   "hero": {
-    "title": "SoundNinja",
+    "title": "SOUND NINJA",
+    "titleSound": "SOUND",
+    "titleNinja": "NINJA",
     "logoAlt": "SoundNinja 标志",
-    "subtitle": "现代、可定制的开源音效板",
+    "subtitle": "高性能、现代、开源音效板",
     "download": "下载",
     "downloadVersion": "下载 {version}",
     "contribute": "在 GitHub 上贡献"
