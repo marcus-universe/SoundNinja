@@ -1,4 +1,4 @@
-@use 'variables' as *;
+@use '../abstracts/variables' as *;
 
 // Space reserved for the fixed navbar strip (icons + horizontal padding + border).
 html {
@@ -10,6 +10,7 @@ html {
   box-sizing: border-box;
   padding: 0 $padding_1;
   width: var(--navbar-offset);
+  overflow: visible;
   position: fixed;
   top: var(--topbar_height, 0px);
   // Above soundboard / player so side tooltips paint over buttons.
@@ -105,14 +106,18 @@ html {
       // Equal gutters inside the content area (navbar strip excluded).
       left: calc(var(--navbar-offset) + #{$padding_1});
       right: $padding_1;
-      height: var(--icon_size);
-      background: var(--color-bg, #{$color-bg});
+      height: auto;
+      min-height: var(--icon_size);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      background: transparent;
       z-index: 3;
 
       &__field {
         position: relative;
         width: 100%;
-        height: 100%;
+        height: var(--icon_size);
         display: flex;
         align-items: center;
       }

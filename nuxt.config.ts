@@ -8,6 +8,20 @@ function isTransientSocketError(reason: unknown): boolean {
   return err?.code === 'ECONNRESET' || err?.code === 'EPIPE' || msg.includes('ECONNRESET') || msg.includes('EPIPE')
 }
 
+// nuxi fork: process.once('unhandledRejection') → IPC restart. Socket drops from
+// WebView2 must not kill the child. Swallow before nuxi's listener runs.
+const rawEmit = process.emit.bind(process) as (event: string | symbol, ...args: unknown[]) => boolean
+;(process as NodeJS.Process).emit = ((event: string | symbol, ...args: unknown[]) => {
+  if (
+    (event === 'unhandledRejection' || event === 'uncaughtException')
+    && isTransientSocketError(args[0])
+  ) {
+    // true = Node marks it handled (false → triggerUncaughtException on Node 23)
+    return true
+  }
+  return rawEmit(event, ...args)
+}) as typeof process.emit
+
 function swallowSockErr(err: unknown) {
   if (isTransientSocketError(err)) return
 }
@@ -106,19 +120,7 @@ export default defineNuxtConfig({
   },
 
   css: [
-    '~/assets/scss/_base.scss',
-    '~/assets/scss/style.scss',
-    '~/assets/scss/navbar.scss',
-    '~/assets/scss/settings.scss',
-    '~/assets/scss/dialogs.scss',
-    '~/assets/scss/ui-elements.scss',
-    '~/assets/scss/titlebar.scss',
-    '~/assets/scss/context-menu.scss',
-    '~/assets/scss/import-folders.scss',
-    '~/assets/scss/pages.scss',
-    '~/assets/scss/settings-audio.scss',
-    '~/assets/scss/player.scss',
-    '~/assets/scss/splash.scss',
+    '~/assets/scss/main.scss',
   ],
 
   // Nuxt 4.4.x plugins often transform without emitting maps; keep them off for Tauri builds.

@@ -5,6 +5,20 @@ import { resolveThemeTokens } from '~/utils/themeTokens'
 // ── Types (mirrors the shape the components already consume) ───────────────────
 export const MAX_GIF_BYTES = 8 * 1024 * 1024
 
+export interface SoundTag {
+  id: string
+  name: string
+  color: string
+}
+
+export type SortMode = 'user' | 'name' | 'added' | 'duration' | 'size'
+
+const SORT_MODES: SortMode[] = ['user', 'name', 'added', 'duration', 'size']
+
+export function normalizeSortMode(value: unknown): SortMode {
+  return SORT_MODES.includes(value as SortMode) ? (value as SortMode) : 'user'
+}
+
 export interface SoundFile {
   name: string
   path: string
@@ -20,6 +34,14 @@ export interface SoundFile {
   gifId?: string
   gifPosX?: number
   gifPosY?: number
+  /** Project tag ids assigned to this sound. */
+  tagIds?: string[]
+  /** Unix ms when the sound was added to the project. */
+  addedAt?: number
+  /** Audio duration in seconds (cached after first probe). */
+  durationSecs?: number
+  /** File size in bytes. */
+  fileSize?: number
 }
 
 export interface GifBlobRow {
@@ -127,6 +149,10 @@ export interface Settings {
    * rewritten to 1.0. After this flag, user-set 40% stays 40%.
    */
   perSoundVolumeV1?: boolean
+  /** Board sort. `user` = drag order (default). */
+  sortMode?: SortMode
+  /** Active tag filter ids (OR). Empty = no tag filter. */
+  selectedTagIds?: string[]
 }
 
 export interface ProjectConfig {
@@ -134,6 +160,7 @@ export interface ProjectConfig {
   tabList: TabEntry[]
   files: SoundFile[]
   separators: Separator[]
+  tags: SoundTag[]
 }
 
 export function defaultSettings(): Settings {
@@ -172,11 +199,13 @@ export function defaultSettings(): Settings {
     cacheMaxEntryMib: 128,
     tabTransition: 'slide',
     soundHotkeys: [],
+    sortMode: 'user',
+    selectedTagIds: [],
   }
 }
 
 export function emptyConfig(): ProjectConfig {
-  return { settings: defaultSettings(), tabList: [], files: [], separators: [] }
+  return { settings: defaultSettings(), tabList: [], files: [], separators: [], tags: [] }
 }
 
 /** Parent folder of a sound path (`C:\board\Lolli\foo.wav` → `Lolli`). */
@@ -401,6 +430,18 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'separators', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'tabs', 'button_align', 'TEXT')
   await addColumnIfMissing(d, 'sounds', 'sound_id', 'TEXT')
+  await addColumnIfMissing(d, 'sounds', 'added_at', 'INTEGER')
+  await addColumnIfMissing(d, 'sounds', 'file_size', 'INTEGER')
+  await addColumnIfMissing(d, 'sounds', 'duration_secs', 'REAL')
+  await d.execute(`CREATE TABLE IF NOT EXISTS tags (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    color TEXT
+  )`)
+  await d.execute(`CREATE TABLE IF NOT EXISTS sound_tags (
+    sound_path TEXT,
+    tag_id TEXT
+  )`)
 }
 
 async function addColumnIfMissing(
@@ -437,6 +478,9 @@ async function loadSoundRows(d: Database): Promise<{
   gif_id?: string | null
   gif_pos_x?: number | null
   gif_pos_y?: number | null
+  added_at?: number | null
+  file_size?: number | null
+  duration_secs?: number | null
 }[]> {
   const cols = await tableColumns(d, 'sounds')
   const idSql = cols.has('sound_id')
@@ -447,9 +491,12 @@ async function loadSoundRows(d: Database): Promise<{
   const gifId = cols.has('gif_id') ? 'gif_id' : 'NULL'
   const gifX = cols.has('gif_pos_x') ? 'gif_pos_x' : 'NULL'
   const gifY = cols.has('gif_pos_y') ? 'gif_pos_y' : 'NULL'
+  const addedAt = cols.has('added_at') ? 'added_at' : 'NULL'
+  const fileSize = cols.has('file_size') ? 'file_size' : 'NULL'
+  const duration = cols.has('duration_secs') ? 'duration_secs' : 'NULL'
   try {
     return await d.select(
-      `SELECT path, ${idSql} AS sound_id, name, volume, color, global_index, active, ${gifId} AS gif_id, ${gifX} AS gif_pos_x, ${gifY} AS gif_pos_y FROM sounds ORDER BY global_index ASC`,
+      `SELECT path, ${idSql} AS sound_id, name, volume, color, global_index, active, ${gifId} AS gif_id, ${gifX} AS gif_pos_x, ${gifY} AS gif_pos_y, ${addedAt} AS added_at, ${fileSize} AS file_size, ${duration} AS duration_secs FROM sounds ORDER BY global_index ASC`,
     )
   } catch {
     return await d.select(
@@ -507,6 +554,11 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
         try { settings.soundHotkeys = JSON.parse(value) } catch { settings.soundHotkeys = [] }
         break
       case 'perSoundVolumeV1': settings.perSoundVolumeV1 = value === 'true'; break
+      case 'sortMode': settings.sortMode = normalizeSortMode(value); break
+      case 'selectedTagIds':
+        try { settings.selectedTagIds = JSON.parse(value) } catch { settings.selectedTagIds = [] }
+        if (!Array.isArray(settings.selectedTagIds)) settings.selectedTagIds = []
+        break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -598,10 +650,14 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       active: s.active === 1,
       tabs,
       tabIndexes,
+      tagIds: [],
       ...(s.color ? { color: s.color } : {}),
       ...(s.gif_id ? { gifId: s.gif_id } : {}),
       ...(s.gif_pos_x != null ? { gifPosX: Number(s.gif_pos_x) } : {}),
       ...(s.gif_pos_y != null ? { gifPosY: Number(s.gif_pos_y) } : {}),
+      ...(s.added_at != null ? { addedAt: Number(s.added_at) } : {}),
+      ...(s.file_size != null ? { fileSize: Number(s.file_size) } : {}),
+      ...(s.duration_secs != null ? { durationSecs: Number(s.duration_secs) } : {}),
     }
   })
 
@@ -632,7 +688,31 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       : {}),
   }))
 
-  const config = { settings, tabList, files, separators }
+  let tags: SoundTag[] = []
+  try {
+    const tagRows = await d.select<{ id: string; name: string; color: string }[]>(
+      'SELECT id, name, color FROM tags',
+    )
+    tags = (tagRows ?? []).map((t) => ({
+      id: t.id,
+      name: t.name ?? '',
+      color: t.color || '#00d4ff',
+    }))
+    const soundTagRows = await d.select<{ sound_path: string; tag_id: string }[]>(
+      'SELECT sound_path, tag_id FROM sound_tags',
+    )
+    const byPath = new Map(files.map((f) => [f.path, f]))
+    for (const row of soundTagRows ?? []) {
+      const file = byPath.get(row.sound_path)
+      if (!file || !row.tag_id) continue
+      if (!file.tagIds) file.tagIds = []
+      if (!file.tagIds.includes(row.tag_id)) file.tagIds.push(row.tag_id)
+    }
+  } catch {
+    tags = []
+  }
+
+  const config = { settings, tabList, files, separators, tags }
   mergeTabsFromUsage(config)
   healFolderTabMembership(config)
   return config
@@ -688,6 +768,8 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await d.execute('DELETE FROM sounds')
   await d.execute('DELETE FROM sound_tabs')
   await d.execute('DELETE FROM separators')
+  try { await d.execute('DELETE FROM tags') } catch { /* table missing on very old files */ }
+  try { await d.execute('DELETE FROM sound_tags') } catch { /* table missing on very old files */ }
 
   const s = config.settings
   // Note: outputSource / outputHost / outputVolume / ASIO channels are app-wide
@@ -708,6 +790,8 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['tabTransition', normalizeTabTransition(s.tabTransition)],
     ['soundHotkeys', JSON.stringify(s.soundHotkeys ?? [])],
     ['perSoundVolumeV1', String(s.perSoundVolumeV1 === true)],
+    ['sortMode', normalizeSortMode(s.sortMode)],
+    ['selectedTagIds', JSON.stringify(Array.isArray(s.selectedTagIds) ? s.selectedTagIds : [])],
     ['primaryColor', s.primaryColor ?? '#00d4ff'],
     ['primaryHover', s.primaryHover ?? '#33ddff'],
     ['bg', s.bg ?? '#222831'],
@@ -750,6 +834,9 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       f.gifId ?? null,
       f.gifPosX ?? 50,
       f.gifPosY ?? 50,
+      f.addedAt ?? null,
+      f.fileSize ?? null,
+      f.durationSecs ?? null,
     ])
     for (const tab of f.tabs ?? ['All']) {
       const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
@@ -759,10 +846,20 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await batchInsert(
     d,
     'sounds',
-    ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y'],
+    ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y', 'added_at', 'file_size', 'duration_secs'],
     soundRows
   )
   await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
+
+  const tagRows = (config.tags ?? []).map((t) => [t.id, t.name ?? '', t.color || '#00d4ff'])
+  await batchInsert(d, 'tags', ['id', 'name', 'color'], tagRows)
+  const soundTagRows: unknown[][] = []
+  for (const f of config.files) {
+    for (const tagId of f.tagIds ?? []) {
+      if (tagId) soundTagRows.push([f.path, tagId])
+    }
+  }
+  await batchInsert(d, 'sound_tags', ['sound_path', 'tag_id'], soundTagRows)
 
   const sepRows = (config.separators ?? []).map((sep) => [
     sep.id,

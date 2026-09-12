@@ -1,4 +1,4 @@
-@use 'variables' as *;
+@use '../abstracts/variables' as *;
 
 // 62.5% trick: 1rem = 10px at default 16px browser font size
 // This makes rem values easier to reason about and respects user font-size prefs.
@@ -14,6 +14,7 @@ body {
   --primary_color: hsl(189, 100%, 58%);
   --icon_size: 4rem;
   --icon_min_size: 3rem;
+  --search-extra: 0px;
 
   /* ── Theme colors (overridable by themes) ────── */
   --color-bg: #{$color-bg};
@@ -96,22 +97,22 @@ body {
 // ########################################
 @font-face {
   font-family: "Nunito-Regular";
-  src: url('../FONTS/Nunito-Regular.ttf') format('truetype');
+  src: url('../../FONTS/Nunito-Regular.ttf') format('truetype');
 }
 
 @font-face {
   font-family: "Nunito-Bold";
-  src: url('../FONTS/Nunito-Bold.ttf') format('truetype');
+  src: url('../../FONTS/Nunito-Bold.ttf') format('truetype');
 }
 
 @font-face {
   font-family: "Nunito-SemiBold";
-  src: url('../FONTS/Nunito-SemiBold.ttf') format('truetype');
+  src: url('../../FONTS/Nunito-SemiBold.ttf') format('truetype');
 }
 
 @font-face {
   font-family: "Nunito-Black";
-  src: url('../FONTS/Nunito-Black.ttf') format('truetype');
+  src: url('../../FONTS/Nunito-Black.ttf') format('truetype');
 }
 
 // ########################################

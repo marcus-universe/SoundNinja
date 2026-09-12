@@ -41,6 +41,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
     hideTitlebarSkipWarn: false,
     /** Show slide-in tooltips next to sidebar (navbar) buttons. Default on. */
     navbarTooltips: true,
+    /** Show color tag badges on sound buttons. Default on. */
+    showTagBadges: true,
     /** Check GitHub Releases for a newer version on app start. Default on. */
     checkUpdatesOnStart: true,
     /** User-supplied Klipy GIF API key (app-wide, never stored in project files). */
@@ -108,6 +110,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.hideTitlebarSkipWarn = s.hideTitlebarSkipWarn === '1' || s.hideTitlebarSkipWarn === 'true'
       // Default enabled when unset (first launch / older configs).
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
+      this.showTagBadges = s.showTagBadges !== '0' && s.showTagBadges !== 'false'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
       this.klipyApiKey = s.klipyApiKey || ''
       this.gifLocalFolders = parseStringList(s.gifLocalFolders)
@@ -263,6 +266,12 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.navbarTooltips = !!enabled
       const d = await this._db()
       await saveSetting(d, 'navbarTooltips', this.navbarTooltips ? '1' : '0')
+    },
+
+    async setShowTagBadges(enabled: boolean) {
+      this.showTagBadges = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'showTagBadges', this.showTagBadges ? '1' : '0')
     },
 
     async setCheckUpdatesOnStart(enabled: boolean) {

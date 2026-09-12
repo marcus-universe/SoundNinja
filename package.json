@@ -3,7 +3,7 @@
   "version": "0.7.0",
   "private": true,
   "scripts": {
-    "dev": "nuxt dev --host 127.0.0.1 --port 3000",
+    "dev": "node --import ./scripts/patch-econnreset.mjs ./node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3000",
     "build": "nuxt generate",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
