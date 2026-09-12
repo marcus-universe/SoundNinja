@@ -1,0 +1,44 @@
+name: Release Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (e.g. 0.7.0). Leave empty to use src-tauri/tauri.conf.json. Draft must already exist."
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.draft.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Require release draft
+        id: draft
+        uses: ./.github/actions/require-release-draft
+        with:
+          version: ${{ inputs.version }}
+
+  build:
+    needs: guard
+    uses: ./.github/workflows/_tauri-build.yml
+    with:
+      tag: ${{ needs.guard.outputs.tag }}
+      runner: ubuntu-24.04
+      rust_targets: x86_64-unknown-linux-gnu
+      cache_key: linux-x64
+      args: "--target x86_64-unknown-linux-gnu --bundles deb,appimage -- --features stems"
+      kind: linux
+    secrets: inherit

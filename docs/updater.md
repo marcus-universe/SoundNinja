@@ -13,7 +13,7 @@ A keypair was generated for this project. The **public** key is in `src-tauri/ta
    - `TAURI_SIGNING_PRIVATE_KEY` — full contents of the private key file (real newlines)
    - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — only if the key has a password; otherwise omit
 3. Set `"createUpdaterArtifacts": true` in `src-tauri/tauri.conf.json` `bundle`.
-4. Release workflow signs updater artifacts and uploads `latest.json` (`uploadUpdaterJson: true`).
+4. After `createUpdaterArtifacts` is true, platform release jobs sign updater artifacts. `latest.json` is not uploaded until that is re-enabled.
 
 > **v0.5.3 note:** `createUpdaterArtifacts` is currently `false` because the repo had no `TAURI_SIGNING_PRIVATE_KEY` secret (only `SOUND_NINJA_SECRET`, unrelated). Installers still ship; in-app update signatures do not until the secret is added and artifacts are re-enabled.
 
