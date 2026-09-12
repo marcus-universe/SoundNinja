@@ -7,10 +7,40 @@
       :style="{ top: menuY + 'px', left: menuX + 'px' }"
       @click.stop
     >
-      <ul class="context-menu__list">
+      <ul class="context-menu__list" role="menu">
         <li
-          v-if="appStore.contextMenu.type !== 'separator'"
+          v-if="isSound"
+          class="context-menu__volume"
+          @click.stop
+          @mousedown.stop
+          @mouseenter="hoveredItem = 'volume'"
+          @mouseleave="hoveredItem = null"
+        >
+          <div class="context-menu__volume-head">
+            <span class="context-menu__volume-label">{{ $t('contextMenu.volume') }}</span>
+            <span class="context-menu__volume-pct">{{ volumePct }}%</span>
+            <Transition name="desc-fade">
+              <span v-if="hoveredItem === 'volume'" class="context-menu__desc">{{ $t('contextMenu.volumeDesc') }}</span>
+            </Transition>
+          </div>
+          <input
+            type="range"
+            class="settings-slider"
+            min="0"
+            max="100"
+            step="1"
+            :value="volumePct"
+            :aria-label="$t('contextMenu.volume')"
+            @pointerdown="onVolumePointerDown"
+            @input="onVolumeInput"
+            @dblclick.prevent="resetVolume"
+          />
+        </li>
+        <li v-if="isSound" class="context-menu__sep" role="separator" />
+        <li
+          v-if="isTab || isSound"
           class="context-menu__item"
+          role="menuitem"
           @click="openRename"
           @mouseenter="hoveredItem = 'rename'"
           @mouseleave="hoveredItem = null"
@@ -26,6 +56,7 @@
         <li
           v-if="appStore.contextMenu.type === 'separator'"
           class="context-menu__item"
+          role="menuitem"
           @click="openRenameGroup"
           @mouseenter="hoveredItem = 'renameGroup'"
           @mouseleave="hoveredItem = null"
@@ -38,7 +69,7 @@
             <span v-if="hoveredItem === 'renameGroup'" class="context-menu__desc">{{ $t('contextMenu.renameGroupDesc') }}</span>
           </Transition>
         </li>
-        <li class="context-menu__item context-menu__item--danger" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
+        <li v-if="isTab || isSound || isSeparator" class="context-menu__item context-menu__item--danger" role="menuitem" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
           <span class="context-menu__icon">
             <Icons icon="delete" custom-class="context-menu__icon-svg" />
           </span>
@@ -51,9 +82,11 @@
             }}</span>
           </Transition>
         </li>
+        <li v-if="!isBoard" class="context-menu__sep" role="separator" />
         <li
-          v-if="appStore.contextMenu.type === 'sound'"
+          v-if="isSound"
           class="context-menu__item"
+          role="menuitem"
           @click="toggleMoveToTab"
           @mouseenter="hoveredItem = 'moveToTab'"
           @mouseleave="hoveredItem = null"
@@ -72,15 +105,17 @@
             v-for="tab in allTabs"
             :key="tab.name"
             class="context-menu__item context-menu__tab-row"
+            role="menuitemcheckbox"
             @click.stop="toggleSoundTab(tab.name)"
           >
             <span class="context-menu__check">{{ soundTabs.includes(tab.name) ? '☑' : '☐' }}</span>
-            {{ tab.name }}
+            <span class="context-menu__label">{{ tab.name }}</span>
           </li>
         </template>
         <li
-          v-if="appStore.contextMenu.type === 'sound'"
+          v-if="isSound || isBoard"
           class="context-menu__item"
+          role="menuitem"
           @click="addGroup"
           @mouseenter="hoveredItem = 'group'"
           @mouseleave="hoveredItem = null"
@@ -90,12 +125,16 @@
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.addGroup') }}</span>
           <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'group'" class="context-menu__desc">{{ $t('contextMenu.addGroupDesc') }}</span>
+            <span v-if="hoveredItem === 'group'" class="context-menu__desc">{{
+              isBoard ? $t('contextMenu.addGroupBoardDesc') : $t('contextMenu.addGroupDesc')
+            }}</span>
           </Transition>
         </li>
+        <li v-if="appStore.contextMenu.type === 'sound'" class="context-menu__sep" role="separator" />
         <li
           v-if="appStore.contextMenu.type === 'sound'"
           class="context-menu__item"
+          role="menuitem"
           @click="copySoundId"
           @mouseenter="hoveredItem = 'copyId'"
           @mouseleave="hoveredItem = null"
@@ -111,6 +150,7 @@
         <li
           v-if="appStore.contextMenu.type === 'sound'"
           class="context-menu__item"
+          role="menuitem"
           @click="assignHotkey"
           @mouseenter="hoveredItem = 'assignHotkey'"
           @mouseleave="hoveredItem = null"
@@ -123,11 +163,62 @@
             <span v-if="hoveredItem === 'assignHotkey'" class="context-menu__desc">{{ $t('contextMenu.assignHotkeyDesc') }}</span>
           </Transition>
         </li>
+        <li v-if="isSound" class="context-menu__sep" role="separator" />
+        <li
+          v-if="isSound"
+          class="context-menu__item"
+          role="menuitem"
+          @click="showInFolder"
+          @mouseenter="hoveredItem = 'showInFolder'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="folder" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.showInFolder') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'showInFolder'" class="context-menu__desc">{{ $t('contextMenu.showInFolderDesc') }}</span>
+          </Transition>
+        </li>
+        <li
+          v-if="isSound"
+          class="context-menu__item"
+          role="menuitem"
+          @click="copySoundPath"
+          @mouseenter="hoveredItem = 'copyPath'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="rename" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.copyPath') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'copyPath'" class="context-menu__desc">{{ $t('contextMenu.copyPathDesc') }}</span>
+          </Transition>
+        </li>
+        <li
+          v-if="isSound"
+          class="context-menu__item"
+          role="menuitem"
+          @click="replaceAudio"
+          @mouseenter="hoveredItem = 'replaceAudio'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="audio-file" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.replaceAudio') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'replaceAudio'" class="context-menu__desc">{{ $t('contextMenu.replaceAudioDesc') }}</span>
+          </Transition>
+        </li>
+        <li v-if="isSound" class="context-menu__sep" role="separator" />
 
         <!-- Tab button alignment -->
         <li
           v-if="appStore.contextMenu.type === 'tab'"
           class="context-menu__item"
+          role="menuitem"
           @click="toggleTabAlign"
           @mouseenter="hoveredItem = 'tabAlign'"
           @mouseleave="hoveredItem = null"
@@ -146,17 +237,20 @@
             v-for="opt in alignOptions"
             :key="'tab-' + opt.value"
             class="context-menu__item context-menu__tab-row"
+            role="menuitemradio"
             @click.stop="setTabAlign(opt.value)"
           >
             <span class="context-menu__check">{{ currentTabAlign === opt.value ? '☑' : '☐' }}</span>
-            {{ opt.label }}
+            <span class="context-menu__label">{{ opt.label }}</span>
           </li>
         </template>
+        <li v-if="appStore.contextMenu.type === 'tab'" class="context-menu__sep" role="separator" />
 
         <!-- Group alignment + colors -->
         <li
           v-if="appStore.contextMenu.type === 'separator'"
           class="context-menu__item"
+          role="menuitem"
           @click="toggleGroupAlign"
           @mouseenter="hoveredItem = 'groupAlign'"
           @mouseleave="hoveredItem = null"
@@ -175,16 +269,19 @@
             v-for="opt in groupAlignOptions"
             :key="'g-' + String(opt.value)"
             class="context-menu__item context-menu__tab-row"
+            role="menuitemradio"
             @click.stop="setGroupAlign(opt.value)"
           >
             <span class="context-menu__check">{{ currentGroupAlign === opt.value ? '☑' : '☐' }}</span>
-            {{ opt.label }}
+            <span class="context-menu__label">{{ opt.label }}</span>
           </li>
         </template>
+        <li v-if="appStore.contextMenu.type === 'separator'" class="context-menu__sep" role="separator" />
 
         <li
           v-if="appStore.contextMenu.type === 'separator'"
           class="context-menu__item context-menu__item--color"
+          role="menuitem"
           @click="toggleGroupColors"
           @mouseenter="hoveredItem = 'groupColors'"
           @mouseleave="hoveredItem = null"
@@ -228,7 +325,7 @@
           </button>
         </li>
 
-        <li v-if="appStore.contextMenu.type !== 'separator'" class="context-menu__item context-menu__item--color" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
+        <li v-if="isTab || isSound" class="context-menu__item context-menu__item--color" role="menuitem" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
           <span
             class="context-menu__swatch"
             :style="swatchStyle"
@@ -239,7 +336,7 @@
           </Transition>
           <span class="context-menu__chevron">{{ colorPickerOpen ? '▲' : '▼' }}</span>
         </li>
-        <li v-if="colorPickerOpen" class="context-menu__color-panel" @click.stop>
+        <li v-if="colorPickerOpen && (isTab || isSound)" class="context-menu__color-panel" @click.stop>
           <ColorGroupPicker
             :model-value="currentOverride"
             :base-colors="baseColors"
@@ -250,6 +347,7 @@
         <li
           v-if="appStore.contextMenu.type === 'sound'"
           class="context-menu__item"
+          role="menuitem"
           @click="openGifPicker"
           @mouseenter="hoveredItem = 'gifBg'"
           @mouseleave="hoveredItem = null"
@@ -284,6 +382,10 @@ import {
 } from '~/utils/colorOverride'
 import { copyText } from '~/utils/clipboard'
 import { leadHue, shiftColorRecord } from '~/utils/hue'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import { pickOpenPath } from '~/utils/projects'
+import { invoke } from '@tauri-apps/api/core'
 
 const { t: $t } = useI18n()
 const appStore = useAppStore()
@@ -297,6 +399,12 @@ const groupColorsOpen = ref(false)
 const hoveredItem = ref(null)
 const menuEl = ref(null)
 const menuSize = ref({ w: 220, h: 180 })
+
+const menuType = computed(() => appStore.contextMenu.type)
+const isTab = computed(() => menuType.value === 'tab')
+const isSound = computed(() => menuType.value === 'sound')
+const isSeparator = computed(() => menuType.value === 'separator')
+const isBoard = computed(() => menuType.value === 'board')
 
 const allTabs = computed(() => jsonStore.configFile.tabList)
 const soundTabs = computed(() => {
@@ -326,6 +434,36 @@ const currentTabAlign = computed(() => {
 })
 
 const currentGroupAlign = computed(() => activeGroup.value?.buttonAlign)
+
+const volumePct = computed(() => {
+  const sound = jsonStore.configFile.files[appStore.contextMenu.targetIndex]
+  return Math.round((sound?.volume ?? 1) * 100)
+})
+
+let volumeHistoryPushed = false
+
+function onVolumePointerDown() {
+  volumeHistoryPushed = false
+}
+
+function applySoundVolume(pct) {
+  const { targetIndex } = appStore.contextMenu
+  const sound = jsonStore.configFile.files[targetIndex]
+  if (!sound) return
+  const volume = Math.min(1, Math.max(0, pct / 100))
+  jsonStore.setSoundVolume(targetIndex, volume, { history: !volumeHistoryPushed })
+  volumeHistoryPushed = true
+  invoke('set_sound_volume', { soundPath: sound.path, volume }).catch(() => {})
+}
+
+function onVolumeInput(e) {
+  applySoundVolume(Number(e.target.value))
+}
+
+function resetVolume() {
+  volumeHistoryPushed = false
+  applySoundVolume(100)
+}
 
 function toggleMoveToTab() {
   moveToTabOpen.value = !moveToTabOpen.value
@@ -419,12 +557,26 @@ function resetGroupColors() {
 }
 
 function addGroup() {
-  const { targetIndex } = appStore.contextMenu
-  const sound = jsonStore.configFile.files[targetIndex]
+  const { type, targetIndex } = appStore.contextMenu
+  const tab = appStore.currentTab
   appStore.closeContextMenu()
   resetPanels()
+  if (type === 'board') {
+    const seps = (jsonStore.configFile.separators ?? []).filter((s) => s.tab === tab)
+    const sounds = jsonStore.configFile.files.filter((f) => f.tabs.includes(tab))
+    let max = -1
+    for (const s of seps) {
+      if (Number.isFinite(s.position)) max = Math.max(max, s.position)
+    }
+    for (const f of sounds) {
+      const order = tab === 'All' ? (f.index ?? 0) : (f.tabIndexes?.[tab] ?? 0)
+      if (Number.isFinite(order)) max = Math.max(max, order)
+    }
+    jsonStore.addSeparator(tab, max + 1)
+    return
+  }
+  const sound = jsonStore.configFile.files[targetIndex]
   if (!sound) return
-  const tab = appStore.currentTab
   const order = tab === 'All' ? (sound.index ?? 0) : (sound.tabIndexes?.[tab] ?? 0)
   jsonStore.addSeparator(tab, order - 0.5)
 }
@@ -463,7 +615,10 @@ watch(
     groupColorsOpen.value,
   ],
   ([visible]) => {
-    if (visible) measureMenu()
+    if (visible) {
+      volumeHistoryPushed = false
+      measureMenu()
+    }
   },
   { flush: 'post' },
 )
@@ -595,6 +750,48 @@ async function copySoundId() {
   const sound = currentSound()
   close()
   if (sound?.id) await copyText(sound.id)
+}
+
+async function showInFolder() {
+  const sound = currentSound()
+  close()
+  if (!sound?.path) return
+  try {
+    await revealItemInDir(sound.path)
+  } catch {
+    appStore.setErrorActive($t('contextMenu.showInFolderFailed'))
+  }
+}
+
+async function copySoundPath() {
+  const sound = currentSound()
+  close()
+  if (sound?.path) await copyText(sound.path)
+}
+
+async function replaceAudio() {
+  const { targetIndex } = appStore.contextMenu
+  const sound = currentSound()
+  close()
+  if (!sound || typeof targetIndex !== 'number' || targetIndex < 0) return
+  try {
+    const selected = await openDialog({
+      multiple: false,
+      title: $t('contextMenu.replaceAudio'),
+      filters: [{ name: $t('common.audioFiles'), extensions: ['mp3', 'wav', 'ogg'] }],
+    })
+    const nextPath = pickOpenPath(selected)
+    if (!nextPath || nextPath === sound.path) return
+    if (sound.id) {
+      window.dispatchEvent(new CustomEvent('sn:stop-sound-id', { detail: sound.id }))
+    }
+    jsonStore.replaceSoundPath(targetIndex, nextPath)
+    const selectedPaths = appStore.selectedSoundPaths
+    const i = selectedPaths.indexOf(sound.path)
+    if (i !== -1) selectedPaths.splice(i, 1, nextPath)
+  } catch {
+    appStore.setErrorActive($t('contextMenu.replaceAudioFailed'))
+  }
 }
 
 function assignHotkey() {

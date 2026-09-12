@@ -40,7 +40,7 @@ fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-fn extension_for(mime: &str) -> &'static str {
+pub(crate) fn extension_for(mime: &str) -> &'static str {
     match mime {
         "image/webp" => "webp",
         "image/png" => "png",
@@ -51,7 +51,7 @@ fn extension_for(mime: &str) -> &'static str {
 
 /// Reject anything that is not a plain content hash before it reaches the
 /// filesystem — ids come from the renderer.
-fn is_content_hash(id: &str) -> bool {
+pub(crate) fn is_content_hash(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
         && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
@@ -69,6 +69,26 @@ fn write_if_missing(path: &Path, base64_data: &str) -> Result<(), String> {
     let tmp = path.with_extension("partial");
     std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extension_for, is_content_hash};
+
+    #[test]
+    fn extension_for_maps_known_mimes() {
+        assert_eq!(extension_for("image/png"), "png");
+        assert_eq!(extension_for("image/webp"), "webp");
+        assert_eq!(extension_for("image/unknown"), "gif");
+    }
+
+    #[test]
+    fn is_content_hash_rejects_path_chars() {
+        assert!(!is_content_hash(""));
+        assert!(!is_content_hash("../etc"));
+        assert!(!is_content_hash("abc/def"));
+        assert!(is_content_hash("abc-DEF_12"));
+    }
 }
 
 /// Materialise the requested blobs as files and return their paths.

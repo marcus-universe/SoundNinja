@@ -1,13 +1,13 @@
 [package]
 name = "app"
-version = "0.6.1"
-description = "Your best Soundboard App"
+version = "0.7.0"
+description = "Sound Ninja"
 authors = ["you"]
 license = ""
 repository = ""
 default-run = "app"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.88"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -57,16 +57,15 @@ cpal = "0.18"
 hound = "3.5"
 nnnoiseless = "0.5"
 rubato = "0.16"
-directories = "5"
 # Optional stem engine (gated by `stems` feature).
 # `load-dynamic` avoids static-linking ort-sys (MSVC STL symbol mismatch on VS < 17.14).
 # `copy-dylibs` + `download-binaries` place onnxruntime next to the exe for runtime load.
-ort = { version = "2.0.0-rc.11", optional = true, default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "copy-dylibs", "load-dynamic", "tls-rustls"] }
+ort = { version = "2.0.0-rc.11", optional = true, default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "load-dynamic", "tls-rustls"] }
 rustfft = { version = "6.2", optional = true }
 realfft = { version = "3.4", optional = true }
 # reqwest / zip versions match what tauri and tauri-plugin-updater already pull,
 # so the build compiles one HTTP stack and one zip implementation, not two.
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 sha2 = { version = "0.10", optional = true }
 tauri-plugin-updater = "2.10"
 tauri-plugin-process = "2.3"
@@ -86,6 +85,21 @@ winreg = "0.56"
 [target.'cfg(target_os = "linux")'.dependencies]
 cpal = { version = "0.18", features = ["pipewire", "pulseaudio"] }
 rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", features = ["pipewire", "pulseaudio"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+future-incompatible = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = 10 }
+redundant_clone = { level = "deny", priority = 9 }
+needless_collect = { level = "deny", priority = 8 }
+
+[profile.dev]
+debug = 0
+split-debuginfo = "unpacked"
 
 [profile.release]
 opt-level = 3

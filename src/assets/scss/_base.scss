@@ -48,9 +48,9 @@ body {
   --font-size-md: 1.92rem;
   --font-size-btn: var(--font-size-md);
   --font-size-tab: var(--font-size-sm);
-  /* Context / app menus: readable across resolutions */
-  --font-size-menu: clamp(1.6rem, 0.35vw + 1.35rem, 2.2rem);
-  --font-size-menu-desc: clamp(1.35rem, 0.25vw + 1.2rem, 1.8rem);
+  /* Chrome menus: lock to titlebar size. No vw — context menus must not grow with the display. */
+  --font-size-menu: 1.36rem;
+  --font-size-menu-desc: 1.2rem;
 
   --tab_width: 8rem;
   --btn_width: 17.6rem;
@@ -60,6 +60,13 @@ body {
   --button-gap: #{$padding_1};
   --btn-border-width: 0.32rem;
   --border-radius: 0.8rem;
+  --radius-sm: 0.4rem;
+  --radius-md: 0.64rem;
+  --radius-lg: 0.8rem;
+  --radius-panel: 1.2rem;
+  --radius-pill: 999px;
+  --surface-hover: color-mix(in srgb, var(--color-text) 10%, transparent);
+  --control-h: calc(0.72rem * 2 + var(--font-size-sm) * 1.2 + 0.16rem * 2);
   --btn_padding: #{$padding_1};
   /* Color wash over GIF/image button backgrounds (0 = GIF only, 1 = solid). */
   --gif-overlay: 0.72;
@@ -105,16 +112,6 @@ body {
 @font-face {
   font-family: "Nunito-Black";
   src: url('../FONTS/Nunito-Black.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: "Caveat-Regular";
-  src: url('../FONTS/Caveat-Regular.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: "Caveat-Bold";
-  src: url('../FONTS/Caveat-Bold.ttf') format('truetype');
 }
 
 // ########################################

@@ -42,7 +42,7 @@ fn emit_progress(app: &AppHandle, event: &str, current: u32, total: u32) {
     );
 }
 
-fn sanitize_zip_rel(rel: &str) -> Result<String, String> {
+pub(crate) fn sanitize_zip_rel(rel: &str) -> Result<String, String> {
     let norm = rel.replace('\\', "/");
     if norm.starts_with('/') || norm.contains("..") {
         return Err(format!("invalid zip path: {rel}"));
@@ -199,4 +199,20 @@ fn walkdir_one(root: &Path) -> Vec<PathBuf> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_zip_rel;
+
+    #[test]
+    fn sanitize_zip_rel_rejects_parent_dir() {
+        assert!(sanitize_zip_rel("../etc/passwd").is_err());
+        assert!(sanitize_zip_rel("/abs").is_err());
+    }
+
+    #[test]
+    fn sanitize_zip_rel_normalizes_slashes() {
+        assert_eq!(sanitize_zip_rel("a\\b\\c.wav").unwrap(), "a/b/c.wav");
+    }
 }

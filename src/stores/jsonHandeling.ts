@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import {
   openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
   healFolderTabMembership, mergeTabsFromUsage,
-  persistSoundIds,
+  persistSoundIds, ensurePerSoundVolume,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign,
 } from '~/utils/db'
@@ -105,7 +105,15 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.dirty = false
       this.missingPaths = []
       this.clearHistory()
-      if (ensureSoundIds(this.configFile.files)) {
+      const idsChanged = ensureSoundIds(this.configFile.files)
+      const volumeMigrated = ensurePerSoundVolume(this.configFile)
+      if (volumeMigrated) {
+        try {
+          await this.persistNow()
+        } catch (e) {
+          console.error('Failed to persist per-sound volume migration', e)
+        }
+      } else if (idsChanged) {
         try {
           await withProjectDb(dbAbsPath, (d) => persistSoundIds(d, this.configFile.files))
         } catch (e) {
@@ -169,6 +177,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       mergeTabsFromUsage(this.configFile)
       healFolderTabMembership(this.configFile)
       ensureSoundIds(this.configFile.files)
+      ensurePerSoundVolume(this.configFile)
       this.normalizeIndexes()
       this.filteredFiles = this.configFile.files
       this.openingSnapshot = clone(this.configFile)
@@ -435,6 +444,16 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
+    setSoundVolume(soundindex: number, volume: number, opts?: { history?: boolean }) {
+      const file = this.configFile.files[soundindex]
+      if (!file) return
+      const next = Math.min(1, Math.max(0, volume))
+      if (file.volume === next) return
+      if (opts?.history !== false) this.pushBeforeChange()
+      file.volume = next
+      this.writeConfig()
+    },
+
     setSoundColor(soundindex: number, color: string) {
       this.pushBeforeChange()
       this.configFile.files[soundindex].color = color
@@ -461,6 +480,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.pushBeforeChange()
       this.configFile.files[soundFileIndex].tabs = tabs
       this.normalizeIndexes()
+      this.writeConfig()
+    },
+
+    /** Swap the audio file on a button. Name, id, color, gif, tabs, volume stay. */
+    replaceSoundPath(soundindex: number, nextPath: string) {
+      const file = this.configFile.files[soundindex]
+      if (!file || !nextPath || file.path === nextPath) return
+      this.pushBeforeChange()
+      const old = file.path
+      file.path = nextPath
+      this.missingPaths = this.missingPaths.filter((p) => p !== old)
       this.writeConfig()
     },
 

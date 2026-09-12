@@ -1,0 +1,1 @@
+{"sessionId":"6bab6a","runId":"agent-serve","hypothesisId":"A","location":"bun tauri:serve","message":"Finished dev 1.69s then Running target\\debug\\app.exe; no rlib error","data":{"rlibError":false,"appStarted":true},"timestamp":1757613480000}

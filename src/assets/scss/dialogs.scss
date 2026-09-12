@@ -169,7 +169,7 @@
   transform-origin: center center;
 
   &:hover {
-    background: rgba($white, 0.1);
+    background: var(--surface-hover);
     transform: scale(1.12);
   }
 
@@ -207,10 +207,83 @@
   }
 }
 
-.dialog-panel:has(.gif-picker__toolbar),
+.dialog-panel:has(.gif-picker),
 .dialog-panel:has(.gif-picker__preview) {
-  width: min(56rem, calc(100dvw - 4rem));
+  width: min(64rem, calc(100dvw - 4rem));
   min-width: min(36rem, calc(100dvw - 4rem));
+}
+
+.gif-picker {
+  display: flex;
+  gap: 1.2rem;
+  align-items: stretch;
+  min-height: min(46vh, 40rem);
+  width: 100%;
+}
+
+.gif-picker__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+  width: 14.4rem;
+  flex-shrink: 0;
+  padding: 0.2rem 0.8rem 0 0;
+  border-right: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
+}
+
+.gif-picker__rail-item {
+  all: unset;
+  cursor: pointer;
+  padding: 0.88rem 1.2rem;
+  border-radius: 0.64rem;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  color: color-mix(in srgb, var(--color-text, #{$white}) 65%, transparent);
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
+    color: var(--color-text, #{$white});
+  }
+
+  &.active {
+    background: var(--primary_color);
+    color: var(--color-bg, #{$color-bg});
+    font-family: $fontBold;
+  }
+
+  &:focus-visible {
+    outline: 0.16rem solid var(--primary_color);
+    outline-offset: 0.16rem;
+  }
+}
+
+.gif-picker__rail-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  display: flex;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+
+.gif-picker__rail-label {
+  white-space: nowrap;
+}
+
+.gif-picker__pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .gif-picker__toolbar {
@@ -223,6 +296,49 @@
 .gif-picker__search {
   flex: 1 1 16rem;
   min-width: 12rem;
+}
+
+.gif-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.gif-picker__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  max-width: 100%;
+  padding: 0.24rem 0.32rem 0.24rem 0.64rem;
+  border-radius: 0.48rem;
+  background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+  font-size: var(--font-size-sm, 1.3rem);
+}
+
+.gif-picker__chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 16rem;
+}
+
+.gif-picker__chip-remove {
+  all: unset;
+  cursor: pointer;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.32rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--color-text, #{$white});
+    background: color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+  }
 }
 
 .gif-picker__info {
@@ -265,14 +381,17 @@
 .gif-picker__cell {
   all: unset;
   display: block;
+  position: relative;
   aspect-ratio: 1;
   border-radius: 0.5rem;
   overflow: hidden;
   cursor: pointer;
   border: 0.16rem solid transparent;
+  box-sizing: border-box;
 
   &:hover,
-  &:focus-visible {
+  &:focus-visible,
+  &:focus-within {
     border-color: var(--primary_color);
   }
 
@@ -281,6 +400,55 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+}
+
+.gif-picker__cell-pick {
+  all: unset;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.gif-picker__cell-ph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+}
+
+.gif-picker__cell-remove {
+  all: unset;
+  position: absolute;
+  top: 0.28rem;
+  right: 0.28rem;
+  z-index: 1;
+  width: 1.8rem;
+  height: 1.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.32rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  color: var(--color-bg, #{$color-bg});
+  background: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
+
+  .gif-picker__cell:hover &,
+  .gif-picker__cell:focus-within & {
+    opacity: 1;
+  }
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: var(--primary_color);
   }
 }
 

@@ -26,6 +26,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
+const { t } = useI18n()
 
 const missing = computed(() => jsonStore.missingPaths ?? [])
 const rows = ref([])
@@ -58,7 +59,7 @@ function close() {
 
 async function pickFolder() {
   scanError.value = ''
-  const dir = await open({ directory: true, multiple: false, title: 'Find missing sounds' })
+  const dir = await open({ directory: true, multiple: false, title: t('native.findMissingSounds') })
   if (!dir || Array.isArray(dir)) return
   const names = [...new Set(missing.value.map(basename))]
   try {

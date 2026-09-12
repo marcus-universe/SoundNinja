@@ -190,28 +190,43 @@ jobs:
           TAG="${{ steps.meta.outputs.tag }}"
           mkdir -p aliases
           cd aliases
-          gh release download "$TAG" --pattern "soundninja_*" || true
+          # productName "Sound Ninja" produces spaced filenames; also match the old soundninja_* prefix.
+          gh release download "$TAG" --pattern "*x64-setup.exe" || true
+          gh release download "$TAG" --pattern "*_aarch64.dmg" || true
+          gh release download "$TAG" --pattern "*_x64.dmg" || true
+          gh release download "$TAG" --pattern "*_amd64.deb" || true
+          gh release download "$TAG" --pattern "*_amd64.AppImage" || true
           shopt -s nullglob
           upload=()
-          for f in *_x64-setup.exe; do
+          for f in *x64-setup.exe; do
+            [[ "$f" == "soundninja-windows-x64-setup.exe" ]] && continue
             cp "$f" soundninja-windows-x64-setup.exe
             upload+=(soundninja-windows-x64-setup.exe)
+            break
           done
           for f in *_aarch64.dmg; do
+            [[ "$f" == "soundninja-macos-arm64.dmg" ]] && continue
             cp "$f" soundninja-macos-arm64.dmg
             upload+=(soundninja-macos-arm64.dmg)
+            break
           done
           for f in *_x64.dmg; do
+            [[ "$f" == "soundninja-macos-x64.dmg" ]] && continue
             cp "$f" soundninja-macos-x64.dmg
             upload+=(soundninja-macos-x64.dmg)
+            break
           done
           for f in *_amd64.deb; do
+            [[ "$f" == "soundninja-linux-amd64.deb" ]] && continue
             cp "$f" soundninja-linux-amd64.deb
             upload+=(soundninja-linux-amd64.deb)
+            break
           done
           for f in *_amd64.AppImage; do
+            [[ "$f" == "soundninja-linux-amd64.AppImage" ]] && continue
             cp "$f" soundninja-linux-amd64.AppImage
             upload+=(soundninja-linux-amd64.AppImage)
+            break
           done
           if [ ${#upload[@]} -eq 0 ]; then
             echo "::warning::No installer assets found to alias"

@@ -1,5 +1,12 @@
 <template>
-  <div class="color-group-picker" :class="{ 'color-group-picker--inline': inline }" ref="rootEl">
+  <div
+    class="color-group-picker"
+    :class="{
+      'color-group-picker--inline': inline,
+      'color-group-picker--row': layout === 'row',
+    }"
+    ref="rootEl"
+  >
     <button
       v-if="!inline"
       type="button"
@@ -57,9 +64,61 @@
       </div>
     </div>
 
-    <Teleport to="body">
+    <Teleport v-else-if="layout === 'row'" defer to="[data-bulk-palette]">
       <div
-        v-if="!inline && open"
+        class="color-group-picker__expand"
+        :class="{ 'color-group-picker__expand--open': open }"
+      >
+        <div class="color-group-picker__expand-inner">
+          <div class="color-group-picker__panel color-group-picker__panel--row" @click.stop>
+            <div class="color-group-picker__hue" :title="$t('contextMenu.colorHueHint')">
+              <div class="color-group-picker__hue-head">
+                <span>{{ $t('contextMenu.colorHue') }}</span>
+                <span>{{ displayHue }}°</span>
+              </div>
+              <HueSlider
+                :model-value="displayHue"
+                :hint="$t('contextMenu.colorHueHint')"
+                :aria-label="$t('contextMenu.colorHue')"
+                @drag-start="beginHueDrag"
+                @update:model-value="onHue"
+                @drag-end="endHueDrag"
+              />
+            </div>
+            <div
+              v-for="row in rows"
+              :key="row.key"
+              class="color-group-picker__row"
+            >
+              <label class="color-group-picker__row-label">{{ $t(row.labelKey) }}</label>
+              <div class="color-group-picker__row-tools">
+                <input
+                  type="color"
+                  class="color-group-picker__wheel"
+                  :value="wheelValue(row.key)"
+                  @input="onWheel(row.key, $event)"
+                />
+                <button
+                  type="button"
+                  class="color-group-picker__row-reset"
+                  :title="$t('contextMenu.resetColor')"
+                  @click="clearKey(row.key)"
+                >↺</button>
+              </div>
+            </div>
+            <div class="color-group-picker__footer">
+              <button type="button" class="color-group-picker__reset-all" @click="resetAll">
+                {{ $t('contextMenu.resetAllColors') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport v-else to="body">
+      <div
+        v-if="open"
         ref="panelEl"
         class="color-group-picker__panel color-group-picker__panel--floating"
         :style="panelStyle"
@@ -123,9 +182,14 @@ const props = withDefaults(defineProps<{
   /** Render panel inline (no trigger / no floating teleport). */
   inline?: boolean
   /**
+   * stack: vertical rows (context menu / floating).
+   * row: in-flow horizontal fields (multi-select bulk bar).
+   */
+  layout?: 'stack' | 'row'
+  /**
    * Floating panel anchor:
    * - auto: below trigger (context menu / default)
-   * - bottom-right: SoundContainer corner, above player (multi-select bar)
+   * - bottom-right: SoundContainer corner, above player (legacy)
    */
   placement?: 'auto' | 'bottom-right'
   /** Theme/applied colors shown when a key has no override. */
@@ -134,6 +198,7 @@ const props = withDefaults(defineProps<{
   modelValue: () => ({}),
   showLabel: true,
   inline: false,
+  layout: 'stack',
   placement: 'auto',
   baseColors: () => ({}),
 })
@@ -143,7 +208,8 @@ const emit = defineEmits<{
   change: [ColorOverride]
 }>()
 
-const open = ref(false)
+const open = defineModel<boolean>('open', { default: false })
+
 const rootEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const panelPos = ref({ top: 0, left: 0 })
@@ -244,7 +310,7 @@ function resetAll() {
 
 function toggle() {
   open.value = !open.value
-  if (open.value) positionPanel()
+  if (open.value && props.layout !== 'row') positionPanel()
 }
 
 async function positionPanel() {
@@ -278,7 +344,7 @@ async function positionPanel() {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (props.inline || !open.value) return
+  if (props.inline || props.layout === 'row' || !open.value) return
   const t = e.target
   if (!(t instanceof Node)) return
   if (rootEl.value?.contains(t)) return
@@ -287,7 +353,7 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onViewportChange() {
-  if (open.value) positionPanel()
+  if (open.value && props.layout !== 'row') positionPanel()
 }
 
 onMounted(() => {

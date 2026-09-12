@@ -180,7 +180,7 @@ async function doImport(mode = 'current') {
           .replace(/([A-Z])/g, ' $1')
           .trim(),
         path: joinPath(bucket.dir, fileName),
-        volume: 0.4,
+        volume: 1,
         tabs,
         active: false,
         index: indexLength++,

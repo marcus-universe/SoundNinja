@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
+import { tt } from '~/utils/tt'
 import { useJsonHandelingStore } from './jsonHandeling'
 
 interface ContextMenuState {
   visible: boolean
   x: number
   y: number
-  type: 'tab' | 'sound' | 'separator' | null
+  type: 'tab' | 'sound' | 'separator' | 'board' | null
   targetName: string
   targetIndex: number
 }
@@ -16,6 +17,8 @@ export const useAppStore = defineStore('app', {
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
     pendingSettingsTab: null as string | null,
+    /** Scroll target inside a settings tab (e.g. 'klipyApi'). */
+    pendingSettingsSection: null as string | null,
     /** Prefill Settings → Hotkeys with this sound id (context-menu assign). */
     pendingHotkeySoundId: null as string | null,
     PopupActive: { active: false, type: 'addTab' } as { active: boolean; type: string },
@@ -32,6 +35,8 @@ export const useAppStore = defineStore('app', {
     relinkActive: false,
     multiSelectActive: false,
     selectedSoundPaths: [] as string[],
+    /** Last non-shift click in multi-select; Shift+click ranges from here. */
+    selectionAnchorPath: null as string | null,
     draggingSoundIndex: null as number | null,
     draggingTabName: null as string | null,
     /** Sound array index whose GIF picker is open, or null. */
@@ -56,7 +61,7 @@ export const useAppStore = defineStore('app', {
       const jsonStore = useJsonHandelingStore()
       // Groups may clear the name (empty → untitled placeholder).
       if (name === '' && this.PopupActive.type !== 'renameGroup') {
-        this.ErrorMessage = 'Field is empty'
+        this.ErrorMessage = tt('rename.emptyField')
         return
       }
       this.RenameContent = name
@@ -105,21 +110,29 @@ export const useAppStore = defineStore('app', {
 
     setCurrentTab(val: string) {
       this.currentTab = val
+      this.selectionAnchorPath = null
     },
 
     setActiveOverlay(val: 'settings' | 'about' | null) {
       this.activeOverlay = val
     },
 
-    openSettingsTab(tab: string) {
+    openSettingsTab(tab: string, section?: string) {
       this.activeOverlay = 'settings'
       this.pendingSettingsTab = tab
+      this.pendingSettingsSection = section ?? null
     },
 
     consumePendingSettingsTab(): string | null {
       const t = this.pendingSettingsTab
       this.pendingSettingsTab = null
       return t
+    },
+
+    consumePendingSettingsSection(): string | null {
+      const s = this.pendingSettingsSection
+      this.pendingSettingsSection = null
+      return s
     },
 
     consumePendingHotkeySoundId(): string | null {
@@ -138,7 +151,10 @@ export const useAppStore = defineStore('app', {
 
     setMultiSelectActive(val: boolean) {
       this.multiSelectActive = val
-      if (!val) this.selectedSoundPaths = []
+      if (!val) {
+        this.selectedSoundPaths = []
+        this.selectionAnchorPath = null
+      }
     },
 
     toggleMultiSelectActive() {
@@ -149,10 +165,23 @@ export const useAppStore = defineStore('app', {
       const i = this.selectedSoundPaths.indexOf(path)
       if (i === -1) this.selectedSoundPaths.push(path)
       else this.selectedSoundPaths.splice(i, 1)
+      this.selectionAnchorPath = path
+    },
+
+    selectSoundRange(paths: string[]) {
+      if (!paths.length) return
+      const set = new Set(this.selectedSoundPaths)
+      for (const p of paths) set.add(p)
+      this.selectedSoundPaths = [...set]
+    },
+
+    setSelectionAnchor(path: string | null) {
+      this.selectionAnchorPath = path
     },
 
     clearSoundSelection() {
       this.selectedSoundPaths = []
+      this.selectionAnchorPath = null
     },
 
     setDraggingSoundIndex(idx: number | null) {
@@ -165,7 +194,7 @@ export const useAppStore = defineStore('app', {
 
     openContextMenu({
       x, y, type, targetName, targetIndex,
-    }: { x: number; y: number; type: 'tab' | 'sound' | 'separator'; targetName: string; targetIndex: number }) {
+    }: { x: number; y: number; type: 'tab' | 'sound' | 'separator' | 'board'; targetName: string; targetIndex: number }) {
       this.contextMenu = { visible: true, x, y, type, targetName, targetIndex }
     },
 

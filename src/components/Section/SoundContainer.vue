@@ -5,8 +5,15 @@
           'SoundContainer--player-large': showPlayer && playerLarge,
           'SoundContainer--bulk': appStore.multiSelectActive,
         }"
+        :style="bulkBarHeight ? { '--bulk-bar-height': bulkBarHeight + 'px' } : {}"
     >
-        <div class="SoundContainer__scroll">
+        <div
+            class="SoundContainer__scroll"
+            :class="{ 'SoundContainer__scroll--selecting': !!marqueeRect }"
+            ref="scrollRef"
+            @contextmenu.prevent="openBoardMenu"
+            @pointerdown="onBoardPointerDown"
+        >
         <Transition
             :name="tabTransitionName"
             :mode="tabTransitionMode"
@@ -44,7 +51,7 @@
                     :progressPaused="!!playingSounds.get(sound.index)?.paused || !windowFocused"
                     :missing="!!jsonStore.missingPaths?.includes(sound.path)"
                     :data-sound-path="sound.path"
-                    @play="onSoundClick(sound)"
+                    @play="(e) => onSoundClick(sound, e)"
                     @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
                 />
             </div>
@@ -57,7 +64,7 @@
                     class="sound-group tab-separator"
                     :data-sep-id="sec.sep.id"
                     :style="groupCardStyle(sec.sep)"
-                    @contextmenu.prevent="(e) => openSeparatorMenu(e, sec.sep)"
+                    @contextmenu.prevent.stop="(e) => openSeparatorMenu(e, sec.sep)"
                 >
                     <div class="sound-group__name" :style="groupNameStyle(sec.sep)">
                         {{ sec.sep.name?.trim() || $t('contextMenu.untitledGroup') }}
@@ -85,7 +92,7 @@
                             :progressPaused="!!playingSounds.get(sound.index)?.paused || !windowFocused"
                             :missing="!!jsonStore.missingPaths?.includes(sound.path)"
                             :data-sound-path="sound.path"
-                            @play="onSoundClick(sound)"
+                            @play="(e) => onSoundClick(sound, e)"
                             @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
                         />
                     </div>
@@ -96,26 +103,46 @@
         </Transition>
         </div>
 
+        <div
+            v-if="marqueeRect"
+            class="select-marquee"
+            :style="{
+              left: marqueeRect.left + 'px',
+              top: marqueeRect.top + 'px',
+              width: marqueeRect.width + 'px',
+              height: marqueeRect.height + 'px',
+            }"
+        />
+
         <Transition name="fade">
-            <div v-if="appStore.multiSelectActive" class="bulk-bar flex_c_h align_c">
-                <span class="bulk-bar__count">{{ $t('bulk.selected', { count: appStore.selectedSoundPaths.length }) }}</span>
-                <div class="bulk-bar__color">
-                    <ColorGroupPicker
-                        :model-value="bulkOverride"
-                        :base-colors="bulkBaseColors"
-                        :title="$t('bulk.color')"
-                        placement="bottom-right"
-                        @change="onBulkOverride"
-                    />
+            <div
+                v-if="appStore.multiSelectActive"
+                ref="bulkBarRef"
+                class="bulk-bar"
+                :class="{ 'bulk-bar--color-open': bulkColorOpen }"
+            >
+                <div class="bulk-bar__tools">
+                    <span class="bulk-bar__count">{{ $t('bulk.selected', { count: appStore.selectedSoundPaths.length }) }}</span>
+                    <div class="bulk-bar__color">
+                        <ColorGroupPicker
+                            v-model:open="bulkColorOpen"
+                            :model-value="bulkOverride"
+                            :base-colors="bulkBaseColors"
+                            :title="$t('bulk.color')"
+                            layout="row"
+                            @change="onBulkOverride"
+                        />
+                    </div>
+                    <select class="bulk-bar__select" v-model="bulkTab" @change="applyBulkTab">
+                        <option value="">{{ $t('bulk.moveToTab') }}</option>
+                        <option v-for="t in tabOptions" :key="t" :value="t">{{ t }}</option>
+                    </select>
+                    <button class="bulk-bar__btn bulk-bar__btn--danger" :disabled="appStore.selectedSoundPaths.length === 0" @click="applyBulkDelete">
+                        {{ $t('bulk.delete') }}
+                    </button>
+                    <button class="bulk-bar__btn bulk-bar__btn--primary" @click="appStore.setMultiSelectActive(false)">{{ $t('bulk.done') }}</button>
                 </div>
-                <select class="bulk-bar__select" v-model="bulkTab" @change="applyBulkTab">
-                    <option value="">{{ $t('bulk.moveToTab') }}</option>
-                    <option v-for="t in tabOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-                <button class="bulk-bar__btn bulk-bar__btn--danger" :disabled="appStore.selectedSoundPaths.length === 0" @click="applyBulkDelete">
-                    {{ $t('bulk.delete') }}
-                </button>
-                <button class="bulk-bar__btn bulk-bar__btn--primary" @click="appStore.setMultiSelectActive(false)">{{ $t('bulk.done') }}</button>
+                <div class="bulk-bar__palette" data-bulk-palette></div>
             </div>
         </Transition>
 
@@ -139,9 +166,20 @@ const appSettings = useAppSettingsStore()
 const boardRef = ref(null)
 const orphansRef = ref(null)
 const groupsOuterRef = ref(null)
+const scrollRef = ref(null)
+const bulkBarRef = ref(null)
+const bulkColorOpen = ref(false)
+const bulkBarHeight = ref(0)
+const marqueeRect = ref(null)
 let outerSortable = null
 /** @type {import('sortablejs').default[]} */
 const innerSortables = []
+/** @type {ResizeObserver | null} */
+let bulkBarObserver = null
+/** @type {{ x: number, y: number, pointerId: number } | null} */
+let marqueeStart = null
+let skipOutsideDeselect = false
+const MARQUEE_THRESHOLD = 4
 
 const showPlayer = computed(() => jsonStore.configFile?.settings?.showPlayer !== false)
 const playerLarge = computed(() => jsonStore.configFile?.settings?.playerLarge === true)
@@ -306,7 +344,13 @@ const allDisplaySounds = computed(() => {
 })
 
 function reorderDisabled() {
-  return jsonStore.configFile?.settings?.allowReorder === false
+  return jsonStore.configFile?.settings?.allowReorder === false || appStore.multiSelectActive
+}
+
+function syncSortableDisabled() {
+  const disabled = reorderDisabled()
+  outerSortable?.option('disabled', disabled)
+  for (const s of innerSortables) s.option('disabled', disabled)
 }
 
 function destroySortables() {
@@ -414,6 +458,9 @@ onUnmounted(() => {
   destroySortables()
   gifObserver?.disconnect()
   gifObserver = null
+  bulkBarObserver?.disconnect()
+  bulkBarObserver = null
+  endMarqueeListeners()
   clearTimeout(warmTimer)
   warmTimer = null
 })
@@ -549,13 +596,34 @@ function setupGifObserver() {
 }
 
 watch(
-  () => Settings.value?.allowReorder,
-  (v) => {
-    const disabled = v === false
-    outerSortable?.option('disabled', disabled)
-    for (const s of innerSortables) s.option('disabled', disabled)
+  [() => Settings.value?.allowReorder, () => appStore.multiSelectActive],
+  () => syncSortableDisabled(),
+)
+
+watch(
+  () => appStore.multiSelectActive,
+  (on) => {
+    if (!on) {
+      bulkColorOpen.value = false
+      bulkBarHeight.value = 0
+      cancelMarquee()
+    }
   },
 )
+
+watch(bulkBarRef, (el) => {
+  bulkBarObserver?.disconnect()
+  bulkBarObserver = null
+  if (!el || typeof ResizeObserver === 'undefined') {
+    if (!el) bulkBarHeight.value = 0
+    return
+  }
+  bulkBarObserver = new ResizeObserver(() => {
+    bulkBarHeight.value = el.offsetHeight
+  })
+  bulkBarObserver.observe(el)
+  bulkBarHeight.value = el.offsetHeight
+})
 
 function updateUniformHeight() {
   if (!Settings.value?.uniformButtonHeight) {
@@ -639,6 +707,16 @@ function openSeparatorMenu(event, sep) {
     y: event.clientY,
     type: 'separator',
     targetName: sep.id,
+    targetIndex: -1,
+  })
+}
+
+function openBoardMenu(event) {
+  appStore.openContextMenu({
+    x: event.clientX,
+    y: event.clientY,
+    type: 'board',
+    targetName: appStore.currentTab,
     targetIndex: -1,
   })
 }
@@ -788,11 +866,13 @@ onMounted(async () => {
   window.addEventListener('sn:play-sound-id', onPlaySoundId)
   window.addEventListener('sn:stop-sound-id', onStopSoundId)
   window.addEventListener('sn:stop-all', onHotkeyStopAll)
+  document.addEventListener('pointerup', onOutsidePointerUp)
 })
 
 onUnmounted(() => {
   stopAllProgress()
   document.removeEventListener('visibilitychange', syncWindowFocus)
+  document.removeEventListener('pointerup', onOutsidePointerUp)
   window.removeEventListener('focus', syncWindowFocus)
   window.removeEventListener('blur', syncWindowFocus)
   if (unlistenFinished) unlistenFinished()
@@ -844,8 +924,19 @@ function onHotkeyStopAll() {
   jsonStore.ReturnStatusAll()
 }
 
-function onSoundClick(sound) {
+function onSoundClick(sound, e) {
   if (appStore.multiSelectActive) {
+    if (e?.shiftKey && appStore.selectionAnchorPath) {
+      const paths = allDisplaySounds.value.map((s) => s.path)
+      const a = paths.indexOf(appStore.selectionAnchorPath)
+      const b = paths.indexOf(sound.path)
+      if (a !== -1 && b !== -1) {
+        const lo = Math.min(a, b)
+        const hi = Math.max(a, b)
+        appStore.selectSoundRange(paths.slice(lo, hi + 1))
+        return
+      }
+    }
     appStore.toggleSoundSelection(sound.path)
     return
   }
@@ -854,6 +945,117 @@ function onSoundClick(sound) {
     return
   }
   setActiveSound(sound)
+}
+
+function isMarqueeIgnoreTarget(el) {
+  if (!(el instanceof Element)) return true
+  if (el.closest('.Soundbtn')) return true
+  if (el.closest('.bulk-bar')) return true
+  if (el.closest('button, input, select, a, textarea, label')) return true
+  return false
+}
+
+function isSelectionChrome(el) {
+  if (!(el instanceof Element)) return true
+  if (el.closest('.Soundbtn')) return true
+  if (el.closest('.bulk-bar')) return true
+  if (el.closest('.color-group-picker')) return true
+  return false
+}
+
+function rectsIntersect(a, b) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+}
+
+function onBoardPointerDown(e) {
+  if (!appStore.multiSelectActive) return
+  if (e.button !== 0) return
+  if (isMarqueeIgnoreTarget(e.target)) return
+  const scroll = scrollRef.value
+  if (!scroll) return
+  marqueeStart = { x: e.clientX, y: e.clientY, pointerId: e.pointerId }
+  try {
+    scroll.setPointerCapture(e.pointerId)
+  } catch { /* already captured */ }
+  scroll.addEventListener('pointermove', onBoardPointerMove)
+  scroll.addEventListener('pointerup', onBoardPointerUp)
+  scroll.addEventListener('pointercancel', onBoardPointerUp)
+}
+
+function onBoardPointerMove(e) {
+  if (!marqueeStart) return
+  const dx = e.clientX - marqueeStart.x
+  const dy = e.clientY - marqueeStart.y
+  if (!marqueeRect.value && Math.hypot(dx, dy) < MARQUEE_THRESHOLD) return
+  e.preventDefault()
+  marqueeRect.value = {
+    left: Math.min(marqueeStart.x, e.clientX),
+    top: Math.min(marqueeStart.y, e.clientY),
+    width: Math.abs(e.clientX - marqueeStart.x),
+    height: Math.abs(e.clientY - marqueeStart.y),
+  }
+}
+
+function onBoardPointerUp() {
+  const rect = marqueeRect.value
+  const started = marqueeStart
+  cancelMarquee()
+  if (!started) return
+  if (!rect || (rect.width < MARQUEE_THRESHOLD && rect.height < MARQUEE_THRESHOLD)) {
+    skipOutsideDeselect = true
+    appStore.clearSoundSelection()
+    return
+  }
+  const clientRect = {
+    left: rect.left,
+    top: rect.top,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+  }
+  const root = scrollRef.value || boardRef.value
+  if (!root) return
+  const paths = []
+  root.querySelectorAll('.Soundbtn[data-sound-path]').forEach((el) => {
+    const b = el.getBoundingClientRect()
+    if (rectsIntersect(clientRect, b)) {
+      const path = el.getAttribute('data-sound-path')
+      if (path) paths.push(path)
+    }
+  })
+  if (paths.length) {
+    skipOutsideDeselect = true
+    appStore.selectSoundRange(paths)
+  }
+}
+
+function onOutsidePointerUp(e) {
+  if (!appStore.multiSelectActive) return
+  if (e.button !== 0) return
+  if (skipOutsideDeselect) {
+    skipOutsideDeselect = false
+    return
+  }
+  if (isSelectionChrome(e.target)) return
+  appStore.clearSoundSelection()
+}
+
+function endMarqueeListeners() {
+  const scroll = scrollRef.value
+  if (!scroll) return
+  scroll.removeEventListener('pointermove', onBoardPointerMove)
+  scroll.removeEventListener('pointerup', onBoardPointerUp)
+  scroll.removeEventListener('pointercancel', onBoardPointerUp)
+}
+
+function cancelMarquee() {
+  if (marqueeStart && scrollRef.value) {
+    try {
+      scrollRef.value.releasePointerCapture(marqueeStart.pointerId)
+    } catch { /* not captured */ }
+  }
+  endMarqueeListeners()
+  marqueeStart = null
+  marqueeRect.value = null
 }
 
 function onBulkOverride(override) {
@@ -896,6 +1098,7 @@ async function setActiveSound(sound) {
       hostName: appSettings.outputHost || null,
       active: false,
       overlap: overlapSounds,
+      volume: sound.volume ?? 1,
     })
       .then((duration) => {
         if (!sound.active) return

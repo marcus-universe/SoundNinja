@@ -19,6 +19,14 @@ ManifestDPIAwareness PerMonitorV2
 !addplugindir "{{signed_plugins_path}}"
 {{/if}}
 
+; Always-dark installer to match the app. Must be set before MUI2.nsh
+; or MUI bakes in the default white background.
+!define MUI_BGCOLOR "222831"
+!define MUI_TEXTCOLOR "EEEEEE"
+!define MUI_HEADER_TRANSPARENT_TEXT
+!define MUI_LICENSEPAGE_BGCOLOR "222831"
+!define MUI_DIRECTORYPAGE_BGCOLOR "222831"
+!define MUI_INSTFILESPAGE_COLORS "EEEEEE" "222831"
 !include MUI2.nsh
 !include FileFunc.nsh
 !include x64.nsh
@@ -65,7 +73,8 @@ ${StrLoc}
 !define WEBVIEW2BOOTSTRAPPERPATH "{{webview2_bootstrapper_path}}"
 !define WEBVIEW2INSTALLERPATH "{{webview2_installer_path}}"
 !define MINIMUMWEBVIEW2VERSION "{{minimum_webview2_version}}"
-!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCTNAME}"
+; Stable ARP key so upgrades from productName "soundninja" do not create a second Installed Apps row.
+!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\soundninja"
 !define MANUKEY "Software\${MANUFACTURER}"
 !define MANUPRODUCTKEY "${MANUKEY}\${PRODUCTNAME}"
 !define UNINSTALLERSIGNCOMMAND "{{uninstaller_sign_cmd}}"
@@ -155,6 +164,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ; Installer header image
 !if "${HEADERIMAGE}" != ""
  !define MUI_HEADERIMAGE_BITMAP "${HEADERIMAGE}"
+ !define MUI_HEADERIMAGE_BITMAP_NOSTRETCH
 !endif
 
 ; Uninstaller header image
@@ -172,20 +182,44 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 !define MUI_LANGDLL_REGISTRY_KEY "${MANUPRODUCTKEY}"
 !define MUI_LANGDLL_REGISTRY_VALUENAME "Installer Language"
 
+!macro ApplyDarkUiImpl
+ SetCtlColors $HWNDPARENT "EEEEEE" "222831"
+ FindWindow $0 "#32770" "" $HWNDPARENT
+ SetCtlColors $0 "EEEEEE" "222831"
+ GetDlgItem $1 $HWNDPARENT 1034
+ SetCtlColors $1 "EEEEEE" "222831"
+ GetDlgItem $1 $HWNDPARENT 1037
+ SetCtlColors $1 "EEEEEE" "222831"
+ GetDlgItem $1 $HWNDPARENT 1038
+ SetCtlColors $1 "EEEEEE" "222831"
+ GetDlgItem $1 $HWNDPARENT 1028
+ SetCtlColors $1 "EEEEEE" "222831"
+!macroend
+
+Function ApplyDarkUi
+ !insertmacro ApplyDarkUiImpl
+FunctionEnd
+Function un.ApplyDarkUi
+ !insertmacro ApplyDarkUiImpl
+FunctionEnd
+
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
 !insertmacro MUI_PAGE_WELCOME
 
 ; 2. License Page (if defined)
 !if "${LICENSE}" != ""
  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+ !define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
  !insertmacro MUI_PAGE_LICENSE "${LICENSE}"
 !endif
 
 ; 3. Install mode (if it is set to `both`)
 !if "${INSTALLMODE}" == "both"
  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+ !define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
  !insertmacro MULTIUSER_PAGE_INSTALLMODE
 !endif
 
@@ -278,16 +312,21 @@ Function PageReinstall
  nsDialogs::Create 1018
  Pop $R4
  ${IfThen} $(^RTL) = 1 ${|} nsDialogs::SetRTL $(^RTL) ${|}
+ Call ApplyDarkUi
 
  ${NSD_CreateLabel} 0 0 100% 24u $R1
  Pop $R1
+ SetCtlColors $R4 "EEEEEE" "222831"
+ SetCtlColors $R1 "EEEEEE" "222831"
 
  ${NSD_CreateRadioButton} 30u 50u -30u 8u $R2
  Pop $R2
+ SetCtlColors $R2 "EEEEEE" "222831"
  ${NSD_OnClick} $R2 PageReinstallUpdateSelection
 
  ${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
  Pop $R3
+ SetCtlColors $R3 "EEEEEE" "222831"
  ; Disable this radio button if downgrading and downgrades are disabled
  !if "${ALLOWDOWNGRADES}" == "false"
  ${IfThen} $R0 = -1 ${|} EnableWindow $R3 0 ${|}
@@ -394,6 +433,7 @@ FunctionEnd
 
 ; 5. Choose install directory page
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; 5a. Default app language
@@ -410,9 +450,12 @@ Function LangPageCreate
  ${If} $LangDialog == error
  Abort
  ${EndIf}
+ Call ApplyDarkUi
 
  ${NSD_CreateLabel} 0 0 100% 28u "Select the language used when Sound Ninja first starts. You can change this later in Settings."
  Pop $0
+ SetCtlColors $LangDialog "EEEEEE" "222831"
+ SetCtlColors $0 "EEEEEE" "222831"
 
  ${NSD_CreateDropList} 0 40u 70% 12u ""
  Pop $LangCombo
@@ -471,12 +514,16 @@ Function StemsPageCreate
  ${If} $StemsDialog == error
  Abort
  ${EndIf}
+ Call ApplyDarkUi
 
  ${NSD_CreateLabel} 0 0 100% 36u "Sound Ninja can separate vocals from music in the Record Editor using an AI model (BS-RoFormer, ~158 MB). The model is downloaded the first time you open the app — not during this install."
  Pop $0
+ SetCtlColors $StemsDialog "EEEEEE" "222831"
+ SetCtlColors $0 "EEEEEE" "222831"
 
  ${NSD_CreateCheckbox} 0 50u 100% 12u "Download the AI stem separation model on first launch (~158 MB)"
  Pop $StemsCheckbox
+ SetCtlColors $StemsCheckbox "EEEEEE" "222831"
  ; Default: checked
  ${NSD_Check} $StemsCheckbox
  StrCpy $StemsCheckboxState 1
@@ -496,9 +543,11 @@ Var AppStartMenuFolder
 !else
  !define MUI_PAGE_CUSTOMFUNCTION_PRE Skip
 !endif
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
 ; 7. Installation page
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
 !insertmacro MUI_PAGE_INSTFILES
 
 ; 8. Finish page
@@ -514,6 +563,7 @@ Var AppStartMenuFolder
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
 !insertmacro MUI_PAGE_FINISH
 
 Function RunMainBinary
@@ -527,6 +577,7 @@ Var DeleteAppDataCheckboxState
 !define /ifndef WS_EX_LAYOUTRTL 0x00400000
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.ConfirmShow
 Function un.ConfirmShow ; Add add a `Delete app data` check box
+ Call un.ApplyDarkUi
  ; $1 inner dialog HWND
  ; $2 window DPI
  ; $3 style
@@ -554,6 +605,7 @@ Function un.ConfirmShow ; Add add a `Delete app data` check box
  Pop $DeleteAppDataCheckbox
  SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
  SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
+ SetCtlColors $DeleteAppDataCheckbox "EEEEEE" "222831"
 FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
@@ -563,6 +615,7 @@ FunctionEnd
 !insertmacro MUI_UNPAGE_CONFIRM
 
 ; 2. Uninstalling Page
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW un.ApplyDarkUi
 !insertmacro MUI_UNPAGE_INSTFILES
 
 ;Languages
@@ -983,6 +1036,7 @@ Section Uninstall
  !insertmacro UnpinShortcut "$DESKTOP\${PRODUCTNAME}.lnk"
  Delete "$DESKTOP\${PRODUCTNAME}.lnk"
  ${EndIf}
+ Call un.DeleteLegacySoundninjaShortcuts
  ${EndIf}
 
  ; Remove registry information for add/remove programs
@@ -1037,6 +1091,30 @@ Function RestorePreviousInstallLocation
  StrCpy $INSTDIR $4
 FunctionEnd
 
+!macro DeleteLegacySoundninjaShortcutsImpl
+ ${If} ${FileExists} "$SMPROGRAMS\soundninja.lnk"
+  !insertmacro UnpinShortcut "$SMPROGRAMS\soundninja.lnk"
+  Delete "$SMPROGRAMS\soundninja.lnk"
+ ${EndIf}
+ ${If} ${FileExists} "$DESKTOP\soundninja.lnk"
+  !insertmacro UnpinShortcut "$DESKTOP\soundninja.lnk"
+  Delete "$DESKTOP\soundninja.lnk"
+ ${EndIf}
+ ${If} "$AppStartMenuFolder" != ""
+  ${If} ${FileExists} "$SMPROGRAMS\$AppStartMenuFolder\soundninja.lnk"
+   !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\soundninja.lnk"
+   Delete "$SMPROGRAMS\$AppStartMenuFolder\soundninja.lnk"
+  ${EndIf}
+ ${EndIf}
+!macroend
+
+Function DeleteLegacySoundninjaShortcuts
+ !insertmacro DeleteLegacySoundninjaShortcutsImpl
+FunctionEnd
+Function un.DeleteLegacySoundninjaShortcuts
+ !insertmacro DeleteLegacySoundninjaShortcutsImpl
+FunctionEnd
+
 Function Skip
  Abort
 FunctionEnd
@@ -1068,6 +1146,7 @@ Function CreateOrUpdateStartMenuShortcut
  ${EndIf}
 
  ${If} $R0 = 1
+ Call DeleteLegacySoundninjaShortcuts
  Return
  ${EndIf}
 
@@ -1088,6 +1167,7 @@ Function CreateOrUpdateStartMenuShortcut
  CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
  !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
  !endif
+ Call DeleteLegacySoundninjaShortcuts
 FunctionEnd
 
 Function CreateOrUpdateDesktopShortcut
@@ -1097,6 +1177,7 @@ Function CreateOrUpdateDesktopShortcut
  Pop $0
  ${If} $0 = 1
  !insertmacro SetShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+ Call DeleteLegacySoundninjaShortcuts
  Return
  ${EndIf}
 
@@ -1111,4 +1192,5 @@ Function CreateOrUpdateDesktopShortcut
 
  CreateShortcut "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
  !insertmacro SetLnkAppUserModelId "$DESKTOP\${PRODUCTNAME}.lnk"
+ Call DeleteLegacySoundninjaShortcuts
 FunctionEnd

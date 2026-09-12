@@ -1,6 +1,7 @@
 {
-  "productName": "soundninja",
-  "version": "0.6.1",
+  "productName": "Sound Ninja",
+  "mainBinaryName": "soundninja",
+  "version": "0.7.0",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -25,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost; media-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost https: ws: wss:",
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost https://klipy.com https://*.klipy.com https://klipycdn.com https://*.klipycdn.com; media-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost https: ws: wss:",
       "assetProtocol": {
         "enable": true,
         "scope": {
@@ -64,13 +65,17 @@
       "signingIdentity": null
     },
     "resources": [],
-    "shortDescription": "",
+    "shortDescription": "Sound Ninja",
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "nsis": {
-        "template": "installer/installer.nsi"
+        "template": "installer/installer.nsi",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp"
       }
     }
   },

@@ -126,8 +126,7 @@
   &__header {
     font-family: $fontBold;
     font-size: 1.2rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0.02em;
     color: color-mix(in srgb, var(--color-text, #{$white}) 45%, transparent);
     padding: 0 0.8rem 1.2rem;
     border-bottom: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
@@ -154,7 +153,7 @@
   padding: 0.88rem 1.2rem;
   border-radius: 0.64rem;
   font-family: $fontRegular;
-  font-size: 1.52rem;
+  font-size: var(--font-size-sm);
   color: color-mix(in srgb, var(--color-text, #{$white}) 65%, transparent);
   transition: background 0.15s, color 0.15s;
   display: flex;
@@ -189,7 +188,7 @@
 }
 
 .settings-nav__label {
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
   transition: opacity 0.2s ease, max-width 0.25s ease;
   max-width: 16rem;
@@ -233,7 +232,7 @@
   container-type: inline-size;
   container-name: settings-content;
   // Shared select / square-icon-button size
-  --settings-control-h: calc(0.72rem * 2 + 1.44rem * 1.2 + 0.16rem * 2);
+  --settings-control-h: var(--control-h);
   // Label column shrinks with panel width (was stuck at 16rem / 160px)
   --settings-label-w: clamp(6.5rem, 28cqi, 16rem);
   --settings-group-gap: clamp(0.6rem, 2.5cqi, 1.6rem);
@@ -337,7 +336,7 @@
 
 .settings-label {
   font-family: $fontRegular;
-  font-size: 1.52rem;
+  font-size: var(--font-size-sm);
   color: var(--color-text, #{$white});
   flex: 0 0 var(--settings-label-w, 16rem);
   width: var(--settings-label-w, 16rem);
@@ -495,8 +494,7 @@
 .settings-section-divider {
   font-family: $fontBold;
   font-size: 1.15rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: color-mix(in srgb, var(--color-text, #{$white}) 40%, transparent);
   margin: 2rem 0 0.4rem;
   padding-left: 4rem;
@@ -518,7 +516,7 @@
   color: var(--color-text, #{$white});
   color-scheme: dark;
   font-family: $fontRegular;
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   line-height: 1.2;
   padding: 0 1.2rem;
   transition: border-color 0.15s;
@@ -592,7 +590,7 @@
   border-radius: 0.64rem;
   color: var(--color-text, #{$white});
   font-family: $fontRegular;
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 
@@ -771,7 +769,7 @@
       height: auto;
       min-height: 0;
       padding: 0.72rem 1.2rem;
-      font-size: 1.44rem;
+      font-size: var(--font-size-sm);
       line-height: 1.2;
       border-radius: 0.64rem;
     }
@@ -794,7 +792,7 @@
   border-radius: 0.64rem;
   cursor: pointer;
   color: var(--color-text, #{$white});
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   transition: border-color 0.15s;
   gap: 0.8rem;
 
@@ -838,7 +836,7 @@
 
 .font-dropdown__option {
   padding: 0.72rem 1.2rem;
-  font-size: 1.52rem;
+  font-size: var(--font-size-sm);
   color: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
   cursor: pointer;
   transition: background 0.1s;
@@ -933,7 +931,7 @@
   border-radius: 0.8rem;
   color: color-mix(in srgb, var(--color-text, #{$white}) 70%, transparent);
   font-family: $fontRegular;
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
 
   &__label {
     opacity: 0.75;
@@ -994,7 +992,7 @@
 
   &__url {
     font-family: $fontRegular;
-    font-size: 1.44rem;
+    font-size: var(--font-size-sm);
     color: var(--color-text, #{$white});
     word-break: break-all;
   }
@@ -1042,7 +1040,7 @@
   border-radius: 0.8rem;
   color: color-mix(in srgb, var(--color-text, #{$white}) 70%, transparent);
   font-family: $fontRegular;
-  font-size: 1.44rem;
+  font-size: var(--font-size-sm);
   text-decoration: none;
   background: none;
   width: 100%;
@@ -1140,7 +1138,7 @@
     text-align: center;
     color: color-mix(in srgb, var(--color-text, #{$white}) 35%, transparent);
     font-family: $fontRegular;
-    font-size: 1.44rem;
+    font-size: var(--font-size-sm);
   }
 
   &__error {
@@ -1170,7 +1168,7 @@
     cursor: pointer;
     transition: background 0.15s;
     font-family: $fontRegular;
-    font-size: 1.52rem;
+    font-size: var(--font-size-sm);
     color: color-mix(in srgb, var(--color-text, #{$white}) 85%, transparent);
 
     &:hover {
@@ -1453,7 +1451,7 @@
     height: 3.6rem;
     box-sizing: border-box;
     padding: 0 1.2rem;
-    font-size: 1.44rem;
+    font-size: var(--font-size-sm);
     line-height: 1;
     display: flex;
     align-items: center;
@@ -1481,7 +1479,7 @@
     padding: 0.64rem 1.4rem;
     border-radius: 0.56rem;
     font-family: $fontRegular;
-    font-size: 1.44rem;
+    font-size: var(--font-size-sm);
     color: color-mix(in srgb, var(--color-text, #{$white}) 65%, transparent);
     border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
     transition: background 0.15s, color 0.15s, border-color 0.15s;

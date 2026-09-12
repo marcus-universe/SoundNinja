@@ -2,46 +2,145 @@
   <DialogField :title="step === 'position' ? $t('gifPicker.positionTitle') : $t('gifPicker.title')" @close="close">
     <p v-if="error" class="dialog-error">{{ error }}</p>
 
-    <template v-if="step === 'browse'">
-      <div class="gif-picker__info">
-        <p class="gif-picker__hint">{{ $t('gifPicker.info') }}</p>
-        <div class="gif-picker__info-actions">
-          <UIButton @click="openPartner">{{ $t('gifPicker.getKey') }}</UIButton>
-          <UIButton @click="pickLocal">{{ $t('gifPicker.localFile') }}</UIButton>
-        </div>
-      </div>
-      <div class="gif-picker__toolbar">
-        <input
-          class="ui-input gif-picker__search"
-          type="search"
-          :placeholder="$t('gifPicker.searchPlaceholder')"
-          :disabled="!hasKey || loading"
-          v-model="query"
-          @keydown.enter.prevent="runSearch"
-        />
-        <UIButton :disabled="!hasKey || loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
-      </div>
-      <div v-if="items.length" ref="gridRef" class="gif-picker__grid">
+    <div v-if="step === 'browse'" class="gif-picker">
+      <nav class="gif-picker__rail" :aria-label="$t('gifPicker.title')">
         <button
-          v-for="g in items"
-          :key="g.id"
           type="button"
-          class="gif-picker__cell"
-          :title="g.title"
-          @click="selectRemote(g)"
+          :class="['gif-picker__rail-item', { active: browseTab === 'local' }]"
+          @click="browseTab = 'local'"
         >
-          <img :src="g.previewUrl || g.thumbUrl" :alt="g.title" loading="lazy" draggable="false" />
+          <span class="gif-picker__rail-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            </svg>
+          </span>
+          <span class="gif-picker__rail-label">{{ $t('gifPicker.tabLocal') }}</span>
         </button>
-        <div
-          v-if="canLoadMore"
-          ref="sentinelRef"
-          class="gif-picker__sentinel"
-        >{{ loadingMore ? $t('gifPicker.loadingMore') : '' }}</div>
+        <button
+          type="button"
+          :class="['gif-picker__rail-item', { active: browseTab === 'klipy' }]"
+          @click="browseTab = 'klipy'"
+        >
+          <span class="gif-picker__rail-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="M21 15l-5-5L5 21"/>
+            </svg>
+          </span>
+          <span class="gif-picker__rail-label">{{ $t('gifPicker.tabKlipy') }}</span>
+        </button>
+      </nav>
+
+      <div class="gif-picker__pane">
+        <template v-if="browseTab === 'local'">
+          <div class="gif-picker__toolbar">
+            <input
+              class="ui-input gif-picker__search"
+              type="search"
+              :placeholder="$t('gifPicker.localSearchPlaceholder')"
+              v-model="localQuery"
+            />
+            <UIButton @click="addFolder">{{ $t('gifPicker.addFolder') }}</UIButton>
+            <UIButton @click="pickLocal">{{ $t('gifPicker.localFile') }}</UIButton>
+          </div>
+          <div v-if="folderChips.length" class="gif-picker__chips">
+            <span
+              v-for="folder in folderChips"
+              :key="folder"
+              class="gif-picker__chip"
+              :title="folder"
+            >
+              <span class="gif-picker__chip-name">{{ folderName(folder) }}</span>
+              <button
+                type="button"
+                class="gif-picker__chip-remove"
+                :aria-label="$t('gifPicker.removeFolder')"
+                @click="removeFolder(folder)"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+          <p v-if="localTruncated" class="gif-picker__hint">{{ $t('gifPicker.localTruncated', { count: LOCAL_CAP }) }}</p>
+          <div v-if="filteredLocalItems.length" ref="localGridRef" class="gif-picker__grid">
+            <div
+              v-for="item in filteredLocalItems"
+              :key="item.path"
+              class="gif-picker__cell gif-picker__cell--local"
+              :data-path="item.path"
+            >
+              <button
+                type="button"
+                class="gif-picker__cell-pick"
+                :title="item.name"
+                @click="selectLocal(item.path)"
+              >
+                <img
+                  v-if="localPreviewUrls[item.path]"
+                  :src="localPreviewUrls[item.path]"
+                  :alt="item.name"
+                  draggable="false"
+                />
+                <span v-else class="gif-picker__cell-ph" />
+              </button>
+              <button
+                type="button"
+                class="gif-picker__cell-remove"
+                :aria-label="$t('gifPicker.removeFromLibrary')"
+                @click="removeLocalItem(item)"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          <p v-else class="gif-picker__hint">
+            {{ localQuery.trim() ? $t('gifPicker.empty') : $t('gifPicker.localEmpty') }}
+          </p>
+        </template>
+
+        <template v-else>
+          <div class="gif-picker__info">
+            <p class="gif-picker__hint">{{ hasKey ? $t('gifPicker.info') : $t('gifPicker.noKey') }}</p>
+            <div class="gif-picker__info-actions">
+              <UIButton @click="openPartner">{{ $t('settings.main.klipyDocs') }}</UIButton>
+              <UIButton @click="openKlipySettings">{{ $t('gifPicker.openKlipySettings') }}</UIButton>
+            </div>
+          </div>
+          <div class="gif-picker__toolbar">
+            <input
+              class="ui-input gif-picker__search"
+              type="search"
+              :placeholder="$t('gifPicker.searchPlaceholder')"
+              :disabled="!hasKey || loading"
+              v-model="query"
+              @keydown.enter.prevent="runSearch"
+            />
+            <UIButton :disabled="!hasKey || loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
+          </div>
+          <div v-if="items.length" ref="gridRef" class="gif-picker__grid">
+            <button
+              v-for="g in items"
+              :key="g.id"
+              type="button"
+              class="gif-picker__cell"
+              :title="g.title"
+              @click="selectRemote(g)"
+            >
+              <img :src="g.previewUrl || g.thumbUrl" :alt="g.title" loading="lazy" draggable="false" />
+            </button>
+            <div
+              v-if="canLoadMore"
+              ref="sentinelRef"
+              class="gif-picker__sentinel"
+            >{{ loadingMore ? $t('gifPicker.loadingMore') : '' }}</div>
+          </div>
+          <p v-else-if="!loading && searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
+          <p v-if="loading && !items.length" class="gif-picker__hint">…</p>
+          <button type="button" class="gif-picker__attr" @click="openKlipy">{{ $t('gifPicker.poweredBy') }}</button>
+        </template>
       </div>
-      <p v-else-if="!loading && searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
-      <p v-if="loading && !items.length" class="gif-picker__hint">…</p>
-      <button type="button" class="gif-picker__attr" @click="openKlipy">{{ $t('gifPicker.poweredBy') }}</button>
-    </template>
+    </div>
 
     <template v-else>
       <p class="gif-picker__hint">{{ $t('gifPicker.positionHint') }}</p>
@@ -90,12 +189,16 @@ import {
 } from '~/utils/gifCache'
 import { KLIPY_HOME_URL, KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
 
+const LOCAL_CAP = 400
+const PREVIEW_LRU = 36
+
 const { t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
 
 const step = ref('browse')
+const browseTab = ref('local')
 const query = ref('')
 const items = ref([])
 const loading = ref(false)
@@ -106,9 +209,12 @@ const hasMore = ref(false)
 const searchActive = ref(false)
 const gridRef = ref(null)
 const sentinelRef = ref(null)
+const localGridRef = ref(null)
 const error = ref('')
 let searchGen = 0
 let io = null
+let localIo = null
+let klipyVisited = false
 const posX = ref(50)
 const posY = ref(50)
 const previewUrl = ref('')
@@ -116,6 +222,15 @@ const pendingMime = ref('image/gif')
 /** Keep bytes off Vue reactivity — Uint8Array + Proxy is a bad mix. */
 let pendingBytes = null
 let drag = null
+
+const localQuery = ref('')
+const localItems = ref([])
+const localTruncated = ref(false)
+const localPreviewUrls = reactive({})
+const previewLoading = new Set()
+const previewOrder = []
+const reduceMotion = ref(false)
+let motionMq = null
 
 const hasKey = computed(() => !!appSettings.klipyApiKey?.trim())
 const canLoadMore = computed(() => searchActive.value && hasMore.value)
@@ -125,9 +240,33 @@ const existingGif = computed(() => {
   if (i == null || i < 0) return false
   return !!jsonStore.configFile.files[i]?.gifId
 })
+const folderChips = computed(() => appSettings.gifLocalFolders)
+const filteredLocalItems = computed(() => {
+  const q = localQuery.value.trim().toLowerCase()
+  if (!q) return localItems.value
+  return localItems.value.filter((item) => item.name.toLowerCase().includes(q))
+})
+
+function normPath(p) {
+  return String(p || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+function basename(p) {
+  const parts = String(p || '').replace(/\\/g, '/').split('/').filter(Boolean)
+  return parts[parts.length - 1] || p
+}
+
+function folderName(folder) {
+  return basename(folder)
+}
+
+function pathUnderFolder(file, folder) {
+  return normPath(file).startsWith(normPath(folder) + '/')
+}
 
 function close() {
   revokePreview()
+  revokeAllLocalPreviews()
   appStore.closeGifPicker()
 }
 
@@ -138,12 +277,35 @@ function revokePreview() {
   }
 }
 
+function revokeLocalPreview(path) {
+  const u = localPreviewUrls[path]
+  if (u) {
+    URL.revokeObjectURL(u)
+    delete localPreviewUrls[path]
+  }
+  const i = previewOrder.indexOf(path)
+  if (i >= 0) previewOrder.splice(i, 1)
+}
+
+function revokeAllLocalPreviews() {
+  for (const p of Object.keys(localPreviewUrls)) {
+    URL.revokeObjectURL(localPreviewUrls[p])
+    delete localPreviewUrls[p]
+  }
+  previewOrder.length = 0
+}
+
 async function openKlipy() {
   await openInSystemBrowser(KLIPY_HOME_URL)
 }
 
 async function openPartner() {
   await openInSystemBrowser(KLIPY_PARTNER_URL)
+}
+
+function openKlipySettings() {
+  close()
+  appStore.openSettingsTab('behavior', 'klipyApi')
 }
 
 function applyPage(result, append) {
@@ -250,6 +412,151 @@ function bindSentinel() {
   io.observe(target)
 }
 
+function bindLocalPreviews() {
+  if (typeof IntersectionObserver === 'undefined') return
+  localIo?.disconnect()
+  localIo = null
+  const root = localGridRef.value
+  if (!root) return
+  localIo = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue
+      const path = e.target.getAttribute('data-path')
+      if (path) loadLocalPreview(path)
+    }
+  }, { root, rootMargin: '80px', threshold: 0 })
+  for (const el of root.querySelectorAll('[data-path]')) localIo.observe(el)
+}
+
+async function loadLocalPreview(path) {
+  if (localPreviewUrls[path]) {
+    const i = previewOrder.indexOf(path)
+    if (i >= 0) previewOrder.splice(i, 1)
+    previewOrder.push(path)
+    return
+  }
+  if (previewLoading.has(path)) return
+  previewLoading.add(path)
+  try {
+    const b64 = await invoke('read_file_base64_abs', { path })
+    const bytes = b64ToBytes(b64)
+    if (bytes.length > MAX_GIF_BYTES) return
+    const mime = detectImageMime(bytes)
+    if (!mime || !isLocalImageMime(mime)) return
+    let blobBytes = bytes
+    let blobMime = mime
+    if (reduceMotion.value && isAnimatedImageMime(mime)) {
+      try {
+        blobBytes = await extractPosterPng(bytes, mime)
+        blobMime = 'image/png'
+      } catch { /* keep animated */ }
+    }
+    while (previewOrder.length >= PREVIEW_LRU) {
+      const old = previewOrder.shift()
+      if (old && old !== path) revokeLocalPreview(old)
+    }
+    if (localPreviewUrls[path]) URL.revokeObjectURL(localPreviewUrls[path])
+    localPreviewUrls[path] = URL.createObjectURL(new Blob([blobBytes], { type: blobMime }))
+    previewOrder.push(path)
+  } catch {
+    /* skip unreadable files */
+  } finally {
+    previewLoading.delete(path)
+  }
+}
+
+async function refreshLocalLibrary() {
+  if (!appSettings.loaded) await appSettings.load()
+  const hidden = new Set(appSettings.gifLocalHidden.map(normPath))
+  const seen = new Set()
+  const next = []
+  let truncated = false
+
+  for (const file of appSettings.gifLocalFiles) {
+    const key = normPath(file)
+    if (!key || seen.has(key) || hidden.has(key)) continue
+    seen.add(key)
+    next.push({ path: file, name: basename(file), extra: true })
+    if (next.length >= LOCAL_CAP) {
+      truncated = true
+      break
+    }
+  }
+
+  if (!truncated) {
+    for (const folder of appSettings.gifLocalFolders) {
+      let files = []
+      try {
+        files = await invoke('list_image_files_abs', { dir: folder })
+      } catch {
+        continue
+      }
+      for (const file of files) {
+        const key = normPath(file)
+        if (!key || seen.has(key) || hidden.has(key)) continue
+        seen.add(key)
+        next.push({ path: file, name: basename(file), extra: false })
+        if (next.length >= LOCAL_CAP) {
+          truncated = true
+          break
+        }
+      }
+      if (truncated) break
+    }
+  }
+
+  localItems.value = next
+  localTruncated.value = truncated
+}
+
+async function addFolder() {
+  error.value = ''
+  try {
+    const dir = await open({
+      directory: true,
+      multiple: false,
+      title: t('gifPicker.addFolder'),
+    })
+    if (!dir) return
+    const path = Array.isArray(dir) ? dir[0] : dir
+    if (!path) return
+    const key = normPath(path)
+    if (appSettings.gifLocalFolders.some((f) => normPath(f) === key)) {
+      await refreshLocalLibrary()
+      return
+    }
+    await appSettings.setGifLocalLibrary({
+      folders: [...appSettings.gifLocalFolders, path],
+    })
+    await refreshLocalLibrary()
+  } catch (e) {
+    error.value = String(e)
+  }
+}
+
+async function removeFolder(folder) {
+  const folders = appSettings.gifLocalFolders.filter((f) => normPath(f) !== normPath(folder))
+  const hidden = appSettings.gifLocalHidden.filter((h) => !pathUnderFolder(h, folder))
+  await appSettings.setGifLocalLibrary({ folders, hidden })
+  for (const item of localItems.value) {
+    if (pathUnderFolder(item.path, folder)) revokeLocalPreview(item.path)
+  }
+  await refreshLocalLibrary()
+}
+
+async function removeLocalItem(item) {
+  if (item.extra) {
+    const files = appSettings.gifLocalFiles.filter((f) => normPath(f) !== normPath(item.path))
+    await appSettings.setGifLocalLibrary({ files })
+  } else {
+    await appSettings.setGifLocalLibrary({
+      hidden: [...appSettings.gifLocalHidden, item.path],
+    })
+  }
+  revokeLocalPreview(item.path)
+  await refreshLocalLibrary()
+}
+
 function isSizeLimitError(err) {
   const msg = String(err ?? '')
   return msg.includes('exceeds') && msg.includes('byte limit')
@@ -304,6 +611,46 @@ async function selectRemote(g) {
   }
 }
 
+async function readLocalImage(filePath) {
+  const b64 = await invoke('read_file_base64_abs', { path: filePath })
+  const bytes = b64ToBytes(b64)
+  if (bytes.length > MAX_GIF_BYTES) {
+    error.value = t('gifPicker.tooLarge')
+    return null
+  }
+  const mime = detectImageMime(bytes)
+  if (!mime || !isLocalImageMime(mime)) {
+    error.value = t('gifPicker.badType')
+    return null
+  }
+  return { bytes, mime }
+}
+
+async function rememberLocalFile(filePath) {
+  const key = normPath(filePath)
+  const hidden = appSettings.gifLocalHidden.filter((h) => normPath(h) !== key)
+  const wasHidden = hidden.length !== appSettings.gifLocalHidden.length
+  const inFolder = appSettings.gifLocalFolders.some((f) => pathUnderFolder(filePath, f))
+  const alreadyExtra = appSettings.gifLocalFiles.some((f) => normPath(f) === key)
+  if (!wasHidden && (alreadyExtra || inFolder)) return
+  const files = alreadyExtra || inFolder
+    ? appSettings.gifLocalFiles
+    : [...appSettings.gifLocalFiles, filePath]
+  await appSettings.setGifLocalLibrary({ files, hidden })
+  await refreshLocalLibrary()
+}
+
+async function selectLocal(filePath) {
+  error.value = ''
+  try {
+    const img = await readLocalImage(filePath)
+    if (!img) return
+    beginPosition(img.bytes, img.mime)
+  } catch (e) {
+    error.value = String(e)
+  }
+}
+
 async function pickLocal() {
   error.value = ''
   try {
@@ -313,18 +660,10 @@ async function pickLocal() {
       filters: [{ name: 'Images / GIF', extensions: ['gif', 'webp', 'png', 'jpg', 'jpeg'] }],
     })
     if (!filePath) return
-    const b64 = await invoke('read_file_base64_abs', { path: filePath })
-    const bytes = b64ToBytes(b64)
-    if (bytes.length > MAX_GIF_BYTES) {
-      error.value = t('gifPicker.tooLarge')
-      return
-    }
-    const mime = detectImageMime(bytes)
-    if (!mime || !isLocalImageMime(mime)) {
-      error.value = t('gifPicker.badType')
-      return
-    }
-    beginPosition(bytes, mime)
+    const img = await readLocalImage(filePath)
+    if (!img) return
+    await rememberLocalFile(filePath)
+    beginPosition(img.bytes, img.mime)
   } catch (e) {
     error.value = String(e)
   }
@@ -408,24 +747,53 @@ function removeGif() {
   close()
 }
 
+function onMotionChange(e) {
+  reduceMotion.value = !!e.matches
+  revokeAllLocalPreviews()
+  nextTick(bindLocalPreviews)
+}
+
+watch(browseTab, (tab) => {
+  if (tab !== 'klipy' || klipyVisited) return
+  klipyVisited = true
+  loadTrending()
+})
+
 watch([sentinelRef, gridRef, canLoadMore, () => items.value.length], () => {
   nextTick(bindSentinel)
 })
 
-onMounted(() => {
+watch([localGridRef, () => filteredLocalItems.value.length, localQuery], () => {
+  nextTick(bindLocalPreviews)
+})
+
+onMounted(async () => {
   const i = targetIndex.value
   const file = i != null ? jsonStore.configFile.files[i] : null
   if (file?.gifId) {
     posX.value = file.gifPosX ?? 50
     posY.value = file.gifPosY ?? 50
   }
-  loadTrending()
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    motionMq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    reduceMotion.value = motionMq.matches
+    if (motionMq.addEventListener) motionMq.addEventListener('change', onMotionChange)
+    else motionMq.addListener?.(onMotionChange)
+  }
+  await refreshLocalLibrary()
 })
 
 onUnmounted(() => {
   io?.disconnect()
   io = null
+  localIo?.disconnect()
+  localIo = null
+  if (motionMq) {
+    if (motionMq.removeEventListener) motionMq.removeEventListener('change', onMotionChange)
+    else motionMq.removeListener?.(onMotionChange)
+  }
   revokePreview()
+  revokeAllLocalPreviews()
   pendingBytes = null
 })
 </script>

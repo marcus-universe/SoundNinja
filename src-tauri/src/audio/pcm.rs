@@ -245,7 +245,7 @@ pub fn load(
         .unwrap_or(0.0);
 
     let mut guard = cache().lock().map_err(|e| e.to_string())?;
-    guard.insert(key.clone(), buffer.clone(), bytes, duration_secs);
+    guard.insert(key, buffer.clone(), bytes, duration_secs);
     Ok((buffer, duration_secs))
 }
 
@@ -517,4 +517,25 @@ pub fn resample_mono(input: &[f32], from: u32, to: u32) -> Result<Vec<f32>, Stri
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{int_sample_to_f32, resample_mono};
+
+    #[test]
+    fn int_sample_to_f32_full_scale_16bit_is_one() {
+        assert!((int_sample_to_f32(i16::MAX as i32, 16) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn resample_mono_same_rate_is_identity() {
+        let input = vec![0.1, -0.2, 0.3];
+        assert_eq!(resample_mono(&input, 48_000, 48_000).unwrap(), input);
+    }
+
+    #[test]
+    fn resample_mono_empty_stays_empty() {
+        assert!(resample_mono(&[], 44_100, 48_000).unwrap().is_empty());
+    }
 }

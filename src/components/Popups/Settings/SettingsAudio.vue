@@ -92,8 +92,8 @@
           <thead>
             <tr>
               <th>{{ $t('settings.audio.asioChannel') }}</th>
-              <th>L</th>
-              <th>R</th>
+              <th>{{ $t('settings.audio.left') }}</th>
+              <th>{{ $t('settings.audio.right') }}</th>
             </tr>
           </thead>
           <tbody>

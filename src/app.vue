@@ -138,6 +138,9 @@ const updateDialogRef = ref(null)
 // Latches on the first open so the settings chunk is fetched once and the
 // overlay's own enter/leave transition keeps working afterwards.
 const settingsEverOpened = ref(false)
+watch(() => appStore.activeOverlay, (val) => {
+  if (val === 'settings') settingsEverOpened.value = true
+})
 const savePopup = ref(null)
 let savePopupTimer = null
 const transferPopup = ref(null)
@@ -467,7 +470,7 @@ async function handleMenuImportAudio() {
         .replace(/([A-Z])/g, ' $1')
         .trim(),
       path: file,
-      volume: 0.4,
+      volume: 1,
       tabs,
       active: false,
       index: index + indexLength,
@@ -714,17 +717,6 @@ onMounted(async () => {
   const whenIdle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 1500))
   whenIdle(() => { settingsEverOpened.value = true })
 
-  setTimeout(() => {
-    import('~/utils/secondaryWindows').then((m) => {
-      m.openSecondaryWindow(m.RECORD_EDITOR)
-        .then(() => {
-          invoke('sn_dbg', { msg: 'js open resolved' }).catch(() => {})
-          setTimeout(() => { invoke('sn_dbg', { msg: 'js open +3s' }).catch(() => {}) }, 3000)
-        })
-        .catch((e) => invoke('sn_dbg', { msg: `js open failed: ${String(e)}` }).catch(() => {}))
-    })
-  }, 9000)
-
   listen('menu_open_settings', () => appStore.setActiveOverlay('settings'))
   listen('menu_open_about', () => appStore.openSettingsTab('about'))
   listen('menu_check_updates', () => {
@@ -878,7 +870,7 @@ onMounted(async () => {
     jsonStore.addFiles([{
       name,
       path,
-      volume: 0.4,
+      volume: 1,
       tabs,
       active: false,
       index: indexLength,

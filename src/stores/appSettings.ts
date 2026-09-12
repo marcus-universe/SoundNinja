@@ -45,6 +45,10 @@ export const useAppSettingsStore = defineStore('appSettings', {
     checkUpdatesOnStart: true,
     /** User-supplied Klipy GIF API key (app-wide, never stored in project files). */
     klipyApiKey: '',
+    /** Local background-image library (app-wide). Folder paths, extra files, hidden folder files. */
+    gifLocalFolders: [] as string[],
+    gifLocalFiles: [] as string[],
+    gifLocalHidden: [] as string[],
     /** App-wide audio prefs (not stored in project files). */
     outputSource: 'default',
     outputHost: 'WASAPI',
@@ -106,6 +110,9 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
       this.klipyApiKey = s.klipyApiKey || ''
+      this.gifLocalFolders = parseStringList(s.gifLocalFolders)
+      this.gifLocalFiles = parseStringList(s.gifLocalFiles)
+      this.gifLocalHidden = parseStringList(s.gifLocalHidden)
       try {
         this.hotkeys = parseAppHotkeys(s.hotkeys ? JSON.parse(s.hotkeys) : null)
       } catch {
@@ -324,6 +331,20 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.klipyApiKey = (key || '').trim()
       const d = await this._db()
       await saveSetting(d, 'klipyApiKey', this.klipyApiKey)
+    },
+
+    async setGifLocalLibrary(partial: {
+      folders?: string[]
+      files?: string[]
+      hidden?: string[]
+    }) {
+      if (partial.folders) this.gifLocalFolders = uniquePaths(partial.folders)
+      if (partial.files) this.gifLocalFiles = uniquePaths(partial.files)
+      if (partial.hidden) this.gifLocalHidden = uniquePaths(partial.hidden)
+      const d = await this._db()
+      await saveSetting(d, 'gifLocalFolders', JSON.stringify(this.gifLocalFolders))
+      await saveSetting(d, 'gifLocalFiles', JSON.stringify(this.gifLocalFiles))
+      await saveSetting(d, 'gifLocalHidden', JSON.stringify(this.gifLocalHidden))
     },
 
     /** CSS --topbar_height only. Does not touch OS decorations or emit events. */
@@ -545,4 +566,33 @@ function joinPath(base: string, child: string): string {
   if (!base) return child
   const sep = base.includes('\\') ? '\\' : '/'
   return base.replace(/[\\/]+$/, '') + sep + child
+}
+
+function parseStringList(raw: string | undefined): string[] {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw)
+    if (!Array.isArray(v)) return []
+    return uniquePaths(v.filter((x): x is string => typeof x === 'string'))
+  } catch {
+    return []
+  }
+}
+
+function normPath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+function uniquePaths(list: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of list) {
+    const p = raw.trim()
+    if (!p) continue
+    const key = normPath(p)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(p)
+  }
+  return out
 }

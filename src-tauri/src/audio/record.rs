@@ -270,7 +270,7 @@ pub fn start_recording(
         .map_err(|e| e)?;
 
     // Level meter ticker
-    let app_level = app.clone();
+    let app_level = app;
     let stop_level = stop_flag.clone();
     thread::spawn(move || {
         while !stop_level.load(Ordering::Relaxed) {

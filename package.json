@@ -1,6 +1,6 @@
 {
   "name": "soundninja",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "nuxt dev --host 127.0.0.1 --port 3000",
@@ -8,6 +8,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "test": "vitest run",
     "tauri:build": "tauri build",
     "tauri:build:fast": "node scripts/build-fast.mjs",
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
@@ -43,7 +44,8 @@
     "@tauri-apps/cli": "^2.11.3",
     "prettier": "^3.9.4",
     "prettier-plugin-rust": "^0.1.9",
-    "sass": "^1.101.0"
+    "sass": "^1.101.0",
+    "vitest": "^3.2.7"
   },
   "overrides": {
     "esbuild": "0.27.7"

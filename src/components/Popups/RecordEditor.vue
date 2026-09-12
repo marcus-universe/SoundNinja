@@ -354,6 +354,8 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
 import { platform } from '@tauri-apps/plugin-os'
 
+const { t } = useI18n()
+
 interface SessionInfo {
   session_id: string
   sample_rate: number
@@ -1376,7 +1378,7 @@ async function importStaged(all: boolean) {
   const dir = await open({
     directory: true,
     multiple: false,
-    title: 'Import folder',
+    title: t('native.importFolder'),
   })
   if (!dir || typeof dir !== 'string') return
 

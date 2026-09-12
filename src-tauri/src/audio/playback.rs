@@ -21,6 +21,10 @@ fn current_volume() -> f32 {
     f32::from_bits(OUTPUT_VOLUME.load(Ordering::Relaxed))
 }
 
+fn effective_volume(sound_volume: f32) -> f32 {
+    (current_volume() * sound_volume.clamp(0.0, 1.0)).clamp(0.0, 1.0)
+}
+
 #[tauri::command(async)]
 pub fn set_output_volume(volume: f32) {
     let volume = volume.clamp(0.0, 1.0);
@@ -118,6 +122,8 @@ pub enum AudioMsg {
         overlap: bool,
         ready: Ready,
         duration_secs: f64,
+        /// Per-sound gain 0–1, multiplied with the master output volume.
+        volume: f32,
     },
     /// Stop a single playing sound matched by its file path.
     StopOne {
@@ -145,6 +151,11 @@ pub enum AudioMsg {
     },
     /// Apply the master volume to sounds that are already running.
     SetVolume(f32),
+    /// Update per-sound gain on already-playing instances of `path`.
+    SetSoundVolume {
+        path: String,
+        volume: f32,
+    },
 }
 
 // --- Global audio sender ---
@@ -211,6 +222,8 @@ struct PlayingSound {
     /// Absolute file offset corresponding to player position 0 (set on seek).
     position_origin_secs: f64,
     ready: Ready,
+    /// Per-sound gain 0–1 (master is applied separately).
+    sound_volume: f32,
 }
 
 /// Fully cached PCM, or a live progressive pump.
@@ -390,7 +403,7 @@ fn seek_playing_slot(
     let target = Duration::from_secs_f64(clamped);
 
     let new_player = Player::connect_new(stream.device_sink.mixer());
-    new_player.set_volume(current_volume());
+    new_player.set_volume(effective_volume(playing[i].sound_volume));
     let origin = match &ready {
         Ready::Cached(buf) => {
             let mut source = buf.clone();
@@ -420,6 +433,7 @@ fn seek_playing_slot(
     if was_paused {
         new_player.pause();
     }
+    let sound_volume = playing[i].sound_volume;
     let old = std::mem::replace(
         &mut playing[i],
         PlayingSound {
@@ -429,6 +443,7 @@ fn seek_playing_slot(
             duration_secs,
             position_origin_secs: origin,
             ready,
+            sound_volume,
         },
     );
     old.player.stop();
@@ -552,6 +567,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     overlap,
                     ready,
                     duration_secs,
+                    volume,
                 } => {
                     if !overlap {
                         for s in playing.drain(..) {
@@ -571,7 +587,8 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
 
                     let st = stream.as_ref().expect("ensure_stream guarantees Some on Ok");
                     let new_player = Player::connect_new(st.device_sink.mixer());
-                    new_player.set_volume(current_volume());
+                    let sound_volume = volume.clamp(0.0, 1.0);
+                    new_player.set_volume(effective_volume(sound_volume));
                     ready.append_to(&new_player);
                     playing.push(PlayingSound {
                         player: new_player,
@@ -580,6 +597,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         duration_secs,
                         position_origin_secs: 0.0,
                         ready,
+                        sound_volume,
                     });
                     let keep: Vec<String> = playing.iter().map(|s| s.path.clone()).collect();
                     super::cache::evict_idle(&keep);
@@ -601,9 +619,19 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     }
                 }
 
-                AudioMsg::SetVolume(volume) => {
+                AudioMsg::SetVolume(_) => {
                     for s in &playing {
-                        s.player.set_volume(volume);
+                        s.player.set_volume(effective_volume(s.sound_volume));
+                    }
+                }
+
+                AudioMsg::SetSoundVolume { path, volume } => {
+                    let volume = volume.clamp(0.0, 1.0);
+                    for s in &mut playing {
+                        if s.path == path {
+                            s.sound_volume = volume;
+                            s.player.set_volume(effective_volume(volume));
+                        }
                     }
                 }
 
@@ -637,6 +665,7 @@ pub fn enqueue_play(
     device_name: String,
     host_name: Option<String>,
     overlap: bool,
+    volume: f32,
 ) -> Result<f64, String> {
     let (ready, duration) = prepare_play(&sound_path, &device_name, host_name.as_deref())?;
     send_msg(AudioMsg::Play {
@@ -646,6 +675,7 @@ pub fn enqueue_play(
         overlap,
         ready,
         duration_secs: duration,
+        volume,
     })?;
     Ok(duration)
 }
@@ -657,13 +687,25 @@ pub async fn play_sound(
     host_name: Option<String>,
     active: bool,
     overlap: bool,
+    volume: Option<f32>,
 ) -> Result<f64, String> {
     if active {
         send_msg(AudioMsg::StopOne { path: sound_path })?;
         return Ok(0.0);
     }
-    crate::task::run_blocking(move || enqueue_play(sound_path, device_name, host_name, overlap))
-        .await
+    let volume = volume.unwrap_or(1.0).clamp(0.0, 1.0);
+    crate::task::run_blocking(move || {
+        enqueue_play(sound_path, device_name, host_name, overlap, volume)
+    })
+    .await
+}
+
+#[tauri::command(async)]
+pub fn set_sound_volume(sound_path: String, volume: f32) -> Result<(), String> {
+    send_msg(AudioMsg::SetSoundVolume {
+        path: sound_path,
+        volume: volume.clamp(0.0, 1.0),
+    })
 }
 
 #[tauri::command(async)]
