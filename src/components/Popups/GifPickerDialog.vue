@@ -118,7 +118,7 @@
             />
             <UIButton :disabled="!hasKey || loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
           </div>
-          <div v-if="items.length" ref="gridRef" class="gif-picker__grid">
+          <div v-if="items.length" ref="gridRef" class="gif-picker__grid" @scroll.passive="onGridScroll">
             <button
               v-for="g in items"
               :key="g.id"
@@ -206,7 +206,6 @@ const loadingMore = ref(false)
 const searched = ref(false)
 const page = ref(1)
 const hasMore = ref(false)
-const searchActive = ref(false)
 const gridRef = ref(null)
 const sentinelRef = ref(null)
 const localGridRef = ref(null)
@@ -233,7 +232,7 @@ const reduceMotion = ref(false)
 let motionMq = null
 
 const hasKey = computed(() => !!appSettings.klipyApiKey?.trim())
-const canLoadMore = computed(() => searchActive.value && hasMore.value)
+const canLoadMore = computed(() => hasMore.value)
 const targetIndex = computed(() => appStore.gifPickerIndex)
 const existingGif = computed(() => {
   const i = targetIndex.value
@@ -310,22 +309,19 @@ function openKlipySettings() {
 
 function applyPage(result, append) {
   const next = result.items || []
-  let added = next.length
   if (!append) {
     items.value = next
   } else {
     const seen = new Set(items.value.map((g) => g.id))
-    added = 0
     for (const g of next) {
       if (!seen.has(g.id)) {
         seen.add(g.id)
         items.value.push(g)
-        added++
       }
     }
   }
   page.value = result.page || page.value
-  hasMore.value = !!result.hasNext && next.length > 0 && added > 0
+  hasMore.value = !!result.hasNext && next.length > 0
 }
 
 async function loadTrending() {
@@ -333,7 +329,6 @@ async function loadTrending() {
   const gen = ++searchGen
   loading.value = true
   error.value = ''
-  searchActive.value = false
   hasMore.value = false
   page.value = 1
   try {
@@ -348,6 +343,7 @@ async function loadTrending() {
   } finally {
     if (gen === searchGen) loading.value = false
   }
+  if (gen === searchGen) await maybeRefill()
 }
 
 async function runSearch() {
@@ -361,7 +357,6 @@ async function runSearch() {
   loading.value = true
   loadingMore.value = false
   error.value = ''
-  searchActive.value = true
   page.value = 1
   try {
     const result = await searchKlipy(appSettings.klipyApiKey, q, 1)
@@ -376,17 +371,34 @@ async function runSearch() {
   } finally {
     if (gen === searchGen) loading.value = false
   }
+  if (gen === searchGen) await maybeRefill()
+}
+
+function isNearGridBottom() {
+  const el = gridRef.value
+  if (!el) return false
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 120
+}
+
+function onGridScroll() {
+  if (isNearGridBottom()) loadMore()
+}
+
+async function maybeRefill() {
+  await nextTick()
+  if (canLoadMore.value && isNearGridBottom()) loadMore()
 }
 
 async function loadMore() {
   if (!canLoadMore.value || loading.value || loadingMore.value || !hasKey.value) return
   const q = query.value.trim()
-  if (!q) return
   const gen = searchGen
   const nextPage = page.value + 1
   loadingMore.value = true
   try {
-    const result = await searchKlipy(appSettings.klipyApiKey, q, nextPage)
+    const result = q
+      ? await searchKlipy(appSettings.klipyApiKey, q, nextPage)
+      : await trendingKlipy(appSettings.klipyApiKey, nextPage)
     if (gen !== searchGen) return
     applyPage(result, true)
     page.value = nextPage
@@ -397,6 +409,7 @@ async function loadMore() {
   } finally {
     if (gen === searchGen) loadingMore.value = false
   }
+  if (gen === searchGen) await maybeRefill()
 }
 
 function bindSentinel() {

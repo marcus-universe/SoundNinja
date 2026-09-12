@@ -239,6 +239,31 @@ pub fn paths_exist_abs(paths: Vec<String>) -> Vec<bool> {
 }
 
 #[derive(Serialize)]
+pub struct SoundFileMeta {
+    pub path: String,
+    pub size: u64,
+    pub mtime: u64,
+}
+
+/// Cheap `stat` for board sort (size + mtime). Missing files are omitted.
+#[tauri::command(async)]
+pub fn get_sound_file_meta(paths: Vec<String>) -> Vec<SoundFileMeta> {
+    let mut out = Vec::with_capacity(paths.len());
+    for path in paths {
+        let Ok(meta) = fs::metadata(&path) else { continue };
+        let size = meta.len();
+        let mtime = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        out.push(SoundFileMeta { path, size, mtime });
+    }
+    out
+}
+
+#[derive(Serialize)]
 pub struct FileNameMatch {
     pub name: String,
     pub paths: Vec<String>,

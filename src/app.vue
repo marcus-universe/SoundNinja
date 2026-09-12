@@ -295,6 +295,7 @@ function toProjectConfig(obj) {
     tabList: obj.tabList ?? [],
     files: obj.files ?? [],
     separators: obj.separators ?? [],
+    tags: obj.tags ?? [],
   }
 }
 

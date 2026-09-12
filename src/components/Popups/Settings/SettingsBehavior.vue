@@ -105,6 +105,14 @@
       <UICheckbox :modelValue="navbarTooltips" @update:modelValue="onNavbarTooltips" />
     </div>
 
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.showTagBadges') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.showTagBadgesHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="showTagBadges" @update:modelValue="onShowTagBadges" />
+    </div>
+
     <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.tabTransition') }}</label>
       <select v-model="tabTransition" @change="onTabTransition" class="settings-select">
@@ -196,6 +204,7 @@ const tabTransition = ref<TabTransition>('slide')
 const klipyApiKey = ref('')
 const klipyKeyVisible = ref(false)
 const navbarTooltips = ref(true)
+const showTagBadges = ref(true)
 const systemTitlebar = ref(false)
 const hideTitlebar = ref(false)
 const hideTitlebarWarnOpen = ref(false)
@@ -271,6 +280,11 @@ async function onNavbarTooltips(val: boolean) {
   await appSettings.setNavbarTooltips(val)
 }
 
+async function onShowTagBadges(val: boolean) {
+  showTagBadges.value = val
+  await appSettings.setShowTagBadges(val)
+}
+
 async function onSystemTitlebar(val: boolean) {
   systemTitlebar.value = val
   await appSettings.setTitlebarMode(val ? 'system' : 'styled')
@@ -325,6 +339,7 @@ async function syncFromStore() {
   tabTransition.value = normalizeTabTransition(jsonStore.configFile?.settings?.tabTransition)
   klipyApiKey.value = appSettings.klipyApiKey || ''
   navbarTooltips.value = appSettings.navbarTooltips !== false
+  showTagBadges.value = appSettings.showTagBadges !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
   recentLimit.value = appSettings.recentLimit ?? 30

@@ -2,6 +2,11 @@
 node_modules
 /dist
 
+# Windows device name (git add -A mmaps it → "mmap failed: Invalid argument")
+NUL
+nul
+*.af~lock~
+
 # Nuxt generated files
 .nuxt
 .output

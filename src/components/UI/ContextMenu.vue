@@ -85,33 +85,46 @@
         <li v-if="!isBoard" class="context-menu__sep" role="separator" />
         <li
           v-if="isSound"
+          ref="moveToTabRowEl"
           class="context-menu__item"
+          :class="{ 'context-menu__item--flyout-open': activeFlyout === 'tabs' }"
           role="menuitem"
-          @click="toggleMoveToTab"
-          @mouseenter="hoveredItem = 'moveToTab'"
-          @mouseleave="hoveredItem = null"
+          aria-haspopup="menu"
+          :aria-expanded="activeFlyout === 'tabs'"
+          @click="openFlyout('tabs', true)"
+          @mouseenter="onFlyoutRowEnter('tabs', 'moveToTab')"
+          @mouseleave="onFlyoutRowLeave"
         >
           <span class="context-menu__icon">
             <Icons icon="tab" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.moveToTab') }}</span>
           <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'moveToTab'" class="context-menu__desc">{{ $t('contextMenu.moveToTabDesc') }}</span>
+            <span v-if="hoveredItem === 'moveToTab' && activeFlyout !== 'tabs'" class="context-menu__desc">{{ $t('contextMenu.moveToTabDesc') }}</span>
           </Transition>
-          <span class="context-menu__chevron">{{ moveToTabOpen ? '▲' : '▼' }}</span>
+          <span class="context-menu__chevron">{{ flyoutChevron('tabs') }}</span>
         </li>
-        <template v-if="moveToTabOpen && appStore.contextMenu.type === 'sound'">
-          <li
-            v-for="tab in allTabs"
-            :key="tab.name"
-            class="context-menu__item context-menu__tab-row"
-            role="menuitemcheckbox"
-            @click.stop="toggleSoundTab(tab.name)"
-          >
-            <span class="context-menu__check">{{ soundTabs.includes(tab.name) ? '☑' : '☐' }}</span>
-            <span class="context-menu__label">{{ tab.name }}</span>
-          </li>
-        </template>
+        <li
+          v-if="appStore.contextMenu.type === 'sound'"
+          ref="tagsRowEl"
+          class="context-menu__item"
+          :class="{ 'context-menu__item--flyout-open': activeFlyout === 'tags' }"
+          role="menuitem"
+          aria-haspopup="menu"
+          :aria-expanded="activeFlyout === 'tags'"
+          @click="openFlyout('tags', true)"
+          @mouseenter="onFlyoutRowEnter('tags', 'tags')"
+          @mouseleave="onFlyoutRowLeave"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="filter" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.tags') }}</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'tags' && activeFlyout !== 'tags'" class="context-menu__desc">{{ $t('contextMenu.tagsDesc') }}</span>
+          </Transition>
+          <span class="context-menu__chevron">{{ flyoutChevron('tags') }}</span>
+        </li>
         <li
           v-if="isSound || isBoard"
           class="context-menu__item"
@@ -325,24 +338,27 @@
           </button>
         </li>
 
-        <li v-if="isTab || isSound" class="context-menu__item context-menu__item--color" role="menuitem" @click="toggleColorPicker" @mouseenter="hoveredItem = 'color'" @mouseleave="hoveredItem = null">
+        <li
+          v-if="isTab || isSound"
+          ref="colorsRowEl"
+          class="context-menu__item context-menu__item--color"
+          :class="{ 'context-menu__item--flyout-open': activeFlyout === 'colors' }"
+          role="menuitem"
+          aria-haspopup="menu"
+          :aria-expanded="activeFlyout === 'colors'"
+          @click="openFlyout('colors', true)"
+          @mouseenter="onFlyoutRowEnter('colors', 'color')"
+          @mouseleave="onFlyoutRowLeave"
+        >
           <span
             class="context-menu__swatch"
             :style="swatchStyle"
           />
           <span class="context-menu__label">{{ $t('contextMenu.colors') }}</span>
           <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'color'" class="context-menu__desc">{{ $t('contextMenu.colorsDesc') }}</span>
+            <span v-if="hoveredItem === 'color' && activeFlyout !== 'colors'" class="context-menu__desc">{{ $t('contextMenu.colorsDesc') }}</span>
           </Transition>
-          <span class="context-menu__chevron">{{ colorPickerOpen ? '▲' : '▼' }}</span>
-        </li>
-        <li v-if="colorPickerOpen && (isTab || isSound)" class="context-menu__color-panel" @click.stop>
-          <ColorGroupPicker
-            :model-value="currentOverride"
-            :base-colors="baseColors"
-            inline
-            @change="onOverrideChange"
-          />
+          <span class="context-menu__chevron">{{ flyoutChevron('colors') }}</span>
         </li>
         <li
           v-if="appStore.contextMenu.type === 'sound'"
@@ -361,6 +377,65 @@
           </Transition>
         </li>
       </ul>
+    </div>
+    <div
+      v-if="appStore.contextMenu.visible && activeFlyout"
+      ref="flyoutEl"
+      class="context-menu__flyout"
+      :class="{
+        'context-menu__flyout--left': flyoutSide === 'left',
+        'context-menu__flyout--ready': flyoutReady,
+      }"
+      :style="{ top: flyoutPos.y + 'px', left: flyoutPos.x + 'px' }"
+      role="menu"
+      @click.stop
+      @contextmenu.prevent.stop
+      @mouseenter="onFlyoutEnter"
+      @mouseleave="onFlyoutLeave"
+    >
+      <div class="context-menu__flyout-inner">
+        <ul v-if="activeFlyout === 'tabs'" class="context-menu__list">
+          <li
+            v-for="tab in allTabs"
+            :key="tab.name"
+            class="context-menu__item context-menu__tab-row"
+            role="menuitemcheckbox"
+            @click.stop="toggleSoundTab(tab.name)"
+          >
+            <span class="context-menu__check">{{ soundTabs.includes(tab.name) ? '☑' : '☐' }}</span>
+            <span class="context-menu__label">{{ tab.name }}</span>
+          </li>
+        </ul>
+        <ul v-else-if="activeFlyout === 'tags'" class="context-menu__list">
+          <li
+            v-for="tag in projectTags"
+            :key="tag.id"
+            class="context-menu__item context-menu__tab-row"
+            role="menuitemcheckbox"
+            @click.stop="toggleSoundTag(tag.id)"
+          >
+            <span class="context-menu__check">{{ soundTagIds.includes(tag.id) ? '☑' : '☐' }}</span>
+            <span class="filter-panel__swatch" :style="{ background: tag.color }" />
+            <span class="context-menu__label">{{ tag.name }}</span>
+          </li>
+          <li
+            v-if="!projectTags.length"
+            class="context-menu__item context-menu__tab-row"
+            role="menuitem"
+            @click.stop="openFilterForTags"
+          >
+            <span class="context-menu__label">{{ $t('contextMenu.manageTags') }}</span>
+          </li>
+        </ul>
+        <div v-else-if="activeFlyout === 'colors'" class="context-menu__color-panel" @click.stop>
+          <ColorGroupPicker
+            :model-value="currentOverride"
+            :base-colors="baseColors"
+            inline
+            @change="onOverrideChange"
+          />
+        </div>
+      </div>
     </div>
     <!-- invisible backdrop to close on outside click -->
     <div
@@ -391,14 +466,27 @@ const { t: $t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 
-const colorPickerOpen = ref(false)
-const moveToTabOpen = ref(false)
 const tabAlignOpen = ref(false)
 const groupAlignOpen = ref(false)
 const groupColorsOpen = ref(false)
 const hoveredItem = ref(null)
 const menuEl = ref(null)
 const menuSize = ref({ w: 220, h: 180 })
+
+const activeFlyout = ref(null)
+const flyoutEl = ref(null)
+const moveToTabRowEl = ref(null)
+const tagsRowEl = ref(null)
+const colorsRowEl = ref(null)
+const flyoutPos = ref({ x: 0, y: 0 })
+const flyoutSide = ref('right')
+const flyoutReady = ref(false)
+
+const FLYOUT_GAP = 4
+const FLYOUT_PAD = 8
+const FLYOUT_CLOSE_MS = 150
+let flyoutCloseTimer = null
+let ignoreRowLeaveUntil = 0
 
 const menuType = computed(() => appStore.contextMenu.type)
 const isTab = computed(() => menuType.value === 'tab')
@@ -410,6 +498,12 @@ const allTabs = computed(() => jsonStore.configFile.tabList)
 const soundTabs = computed(() => {
   const { targetIndex } = appStore.contextMenu
   return jsonStore.configFile.files[targetIndex]?.tabs ?? []
+})
+
+const projectTags = computed(() => jsonStore.configFile.tags ?? [])
+const soundTagIds = computed(() => {
+  const { targetIndex } = appStore.contextMenu
+  return jsonStore.configFile.files[targetIndex]?.tagIds ?? []
 })
 
 const activeGroup = computed(() => {
@@ -465,8 +559,104 @@ function resetVolume() {
   applySoundVolume(100)
 }
 
-function toggleMoveToTab() {
-  moveToTabOpen.value = !moveToTabOpen.value
+function flyoutAnchor(kind) {
+  if (kind === 'tabs') return moveToTabRowEl.value
+  if (kind === 'tags') return tagsRowEl.value
+  return colorsRowEl.value
+}
+
+function flyoutChevron(kind) {
+  return flyoutSide.value === 'left' && activeFlyout.value === kind ? '‹' : '›'
+}
+
+function clearFlyoutClose() {
+  if (flyoutCloseTimer != null) {
+    clearTimeout(flyoutCloseTimer)
+    flyoutCloseTimer = null
+  }
+}
+
+function scheduleFlyoutClose() {
+  clearFlyoutClose()
+  flyoutCloseTimer = setTimeout(() => {
+    activeFlyout.value = null
+    flyoutReady.value = false
+    flyoutCloseTimer = null
+  }, FLYOUT_CLOSE_MS)
+}
+
+function openFlyout(kind, fromClick = false) {
+  clearFlyoutClose()
+  if (fromClick) ignoreRowLeaveUntil = Date.now() + 400
+  if (activeFlyout.value !== kind) {
+    flyoutReady.value = false
+    activeFlyout.value = kind
+  }
+}
+
+function onFlyoutRowEnter(kind, hoverKey) {
+  hoveredItem.value = hoverKey
+  openFlyout(kind)
+}
+
+function onFlyoutRowLeave() {
+  hoveredItem.value = null
+  if (Date.now() < ignoreRowLeaveUntil) return
+  scheduleFlyoutClose()
+}
+
+function onFlyoutEnter() {
+  clearFlyoutClose()
+}
+
+function onFlyoutLeave() {
+  scheduleFlyoutClose()
+}
+
+function applyFlyoutPosition() {
+  const flyout = flyoutEl.value
+  const menu = menuEl.value
+  const row = flyoutAnchor(activeFlyout.value)
+  if (!flyout || !menu || !row || typeof window === 'undefined') return false
+
+  const menuRect = menu.getBoundingClientRect()
+  const rowRect = row.getBoundingClientRect()
+  const flyoutWidth = flyout.offsetWidth
+  const flyoutHeight = flyout.offsetHeight
+  if (!flyoutWidth || !flyoutHeight) return false
+
+  let left = menuRect.right + FLYOUT_GAP
+  let side = 'right'
+  if (left + flyoutWidth > window.innerWidth - FLYOUT_PAD) {
+    left = Math.max(4, menuRect.left - flyoutWidth - FLYOUT_GAP)
+    side = 'left'
+  }
+
+  let top = rowRect.top
+  top = Math.min(top, window.innerHeight - flyoutHeight - FLYOUT_PAD)
+  top = Math.max(4, top)
+
+  flyoutPos.value = { x: left, y: top }
+  flyoutSide.value = side
+  flyoutReady.value = true
+  return true
+}
+
+async function positionFlyout() {
+  await nextTick()
+  if (applyFlyoutPosition()) return
+  requestAnimationFrame(() => applyFlyoutPosition())
+}
+
+function toggleSoundTag(tagId) {
+  const sound = currentSound()
+  if (!sound?.path) return
+  jsonStore.toggleSoundTag(sound.path, tagId)
+}
+
+function openFilterForTags() {
+  close()
+  appStore.setFilterPanelOpen(true)
 }
 
 function toggleTabAlign() {
@@ -608,8 +798,6 @@ watch(
     appStore.contextMenu.visible,
     appStore.contextMenu.x,
     appStore.contextMenu.y,
-    colorPickerOpen.value,
-    moveToTabOpen.value,
     tabAlignOpen.value,
     groupAlignOpen.value,
     groupColorsOpen.value,
@@ -621,6 +809,26 @@ watch(
     }
   },
   { flush: 'post' },
+)
+
+watch(activeFlyout, (kind) => {
+  if (kind) positionFlyout()
+}, { flush: 'post' })
+
+watch(
+  () => [
+    appStore.contextMenu.x,
+    appStore.contextMenu.y,
+    appStore.contextMenu.type,
+    appStore.contextMenu.targetName,
+    appStore.contextMenu.targetIndex,
+  ],
+  () => {
+    if (!appStore.contextMenu.visible) return
+    activeFlyout.value = null
+    flyoutReady.value = false
+    clearFlyoutClose()
+  },
 )
 
 const menuX = computed(() => {
@@ -680,10 +888,6 @@ const swatchStyle = computed(() => ({
   background: overrideSwatch(currentOverride.value, baseColors.value.border),
 }))
 
-function toggleColorPicker() {
-  colorPickerOpen.value = !colorPickerOpen.value
-}
-
 function onOverrideChange(override) {
   const serialized = serializeOverride(override)
   const { type, targetName, targetIndex } = appStore.contextMenu
@@ -729,8 +933,9 @@ function remove() {
 }
 
 function resetPanels() {
-  colorPickerOpen.value = false
-  moveToTabOpen.value = false
+  clearFlyoutClose()
+  activeFlyout.value = null
+  flyoutReady.value = false
   tabAlignOpen.value = false
   groupAlignOpen.value = false
   groupColorsOpen.value = false
@@ -813,6 +1018,9 @@ function openGifPicker() {
 onMounted(() => {
   const handler = (e) => { if (e.key === 'Escape') close() }
   window.addEventListener('keydown', handler)
-  onUnmounted(() => window.removeEventListener('keydown', handler))
+  onUnmounted(() => {
+    window.removeEventListener('keydown', handler)
+    clearFlyoutClose()
+  })
 })
 </script>

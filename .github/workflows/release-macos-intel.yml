@@ -1,0 +1,44 @@
+name: Release macOS Intel
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (e.g. 0.7.0). Leave empty to use src-tauri/tauri.conf.json. Draft must already exist."
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.draft.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Require release draft
+        id: draft
+        uses: ./.github/actions/require-release-draft
+        with:
+          version: ${{ inputs.version }}
+
+  build:
+    needs: guard
+    uses: ./.github/workflows/_tauri-build.yml
+    with:
+      tag: ${{ needs.guard.outputs.tag }}
+      runner: macos-15-intel
+      rust_targets: x86_64-apple-darwin
+      cache_key: macos-x64
+      args: "--target x86_64-apple-darwin --bundles dmg -- --features stems"
+      kind: macos-intel
+    secrets: inherit

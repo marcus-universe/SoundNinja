@@ -1,4 +1,4 @@
-@use 'variables' as *;
+@use '../abstracts/variables' as *;
 
 .dialog-box {
   position: fixed;
@@ -281,6 +281,7 @@
 .gif-picker__pane {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -363,8 +364,13 @@
 .gif-picker__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8.8rem, 1fr));
+  grid-auto-rows: minmax(8.8rem, auto);
+  align-content: start;
   gap: 0.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: min(42vh, 36rem);
+  overflow-x: hidden;
   overflow-y: auto;
   margin-top: 0.4rem;
 }
@@ -383,6 +389,10 @@
   display: block;
   position: relative;
   aspect-ratio: 1;
+  width: 100%;
+  height: auto;
+  min-height: 8.8rem;
+  align-self: start;
   border-radius: 0.5rem;
   overflow: hidden;
   cursor: pointer;

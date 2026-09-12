@@ -1,0 +1,69 @@
+@use '../abstracts/variables' as *;
+
+.sound-tag-badges {
+  position: absolute;
+  left: 0.36rem;
+  bottom: 0.32rem;
+  z-index: 4;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.24rem;
+  max-width: calc(100% - 0.6rem);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tag-badge {
+  max-width: 6.4rem;
+  padding: 0.08rem 0.36rem;
+  border-radius: 0.32rem;
+  font-family: $fontSemiBold;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: var(--color-bg, #{$color-bg});
+  background: var(--tag-color, var(--primary_color));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.6rem;
+  padding: 0 0.7rem;
+  border: 0.12rem solid color-mix(in srgb, var(--tag-color, var(--primary_color)) 55%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag-color, var(--primary_color)) 14%, transparent);
+  color: var(--color-text, #{$white});
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--tag-color, var(--primary_color)) 24%, transparent);
+  }
+
+  &.is-on {
+    border-color: var(--tag-color, var(--primary_color));
+    background: color-mix(in srgb, var(--tag-color, var(--primary_color)) 32%, transparent);
+  }
+}
+
+.tag-chip__dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--tag-color, var(--primary_color));
+}
+
+.searchBar__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 0 0;
+}

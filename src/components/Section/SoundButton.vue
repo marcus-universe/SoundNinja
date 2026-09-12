@@ -19,6 +19,14 @@
             :style="{ objectPosition: gifPosX + '% ' + gifPosY + '%' }"
         />
         <span class="sound-label">{{ sound.name }}</span>
+        <span v-if="showBadges && badgeTags.length" class="sound-tag-badges" aria-hidden="true">
+          <span
+            v-for="tag in badgeTags"
+            :key="tag.id"
+            class="tag-badge"
+            :style="{ '--tag-color': tag.color }"
+          >{{ tag.name }}</span>
+        </span>
         <span
           v-if="multiSelect && sound.id"
           class="sound-id-chip"
@@ -32,6 +40,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { copyText } from '~/utils/clipboard'
+
+const jsonStore = useJsonHandelingStore()
+const appSettings = useAppSettingsStore()
 
 const props = defineProps({
   sound: { type: Object, required: true },
@@ -68,4 +79,28 @@ const gifSrc = computed(() => {
 function copyId() {
   copyText(props.sound.id)
 }
+
+const showBadges = computed(() => appSettings.showTagBadges !== false)
+
+const badgeCap = computed(() => {
+  if (typeof document === 'undefined') return 3
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--btn_width')
+  const rem = parseFloat(raw) || 17.6
+  if (rem < 8) return 1
+  if (rem < 12) return 2
+  return 3
+})
+
+const badgeTags = computed(() => {
+  const ids = props.sound.tagIds ?? []
+  if (!ids.length) return []
+  const byId = new Map((jsonStore.configFile.tags ?? []).map((t) => [t.id, t]))
+  const out = []
+  for (const id of ids) {
+    const tag = byId.get(id)
+    if (tag) out.push(tag)
+    if (out.length >= badgeCap.value) break
+  }
+  return out
+})
 </script>

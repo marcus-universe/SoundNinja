@@ -1,0 +1,132 @@
+name: Require release draft
+description: Resolve tag, require an existing GitHub Release draft, optionally scan assets.
+
+inputs:
+  version:
+    description: Version override (e.g. 0.7.0 or v0.7.0). Empty uses tauri.conf.json.
+    required: false
+    default: ""
+  required_assets:
+    description: >
+      Newline-separated AND groups. Within a group, | separates OR alternatives.
+      Globs match asset names. Empty means missing=true (always build).
+    required: false
+    default: ""
+
+outputs:
+  tag:
+    description: Resolved tag (vX.Y.Z)
+    value: ${{ steps.guard.outputs.tag }}
+  release_id:
+    description: GitHub release id
+    value: ${{ steps.guard.outputs.release_id }}
+  missing:
+    description: true if any required asset group is missing
+    value: ${{ steps.guard.outputs.missing }}
+  assets:
+    description: Newline-separated asset names on the draft
+    value: ${{ steps.guard.outputs.assets }}
+
+runs:
+  using: composite
+  steps:
+    - id: guard
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION_INPUT: ${{ inputs.version }}
+        REQUIRED_ASSETS: ${{ inputs.required_assets }}
+      run: |
+        set -euo pipefail
+
+        resolve_version() {
+          if [ -n "${VERSION_INPUT}" ]; then
+            echo "${VERSION_INPUT#v}"
+            return
+          fi
+          if [ -f src-tauri/tauri.conf.json ]; then
+            jq -r .version src-tauri/tauri.conf.json
+            return
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/contents/src-tauri/tauri.conf.json" \
+            -H "Accept: application/vnd.github.raw" \
+            --jq .version
+        }
+
+        VER="$(resolve_version)"
+        if [ -z "$VER" ] || [ "$VER" = "null" ]; then
+          echo "::error::Could not resolve version (pass version input or add src-tauri/tauri.conf.json)."
+          exit 1
+        fi
+        TAG="v${VER}"
+        echo "Using tag=$TAG"
+
+        if ! REL_JSON="$(gh release view "$TAG" --json isDraft,id,assets 2>/tmp/gh-release.err)"; then
+          echo "::error::No GitHub release for ${TAG}. Create a draft first (GitHub Releases UI or: gh release create ${TAG} --draft)."
+          cat /tmp/gh-release.err >&2 || true
+          exit 1
+        fi
+
+        IS_DRAFT="$(jq -r .isDraft <<<"$REL_JSON")"
+        if [ "$IS_DRAFT" != "true" ]; then
+          echo "::error::Release ${TAG} exists but is not a draft. Refusing to attach assets to a published release."
+          exit 1
+        fi
+
+        RELEASE_ID="$(jq -r .id <<<"$REL_JSON")"
+        ASSET_LIST="$(jq -r '.assets[].name // empty' <<<"$REL_JSON")"
+
+        asset_matches() {
+          local pat="$1"
+          local name="$2"
+          case "$name" in
+            $pat) return 0 ;;
+          esac
+          return 1
+        }
+
+        group_ok() {
+          local group="$1"
+          local rest="$group"
+          while [ -n "$rest" ]; do
+            local pat="${rest%%|*}"
+            if [ "$pat" = "$rest" ]; then
+              rest=""
+            else
+              rest="${rest#*|}"
+            fi
+            pat="${pat#"${pat%%[![:space:]]*}"}"
+            pat="${pat%"${pat##*[![:space:]]}"}"
+            [ -z "$pat" ] && continue
+            while IFS= read -r name; do
+              [ -z "$name" ] && continue
+              if asset_matches "$pat" "$name"; then
+                return 0
+              fi
+            done <<<"$ASSET_LIST"
+          done
+          return 1
+        }
+
+        MISSING=true
+        if [ -n "${REQUIRED_ASSETS//[$'\n' ]/}" ]; then
+          MISSING=false
+          while IFS= read -r group || [ -n "$group" ]; do
+            [ -z "${group//[$' \t']/}" ] && continue
+            if ! group_ok "$group"; then
+              MISSING=true
+              echo "Missing asset group: $group"
+              break
+            fi
+          done <<<"$REQUIRED_ASSETS"
+        fi
+
+        echo "Draft ${TAG} id=${RELEASE_ID} missing=${MISSING}"
+        {
+          echo "tag=${TAG}"
+          echo "release_id=${RELEASE_ID}"
+          echo "missing=${MISSING}"
+          echo "assets<<EOF"
+          printf '%s\n' "$ASSET_LIST"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"

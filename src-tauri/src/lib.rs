@@ -253,6 +253,7 @@ pub fn run() {
             fsx::write_text_file_abs,
             fsx::path_exists_abs,
             fsx::paths_exist_abs,
+            fsx::get_sound_file_meta,
             fsx::find_files_by_names,
             fsx::make_dir_abs,
             fsx::list_dir_files_abs,

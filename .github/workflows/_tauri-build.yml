@@ -1,0 +1,175 @@
+# Reusable Tauri platform build. Does not create a GitHub release.
+# Caller must pass an existing draft tag; this job only builds and uploads.
+name: Tauri platform build
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing draft tag (e.g. v0.7.0)
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      rust_targets:
+        required: true
+        type: string
+      cache_key:
+        required: true
+        type: string
+      args:
+        required: true
+        type: string
+      kind:
+        description: windows | linux | macos-arm | macos-intel
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust_targets }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ inputs.cache_key }}-stems
+          cache-on-failure: true
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Route rustc through sccache
+        shell: bash
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+
+      - name: Install Linux dependencies
+        if: inputs.runner == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libpulse-dev \
+            mold
+
+      - name: Use mold as linker
+        if: inputs.runner == 'ubuntu-24.04'
+        run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=mold" >> "$GITHUB_ENV"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tauriScript: npm run tauri
+          args: ${{ inputs.args }}
+
+      - name: Upload installers and aliases to draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          KIND: ${{ inputs.kind }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          workdir="$(mktemp -d)"
+          upload=()
+
+          add_file() {
+            local src="$1"
+            upload+=("$src")
+            echo "Upload $(basename "$src")"
+          }
+
+          add_alias() {
+            local src="$1"
+            local alias_name="$2"
+            local dest="$workdir/$alias_name"
+            if [ "$(basename "$src")" = "$alias_name" ]; then
+              return
+            fi
+            cp "$src" "$dest"
+            upload+=("$dest")
+            echo "Alias $alias_name"
+          }
+
+          case "$KIND" in
+            windows)
+              files=(src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*x64-setup.exe)
+              if [ ${#files[@]} -eq 0 ]; then
+                echo "::error::No Windows NSIS installer found"
+                exit 1
+              fi
+              add_file "${files[0]}"
+              add_alias "${files[0]}" "soundninja-windows-x64-setup.exe"
+              ;;
+            linux)
+              debs=(src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*_amd64.deb)
+              images=(src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*_amd64.AppImage)
+              if [ ${#debs[@]} -eq 0 ] || [ ${#images[@]} -eq 0 ]; then
+                echo "::error::Linux build missing .deb or .AppImage"
+                exit 1
+              fi
+              add_file "${debs[0]}"
+              add_alias "${debs[0]}" "soundninja-linux-amd64.deb"
+              add_file "${images[0]}"
+              add_alias "${images[0]}" "soundninja-linux-amd64.AppImage"
+              ;;
+            macos-arm)
+              files=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*_aarch64.dmg)
+              if [ ${#files[@]} -eq 0 ]; then
+                echo "::error::No macOS arm64 DMG found"
+                exit 1
+              fi
+              add_file "${files[0]}"
+              add_alias "${files[0]}" "soundninja-macos-arm64.dmg"
+              ;;
+            macos-intel)
+              files=(src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*_x64.dmg)
+              if [ ${#files[@]} -eq 0 ]; then
+                echo "::error::No macOS x64 DMG found"
+                exit 1
+              fi
+              add_file "${files[0]}"
+              add_alias "${files[0]}" "soundninja-macos-x64.dmg"
+              ;;
+            *)
+              echo "::error::Unknown kind=$KIND"
+              exit 1
+              ;;
+          esac
+
+          gh release upload "$TAG" "${upload[@]}" --clobber
+          echo "Uploaded ${#upload[@]} file(s) to $TAG"

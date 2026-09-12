@@ -57,7 +57,11 @@
             </div>
 
             <!-- Group cards -->
-            <div class="sound-groups-outer flex_c_v flex_start button-gaps" ref="groupsOuterRef">
+            <div
+              v-if="groupedLayout"
+              class="sound-groups-outer flex_c_v flex_start button-gaps"
+              ref="groupsOuterRef"
+            >
                 <div
                     v-for="sec in groupSections"
                     :key="'g:' + sec.sep.id"
@@ -202,19 +206,32 @@ const currentTab = computed(() => appStore.currentTab)
 const playingSounds = reactive(new Map())
 const windowFocused = ref(true)
 
+const sortMode = computed(() => {
+  const m = jsonStore.configFile?.settings?.sortMode
+  return m === 'name' || m === 'added' || m === 'duration' || m === 'size' ? m : 'user'
+})
+const groupedLayout = computed(() => sortMode.value === 'user')
+
 const JSONFile = computed(() => {
   const tab = currentTab.value
-  const sortByIndex =
-    tab === 'All'
-      ? (a, b) => a.index - b.index
-      : (a, b) => (a.tabIndexes?.[tab] ?? 0) - (b.tabIndexes?.[tab] ?? 0)
-  const filesToFilter = appStore.Searchbar.SearchbarActive
-    ? jsonStore.filteredFiles
-    : jsonStore.configFile?.files
-
-  return filesToFilter
-    ?.filter((sound) => sound.tabs?.includes(tab))
-    .sort(sortByIndex)
+  const filesToFilter = jsonStore.visibleFiles ?? jsonStore.configFile?.files
+  const inTab = (filesToFilter ?? []).filter((sound) => sound.tabs?.includes(tab))
+  if (sortMode.value === 'user') {
+    const sortByIndex =
+      tab === 'All'
+        ? (a, b) => a.index - b.index
+        : (a, b) => (a.tabIndexes?.[tab] ?? 0) - (b.tabIndexes?.[tab] ?? 0)
+    return inTab.slice().sort(sortByIndex)
+  }
+  return inTab.slice().sort((a, b) => {
+    if (sortMode.value === 'name') {
+      return (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' })
+    }
+    if (sortMode.value === 'added') return (b.addedAt ?? 0) - (a.addedAt ?? 0)
+    if (sortMode.value === 'duration') return (a.durationSecs ?? 0) - (b.durationSecs ?? 0)
+    if (sortMode.value === 'size') return (a.fileSize ?? 0) - (b.fileSize ?? 0)
+    return 0
+  })
 })
 
 const Settings = computed(() => jsonStore.configFile?.settings)
@@ -292,6 +309,9 @@ function tabOrder(sound) {
 /** Orphans + group sections for the current tab, positional membership. */
 const displaySections = computed(() => {
   const sounds = JSONFile.value ?? []
+  if (!groupedLayout.value) {
+    return [{ kind: 'orphans', sounds }]
+  }
   const seps = (jsonStore.separators ?? [])
     .filter((s) => s.tab === currentTab.value)
     .slice()
@@ -344,7 +364,9 @@ const allDisplaySounds = computed(() => {
 })
 
 function reorderDisabled() {
-  return jsonStore.configFile?.settings?.allowReorder === false || appStore.multiSelectActive
+  return jsonStore.configFile?.settings?.allowReorder === false
+    || appStore.multiSelectActive
+    || !groupedLayout.value
 }
 
 function syncSortableDisabled() {
@@ -596,8 +618,12 @@ function setupGifObserver() {
 }
 
 watch(
-  [() => Settings.value?.allowReorder, () => appStore.multiSelectActive],
-  () => syncSortableDisabled(),
+  [() => Settings.value?.allowReorder, () => appStore.multiSelectActive, groupedLayout],
+  () => {
+    syncSortableDisabled()
+    if (groupedLayout.value) nextTick(() => setupSortables())
+    else destroySortables()
+  },
 )
 
 watch(

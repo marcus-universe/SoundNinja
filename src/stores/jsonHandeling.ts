@@ -4,7 +4,7 @@ import {
   healFolderTabMembership, mergeTabsFromUsage,
   persistSoundIds, ensurePerSoundVolume,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
-  type ButtonAlign,
+  type ButtonAlign, type SoundTag, type SortMode, normalizeSortMode,
 } from '~/utils/db'
 import { ensureSoundIds, newSoundId } from '~/utils/soundId'
 import { revokeAllGifUrls } from '~/utils/gifCache'
@@ -34,6 +34,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     saving: false,
     missingPaths: [] as string[],
     _persistTimer: null as ReturnType<typeof setTimeout> | null,
+    _searchTerm: '',
     /** Stepwise undo history for soundboard mutations (sounds/tabs/separators). */
     undoStack: [] as ProjectConfig[],
     redoStack: [] as ProjectConfig[],
@@ -44,6 +45,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
   getters: {
     getConfig: (state) => state.configFile,
     separators: (state) => state.configFile.separators ?? [],
+    tags: (state) => state.configFile.tags ?? [],
+    sortMode: (state) => normalizeSortMode(state.configFile.settings?.sortMode),
+    visibleFiles: (state) => state.filteredFiles,
     canUndo: (state) => state.undoStack.length > 0,
     canRedo: (state) => state.redoStack.length > 0,
   },
@@ -68,7 +72,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       try {
         this.configFile = clone(snap)
         this.normalizeIndexes()
-        this.filteredFiles = this.configFile.files
+        this.applyBoardFilter()
         this.writeConfig()
       } finally {
         this._historySuspended = false
@@ -98,13 +102,15 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         config = await this.tryRestoreFromBak(dbAbsPath, config)
       }
       this.configFile = config
+      if (!this.configFile.tags) this.configFile.tags = []
       this.normalizeIndexes()
-      this.filteredFiles = this.configFile.files
       this.currentProjectPath = dbAbsPath
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
       this.missingPaths = []
       this.clearHistory()
+      this.syncFilterSessionFromSettings()
+      this.applyBoardFilter()
       const idsChanged = ensureSoundIds(this.configFile.files)
       const volumeMigrated = ensurePerSoundVolume(this.configFile)
       if (volumeMigrated) {
@@ -119,6 +125,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         } catch (e) {
           console.error('Failed to persist sound ids', e)
         }
+      }
+      void this.warmSoundMeta()
+      if (normalizeSortMode(this.configFile.settings.sortMode) === 'duration') {
+        void this.warmDurations()
       }
     },
 
@@ -173,13 +183,15 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         tabList: config.tabList ?? [],
         files: config.files ?? [],
         separators: config.separators ?? [],
+        tags: config.tags ?? [],
       }
       mergeTabsFromUsage(this.configFile)
       healFolderTabMembership(this.configFile)
       ensureSoundIds(this.configFile.files)
       ensurePerSoundVolume(this.configFile)
       this.normalizeIndexes()
-      this.filteredFiles = this.configFile.files
+      this.syncFilterSessionFromSettings()
+      this.applyBoardFilter()
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
       this.clearHistory()
@@ -193,7 +205,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       if (!this.openingSnapshot) return
       this.configFile = clone(this.openingSnapshot)
       this.normalizeIndexes()
-      this.filteredFiles = this.configFile.files
+      this.syncFilterSessionFromSettings()
+      this.applyBoardFilter()
       this.dirty = false
       this.clearHistory()
     },
@@ -210,6 +223,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Persistence ───────────────────────────────────────────────────────────
     /** Public compat alias — schedules a debounced save to the project DB. */
     writeConfig() {
+      this.applyBoardFilter()
       this.dirty = true
       if (this._persistTimer) clearTimeout(this._persistTimer)
       this._persistTimer = setTimeout(() => {
@@ -294,9 +308,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         tabList: contents.tabList ?? [],
         files: contents.files ?? [],
         separators: contents.separators ?? [],
+        tags: contents.tags ?? [],
       }
       this.normalizeIndexes()
-      this.filteredFiles = this.configFile.files
+      this.applyBoardFilter()
       this.writeConfig()
     },
 
@@ -412,17 +427,24 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     addFiles(files: SoundFile[]) {
       this.pushBeforeChange()
       const used = new Set(this.configFile.files.map((f) => f.id).filter(Boolean))
+      const now = Date.now()
       const withIds = files.map((f) => {
-        if (f.id) {
-          used.add(f.id)
-          return f
+        const next = {
+          ...f,
+          tagIds: f.tagIds ?? [],
+          addedAt: f.addedAt ?? now,
+        }
+        if (next.id) {
+          used.add(next.id)
+          return next
         }
         const id = newSoundId(used)
         used.add(id)
-        return { ...f, id }
+        return { ...next, id }
       })
       this.configFile.files = [...this.configFile.files, ...withIds]
       this.normalizeIndexes()
+      this.applyBoardFilter()
       this.writeConfig()
     },
 
@@ -815,27 +837,108 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    filterSounds(searchTerm: string) {
-      const q = (searchTerm ?? '').trim()
+    // ── Tags / filter / sort ─────────────────────────────────────────────────
+    syncFilterSessionFromSettings() {
+      const ids = this.configFile.settings?.selectedTagIds
+      this.configFile.settings.selectedTagIds = Array.isArray(ids) ? ids.filter(Boolean) : []
+      void import('./app').then(({ useAppStore }) => {
+        useAppStore().hydrateSelectedTagIds(this.configFile.settings.selectedTagIds ?? [])
+      })
+    },
+
+    persistSelectedTagIds(ids: string[]) {
+      this.configFile.settings.selectedTagIds = [...ids]
+      this.applyBoardFilter()
+      this.writeConfig()
+    },
+
+    setSortMode(mode: SortMode) {
+      const next = normalizeSortMode(mode)
+      if (normalizeSortMode(this.configFile.settings.sortMode) === next) return
+      this.configFile.settings.sortMode = next
+      this.writeConfig()
+      if (next === 'duration') void this.warmDurations()
+    },
+
+    addTag(name: string, color: string): SoundTag {
+      this.pushBeforeChange()
+      if (!this.configFile.tags) this.configFile.tags = []
+      const used = new Set(this.configFile.tags.map((t) => t.id))
+      const tag: SoundTag = {
+        id: newSoundId(used),
+        name: name.trim() || 'Tag',
+        color: color || '#00d4ff',
+      }
+      this.configFile.tags.push(tag)
+      this.writeConfig()
+      return tag
+    },
+
+    updateTag(id: string, patch: Partial<Pick<SoundTag, 'name' | 'color'>>) {
+      const tag = (this.configFile.tags ?? []).find((t) => t.id === id)
+      if (!tag) return
+      this.pushBeforeChange()
+      if (patch.name != null) tag.name = patch.name
+      if (patch.color != null) tag.color = patch.color
+      this.writeConfig()
+    },
+
+    removeTag(id: string) {
+      this.pushBeforeChange()
+      this.configFile.tags = (this.configFile.tags ?? []).filter((t) => t.id !== id)
+      for (const f of this.configFile.files) {
+        if (!f.tagIds?.length) continue
+        f.tagIds = f.tagIds.filter((tid) => tid !== id)
+      }
+      const selected = this.configFile.settings.selectedTagIds ?? []
+      if (selected.includes(id)) {
+        this.configFile.settings.selectedTagIds = selected.filter((tid) => tid !== id)
+      }
+      this.applyBoardFilter()
+      this.writeConfig()
+    },
+
+    setSoundTags(path: string, tagIds: string[]) {
+      const file = this.configFile.files.find((f) => f.path === path)
+      if (!file) return
+      this.pushBeforeChange()
+      file.tagIds = [...tagIds]
+      this.applyBoardFilter()
+      this.writeConfig()
+    },
+
+    toggleSoundTag(path: string, tagId: string) {
+      const file = this.configFile.files.find((f) => f.path === path)
+      if (!file) return
+      this.pushBeforeChange()
+      const cur = file.tagIds ?? []
+      file.tagIds = cur.includes(tagId) ? cur.filter((id) => id !== tagId) : [...cur, tagId]
+      this.applyBoardFilter()
+      this.writeConfig()
+    },
+
+    /** Name search (existing rules) AND OR-match on selected tags. */
+    applyBoardFilter(searchTerm?: string) {
+      if (searchTerm != null) this._searchTerm = searchTerm
+      const q = (this._searchTerm ?? '').trim()
+      const tagIds = this.configFile.settings?.selectedTagIds ?? []
+      let files = this.configFile.files ?? []
+      if (tagIds.length) {
+        const want = new Set(tagIds)
+        files = files.filter((file) => (file.tagIds ?? []).some((id) => want.has(id)))
+      }
       if (!q) {
-        this.filteredFiles = this.configFile.files
+        this.filteredFiles = files
         return
       }
       const qLower = q.toLowerCase()
       const qCompact = compactSearch(q)
-      // Only use tokens with 2+ chars for AND matching. Single letters like
-      // "A L F" would otherwise match any name containing a, l, and f.
       const tokens = qLower.split(/\s+/).filter((t) => t.length >= 2)
-
-      this.filteredFiles = this.configFile.files.filter((file) => {
+      this.filteredFiles = files.filter((file) => {
         const nameLower = (file.name ?? '').toLowerCase()
         const nameCompact = compactSearch(file.name ?? '')
-
-        // 1) Exact-ish substring (case-insensitive)
         if (nameLower.includes(qLower)) return true
-        // 2) Compact: strip spaces/punct so "A L F" ↔ "alf" both ways
         if (qCompact.length > 0 && nameCompact.includes(qCompact)) return true
-        // 3) Multi-word queries ("hypnose cat"): every real token must appear
         if (tokens.length > 1) {
           return tokens.every((t) => {
             const tCompact = compactSearch(t)
@@ -845,6 +948,57 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         }
         return false
       })
+    },
+
+    filterSounds(searchTerm: string) {
+      this.applyBoardFilter(searchTerm)
+    },
+
+    async warmSoundMeta() {
+      const files = this.configFile.files
+      const need = files.filter((f) => f.path && (f.fileSize == null || f.addedAt == null))
+      if (!need.length) return
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const metas = await invoke<{ path: string; size: number; mtime: number }[]>(
+          'get_sound_file_meta',
+          { paths: need.map((f) => f.path) },
+        )
+        const byPath = new Map(metas.map((m) => [m.path, m]))
+        const fallback = Date.now()
+        let changed = false
+        for (const f of files) {
+          const m = byPath.get(f.path)
+          if (f.fileSize == null) {
+            f.fileSize = m?.size ?? 0
+            changed = true
+          }
+          if (f.addedAt == null) {
+            f.addedAt = m?.mtime && m.mtime > 0 ? Number(m.mtime) : fallback
+            changed = true
+          }
+        }
+        if (changed) this.writeConfig()
+      } catch (e) {
+        console.error('Failed to warm sound file meta', e)
+      }
+    },
+
+    async warmDurations() {
+      const files = this.configFile.files.filter((f) => f.path && (f.durationSecs == null || f.durationSecs <= 0))
+      if (!files.length) return
+      const { invoke } = await import('@tauri-apps/api/core')
+      let changed = false
+      for (const f of files) {
+        try {
+          const dur = await invoke<number>('get_sound_duration', { soundPath: f.path })
+          if (typeof dur === 'number' && dur > 0) {
+            f.durationSecs = dur
+            changed = true
+          }
+        } catch { /* missing / undecodable */ }
+      }
+      if (changed) this.writeConfig()
     },
   },
 })

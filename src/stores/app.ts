@@ -13,7 +13,9 @@ interface ContextMenuState {
 
 export const useAppStore = defineStore('app', {
   state: () => ({
-    navbar: ['add', 'project', 'settings', 'about'] as string[],
+    navbar: ['add', 'project', 'filter', 'settings', 'about'] as string[],
+    filterPanelOpen: false,
+    selectedTagIds: [] as string[],
     currentTab: 'All',
     activeOverlay: null as 'settings' | 'about' | null,
     pendingSettingsTab: null as string | null,
@@ -98,6 +100,42 @@ export const useAppStore = defineStore('app', {
 
     setSearchContent(val: string) {
       this.Searchbar.SearchbarContent = val
+    },
+
+    setFilterPanelOpen(val: boolean) {
+      this.filterPanelOpen = val
+    },
+
+    toggleFilterPanel() {
+      this.filterPanelOpen = !this.filterPanelOpen
+    },
+
+    /** Load persisted tag filter without writing the project. */
+    hydrateSelectedTagIds(ids: string[]) {
+      this.selectedTagIds = [...ids]
+    },
+
+    setSelectedTagIds(ids: string[]) {
+      this.selectedTagIds = [...ids]
+      const jsonStore = useJsonHandelingStore()
+      jsonStore.persistSelectedTagIds(this.selectedTagIds)
+    },
+
+    toggleSelectedTag(id: string) {
+      const i = this.selectedTagIds.indexOf(id)
+      if (i === -1) this.selectedTagIds.push(id)
+      else this.selectedTagIds.splice(i, 1)
+      const jsonStore = useJsonHandelingStore()
+      jsonStore.persistSelectedTagIds([...this.selectedTagIds])
+    },
+
+    clearBoardFilters() {
+      this.Searchbar.SearchbarContent = ''
+      this.selectedTagIds = []
+      const jsonStore = useJsonHandelingStore()
+      jsonStore.persistSelectedTagIds([])
+      jsonStore.setSortMode('user')
+      jsonStore.applyBoardFilter('')
     },
 
     setSelectProjectActive(val: boolean) {
