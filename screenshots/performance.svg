@@ -1,15 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img">
-  <rect width="1280" height="720" fill="#222831"/>
-  <rect x="80" y="80" width="1120" height="560" rx="24" fill="#363f4d"/>
-  <rect x="200" y="180" width="360" height="280" rx="20" fill="#222831"/>
-  <text x="380" y="280" text-anchor="middle" font-family="Nunito,sans-serif" font-size="48" font-weight="900" fill="hsl(189,100%,58%)">Rust</text>
-  <text x="380" y="340" text-anchor="middle" font-family="Nunito,sans-serif" font-size="22" font-weight="600" fill="#eee" opacity="0.7">Low RAM</text>
-  <text x="380" y="380" text-anchor="middle" font-family="Nunito,sans-serif" font-size="22" font-weight="600" fill="#eee" opacity="0.7">Pre-cached Sounds</text>
-  <rect x="640" y="180" width="360" height="280" rx="20" fill="#222831"/>
-  <rect x="700" y="240" width="40" height="160" rx="6" fill="hsl(189,100%,58%)" opacity="0.9"/>
-  <rect x="760" y="280" width="40" height="120" rx="6" fill="hsl(189,100%,58%)" opacity="0.7"/>
-  <rect x="820" y="220" width="40" height="180" rx="6" fill="hsl(189,100%,58%)" opacity="0.85"/>
-  <rect x="880" y="300" width="40" height="100" rx="6" fill="hsl(189,100%,58%)" opacity="0.55"/>
-  <rect x="940" y="260" width="40" height="140" rx="6" fill="hsl(189,100%,58%)" opacity="0.75"/>
-  <text x="640" y="640" text-anchor="middle" font-family="Nunito,sans-serif" font-size="28" font-weight="700" fill="#eee" opacity="0.6">Screenshot: Performance</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="pf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c222b"/>
+      <stop offset="1" stop-color="#222831"/>
+    </linearGradient>
+    <linearGradient id="pf-burst" x1="0.2" y1="0.2" x2="0.9" y2="0.9">
+      <stop offset="0" stop-color="hsl(189,100%,70%)"/>
+      <stop offset="1" stop-color="hsl(189,100%,58%)" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="pf-glow" cx="62%" cy="48%" r="40%">
+      <stop offset="0" stop-color="hsl(189,100%,58%)" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="hsl(189,100%,58%)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#pf-bg)"/>
+  <circle cx="820" cy="340" r="300" fill="url(#pf-glow)"/>
+
+  <!-- stacked boards -->
+  <g opacity="0.35">
+    <rect x="168" y="148" width="520" height="340" rx="32" fill="#434e5f" transform="rotate(-8 428 318)"/>
+  </g>
+  <g opacity="0.55">
+    <rect x="188" y="168" width="520" height="340" rx="32" fill="#363f4d" transform="rotate(-4 448 338)"/>
+  </g>
+  <rect x="208" y="188" width="520" height="360" rx="32" fill="#363f4d" stroke="#4a5566" stroke-width="1.5"/>
+
+  <rect x="236" y="216" width="72" height="22" rx="11" fill="hsl(189,100%,58%)"/>
+  <rect x="318" y="216" width="56" height="22" rx="11" fill="#434e5f"/>
+  <rect x="384" y="216" width="56" height="22" rx="11" fill="#a78bfa" opacity="0.75"/>
+
+  <rect x="236" y="260" width="140" height="92" rx="18" fill="#222831"/>
+  <circle cx="306" cy="310" r="16" fill="hsl(189,100%,58%)" opacity="0.8"/>
+  <rect x="396" y="260" width="140" height="92" rx="18" fill="#222831"/>
+  <circle cx="466" cy="310" r="16" fill="#434e5f"/>
+  <rect x="556" y="260" width="140" height="92" rx="18" fill="#222831"/>
+  <circle cx="626" cy="310" r="16" fill="#f86d6d" opacity="0.75"/>
+
+  <rect x="236" y="372" width="140" height="92" rx="18" fill="#222831"/>
+  <circle cx="306" cy="422" r="16" fill="#34d399" opacity="0.75"/>
+  <rect x="396" y="372" width="140" height="92" rx="18" fill="#222831"/>
+  <circle cx="466" cy="422" r="16" fill="#fbbf24" opacity="0.8"/>
+  <rect x="556" y="372" width="140" height="92" rx="18" fill="#222831"/>
+  <circle cx="626" cy="422" r="16" fill="#a78bfa" opacity="0.8"/>
+
+  <!-- instant play burst from a live button -->
+  <g transform="translate(780 250)">
+    <circle cx="120" cy="110" r="92" fill="#222831"/>
+    <circle cx="120" cy="110" r="92" fill="none" stroke="hsl(189,100%,58%)" stroke-width="5"/>
+    <polygon points="104,74 160,110 104,146" fill="hsl(189,100%,58%)"/>
+    <g stroke="url(#pf-burst)" stroke-width="5" stroke-linecap="round" fill="none">
+      <line x1="214" y1="40" x2="268" y2="8"/>
+      <line x1="230" y1="110" x2="300" y2="110"/>
+      <line x1="214" y1="180" x2="268" y2="212"/>
+      <line x1="120" y1="-8" x2="120" y2="-56"/>
+      <line x1="26" y1="40" x2="-20" y2="8"/>
+    </g>
+  </g>
+
+  <!-- tiny footprint chips -->
+  <rect x="236" y="492" width="88" height="20" rx="10" fill="hsl(189,100%,58%)" opacity="0.35"/>
+  <rect x="336" y="492" width="56" height="20" rx="10" fill="#434e5f"/>
+  <rect x="404" y="492" width="72" height="20" rx="10" fill="#434e5f"/>
 </svg>

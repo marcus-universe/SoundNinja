@@ -1,9 +1,62 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img">
-  <rect width="1280" height="720" fill="#222831"/>
-  <rect x="80" y="80" width="1120" height="560" rx="24" fill="#363f4d"/>
-  <circle cx="640" cy="300" r="100" fill="none" stroke="hsl(189,100%,58%)" stroke-width="8"/>
-  <path d="M600 300 l30 30 l50 -60" fill="none" stroke="hsl(189,100%,58%)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="640" y="460" text-anchor="middle" font-family="Nunito,sans-serif" font-size="36" font-weight="800" fill="#eee">GPL-3.0</text>
-  <text x="640" y="510" text-anchor="middle" font-family="Nunito,sans-serif" font-size="20" font-weight="600" fill="#eee" opacity="0.6">Free � Open Source � Forkable</text>
-  <text x="640" y="640" text-anchor="middle" font-family="Nunito,sans-serif" font-size="28" font-weight="700" fill="#eee" opacity="0.6">Screenshot: Open Source</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="os-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c222b"/>
+      <stop offset="1" stop-color="#222831"/>
+    </linearGradient>
+    <radialGradient id="os-glow" cx="50%" cy="42%" r="48%">
+      <stop offset="0" stop-color="hsl(189,100%,58%)" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="hsl(189,100%,58%)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#os-bg)"/>
+  <circle cx="640" cy="300" r="280" fill="url(#os-glow)"/>
+
+  <!-- fork paths -->
+  <path d="M640 300 C640 300 640 360 420 430" fill="none" stroke="hsl(189,100%,58%)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <path d="M640 300 C640 300 640 360 640 470" fill="none" stroke="hsl(189,100%,58%)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <path d="M640 300 C640 300 640 360 860 430" fill="none" stroke="hsl(189,100%,58%)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- source board -->
+  <rect x="476" y="128" width="328" height="220" rx="28" fill="#363f4d" stroke="#4a5566" stroke-width="1.5"/>
+  <rect x="504" y="152" width="64" height="18" rx="9" fill="hsl(189,100%,58%)"/>
+  <rect x="576" y="152" width="48" height="18" rx="9" fill="#434e5f"/>
+  <rect x="504" y="188" width="80" height="56" rx="14" fill="#222831"/>
+  <rect x="596" y="188" width="80" height="56" rx="14" fill="#222831"/>
+  <rect x="688" y="188" width="80" height="56" rx="14" fill="#222831"/>
+  <rect x="504" y="256" width="80" height="56" rx="14" fill="#222831"/>
+  <rect x="596" y="256" width="80" height="56" rx="14" fill="#222831"/>
+  <rect x="688" y="256" width="80" height="56" rx="14" fill="#222831"/>
+  <circle cx="544" cy="216" r="10" fill="hsl(189,100%,58%)"/>
+  <circle cx="636" cy="216" r="10" fill="#f86d6d"/>
+  <circle cx="728" cy="216" r="10" fill="#a78bfa"/>
+
+  <!-- open ring -->
+  <circle cx="640" cy="128" r="18" fill="#222831" stroke="hsl(189,100%,58%)" stroke-width="4"/>
+  <path d="M632 120 l8 8 l12 -14" fill="none" stroke="hsl(189,100%,58%)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- fork boards -->
+  <rect x="268" y="430" width="220" height="150" rx="22" fill="#363f4d" stroke="#4a5566" stroke-width="1.5"/>
+  <rect x="288" y="450" width="52" height="14" rx="7" fill="#34d399"/>
+  <rect x="288" y="476" width="56" height="40" rx="10" fill="#222831"/>
+  <rect x="352" y="476" width="56" height="40" rx="10" fill="#222831"/>
+  <rect x="416" y="476" width="52" height="40" rx="10" fill="#222831"/>
+  <circle cx="316" cy="496" r="7" fill="#34d399"/>
+  <circle cx="380" cy="496" r="7" fill="#fbbf24"/>
+
+  <rect x="530" y="488" width="220" height="150" rx="22" fill="#363f4d" stroke="#4a5566" stroke-width="1.5"/>
+  <rect x="550" y="508" width="52" height="14" rx="7" fill="#a78bfa"/>
+  <rect x="550" y="534" width="56" height="40" rx="10" fill="#222831"/>
+  <rect x="614" y="534" width="56" height="40" rx="10" fill="#222831"/>
+  <rect x="678" y="534" width="52" height="40" rx="10" fill="#222831"/>
+  <circle cx="578" cy="554" r="7" fill="#a78bfa"/>
+  <circle cx="642" cy="554" r="7" fill="hsl(189,100%,58%)"/>
+
+  <rect x="792" y="430" width="220" height="150" rx="22" fill="#363f4d" stroke="#4a5566" stroke-width="1.5"/>
+  <rect x="812" y="450" width="52" height="14" rx="7" fill="#f472b6"/>
+  <rect x="812" y="476" width="56" height="40" rx="10" fill="#222831"/>
+  <rect x="876" y="476" width="56" height="40" rx="10" fill="#222831"/>
+  <rect x="940" y="476" width="52" height="40" rx="10" fill="#222831"/>
+  <circle cx="840" cy="496" r="7" fill="#f472b6"/>
+  <circle cx="904" cy="496" r="7" fill="#f86d6d"/>
 </svg>
