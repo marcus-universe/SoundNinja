@@ -13,6 +13,7 @@ Hol dir einen Build von der [Download-Seite](/download) oder von [GitHub Release
 - **Installer (.exe)** oder **MSI (.msi)** für 64-Bit-Windows
 - Landing-Page-Ziel: Windows 10 und neuer
 - Die App-README nennt auch Windows 8 und höher
+- Der NSIS-Installer ist dunkel. Sprache beim Setup wählen — SoundNinja merkt sie beim nächsten Start.
 
 Installer starten, dann SoundNinja über das Startmenü öffnen.
 

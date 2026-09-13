@@ -35,8 +35,8 @@ The Record button uses the device you pick here.
 
 ## Stem separation (optional)
 
-The Record Editor can keep **vocals** or **music** using BS-RoFormer. The model is about 158 MB and is **not** bundled with the app.
+Official Windows, macOS, and Linux release builds ship the **stems** feature. The Record Editor can keep **vocals** or **music** using BS-RoFormer.
 
-Download it from **Settings → Stem Separation**, or accept the first-run prompt. The Windows installer can also offer to download the model on first launch.
+The model is about 158 MB and is **not** bundled with the installer. Download it from **Settings → Stem Separation**, or accept the first-run prompt. The Windows installer can also offer to download the model on first launch.
 
-Stem builds from source need an extra flag (`tauri:serve:stems` / `tauri:build:stems`).
+Custom source builds need an extra flag (`tauri:serve:stems` / `tauri:build:stems`).

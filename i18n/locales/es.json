@@ -12,40 +12,40 @@
     "titleSound": "SOUND",
     "titleNinja": "NINJA",
     "logoAlt": "Logo de SoundNinja",
-    "subtitle": "Soundboard performante, moderna y de código abierto",
+    "subtitle": "rápido, moderno, soundboard",
     "download": "Descargar",
     "downloadVersion": "Descargar {version}",
     "contribute": "Contribuir en GitHub"
   },
   "features": {
-    "heading": "Funciones principales",
+    "heading": "El kit que no se queda atrás",
     "items": {
       "themes": {
-        "title": "Temas y personalización",
-        "description": "Diseña tu soundboard a tu manera. Colores, diseños y perfiles personalizados para que la interfaz encaje con tu setup — escritorio, overlay de stream o VR."
+        "title": "Temas personalizados",
+        "description": "Crea un look en el Theme Creator — colores, layouts y perfiles para escritorio, stream o VR."
       },
       "tabs": {
-        "title": "Organiza con pestañas y colores",
-        "description": "Agrupa sonidos en pestañas de colores. Encuentra lo que necesitas en milisegundos — incluso con bibliotecas enormes."
+        "title": "Organiza tus sonidos",
+        "description": "¿Librería enorme? Colorea pestañas, anida grupos con nombre, pega etiquetas, filtra al toque."
       },
       "recording": {
-        "title": "Grabación fácil y rápida",
-        "description": "Captura el audio del PC directamente en SoundNinja con el editor de grabación. Recorta, nombra y suéltalo en tu tablero en segundos."
+        "title": "Grabar sonidos nuevos",
+        "description": "Graba audio del PC o un micrófono en el Record Editor, recorta el clip y suéltalo en tu tablero."
       },
       "performance": {
-        "title": "Rendimiento y ligereza",
-        "description": "Núcleo en Rust con Tauri v2. Poca RAM, huella mínima y sonidos precargados para reproducción instantánea."
+        "title": "Rápido y ligero",
+        "description": "Escrito en Rust por debajo. Sonidos precargados. Clic — suena. La RAM casi no se entera."
       },
       "opensource": {
-        "title": "Gratis y de código abierto",
-        "description": "Licenciado bajo GPL-3.0. Haz fork, mejóralo y compártelo — sin paywalls ni telemetría.",
+        "title": "Open Source",
+        "description": "GPL-3.0. Haz fork, remézclalo, suéltalo. Sin paywall. Sin telemetría. El ninja se queda en tus manos.",
         "licenseLink": "Ver LICENSE"
       }
     }
   },
   "cta": {
-    "title": "¿Listo para sonar?",
-    "subtitle": "Descarga SoundNinja gratis — o contribuye en GitHub."
+    "title": "Conviértete en Sound Ninja",
+    "subtitle": "Descarga gratis — o únete en GitHub."
   },
   "footer": {
     "tagline": "Soundboard de código abierto para streamers, amigos y podcasts.",

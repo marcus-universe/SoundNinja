@@ -78,31 +78,6 @@ const base = computed(() => {
   white-space: nowrap;
 }
 
-.hero-ninja {
-  background-image: linear-gradient(
-    90deg,
-    hsl(0 100% 58%),
-    hsl(40 100% 55%),
-    hsl(60 100% 52%),
-    hsl(120 80% 48%),
-    hsl(189 100% 58%),
-    hsl(260 100% 66%),
-    hsl(300 100% 60%),
-    hsl(0 100% 58%)
-  );
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: hero-rainbow-shift 6s linear infinite;
-}
-
-@keyframes hero-rainbow-shift {
-  to {
-    background-position: -200% 0;
-  }
-}
-
 .hero-slogan {
   margin-top: 0.42em;
   color: hsl(189 100% 58%);
@@ -121,11 +96,46 @@ const base = computed(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-ninja {
-    animation: none;
-    background-image: none;
-    -webkit-background-clip: unset;
-    background-clip: unset;
-    color: hsl(189 100% 58%);
+    filter: none;
+  }
+}
+</style>
+
+<style>
+.hero-ninja {
+  background-image: linear-gradient(
+    90deg,
+    hsl(189 100% 58%),
+    hsl(260 100% 68%),
+    hsl(300 100% 62%),
+    hsl(0 100% 58%),
+    hsl(32 100% 55%),
+    hsl(55 100% 52%),
+    hsl(120 85% 50%),
+    hsl(189 100% 58%),
+    hsl(260 100% 68%),
+    hsl(300 100% 62%),
+    hsl(0 100% 58%),
+    hsl(32 100% 55%),
+    hsl(55 100% 52%),
+    hsl(120 85% 50%),
+    hsl(189 100% 58%)
+  );
+  background-size: 400% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px hsl(189 100% 58% / 0.45));
+  animation: hero-rainbow-shift 4s linear infinite reverse;
+}
+
+@keyframes hero-rainbow-shift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    /* one period of the doubled 400% gradient — seamless */
+    background-position: 66.666% 0;
   }
 }
 </style>

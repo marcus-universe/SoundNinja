@@ -1,6 +1,11 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const localePath = useLocalePath()
+const config = useRuntimeConfig()
+const base = computed(() => {
+  const b = config.app.baseURL || '/'
+  return b.endsWith('/') ? b : `${b}/`
+})
 </script>
 
 <template>
@@ -13,9 +18,16 @@ const localePath = useLocalePath()
     >
       <NuxtLink
         :to="localePath('/')"
-        class="text-lg font-extrabold tracking-tight text-ink transition-colors hover:text-primary sm:text-xl"
+        class="flex items-center gap-2 text-lg font-extrabold uppercase tracking-tight text-ink transition-colors hover:text-primary sm:text-xl"
       >
-        SoundNinja
+        <img
+          :src="`${base}assets/Logo_Icon.svg`"
+          :alt="t('hero.logoAlt')"
+          width="40"
+          height="32"
+          class="h-8 w-auto sm:h-9"
+        />
+        Sound Ninja
       </NuxtLink>
 
       <div class="flex items-center gap-3 sm:gap-4">

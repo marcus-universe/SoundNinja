@@ -1,12 +1,12 @@
 ---
 title: Sounds organisieren
-description: Tabs, Gruppen, Suche, Sammelbearbeitung und Hotkeys.
+description: Tabs, Tags, Filter, Sortierung, Mehrfachauswahl, Lautstärke und Hotkeys.
 order: 4
 ---
 
 # Sounds organisieren
 
-SoundNinja ist für große Bibliotheken gebaut. Tabs, Gruppen, Suche und Hotkeys — der Clip ist einen Klick (oder eine Taste) entfernt.
+SoundNinja ist für große Bibliotheken gebaut. Tabs, Tags, Suche, Mehrfachauswahl und Hotkeys — der Clip ist einen Klick (oder eine Taste) entfernt.
 
 ## Tabs
 
@@ -27,26 +27,72 @@ Seit v0.5.3 können Trenner zu benannten Gruppen werden:
 
 Ein einfacher **Trenner** geht weiter, wenn du nur einen visuellen Bruch brauchst.
 
-## Suche
+Rechtsklick auf leeren Board-Bereich: **Gruppe hinzufügen**.
 
-**Suche** in der Navbar. Ergebnisse folgen der Eingabe.
+## Tags
+
+Tags gelten tabübergreifend. Anlegen im ausfahrbaren **Filter**-Panel (Sidebar **Filter**):
+
+- Tag mit Name und Farbe hinzufügen
+- Im selben Panel umbenennen, umfärben oder löschen
+
+Tags zuweisen: Rechtsklick → **Tags**-Flyout (Checkboxen). Existieren noch keine Tags, zeigt das Menü den Weg zum Filter-Panel.
+
+## Filter und Suche
+
+Tags im Filter-Panel oder als **Chips unter der Suchleiste** umschalten. Abgleich ist **ODER**: ein Sound erscheint, wenn er irgendeinen gewählten Tag hat.
+
+Das Feld **Suche** in der Navbar folgt der Eingabe und kombiniert per **UND** mit dem aktiven Tag-Filter.
+
+Farbige Tag-Namen können auf Buttons erscheinen. Schalter: **Einstellungen → Verhalten → Tag-Badges anzeigen**.
+
+## Sortierung
+
+Im Filter-Panel eine Sortierung wählen:
+
+- **Benutzerdefiniert** — deine Tab-Reihenfolge, Gruppen sichtbar
+- **Name**, **Hinzugefügt**, **Spielzeit** oder **Dateigröße** — flache sortierte Liste; **Gruppen sind ausgeblendet**
+
+Sortierung nach Dauer kann beim ersten Mal die Dauer-Metadaten vorwärmen.
 
 ## Neu anordnen
 
-Drag-and-Drop in **Einstellungen → Verhalten** einschalten (**Neu anordnen erlauben**). Dann Sounds und Gruppen ziehen.
+Drag-and-Drop in **Einstellungen → Verhalten** einschalten (**Neu anordnen erlauben**). Dann Sounds und Gruppen ziehen. Neu anordnen gilt bei **Benutzerdefiniert**.
 
-## Sammelbearbeitung
+## Mehrfachauswahl
 
-Mehrere Sounds markieren, dann Farbe ändern, in einen Tab schieben oder löschen.
+**Mehrfachauswahl** in der Navbar einschalten, dann:
+
+- Klick toggelt einen Sound
+- **Shift+Klick** wählt einen Bereich ab dem letzten Anker
+- **Rahmen** auf leerem Board ziehen
+- Klick auf leeres Board (oder außerhalb) leert die Auswahl
+
+Eine Sammelleiste zeigt die Anzahl plus **Farbe**, **Zu Tab verschieben…**, **Löschen** und **Fertig**.
+
+In der Mehrfachauswahl zeigt jeder Button einen **8-Zeichen-ID-Chip**. Rechtsklick auf den Chip kopiert die ID.
+
+## Lautstärke pro Sound
+
+Rechtsklick → **Lautstärke**. Slider von 0 % bis 100 %. **Doppelklick** setzt auf 100 % zurück.
+
+Das stapelt sich mit der Master-Ausgangslautstärke in den Einstellungen.
 
 ## Hotkeys und Sound-IDs
 
-Jeder Sound hat eine 8-stellige ID. Kopieren über das Button-Kontextmenü oder den Mehrfachauswahl-Chip.
+Jeder Sound hat eine 8-stellige ID. Kopieren über das Button-Kontextmenü (**ID kopieren**) oder den Mehrfachauswahl-Chip.
 
-**Einstellungen → Hotkeys**: Taste an eine Sound-ID binden. Globale Hotkeys sind optional.
+**Einstellungen → Hotkeys**: Taste an eine Sound-ID binden. Globale Hotkeys sind optional. **Hotkey zuweisen** im Kontextmenü springt dorthin, ID vorausgefüllt.
 
 Dieselbe ID nutzt [Bitfocus Companion](/docs/remote-control) zum Auslösen.
 
-## GIFs und Farben
+## Hintergrundbilder und Farben
 
-Rechtsklick auf einen Sound: eigene Farben oder GIF-/Bildhintergrund. Das ist getrennt vom [Theme Creator](/docs/theme-editor), der das ganze Board gestaltet.
+Rechtsklick auf einen Sound: eigene Farben oder ein Hintergrundbild. Das ist getrennt vom [Theme Creator](/docs/theme-editor), der das ganze Board gestaltet.
+
+Der Picker ist ein Dialog **Hintergrundbild** (PNG, JPEG, GIF, WebP):
+
+- **Lokale Dateien** — Ordner hinzufügen, einzelne Datei wählen, Dateinamen suchen, Rastervorschau, Ordner aus der Bibliothek entfernen
+- **KLIPY** — GIFs online suchen. Eigenen API-Key unter **Einstellungen → Verhalten**. Der Key landet nicht in Projektdateien.
+
+Nach der Wahl Bild auf dem Button schieben und zuschneiden.

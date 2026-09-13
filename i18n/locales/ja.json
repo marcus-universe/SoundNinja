@@ -12,40 +12,40 @@
     "titleSound": "SOUND",
     "titleNinja": "NINJA",
     "logoAlt": "SoundNinjaロゴ",
-    "subtitle": "高性能でモダンなオープンソースサウンドボード",
+    "subtitle": "速い、モダン、サウンドボード",
     "download": "ダウンロード",
     "downloadVersion": "{version} をダウンロード",
     "contribute": "GitHubでコントリビュート"
   },
   "features": {
-    "heading": "主な機能",
+    "heading": "ついてくるキット",
     "items": {
       "themes": {
-        "title": "テーマとカスタマイズ",
-        "description": "自分好みにサウンドボードをデザイン。カスタムカラー、レイアウト、プロファイルで、デスクトップ、配信オーバーレイ、VRに合わせられます。"
+        "title": "カスタムテーマ",
+        "description": "Theme Creatorでルックを作る — デスクトップ、配信、VR向けの色・レイアウト・プロファイル。"
       },
       "tabs": {
-        "title": "タブと色で整理",
-        "description": "サウンドを色付きタブにグループ化。巨大なライブラリでも、ミリ秒単位で目的の音が見つかります。"
+        "title": "サウンドを整理",
+        "description": "巨大ライブラリ？タブに色、名前付きグループを入れ子、タグを貼って、一瞬で絞る。"
       },
       "recording": {
-        "title": "かんたん高速録音",
-        "description": "Record EditorでPCオーディオを直接SoundNinjaに取り込み。トリム、命名、ボードへの配置まで数秒。"
+        "title": "新しいサウンドを録音",
+        "description": "Record EditorでPCオーディオまたはマイクを録音し、クリップをトリムしてボードに置く。"
       },
       "performance": {
-        "title": "高性能で軽量",
-        "description": "Tauri v2経由のRustコア。低RAM、小さなフットプリント、事前キャッシュで即座に再生。"
+        "title": "速くて軽い",
+        "description": "中身はRust。サウンドは先読み済み。クリック即再生。RAMはほぼ気づかない。"
       },
       "opensource": {
-        "title": "無料＆オープンソース",
-        "description": "GPL-3.0ライセンス。フォーク、改善、共有 — ペイウォールもテレメトリもなし。",
+        "title": "オープンソース",
+        "description": "GPL-3.0。フォークして、リミックスして、出せ。ペイウォールなし。テレメトリなし。忍者はあなたの手元に残る。",
         "licenseLink": "LICENSEを見る"
       }
     }
   },
   "cta": {
-    "title": "準備はできた？",
-    "subtitle": "SoundNinjaを無料でダウンロード — またはGitHubで参加。"
+    "title": "Sound Ninjaになろう",
+    "subtitle": "無料でダウンロード — またはGitHubで参加。"
   },
   "footer": {
     "tagline": "ストリーマー、仲間、ポッドキャスト向けのオープンソースサウンドボード。",

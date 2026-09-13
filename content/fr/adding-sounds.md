@@ -38,4 +38,4 @@ Si des fichiers audio bougent sur le disque, SoundNinja affiche **Fichiers audio
 
 ## Suite
 
-Organise onglets, groupes et raccourcis dans [Organiser les sons](/docs/organizing-sounds).
+Organise onglets, tags, filtres et raccourcis dans [Organiser les sons](/docs/organizing-sounds).

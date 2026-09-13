@@ -38,4 +38,4 @@ If audio files move on disk, SoundNinja shows a **Missing sound files** dialog. 
 
 ## Next
 
-Organize tabs, groups, and hotkeys in [Organizing Sounds](/docs/organizing-sounds).
+Organize tabs, tags, filters, and hotkeys in [Organizing Sounds](/docs/organizing-sounds).

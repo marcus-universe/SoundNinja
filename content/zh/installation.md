@@ -13,6 +13,7 @@ order: 2
 - 64 位 Windows 的 **安装程序 (.exe)** 或 **MSI (.msi)**
 - 落地页目标：Windows 10 及更新
 - 应用 README 也列出 Windows 8 及以上
+- NSIS 安装程序为深色主题。安装时选择语言 — SoundNinja 会在下次启动时记住。
 
 运行安装程序，然后从开始菜单启动 SoundNinja。
 

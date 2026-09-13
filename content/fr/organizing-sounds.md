@@ -1,12 +1,12 @@
 ---
 title: Organiser les sons
-description: Onglets, groupes, recherche, édition groupée et raccourcis.
+description: Onglets, tags, filtres, tri, sélection multiple, volume et raccourcis.
 order: 4
 ---
 
 # Organiser les sons
 
-SoundNinja est conçu pour les grandes bibliothèques. Utilise les onglets, les groupes, la recherche et les raccourcis pour que le clip dont tu as besoin soit à un clic (ou une touche) près.
+SoundNinja est conçu pour les grandes bibliothèques. Onglets, tags, recherche, sélection multiple et raccourcis — le clip dont tu as besoin est à un clic (ou une touche) près.
 
 ## Onglets
 
@@ -27,26 +27,72 @@ Depuis la v0.5.3, les séparateurs peuvent devenir des groupes nommés :
 
 Tu peux toujours ajouter un **Séparateur** simple si tu as seulement besoin d’une coupure visuelle.
 
-## Recherche
+Clic droit sur l’espace vide du board pour **Ajouter un groupe**.
 
-Utilise le champ **Recherche** dans la barre de navigation. Les résultats se mettent à jour pendant que tu tapes.
+## Tags
+
+Les tags traversent les onglets. Crée-les dans le panneau **Filtre** (barre latérale **Filtre**) :
+
+- Ajouter un tag avec un nom et une couleur
+- Renommer, recolorer ou supprimer depuis le même panneau
+
+Assigne les tags via clic droit → menu **Tags** (cases à cocher). S’il n’y a encore aucun tag, le menu pointe vers le panneau filtre.
+
+## Filtre et recherche
+
+Active les tags dans le panneau filtre ou comme **puces sous la barre de recherche**. Le match est **OU** : un son apparaît s’il a n’importe quel tag sélectionné.
+
+Le champ **Recherche** dans la barre de navigation se met à jour pendant que tu tapes et combine en **ET** avec le filtre de tags actif.
+
+Les noms de tags colorés peuvent apparaître sur les boutons. Active-les dans **Paramètres → Comportement → Afficher les badges de tags**.
+
+## Tri
+
+Ouvre le panneau filtre et choisis un mode :
+
+- **Défini par l’utilisateur** — ton ordre d’onglet, groupes visibles
+- **Nom**, **Date d’ajout**, **Durée de lecture** ou **Taille de fichier** — liste plate triée ; **les groupes sont masqués**
+
+Le tri par durée peut préchauffer les métadonnées de durée la première fois.
 
 ## Réordonner
 
-Active le glisser-déposer dans **Paramètres → Comportement** (**Autoriser le réordonnancement**). Puis glisse sons et groupes en place.
+Active le glisser-déposer dans **Paramètres → Comportement** (**Autoriser le réordonnancement**). Puis glisse sons et groupes en place. Le réordonnancement s’applique en tri **Défini par l’utilisateur**.
 
-## Édition groupée
+## Sélection multiple
 
-Sélectionne plusieurs sons, puis change la couleur, déplace-les vers un onglet ou supprime-les en une étape.
+Active **Sélection multiple** dans la barre de navigation, puis :
+
+- Clique pour basculer un son
+- **Maj+clic** pour une plage depuis le dernier ancrage
+- Trace un **rectangle** sur l’espace vide du board
+- Clique le board vide (ou à l’extérieur) pour vider la sélection
+
+Une barre groupée affiche le compte, plus **Couleur**, **Déplacer vers l’onglet…**, **Supprimer** et **Terminé**.
+
+En sélection multiple, chaque bouton montre une **puce d’ID de 8 caractères**. Clic droit sur la puce pour la copier.
+
+## Volume par son
+
+Clic droit → **Volume**. Glisse le curseur de 0 % à 100 %. **Double-clic** le remet à 100 %.
+
+Ça se cumule avec le volume de sortie principal dans les Paramètres.
 
 ## Raccourcis et IDs de son
 
-Chaque son a un ID de 8 caractères. Copie-le depuis le menu contextuel du bouton ou la puce d’ID de la sélection multiple.
+Chaque son a un ID de 8 caractères. Copie-le depuis le menu contextuel du bouton (**Copier l’ID**) ou la puce d’ID de la sélection multiple.
 
-Ouvre **Paramètres → Raccourcis** pour lier une touche à un ID de son. Les raccourcis globaux sont optionnels.
+Ouvre **Paramètres → Raccourcis** pour lier une touche à un ID de son. Les raccourcis globaux sont optionnels. **Assigner un raccourci** dans le menu contextuel y saute avec l’ID déjà rempli.
 
 Le même ID est ce que [Bitfocus Companion](/docs/remote-control) utilise pour déclencher un clip.
 
-## GIFs et couleurs
+## Images de fond et couleurs
 
-Clic droit sur un son pour régler des couleurs par bouton ou un fond GIF / image. C’est séparé du [Theme Creator](/docs/theme-editor), qui habille tout le board.
+Clic droit sur un son pour régler des couleurs par bouton ou une image de fond. C’est séparé du [Theme Creator](/docs/theme-editor), qui habille tout le board.
+
+Le sélecteur est une boîte **Image de fond** (PNG, JPEG, GIF, WebP) :
+
+- **Fichiers locaux** — ajouter des dossiers, choisir un fichier, chercher par nom, prévisualiser la grille, retirer un dossier de la bibliothèque
+- **KLIPY** — chercher des GIF en ligne. Mets ta propre clé API dans **Paramètres → Comportement**. La clé n’est pas stockée dans les fichiers projet.
+
+Après le choix, recadre et décale l’image sur le bouton.

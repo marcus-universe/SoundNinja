@@ -1,12 +1,12 @@
 ---
 title: Organizar sonidos
-description: Pestañas, grupos, búsqueda, edición masiva y atajos.
+description: Pestañas, etiquetas, filtros, orden, selección múltiple, volumen y atajos.
 order: 4
 ---
 
 # Organizar sonidos
 
-SoundNinja está hecho para bibliotecas grandes. Usa pestañas, grupos, búsqueda y atajos para que el clip que necesitas esté a un clic (o una tecla) de distancia.
+SoundNinja está hecho para bibliotecas grandes. Pestañas, etiquetas, búsqueda, selección múltiple y atajos — el clip que necesitas está a un clic (o una tecla).
 
 ## Pestañas
 
@@ -27,26 +27,72 @@ Desde la v0.5.3, los separadores pueden convertirse en grupos con nombre:
 
 Sigue pudiendo añadir un **Separador** simple si solo necesitas un corte visual.
 
-## Búsqueda
+Clic derecho en el espacio vacío del tablero para **Añadir grupo**.
 
-Usa el campo **Buscar** en la barra de navegación. Los resultados se actualizan mientras escribes.
+## Etiquetas
+
+Las etiquetas cruzan las pestañas. Créalas en el panel **Filtro** (barra lateral **Filtro**):
+
+- Añade una etiqueta con nombre y color
+- Renombra, recolorea o elimina desde el mismo panel
+
+Asigna etiquetas con clic derecho → menú **Etiquetas** (casillas). Si aún no hay etiquetas, el menú te lleva al panel de filtro.
+
+## Filtro y búsqueda
+
+Activa etiquetas en el panel de filtro o como **chips bajo la barra de búsqueda**. La coincidencia es **OR**: un sonido aparece si tiene cualquiera de las etiquetas seleccionadas.
+
+El campo **Buscar** en la barra de navegación se actualiza al escribir y combina con **AND** el filtro de etiquetas activo.
+
+Los nombres de etiqueta en color pueden aparecer en los botones. Actívalos en **Ajustes → Comportamiento → Mostrar badges de etiquetas**.
+
+## Orden
+
+Abre el panel de filtro y elige un modo:
+
+- **Definido por el usuario** — tu orden de pestaña, grupos visibles
+- **Nombre**, **Fecha de añadido**, **Tiempo de reproducción** o **Tamaño de archivo** — lista plana ordenada; **los grupos se ocultan**
+
+Ordenar por duración puede precargar los metadatos de duración la primera vez.
 
 ## Reordenar
 
-Activa arrastrar y soltar en **Ajustes → Comportamiento** (**Permitir reordenar**). Luego arrastra sonidos y grupos a su sitio.
+Activa arrastrar y soltar en **Ajustes → Comportamiento** (**Permitir reordenar**). Luego arrastra sonidos y grupos a su sitio. Reordenar aplica en el orden **Definido por el usuario**.
 
-## Edición masiva
+## Selección múltiple
 
-Selecciona varios sonidos y cambia el color, muévelos a una pestaña o elimínalos de una vez.
+Activa **Selección múltiple** en la barra de navegación, luego:
+
+- Clic para alternar un sonido
+- **Mayús+clic** para un rango desde el último ancla
+- Arrastra un **marco** en el espacio vacío del tablero
+- Clic en el tablero vacío (o fuera) para limpiar la selección
+
+Una barra masiva muestra el recuento, más **Color**, **Mover a pestaña…**, **Eliminar** y **Hecho**.
+
+En selección múltiple, cada botón muestra un **chip de ID de 8 caracteres**. Clic derecho en el chip para copiarlo.
+
+## Volumen por sonido
+
+Clic derecho → **Volumen**. Arrastra el control de 0 % a 100 %. **Doble clic** lo restablece a 100 %.
+
+Se acumula con el volumen de salida maestro en Ajustes.
 
 ## Atajos e IDs de sonido
 
-Cada sonido tiene un ID de 8 caracteres. Cópialo desde el menú contextual del botón o el chip de ID de la selección múltiple.
+Cada sonido tiene un ID de 8 caracteres. Cópialo desde el menú contextual del botón (**Copiar ID**) o el chip de ID de la selección múltiple.
 
-Abre **Ajustes → Atajos** para vincular una tecla a un ID de sonido. Los atajos globales son opcionales.
+Abre **Ajustes → Atajos** para vincular una tecla a un ID de sonido. Los atajos globales son opcionales. **Asignar atajo** en el menú contextual salta allí con el ID rellenado.
 
 El mismo ID es el que [Bitfocus Companion](/docs/remote-control) usa para disparar un clip.
 
-## GIFs y colores
+## Imágenes de fondo y colores
 
-Clic derecho en un sonido para definir colores por botón o un fondo GIF / imagen. Eso es independiente del [Theme Creator](/docs/theme-editor), que da estilo a todo el tablero.
+Clic derecho en un sonido para definir colores por botón o una imagen de fondo. Eso es independiente del [Theme Creator](/docs/theme-editor), que da estilo a todo el tablero.
+
+El selector es un diálogo **Imagen de fondo** (PNG, JPEG, GIF, WebP):
+
+- **Archivos locales** — añade carpetas, elige un archivo, busca por nombre, previsualiza la cuadrícula o quita una carpeta de la biblioteca
+- **KLIPY** — busca GIFs en línea. Pon tu propia clave API en **Ajustes → Comportamiento**. La clave no se guarda en los archivos del proyecto.
+
+Tras elegir, mueve y recorta la imagen en el botón.

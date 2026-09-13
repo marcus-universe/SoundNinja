@@ -38,4 +38,4 @@ Si los archivos de audio se mueven en el disco, SoundNinja muestra **Archivos de
 
 ## Siguiente
 
-Organiza pestañas, grupos y atajos en [Organizar sonidos](/docs/organizing-sounds).
+Organiza pestañas, etiquetas, filtros y atajos en [Organizar sonidos](/docs/organizing-sounds).

@@ -1,21 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img">
-  <rect width="1280" height="720" fill="#222831"/>
-  <rect x="80" y="80" width="1120" height="560" rx="24" fill="#363f4d"/>
-  <rect x="120" y="120" width="160" height="40" rx="12" fill="hsl(189,100%,58%)"/>
-  <rect x="300" y="120" width="160" height="40" rx="12" fill="#434e5f"/>
-  <rect x="480" y="120" width="160" height="40" rx="12" fill="#f86d6d" opacity="0.8"/>
-  <rect x="660" y="120" width="160" height="40" rx="12" fill="#a78bfa" opacity="0.7"/>
-  <g>
-    <rect x="120" y="200" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="320" y="200" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="520" y="200" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="720" y="200" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="920" y="200" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="120" y="320" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="320" y="320" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="520" y="320" width="180" height="100" rx="16" fill="hsl(189,100%,58%)" opacity="0.3"/>
-    <rect x="720" y="320" width="180" height="100" rx="16" fill="#222831"/>
-    <rect x="920" y="320" width="180" height="100" rx="16" fill="#222831"/>
-  </g>
-  <text x="640" y="640" text-anchor="middle" font-family="Nunito,sans-serif" font-size="28" font-weight="700" fill="#eee" opacity="0.6">Screenshot: Tabs &amp; Colors</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="tb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c222b"/>
+      <stop offset="1" stop-color="#222831"/>
+    </linearGradient>
+    <radialGradient id="tb-glow" cx="30%" cy="30%" r="55%">
+      <stop offset="0" stop-color="#a78bfa" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#tb-bg)"/>
+  <circle cx="240" cy="180" r="280" fill="url(#tb-glow)"/>
+
+  <rect x="64" y="64" width="1152" height="592" rx="36" fill="#363f4d"/>
+  <rect x="64" y="64" width="1152" height="592" rx="36" fill="none" stroke="#4a5566" stroke-width="1.5"/>
+
+  <!-- tabs -->
+  <rect x="104" y="100" width="132" height="40" rx="20" fill="hsl(189,100%,58%)"/>
+  <rect x="252" y="100" width="108" height="40" rx="20" fill="#434e5f"/>
+  <rect x="376" y="100" width="108" height="40" rx="20" fill="#f86d6d" opacity="0.88"/>
+  <rect x="500" y="100" width="108" height="40" rx="20" fill="#a78bfa" opacity="0.88"/>
+  <rect x="624" y="100" width="88" height="40" rx="20" fill="#34d399" opacity="0.8"/>
+
+  <!-- tag chips -->
+  <rect x="104" y="160" width="86" height="28" rx="14" fill="#fbbf24" opacity="0.92"/>
+  <rect x="202" y="160" width="72" height="28" rx="14" fill="#f472b6" opacity="0.92"/>
+  <rect x="286" y="160" width="96" height="28" rx="14" fill="hsl(189,100%,58%)" opacity="0.92"/>
+  <rect x="394" y="160" width="64" height="28" rx="14" fill="#434e5f"/>
+
+  <!-- buttons -->
+  <rect x="104" y="220" width="240" height="150" rx="24" fill="#222831"/>
+  <rect x="120" y="236" width="70" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="120" y="332" width="52" height="18" rx="9" fill="#fbbf24"/>
+  <rect x="180" y="332" width="44" height="18" rx="9" fill="#f472b6"/>
+
+  <rect x="364" y="220" width="240" height="150" rx="24" fill="#222831" stroke="hsl(189,100%,58%)" stroke-width="4"/>
+  <rect x="380" y="236" width="58" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="380" y="332" width="52" height="18" rx="9" fill="hsl(189,100%,58%)"/>
+  <circle cx="572" cy="248" r="10" fill="hsl(189,100%,58%)"/>
+
+  <rect x="624" y="220" width="240" height="150" rx="24" fill="#222831" stroke="hsl(189,100%,58%)" stroke-width="4"/>
+  <rect x="640" y="236" width="80" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="640" y="332" width="44" height="18" rx="9" fill="#a78bfa"/>
+  <circle cx="832" cy="248" r="10" fill="hsl(189,100%,58%)"/>
+
+  <rect x="884" y="220" width="240" height="150" rx="24" fill="#222831"/>
+  <rect x="900" y="236" width="64" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="900" y="332" width="56" height="18" rx="9" fill="#34d399"/>
+
+  <rect x="104" y="394" width="240" height="150" rx="24" fill="#222831"/>
+  <rect x="120" y="410" width="48" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="120" y="506" width="52" height="18" rx="9" fill="#f86d6d"/>
+
+  <rect x="364" y="394" width="240" height="150" rx="24" fill="#222831" stroke="hsl(189,100%,58%)" stroke-width="4"/>
+  <rect x="380" y="410" width="76" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="380" y="506" width="44" height="18" rx="9" fill="#fbbf24"/>
+  <rect x="432" y="506" width="40" height="18" rx="9" fill="#a78bfa"/>
+  <circle cx="572" cy="422" r="10" fill="hsl(189,100%,58%)"/>
+
+  <rect x="624" y="394" width="240" height="150" rx="24" fill="#222831"/>
+  <rect x="640" y="410" width="54" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="640" y="506" width="48" height="18" rx="9" fill="hsl(189,100%,58%)"/>
+
+  <rect x="884" y="394" width="240" height="150" rx="24" fill="#222831"/>
+  <rect x="900" y="410" width="68" height="10" rx="5" fill="#eee" opacity="0.3"/>
+  <rect x="900" y="506" width="40" height="18" rx="9" fill="#f472b6"/>
+
+  <!-- bulk bar -->
+  <rect x="280" y="574" width="720" height="52" rx="26" fill="#222831"/>
+  <rect x="304" y="590" width="36" height="20" rx="10" fill="hsl(189,100%,58%)"/>
+  <rect x="356" y="594" width="88" height="12" rx="6" fill="#eee" opacity="0.25"/>
+  <rect x="560" y="586" width="96" height="28" rx="14" fill="#434e5f"/>
+  <rect x="668" y="586" width="96" height="28" rx="14" fill="#434e5f"/>
+  <rect x="776" y="586" width="96" height="28" rx="14" fill="#f86d6d" opacity="0.75"/>
+  <rect x="884" y="586" width="88" height="28" rx="14" fill="hsl(189,100%,58%)"/>
+
+  <!-- marquee hint -->
+  <rect x="364" y="220" width="500" height="324" rx="28" fill="none" stroke="hsl(189,100%,58%)" stroke-width="2" stroke-dasharray="10 8" opacity="0.35"/>
 </svg>

@@ -38,4 +38,4 @@ order: 3
 
 ## 次へ
 
-タブ、グループ、ホットキーの整理は[サウンドの整理](/docs/organizing-sounds)。
+タブ、タグ、フィルター、ホットキーの整理は[サウンドの整理](/docs/organizing-sounds)。

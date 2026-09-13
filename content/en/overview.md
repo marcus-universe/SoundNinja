@@ -22,13 +22,16 @@ SoundNinja is still in early development. Features work, but not every platform 
 ## What you can do
 
 - Build a soundboard from your own audio files
-- Organize sounds in colored tabs, groups, and search
+- Organize sounds in colored tabs, groups, tags, and search
+- Filter by tags (OR) and sort by name, date, duration, or size
+- Multi-select with marquee or Shift-range, then bulk color, move, or delete
+- Set per-sound volume from the context menu
 - Design the look with the Theme Creator
 - Record PC audio or a microphone in the Record Editor
 - Assign hotkeys to individual sounds
 - Trigger sounds from [Bitfocus Companion](/docs/remote-control)
 - Import and export a full soundboard to share with others
-- Use GIFs or images on sound buttons
+- Use GIFs or images on sound buttons — from a local folder library or KLIPY
 
 ## License
 

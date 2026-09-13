@@ -1,12 +1,12 @@
 ---
 title: Organizing Sounds
-description: Tabs, groups, search, bulk edit, and hotkeys.
+description: Tabs, tags, filters, sort, multi-select, volume, and hotkeys.
 order: 4
 ---
 
 # Organizing Sounds
 
-SoundNinja is built for large libraries. Use tabs, groups, search, and hotkeys so the clip you need is one click (or one key) away.
+SoundNinja is built for large libraries. Use tabs, tags, search, multi-select, and hotkeys so the clip you need is one click (or one key) away.
 
 ## Tabs
 
@@ -27,26 +27,72 @@ Since v0.5.3, separators can become named groups:
 
 You can still add a plain **Separator** if you only need a visual break.
 
-## Search
+Right-click empty board space to **Add Group**.
 
-Use the **Search** field in the navbar. Results update as you type.
+## Tags
+
+Tags cut across tabs. Create them in the slide-out **Filter** panel (sidebar **Filter**):
+
+- Add a tag with a name and a color
+- Rename, recolor, or delete tags from the same panel
+
+Assign tags with a right-click → **Tags** flyout (checkboxes). If no tags exist yet, the menu points you to the filter panel.
+
+## Filter and search
+
+Toggle tags in the filter panel or as **chips under the search bar**. Matching is **OR**: a sound shows if it has any selected tag.
+
+The **Search** field in the navbar updates as you type and **ANDs** with the active tag filter.
+
+Colored tag names can appear on buttons. Toggle them in **Settings → Behavior → Show tag badges**.
+
+## Sort
+
+Open the filter panel and pick a sort mode:
+
+- **User defined** — your tab order, with groups visible
+- **Name**, **Added time**, **Play time**, or **File size** — a flat sorted list; **groups are hidden** in these modes
+
+Duration sort may warm duration metadata the first time you use it.
 
 ## Reorder
 
-Turn on drag-and-drop in **Settings → Behavior** (**Allow reorder**). Then drag sounds and groups into place.
+Turn on drag-and-drop in **Settings → Behavior** (**Allow reorder**). Then drag sounds and groups into place. Reorder applies in **User defined** sort.
 
-## Bulk edit
+## Multi-select
 
-Multi-select sounds, then change color, move them to a tab, or delete them in one step.
+Turn on **Multi-select** in the navbar, then:
+
+- Click a sound to toggle it
+- **Shift+click** to select a range from the last anchor
+- Drag a **marquee** on empty board space
+- Click empty board (or outside) to clear the selection
+
+A bulk bar appears with the count, plus **Color**, **Move to tab…**, **Delete**, and **Done**.
+
+In multi-select, each button shows an **8-character ID chip**. Right-click the chip to copy it.
+
+## Per-sound volume
+
+Right-click a sound → **Volume**. Drag the slider from 0% to 100%. **Double-click** the slider to reset to 100%.
+
+This stacks with the master output volume in Settings.
 
 ## Hotkeys and sound IDs
 
-Every sound has an 8-character ID. Copy it from the button context menu or the multi-select ID chip.
+Every sound has an 8-character ID. Copy it from the button context menu (**Copy ID**) or the multi-select ID chip.
 
-Open **Settings → Hotkeys** to bind a key to a sound ID. Global hotkeys are optional.
+Open **Settings → Hotkeys** to bind a key to a sound ID. Global hotkeys are optional. **Assign hotkey** on the context menu jumps there with the ID prefilled.
 
 The same ID is what [Bitfocus Companion](/docs/remote-control) uses to trigger a clip.
 
-## GIFs and colors
+## Background images and colors
 
-Right-click a sound to set per-button colors or a GIF / image background. That is separate from the [Theme Creator](/docs/theme-editor), which styles the whole board.
+Right-click a sound to set per-button colors or a background image. That is separate from the [Theme Creator](/docs/theme-editor), which styles the whole board.
+
+The picker is a **Background image** dialog (PNG, JPEG, GIF, WebP):
+
+- **Local files** — add folders, pick a single file, search filenames, preview the grid, or remove a folder from the library
+- **KLIPY** — search online GIFs. Set your own API key in **Settings → Behavior**. The key is not stored in project files.
+
+After you pick an image, pan and crop it on the button.

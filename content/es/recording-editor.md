@@ -35,8 +35,8 @@ El botón Grabar usa el dispositivo que eliges aquí.
 
 ## Separación de stems (opcional)
 
-El Record Editor puede conservar **voces** o **música** con BS-RoFormer. El modelo pesa unos 158 MB y **no** viene incluido con la app.
+Las builds oficiales de Windows, macOS y Linux incluyen la función **stems**. El Record Editor puede conservar **voces** o **música** con BS-RoFormer.
 
-Descárgalo desde **Ajustes → Separación de stems**, o acepta el aviso del primer arranque. El instalador de Windows también puede ofrecer descargar el modelo al primer inicio.
+El modelo pesa unos 158 MB y **no** viene en el instalador. Descárgalo desde **Ajustes → Separación de stems**, o acepta el aviso del primer arranque. El instalador de Windows también puede ofrecer descargar el modelo al primer inicio.
 
-Las builds desde código con stems necesitan un flag extra (`tauri:serve:stems` / `tauri:build:stems`).
+Las builds personalizadas desde código necesitan un flag extra (`tauri:serve:stems` / `tauri:build:stems`).

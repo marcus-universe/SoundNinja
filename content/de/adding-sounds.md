@@ -38,4 +38,4 @@ Wenn Audiodateien auf der Festplatte umziehen, zeigt SoundNinja **Fehlende Sound
 
 ## Weiter
 
-Tabs, Gruppen und Hotkeys: [Sounds organisieren](/docs/organizing-sounds).
+Tabs, Tags, Filter und Hotkeys: [Sounds organisieren](/docs/organizing-sounds).

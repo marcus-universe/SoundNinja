@@ -22,13 +22,16 @@ SoundNinja steckt noch in der frühen Entwicklung. Funktionen laufen, aber nicht
 ## Was du tun kannst
 
 - Ein Soundboard aus eigenen Audiodateien bauen
-- Sounds in farbigen Tabs, Gruppen und über die Suche sortieren
+- Sounds in farbigen Tabs, Gruppen, Tags und über die Suche sortieren
+- Nach Tags filtern (ODER) und nach Name, Datum, Dauer oder Größe sortieren
+- Mehrfachauswahl mit Rahmen oder Shift-Bereich, dann Farbe, Tab oder Löschen in einem Rutsch
+- Lautstärke pro Sound im Kontextmenü setzen
 - Das Aussehen mit dem Theme Creator gestalten
 - PC-Audio oder Mikrofon im Record Editor aufnehmen
 - Hotkeys einzelnen Sounds zuweisen
 - Sounds über [Bitfocus Companion](/docs/remote-control) auslösen
 - Ein komplettes Soundboard importieren und exportieren
-- GIFs oder Bilder auf Sound-Buttons legen
+- GIFs oder Bilder auf Sound-Buttons legen — aus lokaler Ordnerbibliothek oder KLIPY
 
 ## Lizenz
 

@@ -12,40 +12,40 @@
     "titleSound": "SOUND",
     "titleNinja": "NINJA",
     "logoAlt": "SoundNinja logo",
-    "subtitle": "Performant, modern, open source soundboard",
+    "subtitle": "fast, modern, soundboard",
     "download": "Download",
     "downloadVersion": "Download {version}",
     "contribute": "Contribute on GitHub"
   },
   "features": {
-    "heading": "Core Features",
+    "heading": "The kit that keeps up",
     "items": {
       "themes": {
-        "title": "Themes & Customization",
-        "description": "Design your soundboard your way. Custom colors, layouts, and profiles so the UI fits your setup — desktop, stream overlay, or VR."
+        "title": "Custom Themes",
+        "description": "Build a look in the Theme Creator — colors, layouts, and profiles for desktop, stream, or VR."
       },
       "tabs": {
-        "title": "Organize with Tabs & Colors",
-        "description": "Group sounds into colored tabs. Find what you need in milliseconds — even with huge libraries."
+        "title": "Organize your Sounds",
+        "description": "Huge library? Color the tabs, nest named groups, slap on tags, filter in a blink."
       },
       "recording": {
-        "title": "Easy & Fast Recording",
-        "description": "Capture PC audio straight into SoundNinja with the Record Editor. Trim, name, and drop onto your board in seconds."
+        "title": "Record new Sounds",
+        "description": "Record PC audio or a mic in the Record Editor, trim the clip, and drop it on your board."
       },
       "performance": {
-        "title": "Performance & Lightweight",
-        "description": "Rust core via Tauri v2. Low RAM, tiny footprint, and pre-cached sounds for instant playback."
+        "title": "Fast and Lightweight",
+        "description": "Written in Rust under the hood. Sounds sit pre-cached. Click — it plays. RAM barely notices you were here."
       },
       "opensource": {
-        "title": "Free & Open Source",
-        "description": "Licensed under GPL-3.0. Fork it, improve it, share it — no paywalls, no telemetry tax.",
+        "title": "Open Source",
+        "description": "GPL-3.0. Fork it, remix it, ship it. No paywall. No telemetry. The ninja stays in your hands.",
         "licenseLink": "View LICENSE"
       }
     }
   },
   "cta": {
-    "title": "Ready to sound off?",
-    "subtitle": "Download SoundNinja free — or contribute on GitHub."
+    "title": "Become a Sound Ninja",
+    "subtitle": "Download free — or join us on GitHub."
   },
   "footer": {
     "tagline": "Open source soundboard for streamers, friends & podcasts.",

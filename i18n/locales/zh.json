@@ -12,40 +12,40 @@
     "titleSound": "SOUND",
     "titleNinja": "NINJA",
     "logoAlt": "SoundNinja 标志",
-    "subtitle": "高性能、现代、开源音效板",
+    "subtitle": "快速、现代、音效板",
     "download": "下载",
     "downloadVersion": "下载 {version}",
     "contribute": "在 GitHub 上贡献"
   },
   "features": {
-    "heading": "核心功能",
+    "heading": "跟得上你的一套",
     "items": {
       "themes": {
-        "title": "主题与自定义",
-        "description": "按自己的方式设计音效板。自定义颜色、布局和配置，适配桌面、直播叠加层或 VR。"
+        "title": "自定义主题",
+        "description": "在 Theme Creator 里做出外观 — 颜色、布局和配置，适配桌面、直播或 VR。"
       },
       "tabs": {
-        "title": "用标签页和颜色整理",
-        "description": "将音效分组到彩色标签页。即使库再大，也能在毫秒内找到所需内容。"
+        "title": "整理你的音效",
+        "description": "库再大？给标签页上色、嵌套命名分组、贴标签、眨眼筛完。"
       },
       "recording": {
-        "title": "轻松快速录音",
-        "description": "用录音编辑器将电脑音频直接录进 SoundNinja。裁剪、命名并放到音板上，只需几秒。"
+        "title": "录制新音效",
+        "description": "在 Record Editor 中录制电脑音频或麦克风，裁剪片段，放到音板上。"
       },
       "performance": {
-        "title": "高性能且轻量",
-        "description": "通过 Tauri v2 的 Rust 核心。低内存、小体积，预缓存音效即时播放。"
+        "title": "快速且轻量",
+        "description": "底层用 Rust 写成。音效预先缓存。一点就响。内存几乎没察觉你来过。"
       },
       "opensource": {
-        "title": "免费开源",
-        "description": "采用 GPL-3.0 许可。可 fork、改进、分享 — 没有付费墙，没有遥测。",
+        "title": "开源",
+        "description": "GPL-3.0。Fork、混改、发出去。没有付费墙。没有遥测。忍者留在你手里。",
         "licenseLink": "查看 LICENSE"
       }
     }
   },
   "cta": {
-    "title": "准备好开声了吗？",
-    "subtitle": "免费下载 SoundNinja — 或在 GitHub 上参与贡献。"
+    "title": "成为 Sound Ninja",
+    "subtitle": "免费下载 — 或在 GitHub 上加入我们。"
   },
   "footer": {
     "tagline": "面向主播、朋友和播客的开源音效板。",

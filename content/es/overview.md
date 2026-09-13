@@ -22,13 +22,16 @@ SoundNinja sigue en desarrollo temprano. Las funciones marchan, pero no todas la
 ## Qué puedes hacer
 
 - Montar un soundboard con tus propios archivos de audio
-- Organizar sonidos en pestañas de colores, grupos y búsqueda
+- Organizar sonidos en pestañas de colores, grupos, etiquetas y búsqueda
+- Filtrar por etiquetas (OR) y ordenar por nombre, fecha, duración o tamaño
+- Selección múltiple con marco o rango Mayús, luego color, mover o borrar en lote
+- Ajustar el volumen por sonido desde el menú contextual
 - Diseñar el aspecto con el Theme Creator
 - Grabar audio del PC o un micrófono en el Record Editor
 - Asignar atajos a sonidos individuales
 - Disparar sonidos desde [Bitfocus Companion](/docs/remote-control)
 - Importar y exportar un soundboard completo para compartirlo
-- Usar GIFs o imágenes en los botones de sonido
+- Usar GIFs o imágenes en los botones — biblioteca local de carpetas o KLIPY
 
 ## Licencia
 

@@ -35,8 +35,8 @@ Der Aufnahme-Button nutzt das hier gewählte Gerät.
 
 ## Stem-Trennung (optional)
 
-Der Aufnahme-Editor kann **Gesang** oder **Musik** mit BS-RoFormer behalten. Das Modell ist etwa 158 MB und **nicht** im App-Paket.
+Offizielle Windows-, macOS- und Linux-Release-Builds enthalten das **Stems**-Feature. Der Aufnahme-Editor kann **Gesang** oder **Musik** mit BS-RoFormer behalten.
 
-Download unter **Einstellungen → Stem-Trennung** oder über den Erststart-Hinweis. Der Windows-Installer kann den Download beim ersten Start anbieten.
+Das Modell ist etwa 158 MB und **nicht** im Installer. Download unter **Einstellungen → Stem-Trennung** oder über den Erststart-Hinweis. Der Windows-Installer kann den Download beim ersten Start anbieten.
 
-Source-Builds mit Stems brauchen extra Flags (`tauri:serve:stems` / `tauri:build:stems`).
+Eigene Source-Builds brauchen extra Flags (`tauri:serve:stems` / `tauri:build:stems`).

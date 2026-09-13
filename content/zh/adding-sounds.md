@@ -38,4 +38,4 @@ order: 3
 
 ## 下一步
 
-在[整理音效](/docs/organizing-sounds)中整理标签页、分组和快捷键。
+在[整理音效](/docs/organizing-sounds)中整理标签页、标签、筛选和快捷键。

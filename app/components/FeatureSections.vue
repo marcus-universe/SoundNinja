@@ -24,7 +24,6 @@ const features = computed(() =>
     description: t(`features.items.${key}.description`),
     image: `${base.value}screenshots/${key}.svg`,
     imageRight: index % 2 === 0,
-    imageLeft: index % 2 !== 0,
     licenseLink:
       key === 'opensource' ? t('features.items.opensource.licenseLink') : null,
   })),
@@ -34,20 +33,13 @@ const features = computed(() =>
 <template>
   <section
     id="features"
-    class="relative py-16 sm:py-24"
-    :aria-label="t('features.heading')"
+    class="relative pt-8 pb-16 sm:pt-10 sm:pb-24"
+    :aria-label="t('nav.features')"
   >
-    <h2
-      class="mx-auto mb-14 max-w-6xl px-4 text-center text-3xl font-extrabold sm:mb-20 sm:px-6 sm:text-4xl"
-    >
-      {{ t('features.heading') }}
-    </h2>
-
     <article
       v-for="feature in features"
       :key="feature.key"
-      class="px-4 py-16 sm:px-6 sm:py-20"
-      :class="feature.imageLeft ? 'bg-primary text-on-primary' : ''"
+      class="px-4 py-16 first:pt-8 sm:px-6 sm:py-20 sm:first:pt-10"
     >
       <div
         class="mx-auto grid max-w-6xl items-center gap-8 md:grid-cols-2 md:gap-12 lg:gap-16"
@@ -56,16 +48,10 @@ const features = computed(() =>
           class="order-1"
           :class="feature.imageRight ? 'md:order-1' : 'md:order-2'"
         >
-          <h3
-            class="text-2xl font-extrabold sm:text-3xl"
-            :class="feature.imageLeft ? 'text-on-primary' : 'text-primary'"
-          >
+          <h3 class="text-2xl font-extrabold text-primary sm:text-3xl">
             {{ feature.title }}
           </h3>
-          <p
-            class="mt-3 text-base sm:text-lg"
-            :class="feature.imageLeft ? 'text-on-primary/80' : 'text-ink/80'"
-          >
+          <p class="mt-3 text-base text-ink/80 sm:text-lg">
             {{ feature.description }}
           </p>
           <a
@@ -87,7 +73,7 @@ const features = computed(() =>
           <img
             :src="feature.image"
             :alt="feature.title"
-            class="aspect-video w-full object-cover"
+            class="aspect-video w-full object-contain"
             width="1280"
             height="720"
             loading="lazy"

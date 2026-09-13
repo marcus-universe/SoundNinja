@@ -35,8 +35,8 @@ order: 6
 
 ## 音轨分离（可选）
 
-Record Editor 可用 BS-RoFormer 保留 **人声** 或 **音乐**。模型约 158 MB，**不会**随应用捆绑。
+官方 Windows、macOS 和 Linux 发行构建已包含 **音轨分离** 功能。Record Editor 可用 BS-RoFormer 保留 **人声** 或 **音乐**。
 
-从 **设置 → 音轨分离** 下载，或接受首次运行提示。Windows 安装程序也可以在首次启动时提供下载该模型。
+模型约 158 MB，**不会**随安装程序捆绑。从 **设置 → 音轨分离** 下载，或接受首次运行提示。Windows 安装程序也可以在首次启动时提供下载该模型。
 
-从源码构建音轨功能需要额外标志（`tauri:serve:stems` / `tauri:build:stems`）。
+自定义源码构建需要额外标志（`tauri:serve:stems` / `tauri:build:stems`）。

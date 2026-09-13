@@ -1,11 +1,75 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img">
-  <rect width="1280" height="720" fill="#222831"/>
-  <rect x="80" y="80" width="1120" height="560" rx="24" fill="#363f4d"/>
-  <rect x="200" y="200" width="880" height="120" rx="12" fill="#222831"/>
-  <polyline points="220,260 320,240 420,280 520,220 620,250 720,210 820,270 920,230 1040,255" fill="none" stroke="hsl(189,100%,58%)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="640" cy="420" r="56" fill="hsl(189,100%,58%)"/>
-  <rect x="628" y="396" width="24" height="48" rx="4" fill="#222831"/>
-  <rect x="400" y="500" width="480" height="16" rx="8" fill="#434e5f"/>
-  <rect x="400" y="500" width="280" height="16" rx="8" fill="hsl(189,100%,58%)" opacity="0.7"/>
-  <text x="640" y="640" text-anchor="middle" font-family="Nunito,sans-serif" font-size="28" font-weight="700" fill="#eee" opacity="0.6">Screenshot: Record Editor</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="rc-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c222b"/>
+      <stop offset="1" stop-color="#222831"/>
+    </linearGradient>
+    <linearGradient id="rc-wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="hsl(189,100%,58%)" stop-opacity="0.35"/>
+      <stop offset="0.45" stop-color="hsl(189,100%,58%)"/>
+      <stop offset="1" stop-color="#f86d6d"/>
+    </linearGradient>
+    <radialGradient id="rc-glow" cx="50%" cy="55%" r="45%">
+      <stop offset="0" stop-color="hsl(189,100%,58%)" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="hsl(189,100%,58%)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#rc-bg)"/>
+  <ellipse cx="640" cy="400" rx="420" ry="200" fill="url(#rc-glow)"/>
+
+  <rect x="72" y="72" width="1136" height="576" rx="36" fill="#363f4d"/>
+  <rect x="72" y="72" width="1136" height="576" rx="36" fill="none" stroke="#4a5566" stroke-width="1.5"/>
+
+  <!-- transport -->
+  <circle cx="160" cy="160" r="36" fill="#f86d6d"/>
+  <circle cx="160" cy="160" r="14" fill="#222831"/>
+  <rect x="220" y="144" width="160" height="16" rx="8" fill="#434e5f"/>
+  <rect x="220" y="172" width="96" height="10" rx="5" fill="#434e5f" opacity="0.5"/>
+
+  <!-- meters -->
+  <rect x="980" y="120" width="18" height="80" rx="6" fill="#434e5f"/>
+  <rect x="980" y="164" width="18" height="36" rx="6" fill="#34d399"/>
+  <rect x="1008" y="120" width="18" height="80" rx="6" fill="#434e5f"/>
+  <rect x="1008" y="148" width="18" height="52" rx="6" fill="hsl(189,100%,58%)"/>
+  <rect x="1036" y="120" width="18" height="80" rx="6" fill="#434e5f"/>
+  <rect x="1036" y="172" width="18" height="28" rx="6" fill="#fbbf24"/>
+  <rect x="1064" y="120" width="18" height="80" rx="6" fill="#434e5f"/>
+  <rect x="1064" y="156" width="18" height="44" rx="6" fill="#f86d6d"/>
+
+  <!-- waveform well -->
+  <rect x="120" y="236" width="1040" height="260" rx="28" fill="#1a1f27"/>
+
+  <polyline
+    fill="none"
+    stroke="url(#rc-wave)"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    points="160,366 200,340 240,390 280,310 320,380 360,300 400,372 440,288 480,360 520,304 560,384 600,296 640,348 680,276 720,368 760,312 800,392 840,300 880,356 920,292 960,376 1000,328 1040,360 1100,344"
+  />
+  <polyline
+    fill="none"
+    stroke="hsl(189,100%,58%)"
+    stroke-width="2"
+    stroke-linecap="round"
+    opacity="0.35"
+    points="160,366 200,392 240,342 280,422 320,352 360,432 400,360 440,444 480,372 520,428 560,348 600,436 640,384 680,456 720,364 760,420 800,340 840,432 880,376 920,440 960,356 1000,404 1040,372 1100,388"
+  />
+
+  <!-- trim selection -->
+  <rect x="360" y="248" width="400" height="236" rx="8" fill="hsl(189,100%,58%)" opacity="0.1"/>
+  <rect x="360" y="248" width="6" height="236" rx="3" fill="hsl(189,100%,58%)"/>
+  <rect x="754" y="248" width="6" height="236" rx="3" fill="hsl(189,100%,58%)"/>
+  <rect x="344" y="340" width="22" height="52" rx="8" fill="hsl(189,100%,58%)"/>
+  <rect x="754" y="340" width="22" height="52" rx="8" fill="hsl(189,100%,58%)"/>
+
+  <!-- playhead -->
+  <line x1="560" y1="248" x2="560" y2="484" stroke="#eee" stroke-width="2" opacity="0.55"/>
+  <circle cx="560" cy="248" r="6" fill="#eee"/>
+
+  <!-- tools -->
+  <rect x="280" y="544" width="140" height="48" rx="24" fill="#434e5f"/>
+  <rect x="440" y="544" width="140" height="48" rx="24" fill="#434e5f"/>
+  <rect x="600" y="544" width="180" height="48" rx="24" fill="hsl(189,100%,58%)"/>
+  <rect x="800" y="544" width="140" height="48" rx="24" fill="#434e5f"/>
 </svg>
