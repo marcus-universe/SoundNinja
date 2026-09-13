@@ -1,12 +1,12 @@
 ---
 title: Organiser les sons
-description: Onglets, tags, filtres, tri, sélection multiple, volume et raccourcis.
+description: Tags, filtres, onglets, groupes, tri, sélection multiple, volume et raccourcis.
 order: 4
 ---
 
 # Organiser les sons
 
-SoundNinja est conçu pour les grandes bibliothèques. Onglets, tags, recherche, sélection multiple et raccourcis — le clip dont tu as besoin est à un clic (ou une touche) près.
+SoundNinja est conçu pour les grandes bibliothèques. **Tags et filtres**, onglets, recherche, sélection multiple et raccourcis — le clip dont tu as besoin est à un clic (ou une touche) près.
 
 ## Onglets
 
@@ -29,20 +29,27 @@ Tu peux toujours ajouter un **Séparateur** simple si tu as seulement besoin d�
 
 Clic droit sur l’espace vide du board pour **Ajouter un groupe**.
 
-## Tags
+## Tags / Filtres
 
-Les tags traversent les onglets. Crée-les dans le panneau **Filtre** (barre latérale **Filtre**) :
+Les tags traversent les onglets. Le panneau **Filtre** (barre latérale **Filtre**) sert à les créer et à filtrer le board.
 
-- Ajouter un tag avec un nom et une couleur
-- Renommer, recolorer ou supprimer depuis le même panneau
+### Créer et modifier des tags
 
-Assigne les tags via clic droit → menu **Tags** (cases à cocher). S’il n’y a encore aucun tag, le menu pointe vers le panneau filtre.
+1. Ouvre **Filtre** dans la barre latérale.
+2. Sous **Tags**, utilise **Ajouter un tag** — nom et couleur.
+3. Renomme, recolore ou **Supprimer le tag** dans la même liste.
+4. Si tu vois **Aucun tag pour l’instant**, crée-en un ici avant d’assigner.
 
-## Filtre et recherche
+### Assigner des tags aux sons
 
-Active les tags dans le panneau filtre ou comme **puces sous la barre de recherche**. Le match est **OU** : un son apparaît s’il a n’importe quel tag sélectionné.
+Clic droit sur un son → **Tags** (cases à cocher). Un son peut avoir plusieurs tags. S’il n’y en a encore aucun, le menu pointe vers le panneau filtre.
 
-Le champ **Recherche** dans la barre de navigation se met à jour pendant que tu tapes et combine en **ET** avec le filtre de tags actif.
+### Filtrer le board
+
+- Active les tags dans le panneau Filtre, ou comme **puces sous la barre de recherche**.
+- Le match est **OU** : un son reste visible s’il a **n’importe quel** tag sélectionné.
+- Le champ **Recherche** combine en **ET** avec le filtre de tags actif (saisie + tags ensemble).
+- Désactive les puces (ou vide le filtre) pour revoir tout l’onglet.
 
 Les noms de tags colorés peuvent apparaître sur les boutons. Active-les dans **Paramètres → Comportement → Afficher les badges de tags**.
 

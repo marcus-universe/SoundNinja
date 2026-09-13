@@ -1,12 +1,12 @@
 ---
 title: Organizar sonidos
-description: Pestañas, etiquetas, filtros, orden, selección múltiple, volumen y atajos.
+description: Etiquetas, filtros, pestañas, grupos, orden, selección múltiple, volumen y atajos.
 order: 4
 ---
 
 # Organizar sonidos
 
-SoundNinja está hecho para bibliotecas grandes. Pestañas, etiquetas, búsqueda, selección múltiple y atajos — el clip que necesitas está a un clic (o una tecla).
+SoundNinja está hecho para bibliotecas grandes. **Etiquetas y filtros**, pestañas, búsqueda, selección múltiple y atajos — el clip que necesitas está a un clic (o una tecla).
 
 ## Pestañas
 
@@ -29,20 +29,27 @@ Sigue pudiendo añadir un **Separador** simple si solo necesitas un corte visual
 
 Clic derecho en el espacio vacío del tablero para **Añadir grupo**.
 
-## Etiquetas
+## Etiquetas / Filtros
 
-Las etiquetas cruzan las pestañas. Créalas en el panel **Filtro** (barra lateral **Filtro**):
+Las etiquetas cruzan las pestañas. El panel **Filtro** (barra lateral **Filtro**) es donde las creas y filtras el tablero.
 
-- Añade una etiqueta con nombre y color
-- Renombra, recolorea o elimina desde el mismo panel
+### Crear y editar etiquetas
 
-Asigna etiquetas con clic derecho → menú **Etiquetas** (casillas). Si aún no hay etiquetas, el menú te lleva al panel de filtro.
+1. Abre **Filtro** en la barra lateral.
+2. En **Etiquetas**, usa **Añadir etiqueta** — nombre y color.
+3. Renombra, recolorea o **Eliminar etiqueta** en la misma lista.
+4. Si ves **Aún no hay etiquetas**, crea una aquí antes de asignar.
 
-## Filtro y búsqueda
+### Asignar etiquetas a sonidos
 
-Activa etiquetas en el panel de filtro o como **chips bajo la barra de búsqueda**. La coincidencia es **OR**: un sonido aparece si tiene cualquiera de las etiquetas seleccionadas.
+Clic derecho en un sonido → **Etiquetas** (casillas). Un sonido puede tener varias. Si aún no hay ninguna, el menú te lleva al panel de filtro.
 
-El campo **Buscar** en la barra de navegación se actualiza al escribir y combina con **AND** el filtro de etiquetas activo.
+### Filtrar el tablero
+
+- Activa etiquetas en el panel Filtro o como **chips bajo la barra de búsqueda**.
+- La coincidencia es **OR**: un sonido sigue visible si tiene **cualquiera** de las etiquetas seleccionadas.
+- El campo **Buscar** combina con **AND** el filtro de etiquetas activo (texto + etiquetas juntos).
+- Apaga los chips (o limpia el filtro) para ver de nuevo toda la pestaña.
 
 Los nombres de etiqueta en color pueden aparecer en los botones. Actívalos en **Ajustes → Comportamiento → Mostrar badges de etiquetas**.
 

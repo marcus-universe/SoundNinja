@@ -1,12 +1,12 @@
 ---
 title: Sounds organisieren
-description: Tabs, Tags, Filter, Sortierung, Mehrfachauswahl, Lautstärke und Hotkeys.
+description: Tags, Filter, Tabs, Gruppen, Sortierung, Mehrfachauswahl, Lautstärke und Hotkeys.
 order: 4
 ---
 
 # Sounds organisieren
 
-SoundNinja ist für große Bibliotheken gebaut. Tabs, Tags, Suche, Mehrfachauswahl und Hotkeys — der Clip ist einen Klick (oder eine Taste) entfernt.
+SoundNinja ist für große Bibliotheken gebaut. **Tags und Filter**, Tabs, Suche, Mehrfachauswahl und Hotkeys — der Clip ist einen Klick (oder eine Taste) entfernt.
 
 ## Tabs
 
@@ -29,20 +29,27 @@ Ein einfacher **Trenner** geht weiter, wenn du nur einen visuellen Bruch brauchs
 
 Rechtsklick auf leeren Board-Bereich: **Gruppe hinzufügen**.
 
-## Tags
+## Tags / Filter
 
-Tags gelten tabübergreifend. Anlegen im ausfahrbaren **Filter**-Panel (Sidebar **Filter**):
+Tags gelten tabübergreifend. Das ausfahrbare **Filter**-Panel (Sidebar **Filter**) ist der Ort zum Anlegen und zum Filtern des Boards.
 
-- Tag mit Name und Farbe hinzufügen
-- Im selben Panel umbenennen, umfärben oder löschen
+### Tags anlegen und bearbeiten
 
-Tags zuweisen: Rechtsklick → **Tags**-Flyout (Checkboxen). Existieren noch keine Tags, zeigt das Menü den Weg zum Filter-Panel.
+1. **Filter** in der Sidebar öffnen.
+2. Unter **Tags** → **Tag hinzufügen** — Name und Farbe vergeben.
+3. Im selben Panel umbenennen, umfärben oder **Tag löschen**.
+4. Steht da **Noch keine Tags**, zuerst hier einen anlegen, bevor du zuweist.
 
-## Filter und Suche
+### Tags an Sounds hängen
 
-Tags im Filter-Panel oder als **Chips unter der Suchleiste** umschalten. Abgleich ist **ODER**: ein Sound erscheint, wenn er irgendeinen gewählten Tag hat.
+Rechtsklick auf einen Sound → **Tags** (Checkboxen). Ein Sound darf mehrere Tags haben. Existieren noch keine, zeigt das Menü den Weg zum Filter-Panel.
 
-Das Feld **Suche** in der Navbar folgt der Eingabe und kombiniert per **UND** mit dem aktiven Tag-Filter.
+### Board filtern
+
+- Tags im Filter-Panel oder als **Chips unter der Suchleiste** umschalten.
+- Abgleich ist **ODER**: ein Sound bleibt sichtbar, wenn er **irgendeinen** gewählten Tag hat.
+- Das Feld **Suche** in der Navbar kombiniert per **UND** mit dem aktiven Tag-Filter (Tippen + Tags zusammen).
+- Chips aus (oder Filter leeren), um den ganzen Tab wieder zu sehen.
 
 Farbige Tag-Namen können auf Buttons erscheinen. Schalter: **Einstellungen → Verhalten → Tag-Badges anzeigen**.
 

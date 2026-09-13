@@ -1,12 +1,12 @@
 ---
 title: Organizing Sounds
-description: Tabs, tags, filters, sort, multi-select, volume, and hotkeys.
+description: Tags, filters, tabs, groups, sort, multi-select, volume, and hotkeys.
 order: 4
 ---
 
 # Organizing Sounds
 
-SoundNinja is built for large libraries. Use tabs, tags, search, multi-select, and hotkeys so the clip you need is one click (or one key) away.
+SoundNinja is built for large libraries. Use **tags and filters**, tabs, search, multi-select, and hotkeys so the clip you need is one click (or one key) away.
 
 ## Tabs
 
@@ -29,20 +29,27 @@ You can still add a plain **Separator** if you only need a visual break.
 
 Right-click empty board space to **Add Group**.
 
-## Tags
+## Tags / Filters
 
-Tags cut across tabs. Create them in the slide-out **Filter** panel (sidebar **Filter**):
+Tags cut across tabs. The slide-out **Filter** panel (sidebar **Filter**) is where you create them and turn them into a board filter.
 
-- Add a tag with a name and a color
-- Rename, recolor, or delete tags from the same panel
+### Create and edit tags
 
-Assign tags with a right-click → **Tags** flyout (checkboxes). If no tags exist yet, the menu points you to the filter panel.
+1. Open **Filter** in the sidebar.
+2. Under **Tags**, use **Add tag** — give it a name and a color.
+3. Rename, recolor, or **Delete tag** from the same list.
+4. If you see **No tags yet**, add one here before you assign anything.
 
-## Filter and search
+### Assign tags to sounds
 
-Toggle tags in the filter panel or as **chips under the search bar**. Matching is **OR**: a sound shows if it has any selected tag.
+Right-click a sound → **Tags** (checkboxes). A sound can have several tags. If none exist yet, the menu tells you to open the filter panel.
 
-The **Search** field in the navbar updates as you type and **ANDs** with the active tag filter.
+### Filter the board
+
+- Toggle tags in the Filter panel, or as **chips under the search bar**.
+- Matching is **OR**: a sound stays visible if it has **any** selected tag.
+- The navbar **Search** field **ANDs** with the active tag filter (type + tags together).
+- Turn chips off (or clear the filter) to show the full tab again.
 
 Colored tag names can appear on buttons. Toggle them in **Settings → Behavior → Show tag badges**.
 
