@@ -38,6 +38,7 @@ ManifestDPIAwareness PerMonitorV2
 !include "Win\COM.nsh"
 !include "Win\Propkey.nsh"
 !include "StrFunc.nsh"
+!include WinMessages.nsh
 ${StrCase}
 ${StrLoc}
 
@@ -77,6 +78,8 @@ ${StrLoc}
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\soundninja"
 !define MANUKEY "Software\${MANUFACTURER}"
 !define MANUPRODUCTKEY "${MANUKEY}\${PRODUCTNAME}"
+; Pre-rename productName was "soundninja"; old installs wrote this key.
+!define LEGACYMANUPRODUCTKEY "${MANUKEY}\soundninja"
 !define UNINSTALLERSIGNCOMMAND "{{uninstaller_sign_cmd}}"
 !define ESTIMATEDSIZE "{{estimated_size}}"
 !define STARTMENUFOLDER "{{start_menu_folder}}"
@@ -94,7 +97,7 @@ Var LangCombo
 Var LangChoice
 
 Name "${PRODUCTNAME}"
-BrandingText "${COPYRIGHT}"
+BrandingText "${PRODUCTNAME} ${VERSION}"
 OutFile "${OUTFILE}"
 
 ; We don't actually use this value as default install path,
@@ -152,6 +155,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ; Installer sidebar image
 !if "${SIDEBARIMAGE}" != ""
  !define MUI_WELCOMEFINISHPAGE_BITMAP "${SIDEBARIMAGE}"
+ !define MUI_WELCOMEFINISHPAGE_BITMAP_STRETCH AspectFitHeight
 !endif
 
 ; Enable header images for installer and uninstaller pages when either image is configured.
@@ -182,10 +186,64 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 !define MUI_LANGDLL_REGISTRY_KEY "${MANUPRODUCTKEY}"
 !define MUI_LANGDLL_REGISTRY_VALUENAME "Installer Language"
 
+; Untheme a control so SetCtlColors sticks (NSIS bug #443 / themed BUTTON/STATIC).
+!macro DarkenHwnd HWND
+ Push $9
+ StrCpy $9 ${HWND}
+ ${If} $9 != 0
+  System::Call 'uxtheme::SetWindowTheme(p r9, w " ", w " ")'
+  SetCtlColors $9 "EEEEEE" "222831"
+ ${EndIf}
+ Pop $9
+!macroend
+
+!macro DarkenNavButton ID
+ GetDlgItem $1 $HWNDPARENT ${ID}
+ ${If} $1 != 0
+  System::Call 'uxtheme::SetWindowTheme(p r1, w " ", w " ")'
+  SetCtlColors $1 "EEEEEE" "363f4d"
+ ${EndIf}
+!macroend
+
+; Recolor every child except SS_BITMAP (sidebar/header art).
+!macro DarkenChildWindows PARENT
+ Push $2
+ Push $3
+ Push $5
+ Push $6
+ StrCpy $2 ${PARENT}
+ ${If} $2 != 0
+  System::Call 'user32::GetWindow(p r2, i 5) p .r3'
+  ${While} $3 != 0
+   System::Call 'user32::GetClassName(p r3, t .r5, i 64)'
+   System::Call 'user32::GetWindowLong(p r3, i -16) i .r6'
+   IntOp $6 $6 & 0xF
+   ${If} $6 != 14
+    ${If} $5 == "Button"
+     System::Call 'uxtheme::SetWindowTheme(p r3, w " ", w " ")'
+    ${EndIf}
+    SetCtlColors $3 "EEEEEE" "222831"
+   ${EndIf}
+   System::Call 'user32::GetWindow(p r3, i 2) p .r3'
+  ${EndWhile}
+ ${EndIf}
+ Pop $6
+ Pop $5
+ Pop $3
+ Pop $2
+!macroend
+
 !macro ApplyDarkUiImpl
  SetCtlColors $HWNDPARENT "EEEEEE" "222831"
+ ; Dark titlebar (20 = Win10 20H1+, 19 = older 1809 builds)
+ System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 20, *i 1, i 4)'
+ System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 19, *i 1, i 4)'
+
  FindWindow $0 "#32770" "" $HWNDPARENT
  SetCtlColors $0 "EEEEEE" "222831"
+ !insertmacro DarkenChildWindows $HWNDPARENT
+ !insertmacro DarkenChildWindows $0
+
  GetDlgItem $1 $HWNDPARENT 1034
  SetCtlColors $1 "EEEEEE" "222831"
  GetDlgItem $1 $HWNDPARENT 1037
@@ -194,6 +252,23 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
  SetCtlColors $1 "EEEEEE" "222831"
  GetDlgItem $1 $HWNDPARENT 1028
  SetCtlColors $1 "EEEEEE" "222831"
+
+ ; Classic InstallOptions welcome IDs (no-op on nsDialogs MUI2)
+ GetDlgItem $1 $HWNDPARENT 1201
+ SetCtlColors $1 "EEEEEE" "222831"
+ GetDlgItem $1 $HWNDPARENT 1202
+ SetCtlColors $1 "EEEEEE" "222831"
+ ${If} $0 != 0
+  GetDlgItem $1 $0 1201
+  SetCtlColors $1 "EEEEEE" "222831"
+  GetDlgItem $1 $0 1202
+  SetCtlColors $1 "EEEEEE" "222831"
+ ${EndIf}
+
+ ; Next / Cancel / Back
+ !insertmacro DarkenNavButton 1
+ !insertmacro DarkenNavButton 2
+ !insertmacro DarkenNavButton 3
 !macroend
 
 Function ApplyDarkUi
@@ -203,11 +278,98 @@ Function un.ApplyDarkUi
  !insertmacro ApplyDarkUiImpl
 FunctionEnd
 
+!macro StripOuterQuotes VAR
+ Push $8
+ Push $9
+ StrCpy $9 ${VAR}
+ StrCpy $8 $9 1
+ ${If} $8 == '"'
+  StrLen $8 $9
+  IntOp $8 $8 - 2
+  ${If} $8 > 0
+   StrCpy $9 $9 $8 1
+  ${Else}
+   StrCpy $9 ""
+  ${EndIf}
+  StrCpy ${VAR} $9
+ ${EndIf}
+ Pop $9
+ Pop $8
+!macroend
+
+!macro TryReadInstallDir ROOT KEY NAME
+ ${If} $4 == ""
+  ClearErrors
+  ReadRegStr $4 ${ROOT} "${KEY}" "${NAME}"
+  ${If} ${Errors}
+   StrCpy $4 ""
+  ${Else}
+   !insertmacro StripOuterQuotes $4
+  ${EndIf}
+ ${EndIf}
+!macroend
+
+; $4 = previous install directory. Survives productName rename (soundninja -> Sound Ninja).
+Function ResolveOldInstallDir
+ StrCpy $4 ""
+ !insertmacro TryReadInstallDir SHCTX "${MANUPRODUCTKEY}" ""
+ !insertmacro TryReadInstallDir SHCTX "${LEGACYMANUPRODUCTKEY}" ""
+ !insertmacro TryReadInstallDir HKLM "${MANUPRODUCTKEY}" ""
+ !insertmacro TryReadInstallDir HKLM "${LEGACYMANUPRODUCTKEY}" ""
+ !insertmacro TryReadInstallDir SHCTX "${UNINSTKEY}" "InstallLocation"
+ !insertmacro TryReadInstallDir HKLM "${UNINSTKEY}" "InstallLocation"
+ ${If} $4 == ""
+  ReadRegStr $5 SHCTX "${UNINSTKEY}" "UninstallString"
+  ${If} $5 == ""
+   ReadRegStr $5 HKLM "${UNINSTKEY}" "UninstallString"
+  ${EndIf}
+  !insertmacro StripOuterQuotes $5
+  ${If} $5 != ""
+   ${GetParent} "$5" $4
+  ${EndIf}
+ ${EndIf}
+ ${If} $4 == ""
+  StrCpy $4 "$INSTDIR"
+ ${EndIf}
+FunctionEnd
+
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW WelcomeShow
 !insertmacro MUI_PAGE_WELCOME
+
+Function WelcomeShow
+ Call ApplyDarkUi
+ Push $0
+ Push $1
+ Push $9
+ StrCpy $1 0
+ ; MUI2 nsDialogs handle (declared by MUI_PAGE_WELCOME above)
+ StrCpy $1 $mui.WelcomePage.Text
+ ${If} $1 == 0
+  FindWindow $0 "#32770" "" $HWNDPARENT
+  GetDlgItem $1 $0 1202
+ ${EndIf}
+ ${If} $1 == 0
+  GetDlgItem $1 $HWNDPARENT 1202
+ ${EndIf}
+ ${If} $1 != 0
+  System::Call 'user32::GetWindowText(p r1, t .r0, i ${NSIS_MAX_STRLEN})'
+  ${StrLoc} $9 $0 "$(installingVersion)" ">"
+  ${If} $9 == ""
+   StrCpy $0 "$0$\r$\n$\r$\n$(installingVersion)"
+   SendMessage $1 ${WM_SETTEXT} 0 "STR:$0"
+  ${EndIf}
+  SetCtlColors $1 "EEEEEE" "222831"
+ ${EndIf}
+ ${If} $mui.WelcomePage.Title != 0
+  SetCtlColors $mui.WelcomePage.Title "EEEEEE" "222831"
+ ${EndIf}
+ Pop $9
+ Pop $1
+ Pop $0
+FunctionEnd
 
 ; 2. License Page (if defined)
 !if "${LICENSE}" != ""
@@ -312,7 +474,6 @@ Function PageReinstall
  nsDialogs::Create 1018
  Pop $R4
  ${IfThen} $(^RTL) = 1 ${|} nsDialogs::SetRTL $(^RTL) ${|}
- Call ApplyDarkUi
 
  ${NSD_CreateLabel} 0 0 100% 24u $R1
  Pop $R1
@@ -321,12 +482,12 @@ Function PageReinstall
 
  ${NSD_CreateRadioButton} 30u 50u -30u 8u $R2
  Pop $R2
- SetCtlColors $R2 "EEEEEE" "222831"
+ !insertmacro DarkenHwnd $R2
  ${NSD_OnClick} $R2 PageReinstallUpdateSelection
 
  ${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
  Pop $R3
- SetCtlColors $R3 "EEEEEE" "222831"
+ !insertmacro DarkenHwnd $R3
  ; Disable this radio button if downgrading and downgrades are disabled
  !if "${ALLOWDOWNGRADES}" == "false"
  ${IfThen} $R0 = -1 ${|} EnableWindow $R3 0 ${|}
@@ -343,6 +504,7 @@ Function PageReinstall
  ${EndIf}
 
  ${NSD_SetFocus} $R2
+ Call ApplyDarkUi
  nsDialogs::Show
  ${EndIf}
 FunctionEnd
@@ -392,39 +554,71 @@ Function PageLeaveReinstall
  ${EndIf}
 
  reinst_uninstall:
+ ${If} $WixMode = 1
  HideWindow
  ClearErrors
-
- ${If} $WixMode = 1
  ReadRegStr $R1 HKLM "$R6" "UninstallString"
  ExecWait '$R1' $0
- ${Else}
- ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
- ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
- ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 "$R1 /UPDATE" ${|} ; append /UPDATE
- ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 "$R1 /P" ${|} ; append /P
- StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
- ExecWait '$R1' $0
- ${EndIf}
-
  BringToFront
-
- ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|} ; ExecWait failed, set fake exit code
-
- ${If} $0 <> 0
- ${OrIf} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
- ; User cancelled wix uninstaller? return to select un/reinstall page
- ${If} $WixMode = 1
- ${AndIf} $0 = 1602
+ ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|}
+ ${If} $0 = 1602
  Abort
  ${EndIf}
+ ${If} $0 = 1
+ Abort
+ ${EndIf}
+ ${If} $0 <> 0
+ ${OrIf} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
+ MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
+ Abort
+ ${EndIf}
+ Goto reinst_done
+ ${EndIf}
+
+ Call ResolveOldInstallDir
+
+ StrCpy $5 ""
+ ${If} ${FileExists} "$4\uninstall.exe"
+ StrCpy $5 "$4\uninstall.exe"
+ ${Else}
+ ReadRegStr $5 SHCTX "${UNINSTKEY}" "UninstallString"
+ ${If} $5 == ""
+ ReadRegStr $5 HKLM "${UNINSTKEY}" "UninstallString"
+ ${EndIf}
+ !insertmacro StripOuterQuotes $5
+ ${EndIf}
+
+ ; Missing uninstaller: in-place upgrade instead of blocking
+ ${If} $5 == ""
+ ${OrIfNot} ${FileExists} "$5"
+ Goto reinst_done
+ ${EndIf}
+
+ HideWindow
+ ClearErrors
+ InitPluginsDir
+ CopyFiles /SILENT "$5" "$PLUGINSDIR\old-uninstall.exe"
+ ${IfNot} ${FileExists} "$PLUGINSDIR\old-uninstall.exe"
+ BringToFront
+ Goto reinst_done
+ ${EndIf}
+
+ StrCpy $R1 '"$PLUGINSDIR\old-uninstall.exe"'
+ ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 '$R1 /UPDATE' ${|}
+ ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 '$R1 /P' ${|}
+ StrCpy $R1 '$R1 _?=$4'
+ ExecWait '$R1' $0
+ BringToFront
+
+ ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|}
 
  ; User cancelled NSIS uninstaller? return to select un/reinstall page
  ${If} $0 = 1
  Abort
  ${EndIf}
 
- ; Other errors? show generic error message and return to select un/reinstall page
+ ${If} $0 <> 0
+ ${OrIf} ${FileExists} "$4\${MAINBINARYNAME}.exe"
  MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
  Abort
  ${EndIf}
@@ -450,8 +644,6 @@ Function LangPageCreate
  ${If} $LangDialog == error
  Abort
  ${EndIf}
- Call ApplyDarkUi
-
  ${NSD_CreateLabel} 0 0 100% 28u "Select the language used when Sound Ninja first starts. You can change this later in Settings."
  Pop $0
  SetCtlColors $LangDialog "EEEEEE" "222831"
@@ -480,6 +672,7 @@ Function LangPageCreate
   ${NSD_CB_SelectString} $LangCombo "English"
  ${EndIf}
 
+ Call ApplyDarkUi
  nsDialogs::Show
 FunctionEnd
 
@@ -514,8 +707,6 @@ Function StemsPageCreate
  ${If} $StemsDialog == error
  Abort
  ${EndIf}
- Call ApplyDarkUi
-
  ${NSD_CreateLabel} 0 0 100% 36u "Sound Ninja can separate vocals from music in the Record Editor using an AI model (BS-RoFormer, ~158 MB). The model is downloaded the first time you open the app — not during this install."
  Pop $0
  SetCtlColors $StemsDialog "EEEEEE" "222831"
@@ -523,11 +714,12 @@ Function StemsPageCreate
 
  ${NSD_CreateCheckbox} 0 50u 100% 12u "Download the AI stem separation model on first launch (~158 MB)"
  Pop $StemsCheckbox
- SetCtlColors $StemsCheckbox "EEEEEE" "222831"
+ !insertmacro DarkenHwnd $StemsCheckbox
  ; Default: checked
  ${NSD_Check} $StemsCheckbox
  StrCpy $StemsCheckboxState 1
 
+ Call ApplyDarkUi
  nsDialogs::Show
 FunctionEnd
 
@@ -563,8 +755,16 @@ Var AppStartMenuFolder
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-!define MUI_PAGE_CUSTOMFUNCTION_SHOW ApplyDarkUi
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishShow
 !insertmacro MUI_PAGE_FINISH
+
+Function FinishShow
+ Call ApplyDarkUi
+ !insertmacro DarkenHwnd $mui.FinishPage.Title
+ !insertmacro DarkenHwnd $mui.FinishPage.Text
+ !insertmacro DarkenHwnd $mui.FinishPage.Run
+ !insertmacro DarkenHwnd $mui.FinishPage.ShowReadme
+FunctionEnd
 
 Function RunMainBinary
  nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
@@ -605,7 +805,7 @@ Function un.ConfirmShow ; Add add a `Delete app data` check box
  Pop $DeleteAppDataCheckbox
  SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
  SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
- SetCtlColors $DeleteAppDataCheckbox "EEEEEE" "222831"
+ !insertmacro DarkenHwnd $DeleteAppDataCheckbox
 FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
@@ -626,6 +826,33 @@ FunctionEnd
 {{#each language_files}}
  !include "{{this}}"
 {{/each}}
+
+!ifdef LANG_ENGLISH
+ LangString installingVersion ${LANG_ENGLISH} "This will install ${PRODUCTNAME} ${VERSION}."
+!endif
+!ifdef LANG_GERMAN
+ LangString installingVersion ${LANG_GERMAN} "Diese Installation richtet ${PRODUCTNAME} ${VERSION} ein."
+!endif
+!ifdef LANG_SPANISH
+ LangString installingVersion ${LANG_SPANISH} "Se instalará ${PRODUCTNAME} ${VERSION}."
+!endif
+!ifdef LANG_FRENCH
+ LangString installingVersion ${LANG_FRENCH} "Ceci installera ${PRODUCTNAME} ${VERSION}."
+!endif
+!ifdef LANG_JAPANESE
+ LangString installingVersion ${LANG_JAPANESE} "${PRODUCTNAME} ${VERSION} をインストールします。"
+!endif
+!ifdef LANG_SIMPCHINESE
+ LangString installingVersion ${LANG_SIMPCHINESE} "将安装 ${PRODUCTNAME} ${VERSION}。"
+!endif
+!ifdef LANG_TRADCHINESE
+ LangString installingVersion ${LANG_TRADCHINESE} "將安裝 ${PRODUCTNAME} ${VERSION}。"
+!endif
+!ifdef LANG_SPANISHINTERNATIONAL
+ LangString installingVersion ${LANG_SPANISHINTERNATIONAL} "Se instalará ${PRODUCTNAME} ${VERSION}."
+!endif
+; Fallback when current MUI language has no LangString
+LangString installingVersion 0 "This will install ${PRODUCTNAME} ${VERSION}."
 
 Function .onInit
  ; Default: download stem model on first launch (checkbox page can uncheck).
@@ -1086,9 +1313,10 @@ Section Uninstall
 SectionEnd
 
 Function RestorePreviousInstallLocation
- ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
- StrCmp $4 "" +2 0
- StrCpy $INSTDIR $4
+ Call ResolveOldInstallDir
+ ${If} $4 != ""
+  StrCpy $INSTDIR $4
+ ${EndIf}
 FunctionEnd
 
 !macro DeleteLegacySoundninjaShortcutsImpl
