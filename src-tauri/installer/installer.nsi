@@ -284,7 +284,8 @@ FunctionEnd
  Push $9
  StrCpy $9 ${VAR}
  StrCpy $8 $9 1
- StrCpy $7 "$\""
+ ; ASCII 34 = "  (avoid $\" — makensis rejects it in some StrCpy forms)
+ IntFmt $7 "%c" 34
  ${If} $8 == $7
   StrLen $8 $9
   IntOp $8 $8 - 2
@@ -593,24 +594,32 @@ Function PageLeaveReinstall
 
  ; Missing uninstaller: in-place upgrade instead of blocking
  ${If} $5 == ""
- ${OrIfNot} ${FileExists} "$5"
- Goto reinst_done
+  Goto reinst_done
+ ${EndIf}
+ ${If} ${FileExists} "$5"
+ ${Else}
+  Goto reinst_done
  ${EndIf}
 
  HideWindow
  ClearErrors
  InitPluginsDir
  CopyFiles /SILENT "$5" "$PLUGINSDIR\old-uninstall.exe"
- ${IfNot} ${FileExists} "$PLUGINSDIR\old-uninstall.exe"
- BringToFront
- Goto reinst_done
+ ${If} ${FileExists} "$PLUGINSDIR\old-uninstall.exe"
+ ${Else}
+  BringToFront
+  Goto reinst_done
  ${EndIf}
 
- StrCpy $R1 "$\"$PLUGINSDIR\old-uninstall.exe$\""
- ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 '$R1 /UPDATE' ${|}
- ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 '$R1 /P' ${|}
- StrCpy $R1 '$R1 _?=$4'
- ExecWait '$R1' $0
+ StrCpy $R1 ""
+ ${If} $UpdateMode = 1
+  StrCpy $R1 "/UPDATE"
+ ${EndIf}
+ ${If} $PassiveMode = 1
+  StrCpy $R1 "$R1 /P"
+ ${EndIf}
+ ; Backticks: same pattern as WebView2 ExecWait below. Avoid $\" in StrCpy.
+ ExecWait `"$PLUGINSDIR\old-uninstall.exe" $R1 _?=$4` $0
  BringToFront
 
  ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|}
