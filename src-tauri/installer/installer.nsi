@@ -279,11 +279,13 @@ Function un.ApplyDarkUi
 FunctionEnd
 
 !macro StripOuterQuotes VAR
+ Push $7
  Push $8
  Push $9
  StrCpy $9 ${VAR}
  StrCpy $8 $9 1
- ${If} $8 == '"'
+ StrCpy $7 "$\""
+ ${If} $8 == $7
   StrLen $8 $9
   IntOp $8 $8 - 2
   ${If} $8 > 0
@@ -295,6 +297,7 @@ FunctionEnd
  ${EndIf}
  Pop $9
  Pop $8
+ Pop $7
 !macroend
 
 !macro TryReadInstallDir ROOT KEY NAME
@@ -603,7 +606,7 @@ Function PageLeaveReinstall
  Goto reinst_done
  ${EndIf}
 
- StrCpy $R1 '"$PLUGINSDIR\old-uninstall.exe"'
+ StrCpy $R1 "$\"$PLUGINSDIR\old-uninstall.exe$\""
  ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 '$R1 /UPDATE' ${|}
  ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 '$R1 /P' ${|}
  StrCpy $R1 '$R1 _?=$4'
