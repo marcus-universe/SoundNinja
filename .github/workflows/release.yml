@@ -25,7 +25,6 @@ jobs:
       linux: ${{ steps.need.outputs.linux }}
       macos_arm: ${{ steps.need.outputs.macos_arm }}
       macos_intel: ${{ steps.need.outputs.macos_intel }}
-      companion: ${{ steps.need.outputs.companion }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -76,19 +75,13 @@ jobs:
             macos_intel=false
           fi
 
-          companion=true
-          if has 'SoundNinja-Companion.tgz' || has 'SoundNinja-Companion-*.tgz'; then
-            companion=false
-          fi
-
           echo "windows=$windows" >> "$GITHUB_OUTPUT"
           echo "linux=$linux" >> "$GITHUB_OUTPUT"
           echo "macos_arm=$macos_arm" >> "$GITHUB_OUTPUT"
           echo "macos_intel=$macos_intel" >> "$GITHUB_OUTPUT"
-          echo "companion=$companion" >> "$GITHUB_OUTPUT"
 
           echo "Draft ${{ steps.draft.outputs.tag }}"
-          echo "windows=$windows linux=$linux macos_arm=$macos_arm macos_intel=$macos_intel companion=$companion"
+          echo "windows=$windows linux=$linux macos_arm=$macos_arm macos_intel=$macos_intel"
           if [ -n "$ASSETS" ]; then
             echo "Existing assets:"
             printf '%s\n' "$ASSETS"
@@ -124,14 +117,6 @@ jobs:
     needs: plan
     if: needs.plan.outputs.macos_intel == 'true'
     uses: ./.github/workflows/release-macos-intel.yml
-    with:
-      version: ${{ inputs.version }}
-    secrets: inherit
-
-  companion:
-    needs: plan
-    if: needs.plan.outputs.companion == 'true'
-    uses: ./.github/workflows/companion-release.yml
     with:
       version: ${{ inputs.version }}
     secrets: inherit
