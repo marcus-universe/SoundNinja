@@ -7,7 +7,7 @@
 			"path": "../SoundNinja-landing"
 		},
 		{
-			"path": "../SoundNinja-Companion-Module"
+			"path": "../companion-module-soundninja"
 		}
 	],
 	"settings": {}

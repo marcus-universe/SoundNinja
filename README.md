@@ -69,13 +69,13 @@ The core mission was to build a soundboard that empowers you to organize massive
 [![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/soundninja-linux-amd64.AppImage)
 <br>
 <br>
-[![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/SoundNinja/releases/latest/download/SoundNinja-Companion.tgz)
+[![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/companion-module-soundninja/releases/latest)
 <br>
 <br>
 
-App installers and the Companion module `.tgz` both live on `/releases/latest/download/…`.
+App installers live on `/releases/latest/download/…`. The Companion module `.tgz` is on the [companion-module-soundninja](https://github.com/marcus-universe/companion-module-soundninja/releases/latest) release page.
 
-Run **Actions → Release** — it creates a GitHub Release **draft** (`vX.Y.Z`) if none exists, then attaches only platforms that are not already on the draft. Rebuild one target with **Release Windows**, **Release Linux**, **Release macOS ARM**, **Release macOS Intel**, or **Release Companion**. Each action uploads the installer (plus a stable alias) onto that draft. Companion source: [`companion-module` branch](https://github.com/marcus-universe/SoundNinja/tree/companion-module) (`SoundNinja-Companion.tgz` and `SoundNinja-Companion-{Version}.tgz`).
+Run **Actions → Release** — it creates a GitHub Release **draft** (`vX.Y.Z`) if none exists, then attaches only platforms that are not already on the draft. Rebuild one target with **Release Windows**, **Release Linux**, **Release macOS ARM**, or **Release macOS Intel**. Each action uploads the installer (plus a stable alias) onto that draft. Companion module: [companion-module-soundninja](https://github.com/marcus-universe/companion-module-soundninja) (`SoundNinja-Companion.tgz` and `SoundNinja-Companion-{Version}.tgz`).
 
 ## Platforms
 
