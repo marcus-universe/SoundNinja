@@ -48,3 +48,5 @@ bun run tauri:serve
 ```
 
 `npm`, `pnpm` oder `deno` gehen auch. Produktionsbuild: `bun run tauri:build`.
+
+**Nur Windows:** jeder Windows-Compile enthält ASIO über das [Steinberg ASIO SDK](https://www.steinberg.net/asiosdk). Einmal `bun run setup:asio` (SDK nicht im Git). Linux und macOS nutzen PipeWire / Core Audio — diesen Schritt überspringen. Details: [build-from-source.md](https://github.com/marcus-universe/SoundNinja/blob/main/docs/build-from-source.md).

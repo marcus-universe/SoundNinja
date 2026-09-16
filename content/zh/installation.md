@@ -48,3 +48,5 @@ bun run tauri:serve
 ```
 
 `npm`、`pnpm` 或 `deno` 也可以。生产构建：`bun run tauri:build`。
+
+**仅限 Windows：** 每个 Windows 编译都通过 [Steinberg ASIO SDK](https://www.steinberg.net/asiosdk) 包含 ASIO。先运行一次 `bun run setup:asio`（SDK 不在 git 中）。Linux / macOS 使用 PipeWire / Core Audio — 跳过该步骤。详情：[build-from-source.md](https://github.com/marcus-universe/SoundNinja/blob/main/docs/build-from-source.md)。
