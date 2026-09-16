@@ -73,6 +73,12 @@ pub fn output_format() -> Option<(SampleRate, ChannelCount)> {
     Some((rate, channels))
 }
 
+/// PCM cache / decode target: stereo when ASIO channel mapping is on, otherwise
+/// the device's native channel count.
+pub fn mix_output_format(rate: SampleRate, channels: ChannelCount) -> (SampleRate, ChannelCount) {
+    (rate, super::channel_map::mix_channels(channels))
+}
+
 // --- Playing list snapshot (shared with frontend) ---
 
 #[derive(Clone, Serialize)]
@@ -124,6 +130,8 @@ pub enum AudioMsg {
         duration_secs: f64,
         /// Per-sound gain 0–1, multiplied with the master output volume.
         volume: f32,
+        /// Restart from the start when this instance ends.
+        looping: bool,
     },
     /// Stop a single playing sound matched by its file path.
     StopOne {
@@ -156,6 +164,9 @@ pub enum AudioMsg {
         path: String,
         volume: f32,
     },
+    /// Settings changed the ASIO L/R map. Drop an idle stream so the next
+    /// play opens at the new channel count.
+    ApplyChannelMap,
 }
 
 // --- Global audio sender ---
@@ -185,17 +196,30 @@ struct AudioStream {
     sample_rate: SampleRate,
     #[allow(dead_code)]
     channels: ChannelCount,
+    /// True when this stream was opened with ASIO L/R mapping (max channels).
+    mapped: bool,
 }
 
 impl AudioStream {
     fn open(device_name: &str, host_name: Option<&str>) -> Result<Self, String> {
+        let mapped = super::channel_map::output_enabled();
+        let asio = super::devices::is_asio_host_name(host_name);
+        // Hold the process-wide ASIO lock for load + create_buffers. Drop it
+        // after the stream exists so the callback is not behind the mutex.
+        let _asio_guard = asio.then(super::devices::lock_asio_api);
         let device = resolve_output_device(device_name, host_name).map_err(|e| e.to_string())?;
         let resolved_name = super::devices::device_display_name(&device)
             .unwrap_or_else(|| device_name.to_owned());
-        let device_sink = DeviceSinkBuilder::from_device(device)
-            .map_err(|e| e.to_string())?
-            .open_stream()
-            .map_err(|e| e.to_string())?;
+        let outs = super::devices::max_output_channels(&device).unwrap_or(0);
+        let ins = super::devices::max_input_channels(&device).unwrap_or(0);
+        super::devices::cache_asio_device_channels(&resolved_name, outs, ins);
+        // rodio's from_device() pins a 50ms Fixed buffer. ASIO drivers reject
+        // or heap-corrupt on sizes outside their quantum — use Default instead.
+        let mut builder = DeviceSinkBuilder::from_device(device).map_err(|e| e.to_string())?;
+        if asio {
+            builder = builder.with_buffer_size(rodio::cpal::BufferSize::Default);
+        }
+        let device_sink = builder.open_stream().map_err(|e| e.to_string())?;
         let sample_rate = device_sink.config().sample_rate();
         let channels = device_sink.config().channel_count();
         publish_output_format(sample_rate, channels);
@@ -205,6 +229,7 @@ impl AudioStream {
             host_name: host_name.map(str::to_owned),
             sample_rate,
             channels,
+            mapped,
         })
     }
 }
@@ -240,17 +265,25 @@ impl Ready {
         }
     }
 
-    fn append_to(&self, player: &Player) {
+    fn append_to(&self, player: &Player, dst_ch: ChannelCount) {
         match self {
-            Self::Cached(buf) => player.append(buf.clone()),
+            Self::Cached(buf) => append_mapped(player, buf.clone(), dst_ch),
             Self::Growing(h) => {
                 if let Some(buf) = h.snapshot() {
-                    player.append(buf);
+                    append_mapped(player, buf, dst_ch);
                 } else {
-                    player.append(h.source());
+                    append_mapped(player, h.source(), dst_ch);
                 }
             }
         }
+    }
+}
+
+fn append_mapped<S: Source + Send + 'static>(player: &Player, source: S, dst_ch: ChannelCount) {
+    if super::channel_map::output_enabled() {
+        player.append(super::channel_map::ChannelScatter::new(source, dst_ch.get()));
+    } else {
+        player.append(source);
     }
 }
 
@@ -262,9 +295,20 @@ pub fn prepare_play(
     device_name: &str,
     host_name: Option<&str>,
 ) -> Result<(Ready, f64), String> {
-    let (rate, channels) = super::devices::default_output_format(device_name, host_name)
-        .or_else(output_format)
-        .ok_or_else(|| "Cannot resolve output format".to_string())?;
+    // Do not ASIOInit a driver just to pick a decode format — that races the
+    // audio thread and is a common Windows heap-corruption trigger.
+    let (rate, device_ch) = if super::devices::is_asio_host_name(host_name) {
+        output_format().or_else(|| {
+            Some((
+                SampleRate::new(48_000)?,
+                ChannelCount::new(2)?,
+            ))
+        })
+    } else {
+        super::devices::default_output_format(device_name, host_name).or_else(output_format)
+    }
+    .ok_or_else(|| "Cannot resolve output format".to_string())?;
+    let (rate, channels) = mix_output_format(rate, device_ch);
     if let Some((buffer, duration)) = super::pcm::peek(path, rate, channels) {
         if duration > 0.0 {
             super::cache::store_duration(path, duration);
@@ -285,12 +329,15 @@ fn ensure_stream(
     device_name: &str,
     host_name: Option<&str>,
 ) -> Result<(), String> {
+    let mapped = super::channel_map::output_enabled();
+    let asio = super::devices::is_asio_host_name(host_name);
     let needs_new = stream
         .as_ref()
         .map(|s| {
             let host_changed = s.host_name.as_deref() != host_name;
             let device_changed = s.device_name != device_name && !is_default_name(device_name);
-            host_changed || device_changed
+            let map_changed = s.mapped != mapped;
+            host_changed || device_changed || map_changed
         })
         .unwrap_or(true);
 
@@ -298,9 +345,10 @@ fn ensure_stream(
         return Ok(());
     }
 
-    if stream.is_some() {
-        // Allow WASAPI callbacks to drain before opening a new stream.
-        thread::sleep(Duration::from_millis(100));
+    let had_stream = stream.is_some();
+    *stream = None;
+    if had_stream {
+        thread::sleep(Duration::from_millis(if asio { 250 } else { 100 }));
     }
     *stream = Some(AudioStream::open(device_name, host_name)?);
     Ok(())
@@ -409,11 +457,15 @@ fn seek_playing_slot(
             let mut source = buf.clone();
             match source.try_seek(target) {
                 Ok(()) => {
-                    new_player.append(source);
+                    append_mapped(&new_player, source, stream.channels);
                     clamped
                 }
                 Err(_) if clamped < 2.0 => {
-                    new_player.append(buf.clone().skip_duration(Duration::from_secs_f64(clamped)));
+                    append_mapped(
+                        &new_player,
+                        buf.clone().skip_duration(Duration::from_secs_f64(clamped)),
+                        stream.channels,
+                    );
                     clamped
                 }
                 Err(e) => {
@@ -425,7 +477,7 @@ fn seek_playing_slot(
         Ready::Growing(h) => {
             let mut source = h.source();
             let _ = source.try_seek(target);
-            new_player.append(source);
+            append_mapped(&new_player, source, stream.channels);
             clamped
         }
     };
@@ -469,7 +521,10 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         let was_paused = playing[i].player.is_paused();
                         let sink_pos = playing[i].player.get_pos().as_secs_f64();
                         playing[i].position_origin_secs = -sink_pos;
-                        playing[i].ready.append_to(&playing[i].player);
+                        let dst_ch = stream.as_ref().map(|s| s.channels);
+                        if let Some(ch) = dst_ch {
+                            playing[i].ready.append_to(&playing[i].player, ch);
+                        }
                         if was_paused {
                             playing[i].player.pause();
                         }
@@ -568,6 +623,7 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     ready,
                     duration_secs,
                     volume,
+                    looping,
                 } => {
                     if !overlap {
                         for s in playing.drain(..) {
@@ -589,11 +645,11 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     let new_player = Player::connect_new(st.device_sink.mixer());
                     let sound_volume = volume.clamp(0.0, 1.0);
                     new_player.set_volume(effective_volume(sound_volume));
-                    ready.append_to(&new_player);
+                    ready.append_to(&new_player, st.channels);
                     playing.push(PlayingSound {
                         player: new_player,
                         path: path.clone(),
-                        looping: false,
+                        looping,
                         duration_secs,
                         position_origin_secs: 0.0,
                         ready,
@@ -650,6 +706,13 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     }
                     sync_playing_list(&app_handle, &playing);
                 }
+
+                AudioMsg::ApplyChannelMap => {
+                    if playing.is_empty() && stream.is_some() {
+                        thread::sleep(Duration::from_millis(100));
+                        stream = None;
+                    }
+                }
             }
             } // for msg in batch
         }
@@ -666,6 +729,7 @@ pub fn enqueue_play(
     host_name: Option<String>,
     overlap: bool,
     volume: f32,
+    looping: bool,
 ) -> Result<f64, String> {
     let (ready, duration) = prepare_play(&sound_path, &device_name, host_name.as_deref())?;
     send_msg(AudioMsg::Play {
@@ -676,6 +740,7 @@ pub fn enqueue_play(
         ready,
         duration_secs: duration,
         volume,
+        looping,
     })?;
     Ok(duration)
 }
@@ -688,14 +753,16 @@ pub async fn play_sound(
     active: bool,
     overlap: bool,
     volume: Option<f32>,
+    looping: Option<bool>,
 ) -> Result<f64, String> {
     if active {
         send_msg(AudioMsg::StopOne { path: sound_path })?;
         return Ok(0.0);
     }
     let volume = volume.unwrap_or(1.0).clamp(0.0, 1.0);
+    let looping = looping.unwrap_or(false);
     crate::task::run_blocking(move || {
-        enqueue_play(sound_path, device_name, host_name, overlap, volume)
+        enqueue_play(sound_path, device_name, host_name, overlap, volume, looping)
     })
     .await
 }
@@ -755,4 +822,17 @@ pub fn set_playing_loop(looping: bool, sound_path: Option<String>) -> Result<(),
         path: sound_path,
         looping,
     })
+}
+
+#[tauri::command(async)]
+pub fn set_asio_channel_map(
+    enabled: bool,
+    out_left: u16,
+    out_right: u16,
+    in_left: u16,
+    in_right: u16,
+) -> Result<(), String> {
+    super::channel_map::configure(enabled, out_left, out_right, in_left, in_right);
+    let _ = send_msg(AudioMsg::ApplyChannelMap);
+    Ok(())
 }

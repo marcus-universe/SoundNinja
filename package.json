@@ -1,6 +1,6 @@
 {
   "name": "soundninja",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "scripts": {
     "dev": "node --import ./scripts/patch-econnreset.mjs ./node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3000",
@@ -19,6 +19,7 @@
     "tauri:serve:stems": "tauri dev -- --features stems",
     "tauri:serve:stems:linux": "GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev -- --features stems",
     "tauri:build:stems": "tauri build -- --features stems",
+    "setup:asio": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-asio-sdk.ps1",
     "tauri": "tauri",
     "prettier-rust": "prettier --write \"src-tauri/src/**/*.rs\"",
     "version:major": "node scripts/bump-version.mjs major",

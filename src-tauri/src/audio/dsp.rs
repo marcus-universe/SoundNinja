@@ -683,7 +683,7 @@ pub fn preview_session(
     let path_str = path.to_string_lossy().to_string();
     super::cache::invalidate_path(&path_str);
     let _ = stop_all();
-    super::playback::enqueue_play(path_str, device_name, host_name, true, 1.0)?;
+    super::playback::enqueue_play(path_str, device_name, host_name, true, 1.0, false)?;
     Ok(())
 }
 

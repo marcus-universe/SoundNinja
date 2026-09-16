@@ -36,6 +36,25 @@
             @dblclick.prevent="resetVolume"
           />
         </li>
+        <li
+          v-if="isSound"
+          class="context-menu__item"
+          :class="{ 'context-menu__item--checked': soundLooping }"
+          role="menuitemcheckbox"
+          :aria-checked="soundLooping"
+          @click="toggleSoundLoop"
+          @mouseenter="hoveredItem = 'loop'"
+          @mouseleave="hoveredItem = null"
+        >
+          <span class="context-menu__icon">
+            <Icons icon="loop" custom-class="context-menu__icon-svg" />
+          </span>
+          <span class="context-menu__label">{{ $t('contextMenu.loop') }}</span>
+          <span v-if="soundLooping" class="context-menu__check" aria-hidden="true">✓</span>
+          <Transition name="desc-fade">
+            <span v-if="hoveredItem === 'loop'" class="context-menu__desc">{{ $t('contextMenu.loopDesc') }}</span>
+          </Transition>
+        </li>
         <li v-if="isSound" class="context-menu__sep" role="separator" />
         <li
           v-if="isTab || isSound"
@@ -534,6 +553,11 @@ const volumePct = computed(() => {
   return Math.round((sound?.volume ?? 1) * 100)
 })
 
+const soundLooping = computed(() => {
+  const sound = jsonStore.configFile.files[appStore.contextMenu.targetIndex]
+  return !!sound?.looping
+})
+
 let volumeHistoryPushed = false
 
 function onVolumePointerDown() {
@@ -557,6 +581,17 @@ function onVolumeInput(e) {
 function resetVolume() {
   volumeHistoryPushed = false
   applySoundVolume(100)
+}
+
+function toggleSoundLoop() {
+  const { targetIndex } = appStore.contextMenu
+  const sound = jsonStore.configFile.files[targetIndex]
+  if (!sound) return
+  const next = !sound.looping
+  jsonStore.setSoundLoop(targetIndex, next)
+  if (sound.active) {
+    invoke('set_playing_loop', { looping: next, soundPath: sound.path }).catch(() => {})
+  }
 }
 
 function flyoutAnchor(kind) {

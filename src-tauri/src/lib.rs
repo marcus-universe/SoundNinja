@@ -202,6 +202,7 @@ pub fn run() {
             audio::playback::get_playing_sounds,
             audio::playback::seek_playing,
             audio::playback::set_playing_loop,
+            audio::playback::set_asio_channel_map,
             audio::playback::set_output_volume,
             audio::playback::set_sound_volume,
             audio::cache::warm_sound_cache,

@@ -1,6 +1,10 @@
 # Development setup
 
-Requires [Node.js](https://nodejs.org/) (for npm/pnpm) or [Bun](https://bun.sh/) / [Deno](https://deno.com/). Also needs the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for desktop builds.
+Clone, compile, and per-OS notes (including Windows ASIO / Steinberg SDK): [build-from-source.md](./build-from-source.md).
+
+Requires [Node.js](https://nodejs.org/) (for npm/pnpm) or [Bun](https://bun.sh/) / [Deno](https://deno.com/). Also needs the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for desktop builds (Rust stable, platform WebView).
+
+Source: [github.com/marcus-universe/SoundNinja](https://github.com/marcus-universe/SoundNinja)
 
 Install dependencies with any of:
 

@@ -175,7 +175,7 @@
     "audio": {
       "title": "Audio",
       "audioDriver": "Audiotreiber",
-      "audioDriverHint": "Linux: PipeWire (bevorzugt) / PulseAudio / ALSA. Windows: WASAPI standardmäßig; ASIO braucht einen speziellen Build mit --features asio und dem Steinberg ASIO SDK. macOS: CoreAudio.",
+      "audioDriverHint": "Linux: PipeWire (bevorzugt) / PulseAudio / ALSA. Windows: WASAPI und ASIO. macOS: CoreAudio.",
       "asioInfoTitle": "Audiotreiber-Info",
       "outputDevice": "Ausgabegerät",
       "inputDevice": "Eingabe- / Aufnahmegerät",
@@ -190,6 +190,10 @@
       "sliderResetHint": "Doppelklick zum Zurücksetzen",
       "asioChannelMatrix": "ASIO-Kanal-Matrix",
       "asioChannelHint": "Genau einen linken und einen rechten Ausgangskanal wählen.",
+      "asioOutputMatrix": "ASIO-Ausgangskanäle",
+      "asioOutputHint": "Einen linken und einen rechten Ausgangskanal wählen.",
+      "asioInputMatrix": "ASIO-Eingangskanäle",
+      "asioInputHint": "Einen linken und einen rechten Eingangskanal für die Aufnahme wählen.",
       "asioChannel": "Kanal",
       "left": "L",
       "right": "R"
@@ -470,7 +474,9 @@
     "showInFolderFailed": "Datei konnte im Dateimanager nicht geöffnet werden",
     "replaceAudioFailed": "Audiodatei konnte nicht ersetzt werden",
     "volume": "Lautstärke",
-    "volumeDesc": "Wiedergabelautstärke dieses Sounds (0–100 %)"
+    "volumeDesc": "Wiedergabelautstärke dieses Sounds (0–100 %)",
+    "loop": "Loop",
+    "loopDesc": "Diesen Sound vom Anfang neu starten, wenn er endet"
   },
   "gifPicker": {
     "title": "Hintergrundbild",

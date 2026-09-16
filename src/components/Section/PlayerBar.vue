@@ -172,6 +172,9 @@ async function toggleLoop() {
       soundPath: activePath.value || null,
     })
     loopOn.value = next
+    if (activePath.value) {
+      jsonStore.setSoundLoopByPath(activePath.value, next)
+    }
   } catch (e) {
     console.error(e)
   }

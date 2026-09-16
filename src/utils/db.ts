@@ -42,6 +42,8 @@ export interface SoundFile {
   durationSecs?: number
   /** File size in bytes. */
   fileSize?: number
+  /** Play this sound looping when triggered. Default false. */
+  looping?: boolean
 }
 
 export interface GifBlobRow {
@@ -433,6 +435,7 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'sounds', 'added_at', 'INTEGER')
   await addColumnIfMissing(d, 'sounds', 'file_size', 'INTEGER')
   await addColumnIfMissing(d, 'sounds', 'duration_secs', 'REAL')
+  await addColumnIfMissing(d, 'sounds', 'looping', 'INTEGER')
   await d.execute(`CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -481,6 +484,7 @@ async function loadSoundRows(d: Database): Promise<{
   added_at?: number | null
   file_size?: number | null
   duration_secs?: number | null
+  looping?: number | null
 }[]> {
   const cols = await tableColumns(d, 'sounds')
   const idSql = cols.has('sound_id')
@@ -494,9 +498,10 @@ async function loadSoundRows(d: Database): Promise<{
   const addedAt = cols.has('added_at') ? 'added_at' : 'NULL'
   const fileSize = cols.has('file_size') ? 'file_size' : 'NULL'
   const duration = cols.has('duration_secs') ? 'duration_secs' : 'NULL'
+  const looping = cols.has('looping') ? 'looping' : 'NULL'
   try {
     return await d.select(
-      `SELECT path, ${idSql} AS sound_id, name, volume, color, global_index, active, ${gifId} AS gif_id, ${gifX} AS gif_pos_x, ${gifY} AS gif_pos_y, ${addedAt} AS added_at, ${fileSize} AS file_size, ${duration} AS duration_secs FROM sounds ORDER BY global_index ASC`,
+      `SELECT path, ${idSql} AS sound_id, name, volume, color, global_index, active, ${gifId} AS gif_id, ${gifX} AS gif_pos_x, ${gifY} AS gif_pos_y, ${addedAt} AS added_at, ${fileSize} AS file_size, ${duration} AS duration_secs, ${looping} AS looping FROM sounds ORDER BY global_index ASC`,
     )
   } catch {
     return await d.select(
@@ -658,6 +663,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       ...(s.added_at != null ? { addedAt: Number(s.added_at) } : {}),
       ...(s.file_size != null ? { fileSize: Number(s.file_size) } : {}),
       ...(s.duration_secs != null ? { durationSecs: Number(s.duration_secs) } : {}),
+      looping: s.looping === 1,
     }
   })
 
@@ -837,6 +843,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
       f.addedAt ?? null,
       f.fileSize ?? null,
       f.durationSecs ?? null,
+      f.looping ? 1 : 0,
     ])
     for (const tab of f.tabs ?? ['All']) {
       const tabIdx = tab === 'All' ? f.index ?? 0 : f.tabIndexes?.[tab] ?? 0
@@ -846,7 +853,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await batchInsert(
     d,
     'sounds',
-    ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y', 'added_at', 'file_size', 'duration_secs'],
+    ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y', 'added_at', 'file_size', 'duration_secs', 'looping'],
     soundRows
   )
   await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)

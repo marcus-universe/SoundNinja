@@ -107,6 +107,21 @@
         color: $color-bg;
       }
     }
+
+    &--checked .context-menu__icon {
+      color: var(--primary_color);
+    }
+
+    &--checked:hover .context-menu__icon,
+    &--checked:focus-visible .context-menu__icon {
+      color: inherit;
+    }
+  }
+
+  &__check {
+    flex-shrink: 0;
+    font-size: 0.9em;
+    opacity: 0.85;
   }
 
   &__label {

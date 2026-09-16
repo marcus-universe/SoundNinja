@@ -41,7 +41,7 @@ The core mission was to build a soundboard that empowers you to organize massive
 | **Companion Remote**         | Trigger sounds from Bitfocus Companion over HTTP/WebSocket | ✅     |
 | **Soundboard Sharing**       | Share your Soundboard with your friends                   | ✅     |
 | **Soundboard Import/Export** | Import and Export your Soundboard                         | ✅     |
-| **Tag System**               | Tag your favorite sounds in to cathegories                | ⛔     |
+| **Tag System**               | Tag your favorite sounds in to cathegories                | ✅     |
 | **Midi Support**             | Control your Soundboard via Midi                          | ⛔     |
 | **Speech Search**            | Find sounds with the power of your voice                  | ⛔     |
 | **Twitch Chat Control**      | Let your community decide what to play                    | ⛔     |
@@ -51,6 +51,7 @@ The core mission was to build a soundboard that empowers you to organize massive
 
 - [Website](https://marcus-universe.github.io/SoundNinja/)
 - [User guide](https://marcus-universe.github.io/SoundNinja/docs)
+- [Build from source](./docs/build-from-source.md)
 - [Development setup](./docs/development.md)
 - [Companion / Remote](./docs/companion.md)
 - [Stem separation model](./docs/stems-model.md)
@@ -71,6 +72,9 @@ The core mission was to build a soundboard that empowers you to organize massive
 <br>
 <br>
 [![Companion](https://img.shields.io/badge/Companion-Module-111111?style=for-the-badge)](https://github.com/marcus-universe/companion-module-soundninja/releases/latest)
+<br>
+<br>
+[![Build from source](https://img.shields.io/badge/Build-from_source-29d4ff?style=for-the-badge)](./docs/build-from-source.md)
 <br>
 <br>
 

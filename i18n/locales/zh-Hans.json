@@ -175,7 +175,7 @@
     "audio": {
       "title": "音频",
       "audioDriver": "音频驱动",
-      "audioDriverHint": "Linux：PipeWire（首选） / PulseAudio / ALSA。Windows：默认 WASAPI；ASIO 需要带 --features asio 和 Steinberg ASIO SDK 的特殊构建。macOS：CoreAudio。",
+      "audioDriverHint": "Linux：PipeWire（首选） / PulseAudio / ALSA。Windows：WASAPI 和 ASIO。macOS：CoreAudio。",
       "asioInfoTitle": "音频驱动信息",
       "outputDevice": "输出设备",
       "inputDevice": "输入 / 采集设备",
@@ -190,6 +190,10 @@
       "sliderResetHint": "双击重置",
       "asioChannelMatrix": "ASIO 声道矩阵",
       "asioChannelHint": "请恰好选择一个左声道和一个右声道输出。",
+      "asioOutputMatrix": "ASIO 输出声道",
+      "asioOutputHint": "选择一个左声道和一个右声道输出。",
+      "asioInputMatrix": "ASIO 输入声道",
+      "asioInputHint": "为录音选择一个左声道和一个右声道输入。",
       "asioChannel": "声道",
       "left": "L",
       "right": "R"
@@ -470,7 +474,9 @@
     "showInFolderFailed": "无法在文件管理器中打开此文件",
     "replaceAudioFailed": "无法替换音频文件",
     "volume": "音量",
-    "volumeDesc": "此音效的播放音量（0–100%）"
+    "volumeDesc": "此音效的播放音量（0–100%）",
+    "loop": "循环",
+    "loopDesc": "播放结束后从头循环此音效"
   },
   "gifPicker": {
     "title": "背景图片",

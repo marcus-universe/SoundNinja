@@ -175,7 +175,7 @@
     "audio": {
       "title": "Audio",
       "audioDriver": "Audio Driver",
-      "audioDriverHint": "Linux: PipeWire (preferred) / PulseAudio / ALSA. Windows: WASAPI by default; ASIO needs a special build with --features asio and the Steinberg ASIO SDK. macOS: CoreAudio.",
+      "audioDriverHint": "Linux: PipeWire (preferred) / PulseAudio / ALSA. Windows: WASAPI and ASIO. macOS: CoreAudio.",
       "asioInfoTitle": "Audio Driver Info",
       "outputDevice": "Output Device",
       "inputDevice": "Input / Capture Device",
@@ -190,6 +190,10 @@
       "sliderResetHint": "Double-click to reset",
       "asioChannelMatrix": "ASIO Channel Matrix",
       "asioChannelHint": "Select exactly one Left and one Right output channel.",
+      "asioOutputMatrix": "ASIO Output Channels",
+      "asioOutputHint": "Select one Left and one Right output channel.",
+      "asioInputMatrix": "ASIO Input Channels",
+      "asioInputHint": "Select one Left and one Right input channel for recording.",
       "asioChannel": "Channel",
       "left": "L",
       "right": "R"
@@ -470,7 +474,9 @@
     "showInFolderFailed": "Could not open this file in the file browser",
     "replaceAudioFailed": "Could not replace the audio file",
     "volume": "Volume",
-    "volumeDesc": "Playback volume for this sound (0–100%)"
+    "volumeDesc": "Playback volume for this sound (0–100%)",
+    "loop": "Loop",
+    "loopDesc": "Replay this sound from the start when it ends"
   },
   "gifPicker": {
     "title": "Background image",

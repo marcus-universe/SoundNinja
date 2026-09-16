@@ -6,6 +6,14 @@
 # mold is used when present (CI installs it); local builds without mold fall
 # back to the default linker automatically because the flag lives in the CI
 # environment rather than here.
+#
+# Windows-only: asio-sys (cpal/rodio `asio`) reads CPAL_ASIO_DIR.
+# Do not set LIBCLANG_PATH here — an empty/missing vendor/libclang path
+# breaks clang-sys/bindgen on Linux and macOS. Windows gets libclang from
+# `bun run setup:asio` (User env) or CI (install-llvm-action).
+
+[env]
+CPAL_ASIO_DIR = { value = "vendor/asiosdk", relative = true }
 
 [target.x86_64-pc-windows-msvc]
 linker = "rust-lld.exe"

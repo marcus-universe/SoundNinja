@@ -175,7 +175,7 @@
     "audio": {
       "title": "オーディオ",
       "audioDriver": "オーディオドライバー",
-      "audioDriverHint": "Linux: PipeWire（推奨） / PulseAudio / ALSA。Windows: 既定は WASAPI。ASIO は --features asio と Steinberg ASIO SDK 付きの特別ビルドが必要です。macOS: CoreAudio。",
+      "audioDriverHint": "Linux: PipeWire（推奨） / PulseAudio / ALSA。Windows: WASAPI と ASIO。macOS: CoreAudio。",
       "asioInfoTitle": "オーディオドライバー情報",
       "outputDevice": "出力デバイス",
       "inputDevice": "入力 / キャプチャデバイス",
@@ -190,6 +190,10 @@
       "sliderResetHint": "ダブルクリックでリセット",
       "asioChannelMatrix": "ASIO チャンネルマトリックス",
       "asioChannelHint": "左と右の出力チャンネルをそれぞれ 1 つずつ選択してください。",
+      "asioOutputMatrix": "ASIO 出力チャンネル",
+      "asioOutputHint": "左と右の出力チャンネルを 1 つずつ選択します。",
+      "asioInputMatrix": "ASIO 入力チャンネル",
+      "asioInputHint": "録音用に左と右の入力チャンネルを 1 つずつ選択します。",
       "asioChannel": "チャンネル",
       "left": "L",
       "right": "R"
@@ -470,7 +474,9 @@
     "showInFolderFailed": "ファイルブラウザーで開けませんでした",
     "replaceAudioFailed": "音声ファイルを差し替えできませんでした",
     "volume": "音量",
-    "volumeDesc": "このサウンドの再生音量（0–100%）"
+    "volumeDesc": "このサウンドの再生音量（0–100%）",
+    "loop": "ループ",
+    "loopDesc": "終了したらこのサウンドを先頭から再生し直す"
   },
   "gifPicker": {
     "title": "背景画像",

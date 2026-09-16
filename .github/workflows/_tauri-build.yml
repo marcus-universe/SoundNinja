@@ -81,10 +81,61 @@ jobs:
         if: inputs.runner == 'ubuntu-24.04'
         run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=mold" >> "$GITHUB_ENV"
 
+      - name: Install LLVM (ASIO bindgen)
+        if: inputs.kind == 'windows'
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
+
+      - name: Fetch Steinberg ASIO SDK
+        if: inputs.kind == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = Join-Path $env:RUNNER_TEMP "asiosdk.zip"
+          $dest = Join-Path $env:RUNNER_TEMP "asiosdk"
+          $urls = @(
+            "https://download.steinberg.net/sdk_downloads/ASIO-SDK_2.3.4_2025-10-15.zip",
+            "https://www.steinberg.net/asiosdk"
+          )
+          $ok = $false
+          foreach ($url in $urls) {
+            try {
+              Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+              $ok = $true
+              break
+            } catch {
+              Write-Host "ASIO SDK download failed from $url : $_"
+            }
+          }
+          if (-not $ok) {
+            throw "Could not download Steinberg ASIO SDK. Set a runner with CPAL_ASIO_DIR or fix the download URL."
+          }
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          $sdk = Get-ChildItem $dest -Directory | Select-Object -First 1
+          if (-not $sdk) { $sdk = Get-Item $dest }
+          echo "CPAL_ASIO_DIR=$($sdk.FullName)" >> $env:GITHUB_ENV
+          echo "LIBCLANG_PATH=$env:LLVM_PATH\lib" >> $env:GITHUB_ENV
+          Write-Host "CPAL_ASIO_DIR=$($sdk.FullName)"
+
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Build Tauri app (Windows / ASIO)
+        if: inputs.kind == 'windows'
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CPAL_ASIO_DIR: ${{ env.CPAL_ASIO_DIR }}
+          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
+        with:
+          tauriScript: npm run tauri
+          args: ${{ inputs.args }}
+
       - name: Build Tauri app
+        if: inputs.kind != 'windows'
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

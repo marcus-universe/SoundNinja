@@ -476,6 +476,22 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
+    setSoundLoop(soundindex: number, looping: boolean, opts?: { history?: boolean }) {
+      const file = this.configFile.files[soundindex]
+      if (!file) return
+      const next = !!looping
+      if (!!file.looping === next) return
+      if (opts?.history !== false) this.pushBeforeChange()
+      file.looping = next
+      this.writeConfig()
+    },
+
+    setSoundLoopByPath(path: string, looping: boolean, opts?: { history?: boolean }) {
+      const idx = this.configFile.files.findIndex((f) => f.path === path)
+      if (idx < 0) return
+      this.setSoundLoop(idx, looping, opts)
+    },
+
     setSoundColor(soundindex: number, color: string) {
       this.pushBeforeChange()
       this.configFile.files[soundindex].color = color

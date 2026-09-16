@@ -1125,6 +1125,7 @@ async function setActiveSound(sound) {
       active: false,
       overlap: overlapSounds,
       volume: sound.volume ?? 1,
+      looping: sound.looping ?? false,
     })
       .then((duration) => {
         if (!sound.active) return

@@ -327,10 +327,12 @@ function onWavePointerLeave(path: string) {
 
 async function toggleLoop(item: PlayingInfo) {
   try {
+    const next = !item.looping
     await invoke('set_playing_loop', {
-      looping: !item.looping,
+      looping: next,
       soundPath: item.path,
     })
+    jsonStore.setSoundLoopByPath(item.path, next)
     emit('changed')
   } catch (e) {
     console.error(e)

@@ -175,7 +175,7 @@
     "audio": {
       "title": "Audio",
       "audioDriver": "Pilote audio",
-      "audioDriverHint": "Linux : PipeWire (préféré) / PulseAudio / ALSA. Windows : WASAPI par défaut ; ASIO nécessite une compilation spéciale avec --features asio et le Steinberg ASIO SDK. macOS : CoreAudio.",
+      "audioDriverHint": "Linux : PipeWire (préféré) / PulseAudio / ALSA. Windows : WASAPI et ASIO. macOS : CoreAudio.",
       "asioInfoTitle": "Infos du pilote audio",
       "outputDevice": "Périphérique de sortie",
       "inputDevice": "Périphérique d’entrée / capture",
@@ -190,6 +190,10 @@
       "sliderResetHint": "Double-clic pour réinitialiser",
       "asioChannelMatrix": "Matrice de canaux ASIO",
       "asioChannelHint": "Sélectionne exactement un canal de sortie Gauche et un Droit.",
+      "asioOutputMatrix": "Canaux de sortie ASIO",
+      "asioOutputHint": "Sélectionne un canal de sortie Gauche et un Droit.",
+      "asioInputMatrix": "Canaux d’entrée ASIO",
+      "asioInputHint": "Sélectionne un canal d’entrée Gauche et un Droit pour l’enregistrement.",
       "asioChannel": "Canal",
       "left": "L",
       "right": "R"
@@ -470,7 +474,9 @@
     "showInFolderFailed": "Impossible d’ouvrir ce fichier dans l’explorateur",
     "replaceAudioFailed": "Impossible de remplacer le fichier audio",
     "volume": "Volume",
-    "volumeDesc": "Volume de lecture de ce son (0–100 %)"
+    "volumeDesc": "Volume de lecture de ce son (0–100 %)",
+    "loop": "Boucle",
+    "loopDesc": "Rejouer ce son depuis le début lorsqu’il se termine"
   },
   "gifPicker": {
     "title": "Image de fond",
