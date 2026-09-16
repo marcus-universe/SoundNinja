@@ -6,6 +6,7 @@
 
 [![Website](https://img.shields.io/badge/Website-GitHub_Pages-29d4ff?style=for-the-badge)](https://marcus-universe.github.io/SoundNinja/)
 [![Docs](https://img.shields.io/badge/Docs-User_guide-29d4ff?style=for-the-badge)](https://marcus-universe.github.io/SoundNinja/docs)
+<br>
 ![License](https://img.shields.io/github/license/marcus-universe/SoundNinja?style=for-the-badge.svg)
 ![Version](https://img.shields.io/github/package-json/v/marcus-universe/SoundNinja?style=for-the-badge.svg)
 ![Stars](https://img.shields.io/github/stars/marcus-universe/SoundNinja?style=for-the-badge.svg)
