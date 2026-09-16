@@ -20,7 +20,7 @@ Windows may show a firewall prompt the first time the server starts. Allow priva
 ## Bitfocus Companion
 
 1. Install [Bitfocus Companion](https://bitfocus.io/companion).
-2. Download [SoundNinja-Companion.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/SoundNinja-Companion.tgz). There is no Companion Store package yet.
+2. Download [SoundNinja-Companion.tgz](https://github.com/marcus-universe/companion-module-soundninja/releases/latest). There is no Companion Store package yet.
 3. In Companion: **Modules → Load module package** and pick the `.tgz`.
 4. Add a **Sound Ninja** connection. Paste the PC IP, port, and token if you set one.
 

@@ -20,7 +20,7 @@ Windows puede mostrar un aviso del firewall la primera vez que arranca el servid
 ## Bitfocus Companion
 
 1. Instala [Bitfocus Companion](https://bitfocus.io/companion).
-2. Descarga [SoundNinja-Companion.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/SoundNinja-Companion.tgz). Aún no hay paquete en Companion Store.
+2. Descarga [SoundNinja-Companion.tgz](https://github.com/marcus-universe/companion-module-soundninja/releases/latest). Aún no hay paquete en Companion Store.
 3. En Companion: **Modules → Load module package** y elige el `.tgz`.
 4. Añade una conexión **Sound Ninja**. Pega la IP del PC, el puerto y el token si definiste uno.
 

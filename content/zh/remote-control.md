@@ -20,7 +20,7 @@ Windows 可能在服务器首次启动时显示防火墙提示。请允许专用
 ## Bitfocus Companion
 
 1. 安装 [Bitfocus Companion](https://bitfocus.io/companion)。
-2. 下载 [SoundNinja-Companion.tgz](https://github.com/marcus-universe/SoundNinja/releases/latest/download/SoundNinja-Companion.tgz)。尚无 Companion Store 软件包。
+2. 下载 [SoundNinja-Companion.tgz](https://github.com/marcus-universe/companion-module-soundninja/releases/latest)。尚无 Companion Store 软件包。
 3. 在 Companion 中：**Modules → Load module package**，选择 `.tgz`。
 4. 添加一个 **Sound Ninja** 连接。粘贴电脑 IP、端口，以及你设置的令牌。
 
