@@ -18,6 +18,19 @@
         </button>
         <button
           type="button"
+          :class="['gif-picker__rail-item', { active: browseTab === 'gifsnap' }]"
+          @click="browseTab = 'gifsnap'"
+        >
+          <span class="gif-picker__rail-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M8 12h8M12 8v8"/>
+            </svg>
+          </span>
+          <span class="gif-picker__rail-label">{{ $t('gifPicker.tabGifsnap') }}</span>
+        </button>
+        <button
+          type="button"
           :class="['gif-picker__rail-item', { active: browseTab === 'klipy' }]"
           @click="browseTab = 'klipy'"
         >
@@ -99,6 +112,49 @@
           </p>
         </template>
 
+        <template v-else-if="browseTab === 'gifsnap'">
+          <div v-if="!gifsnapConsent" class="gif-picker__info">
+            <p class="gif-picker__hint">{{ $t('gifPicker.gifsnapConsent') }}</p>
+            <div class="gif-picker__info-actions">
+              <UIButton @click="openGifsnap">{{ $t('gifPicker.gifsnapOpenSite') }}</UIButton>
+              <UIButton @click="acceptGifsnap">{{ $t('gifPicker.gifsnapAccept') }}</UIButton>
+            </div>
+          </div>
+          <template v-else>
+            <div class="gif-picker__toolbar">
+              <input
+                class="ui-input gif-picker__search"
+                type="search"
+                :placeholder="$t('gifPicker.searchGifsnapPlaceholder')"
+                :disabled="loading"
+                v-model="gifsnap.query"
+                @keydown.enter.prevent="runSearch"
+              />
+              <UIButton :disabled="loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
+            </div>
+            <div v-if="gifsnap.items.length" ref="gridRef" class="gif-picker__grid" @scroll.passive="onGridScroll">
+              <button
+                v-for="g in gifsnap.items"
+                :key="g.id"
+                type="button"
+                class="gif-picker__cell"
+                :title="g.title"
+                @click="selectRemote(g)"
+              >
+                <img :src="g.previewUrl || g.thumbUrl" :alt="g.title" loading="lazy" draggable="false" />
+              </button>
+              <div
+                v-if="gifsnap.hasMore"
+                ref="sentinelRef"
+                class="gif-picker__sentinel"
+              >{{ loadingMore ? $t('gifPicker.loadingMore') : '' }}</div>
+            </div>
+            <p v-else-if="!loading && gifsnap.searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
+            <p v-if="loading && !gifsnap.items.length" class="gif-picker__hint">…</p>
+            <button type="button" class="gif-picker__attr" @click="openGifsnap">{{ $t('gifPicker.poweredByGifsnap') }}</button>
+          </template>
+        </template>
+
         <template v-else>
           <div class="gif-picker__info">
             <p class="gif-picker__hint">{{ hasKey ? $t('gifPicker.info') : $t('gifPicker.noKey') }}</p>
@@ -113,14 +169,14 @@
               type="search"
               :placeholder="$t('gifPicker.searchPlaceholder')"
               :disabled="!hasKey || loading"
-              v-model="query"
+              v-model="klipy.query"
               @keydown.enter.prevent="runSearch"
             />
             <UIButton :disabled="!hasKey || loading" @click="runSearch">{{ $t('navbar.search') }}</UIButton>
           </div>
-          <div v-if="items.length" ref="gridRef" class="gif-picker__grid" @scroll.passive="onGridScroll">
+          <div v-if="klipy.items.length" ref="gridRef" class="gif-picker__grid" @scroll.passive="onGridScroll">
             <button
-              v-for="g in items"
+              v-for="g in klipy.items"
               :key="g.id"
               type="button"
               class="gif-picker__cell"
@@ -130,13 +186,13 @@
               <img :src="g.previewUrl || g.thumbUrl" :alt="g.title" loading="lazy" draggable="false" />
             </button>
             <div
-              v-if="canLoadMore"
+              v-if="klipy.hasMore"
               ref="sentinelRef"
               class="gif-picker__sentinel"
             >{{ loadingMore ? $t('gifPicker.loadingMore') : '' }}</div>
           </div>
-          <p v-else-if="!loading && searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
-          <p v-if="loading && !items.length" class="gif-picker__hint">…</p>
+          <p v-else-if="!loading && klipy.searched" class="gif-picker__hint">{{ $t('gifPicker.empty') }}</p>
+          <p v-if="loading && !klipy.items.length" class="gif-picker__hint">…</p>
           <button type="button" class="gif-picker__attr" @click="openKlipy">{{ $t('gifPicker.poweredBy') }}</button>
         </template>
       </div>
@@ -172,6 +228,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { searchKlipy, trendingKlipy } from '~/utils/klipy'
+import { searchGifsnap, trendingGifsnap } from '~/utils/gifsnap'
 import {
   MAX_GIF_BYTES,
   upsertGifBlob,
@@ -187,7 +244,7 @@ import {
   isLocalImageMime,
   sha256Hex,
 } from '~/utils/gifCache'
-import { KLIPY_HOME_URL, KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
+import { GIFSNAP_HOME_URL, KLIPY_HOME_URL, KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
 
 const LOCAL_CAP = 400
 const PREVIEW_LRU = 36
@@ -197,23 +254,30 @@ const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
 
+function emptyRemote() {
+  return {
+    query: '',
+    items: [],
+    page: 1,
+    hasMore: false,
+    searched: false,
+    visited: false,
+  }
+}
+
 const step = ref('browse')
 const browseTab = ref('local')
-const query = ref('')
-const items = ref([])
+const klipy = reactive(emptyRemote())
+const gifsnap = reactive(emptyRemote())
 const loading = ref(false)
 const loadingMore = ref(false)
-const searched = ref(false)
-const page = ref(1)
-const hasMore = ref(false)
 const gridRef = ref(null)
 const sentinelRef = ref(null)
 const localGridRef = ref(null)
 const error = ref('')
-let searchGen = 0
+const searchGen = { klipy: 0, gifsnap: 0 }
 let io = null
 let localIo = null
-let klipyVisited = false
 const posX = ref(50)
 const posY = ref(50)
 const previewUrl = ref('')
@@ -232,7 +296,12 @@ const reduceMotion = ref(false)
 let motionMq = null
 
 const hasKey = computed(() => !!appSettings.klipyApiKey?.trim())
-const canLoadMore = computed(() => hasMore.value)
+const gifsnapConsent = computed(() => !!appSettings.gifsnapConsent)
+const canLoadMore = computed(() => {
+  if (browseTab.value === 'gifsnap') return gifsnap.hasMore
+  if (browseTab.value === 'klipy') return klipy.hasMore
+  return false
+})
 const targetIndex = computed(() => appStore.gifPickerIndex)
 const existingGif = computed(() => {
   const i = targetIndex.value
@@ -298,6 +367,10 @@ async function openKlipy() {
   await openInSystemBrowser(KLIPY_HOME_URL)
 }
 
+async function openGifsnap() {
+  await openInSystemBrowser(GIFSNAP_HOME_URL)
+}
+
 async function openPartner() {
   await openInSystemBrowser(KLIPY_PARTNER_URL)
 }
@@ -307,71 +380,94 @@ function openKlipySettings() {
   appStore.openSettingsTab('behavior', 'klipyApi')
 }
 
-function applyPage(result, append) {
+async function acceptGifsnap() {
+  await appSettings.setGifsnapConsent(true)
+  gifsnap.visited = true
+  await loadTrending('gifsnap')
+}
+
+function sourceOf(tab = browseTab.value) {
+  return tab === 'gifsnap' ? 'gifsnap' : 'klipy'
+}
+
+function remoteOf(source) {
+  return source === 'gifsnap' ? gifsnap : klipy
+}
+
+function applyPage(remote, result, append) {
   const next = result.items || []
   if (!append) {
-    items.value = next
+    remote.items = next
   } else {
-    const seen = new Set(items.value.map((g) => g.id))
+    const seen = new Set(remote.items.map((g) => g.id))
     for (const g of next) {
       if (!seen.has(g.id)) {
         seen.add(g.id)
-        items.value.push(g)
+        remote.items.push(g)
       }
     }
   }
-  page.value = result.page || page.value
-  hasMore.value = !!result.hasNext && next.length > 0
+  remote.page = result.page || remote.page
+  remote.hasMore = !!result.hasNext && next.length > 0
 }
 
-async function loadTrending() {
-  if (!hasKey.value) return
-  const gen = ++searchGen
+async function loadTrending(source = sourceOf()) {
+  const remote = remoteOf(source)
+  if (source === 'klipy' && !hasKey.value) return
+  if (source === 'gifsnap' && !appSettings.gifsnapConsent) return
+  const gen = ++searchGen[source]
   loading.value = true
   error.value = ''
-  hasMore.value = false
-  page.value = 1
+  remote.hasMore = false
+  remote.page = 1
   try {
-    const result = await trendingKlipy(appSettings.klipyApiKey, 1)
-    if (gen !== searchGen) return
-    applyPage(result, false)
-    searched.value = true
+    const result = source === 'gifsnap'
+      ? await trendingGifsnap(1)
+      : await trendingKlipy(appSettings.klipyApiKey, 1)
+    if (gen !== searchGen[source]) return
+    applyPage(remote, result, false)
+    remote.searched = true
   } catch (e) {
-    if (gen !== searchGen) return
+    if (gen !== searchGen[source]) return
     error.value = String(e)
-    items.value = []
+    remote.items = []
   } finally {
-    if (gen === searchGen) loading.value = false
+    if (gen === searchGen[source]) loading.value = false
   }
-  if (gen === searchGen) await maybeRefill()
+  if (gen === searchGen[source] && browseTab.value === source) await maybeRefill()
 }
 
 async function runSearch() {
-  if (!hasKey.value) return
-  const q = query.value.trim()
+  const source = sourceOf()
+  const remote = remoteOf(source)
+  if (source === 'klipy' && !hasKey.value) return
+  if (source === 'gifsnap' && !appSettings.gifsnapConsent) return
+  const q = remote.query.trim()
   if (!q) {
-    await loadTrending()
+    await loadTrending(source)
     return
   }
-  const gen = ++searchGen
+  const gen = ++searchGen[source]
   loading.value = true
   loadingMore.value = false
   error.value = ''
-  page.value = 1
+  remote.page = 1
   try {
-    const result = await searchKlipy(appSettings.klipyApiKey, q, 1)
-    if (gen !== searchGen) return
-    applyPage(result, false)
-    searched.value = true
+    const result = source === 'gifsnap'
+      ? await searchGifsnap(q, 1)
+      : await searchKlipy(appSettings.klipyApiKey, q, 1)
+    if (gen !== searchGen[source]) return
+    applyPage(remote, result, false)
+    remote.searched = true
   } catch (e) {
-    if (gen !== searchGen) return
+    if (gen !== searchGen[source]) return
     error.value = String(e)
-    items.value = []
-    hasMore.value = false
+    remote.items = []
+    remote.hasMore = false
   } finally {
-    if (gen === searchGen) loading.value = false
+    if (gen === searchGen[source]) loading.value = false
   }
-  if (gen === searchGen) await maybeRefill()
+  if (gen === searchGen[source] && browseTab.value === source) await maybeRefill()
 }
 
 function isNearGridBottom() {
@@ -390,26 +486,34 @@ async function maybeRefill() {
 }
 
 async function loadMore() {
-  if (!canLoadMore.value || loading.value || loadingMore.value || !hasKey.value) return
-  const q = query.value.trim()
-  const gen = searchGen
-  const nextPage = page.value + 1
+  const source = sourceOf()
+  const remote = remoteOf(source)
+  if (!remote.hasMore || loading.value || loadingMore.value) return
+  if (source === 'klipy' && !hasKey.value) return
+  if (source === 'gifsnap' && !appSettings.gifsnapConsent) return
+  const q = remote.query.trim()
+  const gen = searchGen[source]
+  const nextPage = remote.page + 1
   loadingMore.value = true
   try {
     const result = q
-      ? await searchKlipy(appSettings.klipyApiKey, q, nextPage)
-      : await trendingKlipy(appSettings.klipyApiKey, nextPage)
-    if (gen !== searchGen) return
-    applyPage(result, true)
-    page.value = nextPage
+      ? (source === 'gifsnap'
+        ? await searchGifsnap(q, nextPage)
+        : await searchKlipy(appSettings.klipyApiKey, q, nextPage))
+      : (source === 'gifsnap'
+        ? await trendingGifsnap(nextPage)
+        : await trendingKlipy(appSettings.klipyApiKey, nextPage))
+    if (gen !== searchGen[source]) return
+    applyPage(remote, result, true)
+    remote.page = nextPage
   } catch (e) {
-    if (gen !== searchGen) return
-    hasMore.value = false
+    if (gen !== searchGen[source]) return
+    remote.hasMore = false
     error.value = String(e)
   } finally {
-    if (gen === searchGen) loadingMore.value = false
+    if (gen === searchGen[source]) loadingMore.value = false
   }
-  if (gen === searchGen) await maybeRefill()
+  if (gen === searchGen[source] && browseTab.value === source) await maybeRefill()
 }
 
 function bindSentinel() {
@@ -767,12 +871,17 @@ function onMotionChange(e) {
 }
 
 watch(browseTab, (tab) => {
-  if (tab !== 'klipy' || klipyVisited) return
-  klipyVisited = true
-  loadTrending()
+  if (tab === 'klipy' && !klipy.visited) {
+    klipy.visited = true
+    loadTrending('klipy')
+  }
+  if (tab === 'gifsnap' && appSettings.gifsnapConsent && !gifsnap.visited) {
+    gifsnap.visited = true
+    loadTrending('gifsnap')
+  }
 })
 
-watch([sentinelRef, gridRef, canLoadMore, () => items.value.length], () => {
+watch([sentinelRef, gridRef, canLoadMore, () => klipy.items.length, () => gifsnap.items.length], () => {
   nextTick(bindSentinel)
 })
 

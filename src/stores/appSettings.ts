@@ -18,6 +18,7 @@ import {
   parseAppHotkeys,
   type AppHotkeyAction,
 } from '~/utils/hotkeys'
+import { attachGifsnapCache } from '~/utils/gifsnap'
 
 const DEFAULT_RECENT_LIMIT = 30
 
@@ -43,10 +44,16 @@ export const useAppSettingsStore = defineStore('appSettings', {
     navbarTooltips: true,
     /** Show color tag badges on sound buttons. Default on. */
     showTagBadges: true,
+    /** Solid title chip on GIF/image buttons (hover + active). Default on. */
+    gifTitleChip: true,
+    /** Two-wheel button colors (Base + Hover); rest derived. Default off. */
+    basicButtonColors: false,
     /** Check GitHub Releases for a newer version on app start. Default on. */
     checkUpdatesOnStart: true,
     /** User-supplied Klipy GIF API key (app-wide, never stored in project files). */
     klipyApiKey: '',
+    /** User accepted GifSnap API requests (app-wide). */
+    gifsnapConsent: false,
     /** Local background-image library (app-wide). Folder paths, extra files, hidden folder files. */
     gifLocalFolders: [] as string[],
     gifLocalFiles: [] as string[],
@@ -113,8 +120,15 @@ export const useAppSettingsStore = defineStore('appSettings', {
       // Default enabled when unset (first launch / older configs).
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.showTagBadges = s.showTagBadges !== '0' && s.showTagBadges !== 'false'
+      this.gifTitleChip = s.gifTitleChip !== '0' && s.gifTitleChip !== 'false'
+      this.basicButtonColors = s.basicButtonColors === '1' || s.basicButtonColors === 'true'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
       this.klipyApiKey = s.klipyApiKey || ''
+      this.gifsnapConsent = s.gifsnapConsent === '1' || s.gifsnapConsent === 'true'
+      attachGifsnapCache(s.gifsnapSearchCache || '', async (blob) => {
+        const db = await this._db()
+        await saveSetting(db, 'gifsnapSearchCache', blob)
+      })
       this.gifLocalFolders = parseStringList(s.gifLocalFolders)
       this.gifLocalFiles = parseStringList(s.gifLocalFiles)
       this.gifLocalHidden = parseStringList(s.gifLocalHidden)
@@ -283,6 +297,18 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await saveSetting(d, 'showTagBadges', this.showTagBadges ? '1' : '0')
     },
 
+    async setGifTitleChip(enabled: boolean) {
+      this.gifTitleChip = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'gifTitleChip', this.gifTitleChip ? '1' : '0')
+    },
+
+    async setBasicButtonColors(enabled: boolean) {
+      this.basicButtonColors = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'basicButtonColors', this.basicButtonColors ? '1' : '0')
+    },
+
     async setCheckUpdatesOnStart(enabled: boolean) {
       this.checkUpdatesOnStart = !!enabled
       const d = await this._db()
@@ -349,6 +375,12 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.klipyApiKey = (key || '').trim()
       const d = await this._db()
       await saveSetting(d, 'klipyApiKey', this.klipyApiKey)
+    },
+
+    async setGifsnapConsent(allowed: boolean) {
+      this.gifsnapConsent = !!allowed
+      const d = await this._db()
+      await saveSetting(d, 'gifsnapConsent', this.gifsnapConsent ? '1' : '0')
     },
 
     async setGifLocalLibrary(partial: {

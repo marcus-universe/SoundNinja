@@ -138,6 +138,8 @@ export interface Settings {
   showPlayer?: boolean
   /** Enlarge floating player controls / waveform. */
   playerLarge?: boolean
+  /** Show waveform in the floating player. Off = seekable progress bar. Default on. */
+  showWaveform?: boolean
   /** When true, GIF button backgrounds animate only while hovered. Default on. */
   gifPlayOnHover?: boolean
   /** Keep GIF/image blobs in memory across tabs so switching does not reload them. */
@@ -195,6 +197,7 @@ export function defaultSettings(): Settings {
     asioRightChannel: undefined,
     showPlayer: true,
     playerLarge: false,
+    showWaveform: true,
     gifPlayOnHover: true,
     preloadGifs: false,
     cacheMaxSizeMib: 256,
@@ -552,6 +555,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
       case 'overlapSounds': settings.overlapSounds = value === 'true'; break
       case 'showPlayer': settings.showPlayer = value === 'true'; break
       case 'playerLarge': settings.playerLarge = value === 'true'; break
+      case 'showWaveform': settings.showWaveform = value !== 'false'; break
       case 'gifPlayOnHover': settings.gifPlayOnHover = value !== 'false'; break
       case 'preloadGifs': settings.preloadGifs = value === 'true'; break
       case 'tabTransition': settings.tabTransition = normalizeTabTransition(value); break
@@ -787,6 +791,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     ['overlapSounds', String(s.overlapSounds ?? false)],
     ['showPlayer', String(s.showPlayer ?? true)],
     ['playerLarge', String(s.playerLarge ?? false)],
+    ['showWaveform', String(s.showWaveform !== false)],
     ['cacheMaxSizeMib', String(s.cacheMaxSizeMib ?? 256)],
     ['cacheMaxEntryMib', String(s.cacheMaxEntryMib ?? 128)],
     ['uniformButtonHeight', String(s.uniformButtonHeight ?? false)],

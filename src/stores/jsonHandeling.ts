@@ -8,6 +8,12 @@ import {
 } from '~/utils/db'
 import { ensureSoundIds, newSoundId } from '~/utils/soundId'
 import { revokeAllGifUrls } from '~/utils/gifCache'
+import {
+  NEW_TAB_DEST,
+  audioDisplayName,
+  pathKey,
+  type ImportReviewState,
+} from '~/utils/importReview'
 
 /** Deep clone helper. Config is pure JSON data, so a JSON round-trip both
  *  deep-clones and strips Vue reactive Proxies (which structuredClone rejects). */
@@ -17,6 +23,8 @@ function clone<T>(v: T): T {
 
 /** Cap undo/redo stacks so memory stays bounded for large projects. */
 const MAX_HISTORY = 50
+/** Color-wheel ticks within this window share one undo snapshot. */
+const COLOR_BURST_MS = 400
 
 /** Lowercase + strip spaces/punctuation so "alf" matches "A L F". */
 function compactSearch(s: string): string {
@@ -40,6 +48,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     redoStack: [] as ProjectConfig[],
     /** When true, mutations skip pushBeforeChange (undo/redo restore path). */
     _historySuspended: false,
+    /** Last color mutation timestamp for burst-undo coalescing. */
+    _colorBurstAt: 0,
   }),
 
   getters: {
@@ -60,6 +70,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.undoStack.push(clone(this.configFile))
       if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift()
       this.redoStack = []
+    },
+
+    /** One undo step per color-wheel drag. Ticks closer than COLOR_BURST_MS skip. */
+    pushColorHistory() {
+      const now = Date.now()
+      if (now - this._colorBurstAt < COLOR_BURST_MS) {
+        this._colorBurstAt = now
+        return
+      }
+      this._colorBurstAt = now
+      this.pushBeforeChange()
     },
 
     clearHistory() {
@@ -221,14 +242,19 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     // ── Persistence ───────────────────────────────────────────────────────────
-    /** Public compat alias — schedules a debounced save to the project DB. */
-    writeConfig() {
-      this.applyBoardFilter()
+    /** Debounced save. Does not rebuild the board file list. */
+    schedulePersist() {
       this.dirty = true
       if (this._persistTimer) clearTimeout(this._persistTimer)
       this._persistTimer = setTimeout(() => {
         this.persistNow().catch((e) => console.error('Failed to persist project', e))
       }, 200)
+    },
+
+    /** Public compat alias — rebuilds the filtered board, then schedules a save. */
+    writeConfig() {
+      this.applyBoardFilter()
+      this.schedulePersist()
     },
 
     /** Flushes any pending changes to the project DB immediately. */
@@ -446,16 +472,168 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.normalizeIndexes()
       this.applyBoardFilter()
       this.writeConfig()
+      void this.warmDurations()
+    },
+
+    commitImportReview(review: ImportReviewState) {
+      type BoardLayout = { orphans: string[]; groups: { id: string; paths: string[] }[] }
+      const usedPaths = new Set(this.configFile.files.map((f) => pathKey(f.path)))
+      const takePath = (path: string) => {
+        const key = pathKey(path)
+        if (usedPaths.has(key)) return false
+        usedPaths.add(key)
+        return true
+      }
+
+      const makeSound = (fileName: string, path: string, destTab: string): SoundFile => {
+        const tabs = destTab && destTab !== 'All' ? ['All', destTab] : ['All']
+        return {
+          name: audioDisplayName(fileName),
+          path,
+          id: '',
+          volume: 1,
+          tabs,
+          active: false,
+          index: 0,
+          tabIndexes: {},
+        }
+      }
+
+      const newFiles: SoundFile[] = []
+      const newSeps: Separator[] = []
+      const pendingTabs = new Set<string>()
+      let sepSeq = 0
+      const newSepId = () => `sep_${Date.now()}_${sepSeq++}_${Math.random().toString(36).slice(2, 8)}`
+
+      const layouts = new Map<string, BoardLayout>()
+      const layoutFor = (tab: string): BoardLayout => {
+        let layout = layouts.get(tab)
+        if (!layout) {
+          layout = this.captureBoardLayout(tab)
+          layouts.set(tab, layout)
+        }
+        return layout
+      }
+      const appendToEnd = (tab: string, paths: string[]) => {
+        if (!paths.length) return
+        const layout = layoutFor(tab)
+        const lastGroup = layout.groups[layout.groups.length - 1]
+        if (lastGroup) lastGroup.paths.push(...paths)
+        else layout.orphans.push(...paths)
+      }
+      const tabExists = (name: string) =>
+        name === 'All'
+        || this.configFile.tabList.some((t) => t.name === name)
+        || pendingTabs.has(name)
+
+      const folderDest = (folder: ImportReviewState['folders'][number]) => {
+        if (folder.destTab === NEW_TAB_DEST) {
+          return (folder.name || '').trim() || 'All'
+        }
+        return folder.destTab || 'All'
+      }
+
+      for (const folder of review.folders) {
+        const destTab = folderDest(folder)
+        if (destTab !== 'All' && !tabExists(destTab)) pendingTabs.add(destTab)
+      }
+
+      for (const file of review.files) {
+        if (!takePath(file.path)) continue
+        const dest = tabExists(file.destTab) ? file.destTab : 'All'
+        const sound = makeSound(file.fileName, file.path, dest)
+        newFiles.push(sound)
+        appendToEnd(dest, [sound.path])
+        if (dest !== 'All') appendToEnd('All', [sound.path])
+      }
+
+      for (const folder of review.folders) {
+        const destTab = folderDest(folder)
+        const destLayout = layoutFor(destTab)
+        const rootPaths: string[] = []
+        const allPaths: string[] = []
+
+        for (const audio of folder.rootAudio) {
+          if (!takePath(audio.path)) continue
+          const sound = makeSound(audio.fileName, audio.path, destTab)
+          newFiles.push(sound)
+          rootPaths.push(sound.path)
+          allPaths.push(sound.path)
+        }
+
+        if (rootPaths.length) {
+          if (destLayout.groups.length > 0) {
+            const id = newSepId()
+            newSeps.push({ id, tab: destTab, position: 0, name: folder.name })
+            destLayout.groups.push({ id, paths: rootPaths })
+          } else {
+            destLayout.orphans.push(...rootPaths)
+          }
+        }
+
+        for (const group of folder.groups) {
+          const paths: string[] = []
+          for (const audio of group.audio) {
+            if (!takePath(audio.path)) continue
+            const sound = makeSound(audio.fileName, audio.path, destTab)
+            newFiles.push(sound)
+            paths.push(sound.path)
+            allPaths.push(sound.path)
+          }
+          if (!paths.length) continue
+          const id = newSepId()
+          newSeps.push({ id, tab: destTab, position: 0, name: group.name })
+          destLayout.groups.push({ id, paths })
+        }
+
+        if (destTab !== 'All') appendToEnd('All', allPaths)
+      }
+
+      if (!newFiles.length && !newSeps.length && pendingTabs.size === 0) return
+
+      this.pushBeforeChange()
+      for (const name of pendingTabs) {
+        if (!this.configFile.tabList.some((t) => t.name === name)) {
+          this.configFile.tabList.push({ name })
+        }
+      }
+
+      const usedIds = new Set(this.configFile.files.map((f) => f.id).filter(Boolean))
+      const now = Date.now()
+      const withIds = newFiles.map((f) => {
+        const next = { ...f, tagIds: f.tagIds ?? [], addedAt: f.addedAt ?? now }
+        if (next.id) {
+          usedIds.add(next.id)
+          return next
+        }
+        const id = newSoundId(usedIds)
+        usedIds.add(id)
+        return { ...next, id }
+      })
+      this.configFile.files = [...this.configFile.files, ...withIds]
+      if (!this.configFile.separators) this.configFile.separators = []
+      this.configFile.separators = [...this.configFile.separators, ...newSeps]
+      for (const [tab, layout] of layouts) {
+        this.applyBoardLayoutSilent(tab, layout)
+      }
+      this.normalizeIndexes()
+      this.applyBoardFilter()
+      this.writeConfig()
+      void this.warmDurations()
     },
 
     setActiveSound({ soundindex, status }: { soundindex: number; status: boolean }) {
-      this.configFile.files[soundindex].active = status
+      const file = this.configFile.files[soundindex]
+      if (!file) return
+      file.active = status
       this.writeConfig()
     },
 
     renameSound(soundindex: number, newName: string) {
+      const file = this.configFile.files[soundindex]
+      if (!file) return
       this.pushBeforeChange()
-      this.configFile.files[soundindex].name = newName
+      file.name = newName
       this.writeConfig()
     },
 
@@ -493,9 +671,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     setSoundColor(soundindex: number, color: string) {
-      this.pushBeforeChange()
-      this.configFile.files[soundindex].color = color
-      this.writeConfig()
+      const file = this.configFile.files[soundindex]
+      if (!file) return
+      this.pushColorHistory()
+      file.color = color
+      this.schedulePersist()
     },
 
     setSoundGif(soundindex: number, gifId: string | null, gifPosX = 50, gifPosY = 50) {
@@ -515,8 +695,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     setSoundTabs(soundFileIndex: number, tabs: string[]) {
+      const file = this.configFile.files[soundFileIndex]
+      if (!file) return
       this.pushBeforeChange()
-      this.configFile.files[soundFileIndex].tabs = tabs
+      file.tabs = tabs
       this.normalizeIndexes()
       this.writeConfig()
     },
@@ -534,12 +716,12 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     // ── Bulk (multi-select) actions, keyed by sound path ──────────────────────
     setSoundColorMany(paths: string[], color: string) {
-      this.pushBeforeChange()
+      this.pushColorHistory()
       const set = new Set(paths)
       for (const f of this.configFile.files) {
         if (set.has(f.path)) f.color = color
       }
-      this.writeConfig()
+      this.schedulePersist()
     },
 
     setSoundTabsMany(paths: string[], tab: string) {
@@ -581,6 +763,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         if (from === -1 || to === -1 || from === to) return
         this.pushBeforeChange()
         const [item] = sorted.splice(from, 1)
+        if (!item) return
         sorted.splice(to, 0, item)
         sorted.forEach((f, i) => { f.index = i })
       } else {
@@ -592,6 +775,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         if (from === -1 || to === -1 || from === to) return
         this.pushBeforeChange()
         const [item] = inTab.splice(from, 1)
+        if (!item) return
         inTab.splice(to, 0, item)
         inTab.forEach((f, i) => {
           if (!f.tabIndexes) f.tabIndexes = {}
@@ -630,7 +814,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const idx = f.tabs.indexOf(oldName)
         if (idx !== -1) f.tabs[idx] = trimmed
         if (f.tabIndexes && oldName in f.tabIndexes) {
-          f.tabIndexes[trimmed] = f.tabIndexes[oldName]
+          f.tabIndexes[trimmed] = f.tabIndexes[oldName] ?? 0
           delete f.tabIndexes[oldName]
         }
       })
@@ -642,11 +826,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     setTabColor(name: string, color: string) {
       const tab = this.configFile.tabList.find((t) => t.name === name)
-      if (tab) {
-        this.pushBeforeChange()
-        tab.color = color
-        this.writeConfig()
-      }
+      if (!tab) return
+      this.pushColorHistory()
+      tab.color = color
+      this.schedulePersist()
     },
 
     reorderTabs(draggedName: string, targetName: string) {
@@ -656,6 +839,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       if (from === -1 || to === -1 || from === to) return
       this.pushBeforeChange()
       const [item] = list.splice(from, 1)
+      if (!item) return
       list.splice(to, 0, item)
       this.writeConfig()
     },
@@ -808,15 +992,19 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const order = this.soundOrderOnTab(sound, tab)
         let placed = false
         for (let i = 0; i < seps.length; i++) {
-          const start = seps[i].position
-          const end = i + 1 < seps.length ? seps[i + 1].position : Number.POSITIVE_INFINITY
+          const sep = seps[i]
+          if (!sep) continue
+          const start = sep.position
+          const nextSep = seps[i + 1]
+          const end = nextSep ? nextSep.position : Number.POSITIVE_INFINITY
           if (order >= start && order < end) {
-            groups[i].paths.push(sound.path)
+            groups[i]?.paths.push(sound.path)
             placed = true
             break
           }
         }
-        if (!placed && order < seps[0].position) orphans.push(sound.path)
+        const firstSep = seps[0]
+        if (!placed && firstSep && order < firstSep.position) orphans.push(sound.path)
         else if (!placed) orphans.push(sound.path)
       }
       return { orphans, groups }

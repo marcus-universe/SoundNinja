@@ -19,7 +19,8 @@
       <!-- Lazy* keeps these panels out of the first paint; the inner v-if plus
            its transition stays intact because the wrapper latches on first use. -->
       <LazySettingsOverlay v-if="settingsEverOpened" />
-      <LazyImportFolders v-if="appStore.importFoldersActive" />
+      <LazyImportReview v-if="appStore.importReview" />
+      <DropOverlay />
       <ContextMenu />
       <LazyGifPickerDialog v-if="appStore.gifPickerIndex != null" />
       <UpdateDialog ref="updateDialogRef" />
@@ -104,13 +105,14 @@ import {
 import {
   createProjectFolder,
   listProjects,
-  pickOpenPaths,
   pickProjectFile,
   pickSaveProjectFile,
   projectNameFromDbPath,
   parentDir,
   safeProjectName,
 } from '~/utils/projects'
+import { presentImportPaths, pickAudioFilesAndPresent, pickFoldersAndPresent } from '~/utils/importDrop'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { resolveAppLocale } from '~/utils/locales'
 import { publishRemoteState } from '~/utils/remote'
 
@@ -452,33 +454,7 @@ async function handleMenuSaveAs() {
 }
 
 async function handleMenuImportAudio() {
-  const selected = await openDialog({
-    multiple: true,
-    title: t('common.importAudioFiles'),
-    filters: [{ name: t('common.audioFiles'), extensions: ['mp3', 'wav', 'ogg'] }],
-  })
-  const files = pickOpenPaths(selected)
-  if (!files.length) return
-  const indexLength = jsonStore.configFile.files.length
-  const soundlist = files.map((file, index) => {
-    const tabs = ['All']
-    if (appStore.currentTab !== 'All') tabs.push(appStore.currentTab)
-    return {
-      name: file
-        .replace(/^.*[\\\/]/, '')
-        .replace(/\.(wav|mp3|ogg)$/i, '')
-        .replaceAll('_', ' ')
-        .replace(/([A-Z])/g, ' $1')
-        .trim(),
-      path: file,
-      volume: 1,
-      tabs,
-      active: false,
-      index: index + indexLength,
-      tabIndexes: {},
-    }
-  })
-  jsonStore.addFiles(soundlist)
+  await pickAudioFilesAndPresent()
 }
 
 function joinOsPath(base, ...parts) {
@@ -584,7 +560,7 @@ function injectThemeCss(css) {
     const name = parseThemeName(css) || 'theme'
     // Keep layout extras from the original file by appending after flat rebuild.
     const flat = buildThemeCss(name, tokens)
-    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding|--gif-overlay-hover|--gif-overlay)\s*:\s*([^;]+);/g
+    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding|--gif-overlay-hover|--gif-overlay|--title-chip-pad-x|--title-chip-pad-y)\s*:\s*([^;]+);/g
     const extras = []
     let m
     while ((m = layoutRe.exec(css)) !== null) extras.push(`  ${m[1]}: ${m[2]};`)
@@ -750,7 +726,7 @@ onMounted(async () => {
   listen('menu_save', handleMenuSave)
   listen('menu_save_as', handleMenuSaveAs)
   listen('menu_import_audio', handleMenuImportAudio)
-  listen('menu_import_folders', () => appStore.setImportFoldersActive(true))
+  listen('menu_import_folders', () => { pickFoldersAndPresent() })
   listen('menu_export_soundboard', handleMenuExportSoundboard)
   listen('menu_import_soundboard', handleMenuImportSoundboard)
   listen('menu_select_project', () => appStore.setSelectProjectActive(true))
@@ -763,6 +739,19 @@ onMounted(async () => {
   })
   listen('menu_open_themes_folder', () => openPath(appSettings.themesPath).catch(() => {}))
   listen('menu_open_projects_folder', () => openPath(appSettings.projectsPath).catch(() => {}))
+
+  getCurrentWebview().onDragDropEvent((event) => {
+    const kind = event?.payload?.type
+    if (kind === 'enter' || kind === 'over') {
+      appStore.setDropActive(true)
+    } else if (kind === 'leave') {
+      appStore.setDropActive(false)
+    } else if (kind === 'drop') {
+      appStore.setDropActive(false)
+      const paths = event?.payload?.paths
+      if (Array.isArray(paths) && paths.length) presentImportPaths(paths)
+    }
+  }).then((unlisten) => teardown.push(unlisten)).catch(() => {})
 
   window.addEventListener('keydown', onHotkeyKeydown, true)
   await syncGlobalSoundHotkeys()
@@ -827,6 +816,7 @@ onMounted(async () => {
       '--font-btn', '--font-tab', '--font-size-btn', '--font-size-tab', '--font-size-md',
       '--btn_width', '--border-radius', '--btn-border-width', '--tab-border-width', '--button-gap', '--btn_padding',
       '--gif-overlay', '--gif-overlay-hover',
+      '--title-chip-pad-x', '--title-chip-pad-y',
     ].forEach((n) => { payload[n] = get(n) })
     emit('theme_current', payload).catch(() => {})
   })

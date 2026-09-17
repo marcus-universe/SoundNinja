@@ -134,6 +134,7 @@
                             :base-colors="bulkBaseColors"
                             :title="$t('bulk.color')"
                             layout="row"
+                            @preview="onBulkPreview"
                             @change="onBulkOverride"
                         />
                     </div>
@@ -159,7 +160,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
-import { parseOverride, serializeOverride, resolveEffectiveColors } from '~/utils/colorOverride'
+import { parseOverride, serializeOverride, resolveEffectiveColors, paintOverride } from '~/utils/colorOverride'
 import { normalizeTabTransition } from '~/utils/db'
 import { ensureGifUrls, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
 
@@ -437,6 +438,8 @@ function bindInnerSortable(el) {
   const s = Sortable.create(el, {
     group: { name: 'sounds', pull: true, put: true },
     animation: 180,
+    forceFallback: true,
+    fallbackOnBody: true,
     disabled: reorderDisabled(),
     draggable: '.Soundbtn',
     ghostClass: 'drag-over',
@@ -456,6 +459,8 @@ function setupSortables(retry = true) {
 
   outerSortable = Sortable.create(groupsOuterRef.value, {
     animation: 180,
+    forceFallback: true,
+    fallbackOnBody: true,
     disabled: reorderDisabled(),
     draggable: '.sound-group',
     handle: '.sound-group__name',
@@ -837,6 +842,31 @@ function syncProgressPauseState(list) {
   const files = jsonStore.configFile?.files || []
   const byPath = new Map((list || []).map((p) => [p.path, p]))
 
+  for (const snap of list || []) {
+    const file = files.find((f) => f.path === snap.path)
+    if (!file || !file.active) continue
+    const meta = Number(file.durationSecs)
+    const snapDur = Number(snap.durationSecs)
+    const dur = Math.max(
+      Number.isFinite(meta) && meta > 0 ? meta : 0,
+      Number.isFinite(snapDur) && snapDur > 0 ? snapDur : 0,
+    )
+    if (!(dur > 0)) continue
+    const info = playingSounds.get(file.index)
+    const posSec = Number(snap.positionSecs)
+    const elapsedMs = Number.isFinite(posSec) ? Math.max(0, posSec * 1000) : 0
+    if (!info) {
+      playingSounds.set(file.index, {
+        duration: dur,
+        startTime: Date.now() - elapsedMs,
+        paused: !!snap.paused,
+        elapsedMs,
+      })
+      continue
+    }
+    if (dur > info.duration) info.duration = dur
+  }
+
   for (const [fileIndex, info] of playingSounds) {
     const file = files.find((f) => f.index === fileIndex)
     if (!file || !byPath.has(file.path)) continue
@@ -1084,6 +1114,15 @@ function cancelMarquee() {
   marqueeRect.value = null
 }
 
+function onBulkPreview(override) {
+  const root = boardRef.value
+  if (!root) return
+  for (const path of appStore.selectedSoundPaths) {
+    const el = root.querySelector(`[data-sound-path="${CSS.escape(path)}"]`)
+    paintOverride(el, override, 'button')
+  }
+}
+
 function onBulkOverride(override) {
   bulkOverride.value = override
   const paths = appStore.selectedSoundPaths
@@ -1129,9 +1168,10 @@ async function setActiveSound(sound) {
     })
       .then((duration) => {
         if (!sound.active) return
-        if (typeof duration === 'number' && duration > 0) {
-          startProgress(sound.index, duration)
-        }
+        const meta = Number(sound.durationSecs)
+        const fromPlay = typeof duration === 'number' && duration > 0 ? duration : 0
+        const dur = Math.max(fromPlay, Number.isFinite(meta) && meta > 0 ? meta : 0)
+        if (dur > 0) startProgress(sound.index, dur)
       })
       .catch((e) => {
         console.error('Sound playback error', e)

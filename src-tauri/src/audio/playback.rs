@@ -316,7 +316,9 @@ pub fn prepare_play(
         return Ok((Ready::Cached(buffer), duration));
     }
     let handle = super::stream::start(path.to_owned(), rate, channels)?;
-    let duration = handle.duration_secs();
+    let duration = handle
+        .duration_secs()
+        .max(super::cache::cached_duration(path).unwrap_or(0.0));
     if duration > 0.0 {
         super::cache::store_duration(path, duration);
     }
@@ -417,7 +419,28 @@ fn seek_playing_slot(
 ) {
     let was_paused = playing[i].player.is_paused();
     let mut duration_secs = playing[i].duration_secs;
-    let clamped = clamp_seek_pos(position_secs, duration_secs);
+    if let Ready::Growing(h) = &playing[i].ready {
+        let hinted = h.duration_secs();
+        if hinted > duration_secs {
+            duration_secs = hinted;
+            playing[i].duration_secs = hinted;
+        }
+    }
+    // Audio can only land inside decoded samples while the pump is still
+    // filling. Timeline duration (metadata) stays on PlayingSound; seek target
+    // is clamped to ready so the emitted playhead is not a fake 100%.
+    let max_pos = match &playing[i].ready {
+        Ready::Growing(h) if !h.is_done() => {
+            let ready = h.ready_secs();
+            if duration_secs > 0.0 {
+                ready.min(duration_secs)
+            } else {
+                ready
+            }
+        }
+        _ => duration_secs,
+    };
+    let clamped = clamp_seek_pos(position_secs, max_pos);
     let target = Duration::from_secs_f64(clamped);
 
     // 1) In-place seek while playing (typically 0–5 ms when supported).
@@ -440,15 +463,9 @@ fn seek_playing_slot(
     if duration_secs <= 0.0 {
         duration_secs = match &ready {
             Ready::Cached(b) => b.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0),
-            Ready::Growing(h) => h.duration_secs().max(h.ready_secs()),
+            Ready::Growing(h) => h.duration_secs(),
         };
     }
-    let max_pos = match &ready {
-        Ready::Growing(h) if !h.is_done() => h.ready_secs(),
-        _ => duration_secs,
-    };
-    let clamped = clamp_seek_pos(position_secs, max_pos);
-    let target = Duration::from_secs_f64(clamped);
 
     let new_player = Player::connect_new(stream.device_sink.mixer());
     new_player.set_volume(effective_volume(playing[i].sound_volume));
@@ -541,6 +558,8 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
             }
             for s in &mut playing {
                 if let Ready::Growing(h) = &s.ready {
+                    // Adopt metadata/hint (or exact EOF). Never drop to ready_secs
+                    // while the pump is still filling — that shrinks the timeline.
                     let d = h.duration_secs();
                     if d > s.duration_secs {
                         s.duration_secs = d;

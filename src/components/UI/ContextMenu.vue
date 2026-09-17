@@ -13,15 +13,10 @@
           class="context-menu__volume"
           @click.stop
           @mousedown.stop
-          @mouseenter="hoveredItem = 'volume'"
-          @mouseleave="hoveredItem = null"
         >
           <div class="context-menu__volume-head">
             <span class="context-menu__volume-label">{{ $t('contextMenu.volume') }}</span>
             <span class="context-menu__volume-pct">{{ volumePct }}%</span>
-            <Transition name="desc-fade">
-              <span v-if="hoveredItem === 'volume'" class="context-menu__desc">{{ $t('contextMenu.volumeDesc') }}</span>
-            </Transition>
           </div>
           <input
             type="range"
@@ -43,17 +38,12 @@
           role="menuitemcheckbox"
           :aria-checked="soundLooping"
           @click="toggleSoundLoop"
-          @mouseenter="hoveredItem = 'loop'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="loop" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.loop') }}</span>
           <span v-if="soundLooping" class="context-menu__check" aria-hidden="true">✓</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'loop'" class="context-menu__desc">{{ $t('contextMenu.loopDesc') }}</span>
-          </Transition>
         </li>
         <li v-if="isSound" class="context-menu__sep" role="separator" />
         <li
@@ -61,45 +51,30 @@
           class="context-menu__item"
           role="menuitem"
           @click="openRename"
-          @mouseenter="hoveredItem = 'rename'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="rename" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.rename') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'rename'" class="context-menu__desc">{{ $t('contextMenu.renameDesc') }}</span>
-          </Transition>
         </li>
         <li
           v-if="appStore.contextMenu.type === 'separator'"
           class="context-menu__item"
           role="menuitem"
           @click="openRenameGroup"
-          @mouseenter="hoveredItem = 'renameGroup'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="rename" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.renameGroup') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'renameGroup'" class="context-menu__desc">{{ $t('contextMenu.renameGroupDesc') }}</span>
-          </Transition>
         </li>
-        <li v-if="isTab || isSound || isSeparator" class="context-menu__item context-menu__item--danger" role="menuitem" @click="remove" @mouseenter="hoveredItem = 'remove'" @mouseleave="hoveredItem = null">
+        <li v-if="isTab || isSound || isSeparator" class="context-menu__item context-menu__item--danger" role="menuitem" @click="remove">
           <span class="context-menu__icon">
             <Icons icon="delete" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{
             appStore.contextMenu.type === 'separator' ? $t('contextMenu.removeGroup') : $t('contextMenu.remove')
           }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'remove'" class="context-menu__desc">{{
-              appStore.contextMenu.type === 'separator' ? $t('contextMenu.removeGroupDesc') : $t('contextMenu.removeDesc')
-            }}</span>
-          </Transition>
         </li>
         <li v-if="!isBoard" class="context-menu__sep" role="separator" />
         <li
@@ -111,16 +86,13 @@
           aria-haspopup="menu"
           :aria-expanded="activeFlyout === 'tabs'"
           @click="openFlyout('tabs', true)"
-          @mouseenter="onFlyoutRowEnter('tabs', 'moveToTab')"
+          @mouseenter="onFlyoutRowEnter('tabs')"
           @mouseleave="onFlyoutRowLeave"
         >
           <span class="context-menu__icon">
             <Icons icon="tab" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.moveToTab') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'moveToTab' && activeFlyout !== 'tabs'" class="context-menu__desc">{{ $t('contextMenu.moveToTabDesc') }}</span>
-          </Transition>
           <span class="context-menu__chevron">{{ flyoutChevron('tabs') }}</span>
         </li>
         <li
@@ -132,16 +104,13 @@
           aria-haspopup="menu"
           :aria-expanded="activeFlyout === 'tags'"
           @click="openFlyout('tags', true)"
-          @mouseenter="onFlyoutRowEnter('tags', 'tags')"
+          @mouseenter="onFlyoutRowEnter('tags')"
           @mouseleave="onFlyoutRowLeave"
         >
           <span class="context-menu__icon">
             <Icons icon="filter" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.tags') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'tags' && activeFlyout !== 'tags'" class="context-menu__desc">{{ $t('contextMenu.tagsDesc') }}</span>
-          </Transition>
           <span class="context-menu__chevron">{{ flyoutChevron('tags') }}</span>
         </li>
         <li
@@ -149,18 +118,11 @@
           class="context-menu__item"
           role="menuitem"
           @click="addGroup"
-          @mouseenter="hoveredItem = 'group'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="page-separator" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.addGroup') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'group'" class="context-menu__desc">{{
-              isBoard ? $t('contextMenu.addGroupBoardDesc') : $t('contextMenu.addGroupDesc')
-            }}</span>
-          </Transition>
         </li>
         <li v-if="appStore.contextMenu.type === 'sound'" class="context-menu__sep" role="separator" />
         <li
@@ -168,32 +130,22 @@
           class="context-menu__item"
           role="menuitem"
           @click="copySoundId"
-          @mouseenter="hoveredItem = 'copyId'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="rename" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.copyId') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'copyId'" class="context-menu__desc">{{ $t('contextMenu.copyIdDesc') }}</span>
-          </Transition>
         </li>
         <li
           v-if="appStore.contextMenu.type === 'sound'"
           class="context-menu__item"
           role="menuitem"
           @click="assignHotkey"
-          @mouseenter="hoveredItem = 'assignHotkey'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="settings" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.assignHotkey') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'assignHotkey'" class="context-menu__desc">{{ $t('contextMenu.assignHotkeyDesc') }}</span>
-          </Transition>
         </li>
         <li v-if="isSound" class="context-menu__sep" role="separator" />
         <li
@@ -201,48 +153,33 @@
           class="context-menu__item"
           role="menuitem"
           @click="showInFolder"
-          @mouseenter="hoveredItem = 'showInFolder'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="folder" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.showInFolder') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'showInFolder'" class="context-menu__desc">{{ $t('contextMenu.showInFolderDesc') }}</span>
-          </Transition>
         </li>
         <li
           v-if="isSound"
           class="context-menu__item"
           role="menuitem"
           @click="copySoundPath"
-          @mouseenter="hoveredItem = 'copyPath'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="rename" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.copyPath') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'copyPath'" class="context-menu__desc">{{ $t('contextMenu.copyPathDesc') }}</span>
-          </Transition>
         </li>
         <li
           v-if="isSound"
           class="context-menu__item"
           role="menuitem"
           @click="replaceAudio"
-          @mouseenter="hoveredItem = 'replaceAudio'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="audio-file" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.replaceAudio') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'replaceAudio'" class="context-menu__desc">{{ $t('contextMenu.replaceAudioDesc') }}</span>
-          </Transition>
         </li>
         <li v-if="isSound" class="context-menu__sep" role="separator" />
 
@@ -252,16 +189,11 @@
           class="context-menu__item"
           role="menuitem"
           @click="toggleTabAlign"
-          @mouseenter="hoveredItem = 'tabAlign'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="tab" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.tabButtonAlign') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'tabAlign'" class="context-menu__desc">{{ $t('contextMenu.tabButtonAlignDesc') }}</span>
-          </Transition>
           <span class="context-menu__chevron">{{ tabAlignOpen ? '▲' : '▼' }}</span>
         </li>
         <template v-if="tabAlignOpen && appStore.contextMenu.type === 'tab'">
@@ -284,16 +216,11 @@
           class="context-menu__item"
           role="menuitem"
           @click="toggleGroupAlign"
-          @mouseenter="hoveredItem = 'groupAlign'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="tab" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.groupAlign') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'groupAlign'" class="context-menu__desc">{{ $t('contextMenu.groupAlignDesc') }}</span>
-          </Transition>
           <span class="context-menu__chevron">{{ groupAlignOpen ? '▲' : '▼' }}</span>
         </li>
         <template v-if="groupAlignOpen && appStore.contextMenu.type === 'separator'">
@@ -315,14 +242,9 @@
           class="context-menu__item context-menu__item--color"
           role="menuitem"
           @click="toggleGroupColors"
-          @mouseenter="hoveredItem = 'groupColors'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__swatch" :style="{ background: activeGroup?.borderColor || 'var(--primary_color)' }" />
           <span class="context-menu__label">{{ $t('contextMenu.groupColors') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'groupColors'" class="context-menu__desc">{{ $t('contextMenu.groupColorsDesc') }}</span>
-          </Transition>
           <span class="context-menu__chevron">{{ groupColorsOpen ? '▲' : '▼' }}</span>
         </li>
         <li v-if="groupColorsOpen && appStore.contextMenu.type === 'separator'" class="context-menu__color-panel" @click.stop>
@@ -366,7 +288,7 @@
           aria-haspopup="menu"
           :aria-expanded="activeFlyout === 'colors'"
           @click="openFlyout('colors', true)"
-          @mouseenter="onFlyoutRowEnter('colors', 'color')"
+          @mouseenter="onFlyoutRowEnter('colors')"
           @mouseleave="onFlyoutRowLeave"
         >
           <span
@@ -374,9 +296,6 @@
             :style="swatchStyle"
           />
           <span class="context-menu__label">{{ $t('contextMenu.colors') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'color' && activeFlyout !== 'colors'" class="context-menu__desc">{{ $t('contextMenu.colorsDesc') }}</span>
-          </Transition>
           <span class="context-menu__chevron">{{ flyoutChevron('colors') }}</span>
         </li>
         <li
@@ -384,16 +303,11 @@
           class="context-menu__item"
           role="menuitem"
           @click="openGifPicker"
-          @mouseenter="hoveredItem = 'gifBg'"
-          @mouseleave="hoveredItem = null"
         >
           <span class="context-menu__icon">
             <Icons icon="gif" custom-class="context-menu__icon-svg" />
           </span>
           <span class="context-menu__label">{{ $t('contextMenu.gifBg') }}</span>
-          <Transition name="desc-fade">
-            <span v-if="hoveredItem === 'gifBg'" class="context-menu__desc">{{ $t('contextMenu.gifBgDesc') }}</span>
-          </Transition>
         </li>
       </ul>
     </div>
@@ -451,6 +365,7 @@
             :model-value="currentOverride"
             :base-colors="baseColors"
             inline
+            @preview="onOverridePreview"
             @change="onOverrideChange"
           />
         </div>
@@ -473,6 +388,7 @@ import {
   overrideSwatch,
   resolveEffectiveColors,
   themeButtonColors,
+  paintOverride,
 } from '~/utils/colorOverride'
 import { copyText } from '~/utils/clipboard'
 import { leadHue, shiftColorRecord } from '~/utils/hue'
@@ -488,7 +404,6 @@ const jsonStore = useJsonHandelingStore()
 const tabAlignOpen = ref(false)
 const groupAlignOpen = ref(false)
 const groupColorsOpen = ref(false)
-const hoveredItem = ref(null)
 const menuEl = ref(null)
 const menuSize = ref({ w: 220, h: 180 })
 
@@ -629,14 +544,13 @@ function openFlyout(kind, fromClick = false) {
   }
 }
 
-function onFlyoutRowEnter(kind, hoverKey) {
-  hoveredItem.value = hoverKey
+function onFlyoutRowEnter(kind) {
   openFlyout(kind)
 }
 
 function onFlyoutRowLeave() {
-  hoveredItem.value = null
   if (Date.now() < ignoreRowLeaveUntil) return
+  if (activeFlyout.value === 'colors') return
   scheduleFlyoutClose()
 }
 
@@ -645,6 +559,7 @@ function onFlyoutEnter() {
 }
 
 function onFlyoutLeave() {
+  if (activeFlyout.value === 'colors') return
   scheduleFlyoutClose()
 }
 
@@ -922,6 +837,24 @@ const baseColors = computed(() => {
 const swatchStyle = computed(() => ({
   background: overrideSwatch(currentOverride.value, baseColors.value.border),
 }))
+
+function colorTargetEl() {
+  const { type, targetName, targetIndex } = appStore.contextMenu
+  if (typeof document === 'undefined') return null
+  if (type === 'tab' && targetName) {
+    return document.querySelector(`.tab[data-tab-name="${CSS.escape(targetName)}"]`)
+  }
+  if (type === 'sound' && targetIndex != null) {
+    const path = jsonStore.configFile.files[targetIndex]?.path
+    if (path) return document.querySelector(`[data-sound-path="${CSS.escape(path)}"]`)
+  }
+  return null
+}
+
+function onOverridePreview(override) {
+  const { type } = appStore.contextMenu
+  paintOverride(colorTargetEl(), override, type === 'tab' ? 'tab' : 'button')
+}
 
 function onOverrideChange(override) {
   const serialized = serializeOverride(override)

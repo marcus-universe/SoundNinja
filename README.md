@@ -98,3 +98,5 @@ Early development — not tested on every distro. Please report any issues you e
 
 - [lucidrains/BS-RoFormer](https://github.com/lucidrains/BS-RoFormer) — Band-Split RoPE Transformer, the architecture powering Sound Ninja's AI stem separation in the Record Editor. MIT licensed.
 - Weights trained by viperx; ONNX export tooling by [ZFTurbo/MSS_ONNX_TensorRT](https://github.com/ZFTurbo/MSS_ONNX_TensorRT).
+- [KLIPY](https://klipy.com) — online GIF search (your own API key).
+- [GifSnap](https://gifsnap.com) — keyless GIF search (best-effort public API). Search results are cached locally to reduce requests.

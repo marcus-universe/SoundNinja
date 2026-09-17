@@ -19,6 +19,39 @@ const OVERRIDE_KEYS: (keyof ColorOverride)[] = [
   'bg', 'bgHover', 'text', 'textHover', 'border', 'borderHover',
 ]
 
+const BUTTON_CSS_VARS: Record<keyof ColorOverride, string> = {
+  bg: '--color-btn',
+  bgHover: '--btn-bg-hover',
+  text: '--sound-text',
+  textHover: '--btn-text-hover',
+  border: '--btn-border',
+  borderHover: '--btn-border-hover',
+}
+
+const TAB_CSS_VARS: Record<keyof ColorOverride, string> = {
+  bg: '--tab-bg',
+  bgHover: '--tab-bg-hover',
+  text: '--tab-text',
+  textHover: '--tab-text-hover',
+  border: '--tab-border',
+  borderHover: '--tab-border-hover',
+}
+
+/** Paint override onto a live element (preview). Skips Vue/store. */
+export function paintOverride(
+  el: HTMLElement | null | undefined,
+  o: ColorOverride,
+  kind: ColorTargetKind = 'button',
+): void {
+  if (!el) return
+  const map = kind === 'tab' ? TAB_CSS_VARS : BUTTON_CSS_VARS
+  for (const key of OVERRIDE_KEYS) {
+    const v = o[key]
+    if (v) el.style.setProperty(map[key], v)
+    else el.style.removeProperty(map[key])
+  }
+}
+
 export function isEmptyOverride(o: ColorOverride | null | undefined): boolean {
   if (!o) return true
   return !o.bg && !o.bgHover && !o.text && !o.textHover && !o.border && !o.borderHover
