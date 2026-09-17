@@ -18,6 +18,7 @@ import {
   parseAppHotkeys,
   type AppHotkeyAction,
 } from '~/utils/hotkeys'
+import { attachGifsnapCache } from '~/utils/gifsnap'
 
 const DEFAULT_RECENT_LIMIT = 30
 
@@ -43,10 +44,16 @@ export const useAppSettingsStore = defineStore('appSettings', {
     navbarTooltips: true,
     /** Show color tag badges on sound buttons. Default on. */
     showTagBadges: true,
+    /** Solid title chip on GIF/image buttons (hover + active). Default on. */
+    gifTitleChip: true,
+    /** Two-wheel button colors (Base + Hover); rest derived. Default off. */
+    basicButtonColors: false,
     /** Check GitHub Releases for a newer version on app start. Default on. */
     checkUpdatesOnStart: true,
     /** User-supplied Klipy GIF API key (app-wide, never stored in project files). */
     klipyApiKey: '',
+    /** User accepted GifSnap API requests (app-wide). */
+    gifsnapConsent: false,
     /** Local background-image library (app-wide). Folder paths, extra files, hidden folder files. */
     gifLocalFolders: [] as string[],
     gifLocalFiles: [] as string[],
@@ -57,6 +64,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
     outputVolume: 1,
     asioLeftChannel: null as number | null,
     asioRightChannel: null as number | null,
+    asioInLeftChannel: null as number | null,
+    asioInRightChannel: null as number | null,
     /** Capture device for the Record Editor (mic or PC-audio loopback). */
     inputSource: 'default',
     inputHost: 'WASAPI',
@@ -111,8 +120,15 @@ export const useAppSettingsStore = defineStore('appSettings', {
       // Default enabled when unset (first launch / older configs).
       this.navbarTooltips = s.navbarTooltips !== '0' && s.navbarTooltips !== 'false'
       this.showTagBadges = s.showTagBadges !== '0' && s.showTagBadges !== 'false'
+      this.gifTitleChip = s.gifTitleChip !== '0' && s.gifTitleChip !== 'false'
+      this.basicButtonColors = s.basicButtonColors === '1' || s.basicButtonColors === 'true'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
       this.klipyApiKey = s.klipyApiKey || ''
+      this.gifsnapConsent = s.gifsnapConsent === '1' || s.gifsnapConsent === 'true'
+      attachGifsnapCache(s.gifsnapSearchCache || '', async (blob) => {
+        const db = await this._db()
+        await saveSetting(db, 'gifsnapSearchCache', blob)
+      })
       this.gifLocalFolders = parseStringList(s.gifLocalFolders)
       this.gifLocalFiles = parseStringList(s.gifLocalFiles)
       this.gifLocalHidden = parseStringList(s.gifLocalHidden)
@@ -141,8 +157,14 @@ export const useAppSettingsStore = defineStore('appSettings', {
           ? Number(s.asioLeftChannel) : null
         this.asioRightChannel = s.asioRightChannel != null && s.asioRightChannel !== ''
           ? Number(s.asioRightChannel) : null
+        this.asioInLeftChannel = s.asioInLeftChannel != null && s.asioInLeftChannel !== ''
+          ? Number(s.asioInLeftChannel) : null
+        this.asioInRightChannel = s.asioInRightChannel != null && s.asioInRightChannel !== ''
+          ? Number(s.asioInRightChannel) : null
         if (this.asioLeftChannel != null && !Number.isFinite(this.asioLeftChannel)) this.asioLeftChannel = null
         if (this.asioRightChannel != null && !Number.isFinite(this.asioRightChannel)) this.asioRightChannel = null
+        if (this.asioInLeftChannel != null && !Number.isFinite(this.asioInLeftChannel)) this.asioInLeftChannel = null
+        if (this.asioInRightChannel != null && !Number.isFinite(this.asioInRightChannel)) this.asioInRightChannel = null
         this.inputSource = s.inputSource || 'default'
         this.inputHost = s.inputHost || 'WASAPI'
         const inVol = s.inputVolume != null ? Number(s.inputVolume) : 1
@@ -156,6 +178,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await this.applyWindowChrome()
       await this.applyAudioVolume()
       await this.applyInputVolume()
+      await this.applyAsioChannelMap()
       return s
     },
 
@@ -274,6 +297,18 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await saveSetting(d, 'showTagBadges', this.showTagBadges ? '1' : '0')
     },
 
+    async setGifTitleChip(enabled: boolean) {
+      this.gifTitleChip = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'gifTitleChip', this.gifTitleChip ? '1' : '0')
+    },
+
+    async setBasicButtonColors(enabled: boolean) {
+      this.basicButtonColors = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'basicButtonColors', this.basicButtonColors ? '1' : '0')
+    },
+
     async setCheckUpdatesOnStart(enabled: boolean) {
       this.checkUpdatesOnStart = !!enabled
       const d = await this._db()
@@ -340,6 +375,12 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.klipyApiKey = (key || '').trim()
       const d = await this._db()
       await saveSetting(d, 'klipyApiKey', this.klipyApiKey)
+    },
+
+    async setGifsnapConsent(allowed: boolean) {
+      this.gifsnapConsent = !!allowed
+      const d = await this._db()
+      await saveSetting(d, 'gifsnapConsent', this.gifsnapConsent ? '1' : '0')
     },
 
     async setGifLocalLibrary(partial: {
@@ -447,6 +488,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
       }
       await this.persistAudioSettings()
       await this.applyAudioVolume()
+      await this.applyAsioChannelMap()
     },
 
     async persistAudioSettings() {
@@ -456,6 +498,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await saveSetting(d, 'outputVolume', String(this.outputVolume))
       await saveSetting(d, 'asioLeftChannel', this.asioLeftChannel != null ? String(this.asioLeftChannel) : '')
       await saveSetting(d, 'asioRightChannel', this.asioRightChannel != null ? String(this.asioRightChannel) : '')
+      await saveSetting(d, 'asioInLeftChannel', this.asioInLeftChannel != null ? String(this.asioInLeftChannel) : '')
+      await saveSetting(d, 'asioInRightChannel', this.asioInRightChannel != null ? String(this.asioInRightChannel) : '')
       await saveSetting(d, 'inputSource', this.inputSource || 'default')
       await saveSetting(d, 'inputHost', this.inputHost || 'WASAPI')
       await saveSetting(d, 'inputVolume', String(this.inputVolume))
@@ -482,6 +526,7 @@ export const useAppSettingsStore = defineStore('appSettings', {
         await saveSetting(d, 'audioMigrated', '1')
         this.audioMigrated = true
       }
+      await this.applyAsioChannelMap()
     },
 
     async setInputSource(source: string, loopback = false) {
@@ -530,9 +575,29 @@ export const useAppSettingsStore = defineStore('appSettings', {
       await this.applyAudioVolume()
     },
 
-    async setAsioChannels(left: number | null, right: number | null) {
-      this.asioLeftChannel = left
-      this.asioRightChannel = right
+    async applyAsioChannelMap() {
+      const enabled = (this.outputHost || '').toLowerCase() === 'asio'
+      try {
+        await invoke('set_asio_channel_map', {
+          enabled,
+          outLeft: this.asioLeftChannel ?? 0,
+          outRight: this.asioRightChannel ?? 1,
+          inLeft: this.asioInLeftChannel ?? 0,
+          inRight: this.asioInRightChannel ?? 1,
+        })
+      } catch (e) {
+        console.error('set_asio_channel_map failed', e)
+      }
+    },
+
+    async setAsioOutputChannels(left: number | null, right: number | null) {
+      const toIdx = (v: number | null) => {
+        if (v == null) return null
+        const n = Number(v)
+        return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null
+      }
+      this.asioLeftChannel = toIdx(left)
+      this.asioRightChannel = toIdx(right)
       const d = await this._db()
       await saveSetting(d, 'asioLeftChannel', left != null ? String(left) : '')
       await saveSetting(d, 'asioRightChannel', right != null ? String(right) : '')
@@ -540,6 +605,29 @@ export const useAppSettingsStore = defineStore('appSettings', {
         await saveSetting(d, 'audioMigrated', '1')
         this.audioMigrated = true
       }
+      await this.applyAsioChannelMap()
+    },
+
+    async setAsioInputChannels(left: number | null, right: number | null) {
+      const toIdx = (v: number | null) => {
+        if (v == null) return null
+        const n = Number(v)
+        return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null
+      }
+      this.asioInLeftChannel = toIdx(left)
+      this.asioInRightChannel = toIdx(right)
+      const d = await this._db()
+      await saveSetting(d, 'asioInLeftChannel', left != null ? String(left) : '')
+      await saveSetting(d, 'asioInRightChannel', right != null ? String(right) : '')
+      if (!this.audioMigrated) {
+        await saveSetting(d, 'audioMigrated', '1')
+        this.audioMigrated = true
+      }
+      await this.applyAsioChannelMap()
+    },
+
+    async setAsioChannels(left: number | null, right: number | null) {
+      await this.setAsioOutputChannels(left, right)
     },
 
     async setLastProject(path: string | null) {

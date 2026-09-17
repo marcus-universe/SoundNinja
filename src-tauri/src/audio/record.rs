@@ -42,6 +42,10 @@ static ACTIVE: OnceLock<Mutex<Option<ActiveRecording>>> = OnceLock::new();
 static LEVEL: AtomicU32 = AtomicU32::new(0);
 /// Capture gain applied while recording (0.0–2.0, default 1.0). Stored as f32 bits.
 static INPUT_VOLUME: AtomicU32 = AtomicU32::new(0x3F800000);
+/// Hardware channel count of the open capture stream (before ASIO extract).
+static INPUT_HW_CHANNELS: AtomicU32 = AtomicU32::new(0);
+/// When true, pick ASIO L/R from the hardware buffer and store stereo.
+static INPUT_EXTRACT: AtomicBool = AtomicBool::new(false);
 
 fn active() -> &'static Mutex<Option<ActiveRecording>> {
     ACTIVE.get_or_init(|| Mutex::new(None))
@@ -57,6 +61,16 @@ fn write_level(peak: f32) {
 
 /// Apply gain, update level meter, enqueue chunk. Never touches the sample `Mutex`.
 fn enqueue_f32(tx: &SyncSender<Vec<f32>>, data: &[f32]) {
+    if INPUT_EXTRACT.load(Ordering::Relaxed) {
+        let hw = INPUT_HW_CHANNELS.load(Ordering::Relaxed) as u16;
+        let stereo = super::channel_map::extract_stereo(data, hw);
+        enqueue_gained(tx, &stereo);
+    } else {
+        enqueue_gained(tx, data);
+    }
+}
+
+fn enqueue_gained(tx: &SyncSender<Vec<f32>>, data: &[f32]) {
     let gain = current_input_volume();
     let mut peak = 0.0f32;
     let mut chunk = Vec::with_capacity(data.len());
@@ -80,26 +94,11 @@ fn enqueue_f32(tx: &SyncSender<Vec<f32>>, data: &[f32]) {
 }
 
 fn enqueue_i16(tx: &SyncSender<Vec<f32>>, data: &[i16]) {
-    let gain = current_input_volume();
-    let scale = gain / i16::MAX as f32;
-    let mut peak = 0.0f32;
-    let mut chunk = Vec::with_capacity(data.len());
+    let mut converted = Vec::with_capacity(data.len());
     for &s in data {
-        let v = (s as f32 * scale).clamp(-1.0, 1.0);
-        let a = v.abs();
-        if a > peak {
-            peak = a;
-        }
-        chunk.push(v);
+        converted.push(s as f32 / i16::MAX as f32);
     }
-    write_level(peak);
-    match tx.try_send(chunk) {
-        Ok(()) => {}
-        Err(TrySendError::Full(chunk)) => {
-            let _ = tx.send(chunk);
-        }
-        Err(TrySendError::Disconnected(_)) => {}
-    }
+    enqueue_f32(tx, &converted);
 }
 
 #[tauri::command]
@@ -218,7 +217,11 @@ pub fn start_recording(
     let sample_format = supported.sample_format();
     let config: cpal::StreamConfig = supported.clone().into();
     let sample_rate: u32 = config.sample_rate;
-    let channels: u16 = config.channels;
+    let hw_channels: u16 = config.channels;
+    let extract = super::channel_map::input_enabled() && !loopback;
+    INPUT_EXTRACT.store(extract, Ordering::Relaxed);
+    INPUT_HW_CHANNELS.store(hw_channels as u32, Ordering::Relaxed);
+    let channels: u16 = if extract { 2 } else { hw_channels };
 
     let samples = Arc::new(Mutex::new(Vec::<f32>::new()));
     let stop_flag = Arc::new(AtomicBool::new(false));
@@ -301,6 +304,7 @@ pub fn stop_recording(app: AppHandle) -> Result<String, String> {
     let mut guard = active().lock().map_err(|e| e.to_string())?;
     let rec = guard.take().ok_or("Not recording")?;
     rec.stop_flag.store(true, Ordering::Relaxed);
+    INPUT_EXTRACT.store(false, Ordering::Relaxed);
     // Stream drop closes chunk sender → collector drains + exits.
     if let Some(j) = rec._stream_join {
         let _ = j.join();
@@ -346,6 +350,7 @@ pub fn abort_recording() {
     let Ok(mut guard) = active().lock() else { return };
     let Some(rec) = guard.take() else { return };
     rec.stop_flag.store(true, Ordering::Relaxed);
+    INPUT_EXTRACT.store(false, Ordering::Relaxed);
     if let Some(j) = rec._stream_join {
         let _ = j.join();
     }

@@ -63,6 +63,8 @@ export const THEME_INLINE_VARS = [
   '--color-text',
   '--gif-overlay',
   '--gif-overlay-hover',
+  '--title-chip-pad-x',
+  '--title-chip-pad-y',
 ]
 
 /** Lighten a #rrggbb hex by `amount` (0–1). Falls back to input on parse fail. */

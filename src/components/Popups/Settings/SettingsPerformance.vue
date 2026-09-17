@@ -42,6 +42,14 @@
 
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.gifsnapCache') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.gifsnapCacheHint') }}</span>
+      </div>
+      <button class="settings-btn" style="flex: 0; white-space: nowrap" @click="onClearGifsnapCache">{{ $t('settings.main.clearGifsnapCache') }}</button>
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.preloadGifs') }}</span>
         <span class="settings-hint">{{ $t('settings.main.preloadGifsHint') }}</span>
       </div>
@@ -84,6 +92,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { clearGifsnapCache } from '~/utils/gifsnap'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -190,6 +199,14 @@ async function onClearCache() {
     await refreshCacheStats()
   } catch (e) {
     console.error('clear_sound_cache failed', e)
+  }
+}
+
+async function onClearGifsnapCache() {
+  try {
+    await clearGifsnapCache()
+  } catch (e) {
+    console.error('clearGifsnapCache failed', e)
   }
 }
 

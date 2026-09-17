@@ -1,7 +1,7 @@
 {
   "productName": "Sound Ninja",
   "mainBinaryName": "soundninja",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -21,12 +21,12 @@
         "minHeight": 600,
         "minWidth": 650,
         "decorations": false,
-        "dragDropEnabled": false,
+        "dragDropEnabled": true,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,MsEdgeSidebar,EdgeCollections,TranslateUI,StorageServiceOutOfProcess --enable-features=NetworkServiceInProcess,NetworkServiceInProcess2 --process-per-site --enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding"
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost https://klipy.com https://*.klipy.com https://klipycdn.com https://*.klipycdn.com; media-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost https: ws: wss:",
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost https://klipy.com https://*.klipy.com https://klipycdn.com https://*.klipycdn.com https://gifsnap.com https://*.gifsnap.com https://*.r2.dev; media-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost https: ws: wss:",
       "assetProtocol": {
         "enable": true,
         "scope": {

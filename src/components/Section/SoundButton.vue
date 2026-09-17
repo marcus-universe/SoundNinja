@@ -1,7 +1,7 @@
 <template>
     <div
         class="Soundbtn flex_c_v flex_wrap"
-        :class="{ active: sound.active, loading, selected, 'has-gif': hasGif, 'progress-paused': progressPaused, missing }"
+        :class="{ active: sound.active, loading, selected, 'has-gif': hasGif, 'gif-title-chip': showGifTitleChip, 'progress-paused': progressPaused, missing }"
         :style="btnStyle"
         :data-sound-index="sound.index"
         :data-sound-path="sound.path"
@@ -81,6 +81,7 @@ function copyId() {
 }
 
 const showBadges = computed(() => appSettings.showTagBadges !== false)
+const showGifTitleChip = computed(() => appSettings.gifTitleChip !== false)
 
 const badgeCap = computed(() => {
   if (typeof document === 'undefined') return 3

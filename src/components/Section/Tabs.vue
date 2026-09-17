@@ -67,6 +67,8 @@ function onTabWheel(e) {
 onMounted(() => {
   sortable = Sortable.create(tabListRef.value, {
     animation: 180,
+    forceFallback: true,
+    fallbackOnBody: true,
     disabled: !allowReorder.value,
     draggable: '.tab',
     ghostClass: 'drag-over',

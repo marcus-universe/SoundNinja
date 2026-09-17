@@ -230,6 +230,27 @@
             </div>
             <input type="range" class="settings-slider" min="0" max="100" step="1" v-model.number="themeCreator.gifOverlayHover" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('gifOverlayHover')" />
           </div>
+
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.titleChipPadXHint')">{{ $t('settings.themeCreator.titleChipPadX') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.02" v-model.number="themeCreator.titleChipPadX" @change="clampMin('titleChipPadX', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="2" step="0.02" v-model.number="themeCreator.titleChipPadX" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('titleChipPadX')" />
+          </div>
+          <div class="settings-group settings-group--stacked">
+            <div class="settings-slider-header">
+              <SettingsTipLabel fluid :tip="$t('settings.themeCreator.titleChipPadYHint')">{{ $t('settings.themeCreator.titleChipPadY') }}</SettingsTipLabel>
+              <div class="settings-unit-input">
+                <input type="number" class="settings-input" min="0" step="0.02" v-model.number="themeCreator.titleChipPadY" @change="clampMin('titleChipPadY', 0)" />
+                <span class="settings-unit-label">rem</span>
+              </div>
+            </div>
+            <input type="range" class="settings-slider" min="0" max="1" step="0.02" v-model.number="themeCreator.titleChipPadY" :title="$t('settings.themeCreator.sliderResetHint')" @dblclick.prevent="resetSlider('titleChipPadY')" />
+          </div>
         </template>
 
         <!-- ── Tabs ──────────────────────────────────────────────────────── -->
@@ -372,6 +393,8 @@ const LAYOUT_DEFAULTS = {
   btnPaddingY: 0.5,
   gifOverlay: 72,
   gifOverlayHover: 38,
+  titleChipPadX: 0.4,
+  titleChipPadY: 0.12,
 } as const
 
 const THEME_DEFAULTS = {
@@ -391,6 +414,8 @@ type ThemeSliderKey =
   | 'btnPaddingY'
   | 'gifOverlay'
   | 'gifOverlayHover'
+  | 'titleChipPadX'
+  | 'titleChipPadY'
 
 type CreatorTabId = 'general' | 'buttons' | 'tabs'
 
@@ -570,6 +595,8 @@ function applyParsedTheme(css: string) {
   }
   if (vars['--gif-overlay']) themeCreator.gifOverlay = opacityToPct(vars['--gif-overlay'])
   if (vars['--gif-overlay-hover']) themeCreator.gifOverlayHover = opacityToPct(vars['--gif-overlay-hover'])
+  if (vars['--title-chip-pad-x']) themeCreator.titleChipPadX = parseRem(vars['--title-chip-pad-x'])
+  if (vars['--title-chip-pad-y']) themeCreator.titleChipPadY = parseRem(vars['--title-chip-pad-y'])
   emitPreview()
 }
 
@@ -659,6 +686,8 @@ function applyCurrentVars(v: Record<string, string> | undefined) {
   }
   if (v['--gif-overlay']) themeCreator.gifOverlay = opacityToPct(v['--gif-overlay'])
   if (v['--gif-overlay-hover']) themeCreator.gifOverlayHover = opacityToPct(v['--gif-overlay-hover'])
+  setNum('titleChipPadX', '--title-chip-pad-x')
+  setNum('titleChipPadY', '--title-chip-pad-y')
 }
 
 const allFonts = computed(() => [...customFonts.value, ...systemFonts.value])
@@ -802,6 +831,8 @@ function buildThemeCss() {
     '--btn_padding': `${themeCreator.btnPaddingY}rem ${themeCreator.btnPaddingX}rem`,
     '--gif-overlay': String(themeCreator.gifOverlay / 100),
     '--gif-overlay-hover': String(themeCreator.gifOverlayHover / 100),
+    '--title-chip-pad-x': `${themeCreator.titleChipPadX}rem`,
+    '--title-chip-pad-y': `${themeCreator.titleChipPadY}rem`,
   })
 }
 

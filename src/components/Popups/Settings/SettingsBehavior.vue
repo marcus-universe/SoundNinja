@@ -36,6 +36,14 @@
       <UICheckbox :modelValue="playerLarge" @update:modelValue="onPlayerLarge" />
     </div>
 
+    <div v-if="showPlayer" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.showWaveform') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.showWaveformHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="showWaveform" @update:modelValue="onShowWaveform" />
+    </div>
+
     <div class="settings-section-divider">{{ $t('settings.behavior.window') }}</div>
 
     <div class="settings-group">
@@ -87,6 +95,14 @@
       <UICheckbox :modelValue="allowReorder" @update:modelValue="onAllowReorder" />
     </div>
 
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.basicButtonColors') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.basicButtonColorsHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="basicButtonColors" @update:modelValue="onBasicButtonColors" />
+    </div>
+
     <div class="settings-section-divider">{{ $t('settings.behavior.ui') }}</div>
 
     <div class="settings-group settings-group--toggle">
@@ -111,6 +127,14 @@
         <span class="settings-hint">{{ $t('settings.main.showTagBadgesHint') }}</span>
       </div>
       <UICheckbox :modelValue="showTagBadges" @update:modelValue="onShowTagBadges" />
+    </div>
+
+    <div class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.showGifTitleChip') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.showGifTitleChipHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="gifTitleChip" @update:modelValue="onGifTitleChip" />
     </div>
 
     <div class="settings-group">
@@ -197,14 +221,17 @@ const stopOnRetrigger = ref(true)
 const overlapSounds = ref(false)
 const showPlayer = ref(true)
 const playerLarge = ref(false)
+const showWaveform = ref(true)
 const uniformButtonHeight = ref(false)
 const allowReorder = ref(true)
+const basicButtonColors = ref(false)
 const gifPlayOnHover = ref(true)
 const tabTransition = ref<TabTransition>('slide')
 const klipyApiKey = ref('')
 const klipyKeyVisible = ref(false)
 const navbarTooltips = ref(true)
 const showTagBadges = ref(true)
+const gifTitleChip = ref(true)
 const systemTitlebar = ref(false)
 const hideTitlebar = ref(false)
 const hideTitlebarWarnOpen = ref(false)
@@ -234,6 +261,11 @@ function onShowPlayer(val: boolean) {
 function onPlayerLarge(val: boolean) {
   playerLarge.value = val
   jsonStore.setSetting('playerLarge', val)
+}
+
+function onShowWaveform(val: boolean) {
+  showWaveform.value = val
+  jsonStore.setSetting('showWaveform', val)
 }
 
 function onUniformButtonHeight(val: boolean) {
@@ -275,6 +307,11 @@ function openKlipyCreateKey() {
   openInSystemBrowser(KLIPY_PARTNER_URL)
 }
 
+async function onBasicButtonColors(val: boolean) {
+  basicButtonColors.value = val
+  await appSettings.setBasicButtonColors(val)
+}
+
 async function onNavbarTooltips(val: boolean) {
   navbarTooltips.value = val
   await appSettings.setNavbarTooltips(val)
@@ -283,6 +320,11 @@ async function onNavbarTooltips(val: boolean) {
 async function onShowTagBadges(val: boolean) {
   showTagBadges.value = val
   await appSettings.setShowTagBadges(val)
+}
+
+async function onGifTitleChip(val: boolean) {
+  gifTitleChip.value = val
+  await appSettings.setGifTitleChip(val)
 }
 
 async function onSystemTitlebar(val: boolean) {
@@ -333,13 +375,16 @@ async function syncFromStore() {
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
   showPlayer.value = jsonStore.configFile?.settings?.showPlayer !== false
   playerLarge.value = jsonStore.configFile?.settings?.playerLarge === true
+  showWaveform.value = jsonStore.configFile?.settings?.showWaveform !== false
   uniformButtonHeight.value = jsonStore.configFile?.settings?.uniformButtonHeight ?? false
   allowReorder.value = jsonStore.configFile?.settings?.allowReorder ?? true
+  basicButtonColors.value = !!appSettings.basicButtonColors
   gifPlayOnHover.value = jsonStore.configFile?.settings?.gifPlayOnHover !== false
   tabTransition.value = normalizeTabTransition(jsonStore.configFile?.settings?.tabTransition)
   klipyApiKey.value = appSettings.klipyApiKey || ''
   navbarTooltips.value = appSettings.navbarTooltips !== false
   showTagBadges.value = appSettings.showTagBadges !== false
+  gifTitleChip.value = appSettings.gifTitleChip !== false
   systemTitlebar.value = appSettings.titlebarMode === 'system'
   hideTitlebar.value = !!appSettings.hideTitlebar
   recentLimit.value = appSettings.recentLimit ?? 30

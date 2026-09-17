@@ -209,15 +209,16 @@
 
 .dialog-panel:has(.gif-picker),
 .dialog-panel:has(.gif-picker__preview) {
-  width: min(64rem, calc(100dvw - 4rem));
-  min-width: min(36rem, calc(100dvw - 4rem));
+  width: min(88rem, calc(100dvw - 2.4rem));
+  min-width: min(48rem, calc(100dvw - 2.4rem));
+  max-width: min(88rem, calc(100dvw - 2.4rem));
 }
 
 .gif-picker {
   display: flex;
   gap: 1.2rem;
   align-items: stretch;
-  min-height: min(46vh, 40rem);
+  min-height: min(70vh, 56rem);
   width: 100%;
 }
 
@@ -369,7 +370,7 @@
   gap: 0.5rem;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: min(42vh, 36rem);
+  max-height: min(64vh, 52rem);
   overflow-x: hidden;
   overflow-y: auto;
   margin-top: 0.4rem;

@@ -385,6 +385,9 @@
           position: relative;
           z-index: 3;
           pointer-events: none;
+          align-self: center;
+          width: fit-content;
+          max-width: 100%;
         }
 
         &.missing {
@@ -460,6 +463,14 @@
         &.has-gif:hover,
         &.has-gif.active {
           background-color: transparent;
+        }
+
+        &.has-gif.gif-title-chip:hover .sound-label,
+        &.has-gif.gif-title-chip.active .sound-label {
+          background-color: var(--btn-bg, var(--color-btn));
+          color: var(--btn-text, var(--sound-text));
+          padding: var(--title-chip-pad-y, 0.12rem) var(--title-chip-pad-x, 0.4rem);
+          border-radius: var(--border-radius);
         }
 
         .sound-id-chip {

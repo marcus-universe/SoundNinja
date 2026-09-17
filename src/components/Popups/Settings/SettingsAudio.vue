@@ -83,46 +83,6 @@
       </div>
     </div>
 
-    <template v-if="!compact">
-      <!-- ASIO Channel Matrix -->
-      <div v-if="isAsioHost(hostSelected) && asioChannels.length > 0" class="settings-group">
-        <label class="settings-label">{{ $t('settings.audio.asioChannelMatrix') }}</label>
-        <p class="settings-hint">{{ $t('settings.audio.asioChannelHint') }}</p>
-        <table class="asio-matrix">
-          <thead>
-            <tr>
-              <th>{{ $t('settings.audio.asioChannel') }}</th>
-              <th>{{ $t('settings.audio.left') }}</th>
-              <th>{{ $t('settings.audio.right') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(ch, idx) in asioChannels" :key="idx">
-              <td>{{ ch }}</td>
-              <td>
-                <input
-                  type="radio"
-                  name="asio-left"
-                  :value="idx"
-                  v-model="asioLeft"
-                  @change="saveAsioChannels"
-                />
-              </td>
-              <td>
-                <input
-                  type="radio"
-                  name="asio-right"
-                  :value="idx"
-                  v-model="asioRight"
-                  @change="saveAsioChannels"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </template>
-
     <div class="settings-audio-volumes" :class="{ 'settings-audio-volumes--compact': compact }">
       <!-- Output Volume -->
       <div class="settings-group settings-group--stacked">
@@ -198,6 +158,82 @@
         />
       </div>
     </div>
+
+    <template v-if="!compact">
+      <div v-if="isAsioHost(hostSelected) && asioOutputs.length > 0" class="settings-group settings-group--stacked asio-channel-group">
+        <label class="settings-label">{{ $t('settings.audio.asioOutputMatrix') }}</label>
+        <p class="settings-hint">{{ $t('settings.audio.asioOutputHint') }}</p>
+        <table class="asio-matrix">
+          <thead>
+            <tr>
+              <th>{{ $t('settings.audio.asioChannel') }}</th>
+              <th>{{ $t('settings.audio.left') }}</th>
+              <th>{{ $t('settings.audio.right') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(ch, idx) in asioOutputs" :key="'out-' + idx">
+              <td>{{ ch }}</td>
+              <td>
+                <input
+                  type="radio"
+                  name="asio-out-left"
+                  :value="idx"
+                  v-model="asioLeft"
+                  @change="saveAsioChannels"
+                />
+              </td>
+              <td>
+                <input
+                  type="radio"
+                  name="asio-out-right"
+                  :value="idx"
+                  v-model="asioRight"
+                  @change="saveAsioChannels"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="showAsioInputMatrix" class="settings-group settings-group--stacked asio-channel-group">
+        <label class="settings-label">{{ $t('settings.audio.asioInputMatrix') }}</label>
+        <p class="settings-hint">{{ $t('settings.audio.asioInputHint') }}</p>
+        <table class="asio-matrix">
+          <thead>
+            <tr>
+              <th>{{ $t('settings.audio.asioChannel') }}</th>
+              <th>{{ $t('settings.audio.left') }}</th>
+              <th>{{ $t('settings.audio.right') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(ch, idx) in asioInputs" :key="'in-' + idx">
+              <td>{{ ch }}</td>
+              <td>
+                <input
+                  type="radio"
+                  name="asio-in-left"
+                  :value="idx"
+                  v-model="asioInLeft"
+                  @change="saveAsioChannels"
+                />
+              </td>
+              <td>
+                <input
+                  type="radio"
+                  name="asio-in-right"
+                  :value="idx"
+                  v-model="asioInRight"
+                  @change="saveAsioChannels"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -214,6 +250,11 @@ interface CaptureDeviceInfo {
   loopback: boolean
 }
 
+interface AsioDeviceChannels {
+  outputs: string[]
+  inputs: string[]
+}
+
 const audioHosts = ref<string[]>([])
 const hostSelected = ref('')
 const outputDevices = ref<string[]>([])
@@ -222,13 +263,23 @@ const inputDevices = ref<CaptureDeviceInfo[]>([])
 const inputSelected = ref('')
 const outputVolumePct = ref(100)
 const inputVolumePct = ref(100)
-const asioChannels = ref<string[]>([])
+const asioOutputs = ref<string[]>([])
+const asioInputs = ref<string[]>([])
 const asioLeft = ref<number | null>(null)
 const asioRight = ref<number | null>(null)
+const asioInLeft = ref<number | null>(null)
+const asioInRight = ref<number | null>(null)
 const asioInfoOpen = ref(false)
 
 const inputCaptureDevices = computed(() => inputDevices.value.filter((d) => !d.loopback))
 const outputCaptureDevices = computed(() => inputDevices.value.filter((d) => d.loopback))
+const currentInputIsLoopback = computed(() => {
+  const d = inputDevices.value.find((x) => x.name === inputSelected.value)
+  return !!d?.loopback
+})
+const showAsioInputMatrix = computed(() => {
+  return isAsioHost(hostSelected.value) && asioInputs.value.length > 0 && !currentInputIsLoopback.value
+})
 
 const inputDropdownOpen = ref(false)
 const inputDropdownRef = ref<HTMLElement | null>(null)
@@ -307,24 +358,62 @@ async function loadInputDevices() {
 
 async function loadAsioChannels() {
   if (!isAsioHost(hostSelected.value) || !outputSelected.value) {
-    asioChannels.value = []
+    asioOutputs.value = []
+    asioInputs.value = []
     return
   }
   try {
-    asioChannels.value = await invoke<string[]>('get_asio_device_channels', {
+    const info = await invoke<AsioDeviceChannels>('get_asio_device_channels', {
       deviceName: outputSelected.value,
+      inputDeviceName: stripLoopbackLabel(inputSelected.value) || outputSelected.value,
     })
+    asioOutputs.value = info?.outputs ?? []
+    asioInputs.value = info?.inputs ?? []
+    fillDefaultAsioIndices()
+    await saveAsioChannels()
   } catch {
-    asioChannels.value = []
+    asioOutputs.value = []
+    asioInputs.value = []
+  }
+}
+
+function stripLoopbackLabel(name: string) {
+  return name.replace(/\s*\(PC Audio\)\s*$/i, '')
+}
+
+function fillDefaultAsioIndices() {
+  const outLen = asioOutputs.value.length
+  if (outLen > 0) {
+    if (asioLeft.value == null || asioLeft.value < 0 || asioLeft.value >= outLen) {
+      asioLeft.value = 0
+    }
+    if (asioRight.value == null || asioRight.value < 0 || asioRight.value >= outLen) {
+      asioRight.value = outLen > 1 ? 1 : 0
+    }
+  }
+  const inLen = asioInputs.value.length
+  if (inLen > 0) {
+    if (asioInLeft.value == null || asioInLeft.value < 0 || asioInLeft.value >= inLen) {
+      asioInLeft.value = 0
+    }
+    if (asioInRight.value == null || asioInRight.value < 0 || asioInRight.value >= inLen) {
+      asioInRight.value = inLen > 1 ? 1 : 0
+    }
   }
 }
 
 async function onHostChange() {
-  await appSettings.setOutputHost(hostSelected.value)
-  await appSettings.setInputHost(hostSelected.value)
-  await loadOutputDevices()
-  await loadInputDevices()
-  // Reset to first device on host switch.
+  outputDevices.value = []
+  inputDevices.value = []
+  asioOutputs.value = []
+  asioInputs.value = []
+  outputSelected.value = ''
+  inputSelected.value = ''
+  await Promise.all([
+    appSettings.setOutputHost(hostSelected.value),
+    appSettings.setInputHost(hostSelected.value),
+  ])
+  await Promise.all([loadOutputDevices(), loadInputDevices()])
   const firstOut = outputDevices.value[0]
   if (firstOut) {
     outputSelected.value = firstOut
@@ -349,10 +438,12 @@ async function pickInputDevice(name: string) {
   inputDropdownOpen.value = false
   const info = inputDevices.value.find((d) => d.name === name)
   await appSettings.setInputSource(name, info?.loopback ?? false)
+  await loadAsioChannels()
 }
 
 async function saveAsioChannels() {
-  await appSettings.setAsioChannels(asioLeft.value, asioRight.value)
+  await appSettings.setAsioOutputChannels(asioLeft.value, asioRight.value)
+  await appSettings.setAsioInputChannels(asioInLeft.value, asioInRight.value)
 }
 
 async function onVolumeChange() {
@@ -422,6 +513,8 @@ async function syncFromStore() {
   }
   asioLeft.value = appSettings.asioLeftChannel
   asioRight.value = appSettings.asioRightChannel
+  asioInLeft.value = appSettings.asioInLeftChannel
+  asioInRight.value = appSettings.asioInRightChannel
   await loadAsioChannels()
   outputVolumePct.value = Math.round((appSettings.outputVolume ?? 1) * 100)
   inputVolumePct.value = Math.round((appSettings.inputVolume ?? 1) * 100)

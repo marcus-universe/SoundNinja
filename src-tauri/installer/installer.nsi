@@ -95,6 +95,8 @@ Var StemsCheckboxState
 Var LangDialog
 Var LangCombo
 Var LangChoice
+Var DarkAllowWindow
+Var DarkSetPref
 
 Name "${PRODUCTNAME}"
 BrandingText "${PRODUCTNAME} ${VERSION}"
@@ -186,23 +188,158 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 !define MUI_LANGDLL_REGISTRY_KEY "${MANUPRODUCTKEY}"
 !define MUI_LANGDLL_REGISTRY_VALUENAME "Installer Language"
 
-; Untheme a control so SetCtlColors sticks (NSIS bug #443 / themed BUTTON/STATIC).
-!macro DarkenHwnd HWND
+; Win10+ dark mode (uxtheme ordinals). Must run before any UI.
+; 135 = SetPreferredAppMode / AllowDarkModeForApp, 133 = AllowDarkModeForWindow, 136 = FlushMenuThemes.
+!define /ifndef WM_THEMECHANGED 0x031A
+
+!macro InitWin32DarkModeImpl
+ Push $0
+ Push $1
+ StrCpy $DarkAllowWindow 0
+ StrCpy $DarkSetPref 0
+ System::Call 'kernel32::GetModuleHandle(t "uxtheme.dll") p.r0'
+ ${If} $0 == 0
+  System::Call 'kernel32::LoadLibrary(t "uxtheme.dll") p.r0'
+ ${EndIf}
+ ${If} $0 != 0
+  System::Call 'kernel32::GetProcAddress(p r0, p 135) p.r1'
+  StrCpy $DarkSetPref $1
+  System::Call 'kernel32::GetProcAddress(p r0, p 133) p.r1'
+  StrCpy $DarkAllowWindow $1
+  ${If} $DarkSetPref != 0
+   StrCpy $1 $DarkSetPref
+   System::Call '::$1(i 2)'
+  ${EndIf}
+  System::Call 'kernel32::GetProcAddress(p r0, p 136) p.r1'
+  ${If} $1 != 0
+   System::Call '::$1()'
+  ${EndIf}
+ ${EndIf}
+ Pop $1
+ Pop $0
+!macroend
+
+!macro AllowDarkModeForHwnd HWND
+ Push $8
+ StrCpy $8 $DarkAllowWindow
+ ${If} $8 != 0
+  ${If} ${HWND} != 0
+   System::Call '::$8(p ${HWND}, i 1)'
+  ${EndIf}
+ ${EndIf}
+ Pop $8
+!macroend
+
+; Push buttons / checkbox / radio: Explorer dark theme (do not SetCtlColors — theme paints).
+!macro DarkenButtonHwnd HWND
+ Push $8
  Push $9
  StrCpy $9 ${HWND}
  ${If} $9 != 0
-  System::Call 'uxtheme::SetWindowTheme(p r9, w " ", w " ")'
+  StrCpy $8 $DarkAllowWindow
+  ${If} $8 != 0
+   System::Call '::$8(p r9, i 1)'
+  ${EndIf}
+  System::Call 'uxtheme::SetWindowTheme(p r9, w "Explorer", p 0)'
+  SendMessage $9 ${WM_THEMECHANGED} 0 0
+ ${EndIf}
+ Pop $9
+ Pop $8
+!macroend
+
+!macro DarkenEditHwnd HWND
+ Push $8
+ Push $9
+ StrCpy $9 ${HWND}
+ ${If} $9 != 0
+  StrCpy $8 $DarkAllowWindow
+  ${If} $8 != 0
+   System::Call '::$8(p r9, i 1)'
+  ${EndIf}
+  System::Call 'uxtheme::SetWindowTheme(p r9, w "CFD", p 0)'
+  SendMessage $9 ${WM_THEMECHANGED} 0 0
   SetCtlColors $9 "EEEEEE" "222831"
  ${EndIf}
  Pop $9
+ Pop $8
+!macroend
+
+; ComboBox + inner Edit + dropped list (COMBOBOXINFO, 40 bytes on 32-bit NSIS).
+!macro DarkenCombo HWND
+ Push $0
+ Push $1
+ Push $7
+ Push $8
+ Push $9
+ StrCpy $9 ${HWND}
+ ${If} $9 != 0
+  StrCpy $8 $DarkAllowWindow
+  ${If} $8 != 0
+   System::Call '::$8(p r9, i 1)'
+  ${EndIf}
+  System::Call 'uxtheme::SetWindowTheme(p r9, w "CFD", p 0)'
+  SendMessage $9 ${WM_THEMECHANGED} 0 0
+  System::Alloc 40
+  Pop $0
+  System::Call '*$0(i 40)'
+  System::Call 'user32::GetComboBoxInfo(p r9, p r0) i.r1'
+  ${If} $1 != 0
+   System::Call '*$0(i,i,i,i,i,i,i,i,i,i,p,p.r7,p.r8)'
+   ${If} $7 != 0
+    StrCpy $1 $DarkAllowWindow
+    ${If} $1 != 0
+     System::Call '::$1(p r7, i 1)'
+    ${EndIf}
+    System::Call 'uxtheme::SetWindowTheme(p r7, w "CFD", p 0)'
+    SendMessage $7 ${WM_THEMECHANGED} 0 0
+    SetCtlColors $7 "EEEEEE" "222831"
+   ${EndIf}
+   ${If} $8 != 0
+    StrCpy $1 $DarkAllowWindow
+    ${If} $1 != 0
+     System::Call '::$1(p r8, i 1)'
+    ${EndIf}
+    System::Call 'uxtheme::SetWindowTheme(p r8, w "CFD", p 0)'
+    SendMessage $8 ${WM_THEMECHANGED} 0 0
+    SetCtlColors $8 "EEEEEE" "222831"
+   ${EndIf}
+  ${EndIf}
+  System::Free $0
+ ${EndIf}
+ Pop $9
+ Pop $8
+ Pop $7
+ Pop $1
+ Pop $0
+!macroend
+
+!macro DarkenHwnd HWND
+ Push $5
+ Push $9
+ StrCpy $9 ${HWND}
+ ${If} $9 != 0
+  System::Call 'user32::GetClassName(p r9, t .r5, i 64)'
+  ${If} $5 == "Button"
+   !insertmacro DarkenButtonHwnd $9
+  ${ElseIf} $5 == "ComboBox"
+   !insertmacro DarkenCombo $9
+  ${ElseIf} $5 == "Edit"
+   !insertmacro DarkenEditHwnd $9
+  ${Else}
+   SetCtlColors $9 "EEEEEE" "222831"
+  ${EndIf}
+ ${EndIf}
+ Pop $9
+ Pop $5
 !macroend
 
 !macro DarkenNavButton ID
+ Push $1
  GetDlgItem $1 $HWNDPARENT ${ID}
  ${If} $1 != 0
-  System::Call 'uxtheme::SetWindowTheme(p r1, w " ", w " ")'
-  SetCtlColors $1 "EEEEEE" "363f4d"
+  !insertmacro DarkenButtonHwnd $1
  ${EndIf}
+ Pop $1
 !macroend
 
 ; Recolor every child except SS_BITMAP (sidebar/header art).
@@ -220,9 +357,14 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
    IntOp $6 $6 & 0xF
    ${If} $6 != 14
     ${If} $5 == "Button"
-     System::Call 'uxtheme::SetWindowTheme(p r3, w " ", w " ")'
+     !insertmacro DarkenButtonHwnd $3
+    ${ElseIf} $5 == "ComboBox"
+     !insertmacro DarkenCombo $3
+    ${ElseIf} $5 == "Edit"
+     !insertmacro DarkenEditHwnd $3
+    ${Else}
+     SetCtlColors $3 "EEEEEE" "222831"
     ${EndIf}
-    SetCtlColors $3 "EEEEEE" "222831"
    ${EndIf}
    System::Call 'user32::GetWindow(p r3, i 2) p .r3'
   ${EndWhile}
@@ -238,9 +380,11 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
  ; Dark titlebar (20 = Win10 20H1+, 19 = older 1809 builds)
  System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 20, *i 1, i 4)'
  System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 19, *i 1, i 4)'
+ !insertmacro AllowDarkModeForHwnd $HWNDPARENT
 
  FindWindow $0 "#32770" "" $HWNDPARENT
  SetCtlColors $0 "EEEEEE" "222831"
+ !insertmacro AllowDarkModeForHwnd $0
  !insertmacro DarkenChildWindows $HWNDPARENT
  !insertmacro DarkenChildWindows $0
 
@@ -684,6 +828,7 @@ Function LangPageCreate
   ${NSD_CB_SelectString} $LangCombo "English"
  ${EndIf}
 
+ !insertmacro DarkenCombo $LangCombo
  Call ApplyDarkUi
  nsDialogs::Show
 FunctionEnd
@@ -867,6 +1012,7 @@ FunctionEnd
 LangString installingVersion 0 "This will install ${PRODUCTNAME} ${VERSION}."
 
 Function .onInit
+ !insertmacro InitWin32DarkModeImpl
  ; Default: download stem model on first launch (checkbox page can uncheck).
  StrCpy $StemsCheckboxState 1
  StrCpy $LangChoice "en"
@@ -1184,6 +1330,7 @@ Function .onInstSuccess
 FunctionEnd
 
 Function un.onInit
+ !insertmacro InitWin32DarkModeImpl
  !insertmacro SetContext
 
  !if "${INSTALLMODE}" == "both"

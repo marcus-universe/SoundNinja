@@ -31,6 +31,11 @@ function contrastRatio(a: number, b: number): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
 }
 
+/** WCAG contrast ratio between two hex colors (1–21). */
+export function contrastRatioHex(a: string, b: string): number {
+  return contrastRatio(relativeLuminance(a), relativeLuminance(b))
+}
+
 /**
  * Returns whichever of `lightHex` / `darkHex` has the higher contrast ratio
  * against the given solid background color.

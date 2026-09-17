@@ -35,8 +35,22 @@
           :aria-label="$t('contextMenu.colorHue')"
           @drag-start="beginHueDrag"
           @update:model-value="onHue"
-          @drag-end="endHueDrag"
+          @drag-end="onHueDragEnd"
         />
+      </div>
+      <div v-if="appSettings.basicButtonColors" class="color-group-picker__scheme" role="group">
+        <button
+          type="button"
+          class="color-group-picker__scheme-btn"
+          :class="{ 'is-active': scheme === 'dark' }"
+          @click="setScheme('dark')"
+        >{{ $t('contextMenu.colorSchemeDark') }}</button>
+        <button
+          type="button"
+          class="color-group-picker__scheme-btn"
+          :class="{ 'is-active': scheme === 'light' }"
+          @click="setScheme('light')"
+        >{{ $t('contextMenu.colorSchemeLight') }}</button>
       </div>
       <div
         v-for="row in rows"
@@ -49,6 +63,7 @@
           class="color-group-picker__wheel"
           :value="wheelValue(row.key)"
           @input="onWheel(row.key, $event)"
+          @change="flushEmit"
         />
         <button
           type="button"
@@ -82,8 +97,22 @@
                 :aria-label="$t('contextMenu.colorHue')"
                 @drag-start="beginHueDrag"
                 @update:model-value="onHue"
-                @drag-end="endHueDrag"
+                @drag-end="onHueDragEnd"
               />
+            </div>
+            <div v-if="appSettings.basicButtonColors" class="color-group-picker__scheme" role="group">
+              <button
+                type="button"
+                class="color-group-picker__scheme-btn"
+                :class="{ 'is-active': scheme === 'dark' }"
+                @click="setScheme('dark')"
+              >{{ $t('contextMenu.colorSchemeDark') }}</button>
+              <button
+                type="button"
+                class="color-group-picker__scheme-btn"
+                :class="{ 'is-active': scheme === 'light' }"
+                @click="setScheme('light')"
+              >{{ $t('contextMenu.colorSchemeLight') }}</button>
             </div>
             <div
               v-for="row in rows"
@@ -97,6 +126,7 @@
                   class="color-group-picker__wheel"
                   :value="wheelValue(row.key)"
                   @input="onWheel(row.key, $event)"
+                  @change="flushEmit"
                 />
                 <button
                   type="button"
@@ -135,8 +165,22 @@
             :aria-label="$t('contextMenu.colorHue')"
             @drag-start="beginHueDrag"
             @update:model-value="onHue"
-            @drag-end="endHueDrag"
+            @drag-end="onHueDragEnd"
           />
+        </div>
+        <div v-if="appSettings.basicButtonColors" class="color-group-picker__scheme" role="group">
+          <button
+            type="button"
+            class="color-group-picker__scheme-btn"
+            :class="{ 'is-active': scheme === 'dark' }"
+            @click="setScheme('dark')"
+          >{{ $t('contextMenu.colorSchemeDark') }}</button>
+          <button
+            type="button"
+            class="color-group-picker__scheme-btn"
+            :class="{ 'is-active': scheme === 'light' }"
+            @click="setScheme('light')"
+          >{{ $t('contextMenu.colorSchemeLight') }}</button>
         </div>
         <div
           v-for="row in rows"
@@ -149,6 +193,7 @@
             class="color-group-picker__wheel"
             :value="wheelValue(row.key)"
             @input="onWheel(row.key, $event)"
+            @change="flushEmit"
           />
           <button
             type="button"
@@ -174,6 +219,14 @@ import {
   overrideSwatch,
 } from '~/utils/colorOverride'
 import { leadHue, shiftColorRecord } from '~/utils/hue'
+import {
+  applyBasicPick,
+  applyScheme,
+  inferScheme,
+  type ColorScheme,
+} from '~/utils/monoPalette'
+
+const appSettings = useAppSettingsStore()
 
 const props = withDefaults(defineProps<{
   modelValue?: ColorOverride
@@ -206,6 +259,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [ColorOverride]
   change: [ColorOverride]
+  preview: [ColorOverride]
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -214,7 +268,9 @@ const rootEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const panelPos = ref({ top: 0, left: 0 })
 
-const rows: { key: keyof ColorOverride; labelKey: string }[] = [
+const ALL_KEYS: (keyof ColorOverride)[] = ['bg', 'bgHover', 'text', 'textHover', 'border', 'borderHover']
+
+const FULL_ROWS: { key: keyof ColorOverride; labelKey: string }[] = [
   { key: 'bg', labelKey: 'contextMenu.colorBg' },
   { key: 'bgHover', labelKey: 'contextMenu.colorBgHover' },
   { key: 'text', labelKey: 'contextMenu.colorText' },
@@ -223,7 +279,15 @@ const rows: { key: keyof ColorOverride; labelKey: string }[] = [
   { key: 'borderHover', labelKey: 'contextMenu.colorBorderHover' },
 ]
 
-const local = computed(() => props.modelValue || {})
+const BASIC_ROWS: { key: keyof ColorOverride; labelKey: string }[] = [
+  { key: 'text', labelKey: 'contextMenu.colorBase' },
+]
+
+const rows = computed(() => (appSettings.basicButtonColors ? BASIC_ROWS : FULL_ROWS))
+
+const draft = ref<ColorOverride | null>(null)
+const local = computed(() => draft.value ?? (props.modelValue || {}))
+const scheme = computed(() => inferScheme(local.value))
 const swatch = computed(() =>
   overrideSwatch(local.value, props.baseColors?.border || props.baseColors?.bg || '#00d4ff'),
 )
@@ -253,7 +317,7 @@ function effectiveHex(key: keyof ColorOverride): string {
 
 function snapshotColors(): ColorOverride {
   const out: ColorOverride = {}
-  for (const row of rows) out[row.key] = effectiveHex(row.key)
+  for (const key of ALL_KEYS) out[key] = effectiveHex(key)
   return out
 }
 
@@ -288,24 +352,92 @@ function onHue(next: number) {
   emitValue(shiftColorRecord(hueSnap!, next - hueSnapHue))
 }
 
-function emitValue(next: ColorOverride) {
+function onHueDragEnd() {
+  endHueDrag()
+  flushEmit()
+}
+
+let rafId = 0
+let pendingOverride: ColorOverride | null = null
+let lastLive: ColorOverride | null = null
+
+function firePreview(next: ColorOverride) {
+  draft.value = next
+  emit('preview', next)
+}
+
+function fireCommit(next: ColorOverride) {
+  draft.value = next
+  lastLive = next
   emit('update:modelValue', next)
   emit('change', next)
 }
 
+function emitNow(next: ColorOverride) {
+  pendingOverride = null
+  lastLive = next
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
+  fireCommit(next)
+}
+
+function flushEmit() {
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
+  const v = pendingOverride || lastLive
+  pendingOverride = null
+  if (v) fireCommit(v)
+}
+
+function emitValue(next: ColorOverride) {
+  pendingOverride = next
+  lastLive = next
+  draft.value = next
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = 0
+    const v = pendingOverride
+    pendingOverride = null
+    if (v) firePreview(v)
+  })
+}
+
+function setScheme(next: ColorScheme) {
+  if (!appSettings.basicButtonColors) return
+  if (scheme.value === next) return
+  emitNow(applyScheme(local.value, next, effectiveHex('text')))
+}
+
 function onWheel(key: keyof ColorOverride, e: Event) {
   const hex = (e.target as HTMLInputElement).value
+  if (appSettings.basicButtonColors && key === 'text') {
+    emitValue(applyBasicPick(local.value, hex, scheme.value))
+    return
+  }
   emitValue({ ...local.value, [key]: hex })
 }
 
 function clearKey(key: keyof ColorOverride) {
   const next = { ...local.value }
-  delete next[key]
-  emitValue(next)
+  if (appSettings.basicButtonColors && key === 'text') {
+    delete next.text
+    delete next.bg
+    delete next.border
+    delete next.textHover
+    delete next.bgHover
+    delete next.borderHover
+  } else {
+    delete next[key]
+  }
+  emitNow(next)
 }
 
 function resetAll() {
-  emitValue({})
+  emitNow({})
 }
 
 function toggle() {
@@ -361,6 +493,7 @@ onMounted(() => {
   window.addEventListener('resize', onViewportChange)
 })
 onBeforeUnmount(() => {
+  flushEmit()
   document.removeEventListener('pointerdown', onPointerDown, true)
   window.removeEventListener('resize', onViewportChange)
 })

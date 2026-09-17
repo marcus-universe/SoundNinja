@@ -164,7 +164,7 @@ function injectCustomCss(css: string) {
     const tokens = { ...THEME_TOKEN_DEFAULTS, ...parsed }
     const name = parseThemeName(css) || 'theme'
     const flat = buildThemeCss(name, tokens)
-    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding|--gif-overlay-hover|--gif-overlay)\s*:\s*([^;]+);/g
+    const layoutRe = /(--font-btn|--font-tab|--font-size-btn|--font-size-tab|--font-size-md|--btn_width|--border-radius|--btn-border-width|--tab-border-width|--button-gap|--btn_padding|--gif-overlay-hover|--gif-overlay|--title-chip-pad-x|--title-chip-pad-y)\s*:\s*([^;]+);/g
     const extras: string[] = []
     let m: RegExpExecArray | null
     while ((m = layoutRe.exec(css)) !== null) extras.push(`  ${m[1]}: ${m[2]};`)

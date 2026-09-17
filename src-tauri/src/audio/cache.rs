@@ -292,10 +292,15 @@ pub struct CacheStats {
 /// resolved the files are only warmed as raw bytes.
 #[tauri::command(async)]
 pub fn warm_sound_cache(paths: Vec<String>, device_name: Option<String>, host_name: Option<String>) {
-    let format = super::playback::output_format().or_else(|| {
-        let name = device_name.as_deref()?;
-        super::devices::default_output_format(name, host_name.as_deref())
-    });
+    let format = super::playback::output_format()
+        .or_else(|| {
+            if super::devices::is_asio_host_name(host_name.as_deref()) {
+                return None;
+            }
+            let name = device_name.as_deref()?;
+            super::devices::default_output_format(name, host_name.as_deref())
+        })
+        .map(|(rate, channels)| super::playback::mix_output_format(rate, channels));
 
     std::thread::spawn(move || match format {
         Some((rate, channels)) => super::pcm::prefetch(&paths, rate, channels),

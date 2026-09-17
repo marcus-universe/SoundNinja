@@ -1,9 +1,14 @@
-//! Host-allowlisted HTTP fetches for Klipy (search JSON + GIF bytes).
+//! Host-allowlisted HTTP fetches for Klipy / GifSnap (search JSON + GIF bytes).
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEXT: usize = 2 * 1024 * 1024;
+
+fn is_gifsnap_r2(host: &str) -> bool {
+    // GifSnap media is on Cloudflare R2 public buckets: pub-<id>.r2.dev
+    host.starts_with("pub-") && host.ends_with(".r2.dev") && host.bytes().filter(|&b| b == b'.').count() == 2
+}
 
 pub(crate) fn host_allowed(host: &str) -> bool {
     let h = host.trim().trim_end_matches('.').to_ascii_lowercase();
@@ -15,6 +20,9 @@ pub(crate) fn host_allowed(host: &str) -> bool {
         || h == "klipycdn.com"
         || h.ends_with(".klipycdn.com")
         || (h.contains("klipy") && !h.contains("localhost"))
+        || h == "gifsnap.com"
+        || h.ends_with(".gifsnap.com")
+        || is_gifsnap_r2(&h)
 }
 
 pub(crate) fn parse_https_url(url: &str) -> Result<reqwest::Url, String> {
@@ -72,7 +80,7 @@ pub async fn download_url_bytes(url: String) -> Result<String, String> {
     Ok(STANDARD.encode(bytes))
 }
 
-/// GET UTF-8 text (Klipy search/trending JSON) from an allowlisted HTTPS URL.
+/// GET UTF-8 text (Klipy / GifSnap search JSON) from an allowlisted HTTPS URL.
 #[tauri::command]
 pub async fn http_get_text(url: String) -> Result<String, String> {
     let bytes = fetch_limited(&url, MAX_TEXT).await?;
@@ -92,6 +100,20 @@ mod tests {
     fn host_allowed_accepts_klipy() {
         assert!(host_allowed("klipy.com"));
         assert!(host_allowed("cdn.klipy.com"));
+    }
+
+    #[test]
+    fn host_allowed_accepts_gifsnap() {
+        assert!(host_allowed("gifsnap.com"));
+        assert!(host_allowed("api.gifsnap.com"));
+        assert!(host_allowed("pub-9502c4126a384b90aa92ed45d7f6c379.r2.dev"));
+    }
+
+    #[test]
+    fn host_allowed_rejects_other_r2() {
+        assert!(!host_allowed("r2.dev"));
+        assert!(!host_allowed("evil.r2.dev"));
+        assert!(!host_allowed("pub-x.other.r2.dev"));
     }
 
     #[test]

@@ -1,0 +1,142 @@
+@use '../abstracts/variables' as *;
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  pointer-events: none;
+  display: flex;
+  padding: calc(var(--topbar_height, 3rem) + 1.2rem) 1.2rem 1.2rem;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 50%, transparent);
+  backdrop-filter: blur(0.4rem);
+}
+
+.drop-overlay__frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  border: 0.24rem dashed var(--primary_color);
+  border-radius: 1.2rem;
+  background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 35%, transparent);
+}
+
+.drop-overlay__icon {
+  width: 4.8rem;
+  height: 4.8rem;
+  min-width: 4.8rem;
+  min-height: 4.8rem;
+  fill: var(--primary_color);
+}
+
+.drop-overlay__title {
+  margin: 0;
+  color: var(--color-text, #{$white});
+  font-family: $fontBold;
+  font-size: var(--font-size-md, 1.6rem);
+  line-height: 1.3;
+  text-align: center;
+}
+
+.drop-overlay__hint {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 72%, transparent);
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drop-overlay__frame {
+    animation: drop-overlay-pulse 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes drop-overlay-pulse {
+  0%,
+  100% {
+    border-color: var(--primary_color);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--primary_color) 55%, transparent);
+  }
+}
+
+.import-review-list {
+  max-height: 42dvh;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: min(36rem, calc(100dvw - 8rem));
+
+  &::-webkit-scrollbar {
+    width: 0.4rem;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 0.3rem;
+  }
+}
+
+.import-review-row {
+  align-items: center;
+  min-height: 5.4rem;
+}
+
+.import-review-row__icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  fill: var(--primary_color);
+  pointer-events: none;
+}
+
+.import-review-row__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.import-review-row__hint {
+  color: color-mix(in srgb, var(--color-text, #{$white}) 62%, transparent);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+}
+
+.import-review-select {
+  flex: 0 1 16rem;
+  width: 16rem;
+  max-width: 42%;
+  height: var(--control-h);
+}
+
+.import-review-apply {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
+.import-review-apply__label {
+  color: var(--color-text, #{$white});
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.import-review-actions {
+  width: 100%;
+  justify-content: flex-end;
+}

@@ -325,8 +325,68 @@ where
         maxs[b] = maxs[b].max(frame_peak);
         frame += 1;
     }
-    let mut peaks = Vec::with_capacity(buckets * 2);
-    for b in 0..buckets {
+    interleave_minmax(&mins, &maxs)
+}
+
+const PEAK_WINDOW_FRAMES: usize = 1024;
+
+/// One-pass fold: peak per 1024-frame window, then downsample to `buckets`.
+/// Does not trust container `total_duration()` (wrong/missing on many MP3s).
+fn fold_peaks_one_pass<I>(samples: I, channels: u16, buckets: usize) -> Vec<f32>
+where
+    I: Iterator<Item = f32>,
+{
+    let buckets = buckets.max(1);
+    let ch = channels.max(1) as usize;
+    let mut windows: Vec<f32> = Vec::new();
+    let mut window_peak = 0.0f32;
+    let mut in_window = 0usize;
+    let mut ch_i = 0usize;
+    let mut frame_peak = 0.0f32;
+
+    for s in samples {
+        let a = s.abs();
+        if a > frame_peak {
+            frame_peak = a;
+        }
+        ch_i += 1;
+        if ch_i < ch {
+            continue;
+        }
+        if frame_peak > window_peak {
+            window_peak = frame_peak;
+        }
+        frame_peak = 0.0;
+        ch_i = 0;
+        in_window += 1;
+        if in_window >= PEAK_WINDOW_FRAMES {
+            windows.push(window_peak);
+            window_peak = 0.0;
+            in_window = 0;
+        }
+    }
+    if in_window > 0 || windows.is_empty() {
+        windows.push(window_peak);
+    }
+    downsample_window_peaks(&windows, buckets)
+}
+
+fn downsample_window_peaks(windows: &[f32], buckets: usize) -> Vec<f32> {
+    let buckets = buckets.max(1);
+    let n = windows.len().max(1);
+    let mut mins = vec![0.0f32; buckets];
+    let mut maxs = vec![0.0f32; buckets];
+    for (i, &peak) in windows.iter().enumerate() {
+        let b = ((i as u64 * buckets as u64) / n as u64).min((buckets - 1) as u64) as usize;
+        mins[b] = mins[b].min(-peak);
+        maxs[b] = maxs[b].max(peak);
+    }
+    interleave_minmax(&mins, &maxs)
+}
+
+fn interleave_minmax(mins: &[f32], maxs: &[f32]) -> Vec<f32> {
+    let mut peaks = Vec::with_capacity(mins.len() * 2);
+    for b in 0..mins.len() {
         peaks.push(mins[b]);
         peaks.push(maxs[b]);
     }
@@ -357,31 +417,11 @@ fn peaks_from_wav_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, Stri
 }
 
 fn peaks_from_rodio_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
-    let open = || {
-        let file = File::open(path).map_err(|e| e.to_string())?;
-        rodio::Decoder::new(BufReader::with_capacity(64 * 1024, file)).map_err(|e| e.to_string())
-    };
-
-    let decoder = open()?;
-    let sample_rate: u32 = decoder.sample_rate().into();
+    let file = File::open(path).map_err(|e| e.to_string())?;
+    let decoder =
+        rodio::Decoder::new(BufReader::with_capacity(64 * 1024, file)).map_err(|e| e.to_string())?;
     let channels: u16 = decoder.channels().into();
-
-    let total_frames = if let Some(dur) = decoder.total_duration() {
-        (dur.as_secs_f64() * sample_rate as f64).round().max(1.0) as usize
-    } else {
-        // Unknown length: count frames in a streaming pass (O(1) memory), then fold.
-        let ch = channels.max(1) as usize;
-        let mut n = 0usize;
-        for _ in decoder {
-            n += 1;
-        }
-        let frames = (n / ch).max(1);
-        let decoder = open()?;
-        return Ok(fold_peaks_from_iter(decoder, channels, frames, buckets));
-    };
-
-    let decoder = open()?;
-    Ok(fold_peaks_from_iter(decoder, channels, total_frames, buckets))
+    Ok(fold_peaks_one_pass(decoder, channels, buckets))
 }
 
 fn peaks_from_file_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
@@ -408,25 +448,41 @@ pub async fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec
     }
 
     let path_for_worker = path.clone();
-    let peaks = tauri::async_runtime::spawn_blocking(move || {
-        if super::stream::is_pumping(&path_for_worker) {
-            std::thread::sleep(std::time::Duration::from_millis(350));
+    let (peaks, cacheable) = tauri::async_runtime::spawn_blocking(move || {
+        let pumping = super::stream::is_pumping(&path_for_worker);
+        let done = super::stream::is_pump_done(&path_for_worker);
+        if pumping && !done {
             if let Some(p) = super::stream::active_peaks(&path_for_worker, buckets) {
-                return Ok(p);
+                return Ok((p, false));
+            }
+            return Ok((vec![0.0; buckets * 2], false));
+        }
+        if pumping && done {
+            if let Some(p) = super::stream::active_peaks(&path_for_worker, buckets) {
+                return Ok((p, true));
             }
         }
-        peaks_from_file_streaming(&path_for_worker, buckets)
+        let p = peaks_from_file_streaming(&path_for_worker, buckets)?;
+        Ok::<(Vec<f32>, bool), String>((p, true))
     })
     .await
     .map_err(|e| e.to_string())??;
 
-    if let Ok(mut cache) = peaks_cache().lock() {
-        if cache.len() >= 16 {
-            cache.clear();
+    if cacheable {
+        if let Ok(mut cache) = peaks_cache().lock() {
+            if cache.len() >= 16 {
+                cache.clear();
+            }
+            cache.insert(key, peaks.clone());
         }
-        cache.insert(key, peaks.clone());
     }
     Ok(peaks)
+}
+
+/// True while a progressive decode pump is still filling this path.
+#[tauri::command]
+pub fn is_sound_pumping(path: String) -> bool {
+    super::stream::is_pumping(&path) && !super::stream::is_pump_done(&path)
 }
 
 #[tauri::command(async)]
@@ -683,7 +739,7 @@ pub fn preview_session(
     let path_str = path.to_string_lossy().to_string();
     super::cache::invalidate_path(&path_str);
     let _ = stop_all();
-    super::playback::enqueue_play(path_str, device_name, host_name, true, 1.0)?;
+    super::playback::enqueue_play(path_str, device_name, host_name, true, 1.0, false)?;
     Ok(())
 }
 
@@ -831,8 +887,8 @@ pub(crate) fn insert_test_session(
 #[cfg(test)]
 mod tests {
     use super::{
-        delete_range, insert_test_session, normalize_session, session_info, trim_session,
-        undo_session,
+        delete_range, fold_peaks_one_pass, insert_test_session, normalize_session, session_info,
+        trim_session, undo_session,
     };
 
     fn sine_session() -> String {
@@ -878,5 +934,21 @@ mod tests {
         undo_session(id.clone()).unwrap();
         let after = session_info(&id).unwrap().duration_secs;
         assert!((after - before).abs() < 1e-6);
+    }
+
+    #[test]
+    fn fold_peaks_one_pass_keeps_loud_then_quiet() {
+        let mut samples = Vec::new();
+        for _ in 0..1024 {
+            samples.push(0.9);
+            samples.push(0.9);
+        }
+        for _ in 0..1024 {
+            samples.push(0.05);
+            samples.push(0.05);
+        }
+        let peaks = fold_peaks_one_pass(samples.into_iter(), 2, 4);
+        assert_eq!(peaks.len(), 8);
+        assert!(peaks[1] > peaks[7]);
     }
 }

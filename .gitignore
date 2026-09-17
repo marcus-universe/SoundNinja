@@ -16,6 +16,11 @@ nul
 .env.local
 .env.*.local
 
+# Steinberg ASIO SDK (not redistributable). `bun run setup:asio`
+/vendor/asiosdk/
+# Junction to LLVM bin (libclang.dll). Created by setup:asio.
+/vendor/libclang/
+
 # Log files
 npm-debug.log*
 yarn-debug.log*

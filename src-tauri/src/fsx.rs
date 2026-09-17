@@ -153,84 +153,216 @@ pub fn delete_dir_abs(path: String) -> Result<(), String> {
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct FolderAudioBucket {
-    pub dir: String,
-    pub name: String,
-    pub audio_files: Vec<String>,
+pub struct ImportAudioFile {
+    pub path: String,
+    pub file_name: String,
 }
 
-/// Scans each root directory for audio files and includes subfolders up to
-/// `max_depth` levels deep (0 = root only).
-#[tauri::command(async)]
-pub fn collect_audio_buckets_abs(
-    roots: Vec<String>,
-    max_depth: usize,
-    exts: Vec<String>,
-) -> Result<Vec<FolderAudioBucket>, String> {
-    let lower_exts: Vec<String> = exts
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportFolderGroup {
+    pub name: String,
+    pub path: String,
+    pub audio: Vec<ImportAudioFile>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportFolder {
+    pub path: String,
+    pub name: String,
+    #[serde(rename = "rootAudio")]
+    pub root_audio: Vec<ImportAudioFile>,
+    pub groups: Vec<ImportFolderGroup>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDropScan {
+    pub files: Vec<ImportAudioFile>,
+    pub folders: Vec<ImportFolder>,
+    pub skipped: usize,
+}
+
+fn normalize_exts(exts: Vec<String>) -> Vec<String> {
+    let out: Vec<String> = exts
         .into_iter()
         .map(|e| e.trim_start_matches('.').to_lowercase())
+        .filter(|e| !e.is_empty())
         .collect();
+    if out.is_empty() {
+        vec!["mp3".into(), "wav".into(), "ogg".into()]
+    } else {
+        out
+    }
+}
 
-    let mut out: Vec<FolderAudioBucket> = Vec::new();
+fn file_ext(path: &Path) -> String {
+    path.extension()
+        .map(|v| v.to_string_lossy().to_lowercase())
+        .unwrap_or_default()
+}
 
-    for root in roots {
-        let root_path = PathBuf::from(&root);
-        if !root_path.exists() {
+fn name_ext(path: &Path) -> String {
+    file_name_string(path)
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.trim().to_lowercase())
+        .unwrap_or_default()
+}
+
+fn matches_ext(path: &Path, exts: &[String]) -> bool {
+    let ext = file_ext(path);
+    if !ext.is_empty() && exts.contains(&ext) {
+        return true;
+    }
+    let from_name = name_ext(path);
+    !from_name.is_empty() && exts.contains(&from_name)
+}
+
+fn normalize_import_path(raw: &str) -> PathBuf {
+    let mut s = raw.trim().trim_matches('"').to_string();
+    if let Some(rest) = s.strip_prefix("file:///") {
+        s = rest.to_string();
+    } else if let Some(rest) = s.strip_prefix("file://") {
+        s = rest.to_string();
+    }
+    PathBuf::from(s)
+}
+
+/// Follows symlinks/reparse points. `file_type()` on the DirEntry itself
+/// reports OneDrive placeholders and junctions as neither file nor dir.
+fn meta_is_file(path: &Path) -> bool {
+    fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+}
+
+fn meta_is_dir(path: &Path) -> bool {
+    fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+}
+
+fn file_name_string(path: &Path) -> String {
+    path.file_name()
+        .map(|v| v.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string_lossy().into_owned())
+}
+
+fn to_audio(path: &Path) -> ImportAudioFile {
+    ImportAudioFile {
+        path: path.to_string_lossy().into_owned(),
+        file_name: file_name_string(path),
+    }
+}
+
+fn read_error(dir: &Path, e: std::io::Error) -> String {
+    format!("Failed to read folder '{}': {}", dir.to_string_lossy(), e)
+}
+
+fn collect_audio_recursive(dir: &Path, exts: &[String]) -> Result<Vec<ImportAudioFile>, String> {
+    let mut out = Vec::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(dir.to_path_buf());
+    while let Some(current) = queue.pop_front() {
+        let entries = fs::read_dir(&current).map_err(|e| read_error(&current, e))?;
+        let mut subdirs = Vec::new();
+        for entry_res in entries {
+            let entry = entry_res.map_err(|e| read_error(&current, e))?;
+            let path = entry.path();
+            if meta_is_file(&path) {
+                if matches_ext(&path, exts) {
+                    out.push(to_audio(&path));
+                }
+            } else if meta_is_dir(&path) {
+                subdirs.push(path);
+            }
+        }
+        subdirs.sort();
+        queue.extend(subdirs);
+    }
+    out.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+    Ok(out)
+}
+
+fn scan_folder(dir: &Path, exts: &[String]) -> Result<Option<ImportFolder>, String> {
+    let entries = fs::read_dir(dir).map_err(|e| read_error(dir, e))?;
+    let mut root_audio = Vec::new();
+    let mut subdirs = Vec::new();
+    for entry_res in entries {
+        let entry = entry_res.map_err(|e| read_error(dir, e))?;
+        let path = entry.path();
+        if meta_is_file(&path) {
+            if matches_ext(&path, exts) {
+                root_audio.push(to_audio(&path));
+            }
+        } else if meta_is_dir(&path) {
+            subdirs.push(path);
+        }
+    }
+    root_audio.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+    subdirs.sort();
+
+    let mut groups = Vec::new();
+    for sub in subdirs {
+        let audio = collect_audio_recursive(&sub, exts)?;
+        if audio.is_empty() {
             continue;
         }
+        groups.push(ImportFolderGroup {
+            name: file_name_string(&sub),
+            path: sub.to_string_lossy().into_owned(),
+            audio,
+        });
+    }
 
-        let mut queue: VecDeque<(PathBuf, usize)> = VecDeque::new();
-        queue.push_back((root_path, 0));
+    if root_audio.is_empty() && groups.is_empty() {
+        return Ok(None);
+    }
 
-        while let Some((dir, depth)) = queue.pop_front() {
-            let entries = fs::read_dir(&dir)
-                .map_err(|e| format!("Failed to read folder '{}': {}", dir.to_string_lossy(), e))?;
+    Ok(Some(ImportFolder {
+        path: dir.to_string_lossy().into_owned(),
+        name: file_name_string(dir),
+        root_audio,
+        groups,
+    }))
+}
 
-            let mut audio_files: Vec<String> = Vec::new();
-            let mut subdirs: Vec<PathBuf> = Vec::new();
+/// Classify dropped/picked paths into loose audio files and folders
+/// (root-level audio + one group per immediate subfolder, nested audio flattened).
+#[tauri::command(async)]
+pub fn inspect_import_drop(
+    paths: Vec<String>,
+    exts: Vec<String>,
+) -> Result<ImportDropScan, String> {
+    let exts = normalize_exts(exts);
+    let mut files = Vec::new();
+    let mut folders = Vec::new();
+    let mut skipped = 0usize;
 
-            for entry_res in entries {
-                let entry = entry_res
-                    .map_err(|e| format!("Failed to read folder entry in '{}': {}", dir.to_string_lossy(), e))?;
-                let path = entry.path();
-                let ty = entry
-                    .file_type()
-                    .map_err(|e| format!("Failed to read entry type in '{}': {}", dir.to_string_lossy(), e))?;
-
-                if ty.is_file() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    let ext = Path::new(&name)
-                        .extension()
-                        .map(|v| v.to_string_lossy().to_lowercase())
-                        .unwrap_or_default();
-                    if lower_exts.contains(&ext) {
-                        audio_files.push(name);
-                    }
-                } else if ty.is_dir() && depth < max_depth {
-                    subdirs.push(path);
-                }
+    for raw in paths {
+        let path = normalize_import_path(&raw);
+        let Ok(meta) = fs::metadata(&path) else {
+            skipped += 1;
+            continue;
+        };
+        if meta.is_file() {
+            if matches_ext(&path, &exts) {
+                files.push(to_audio(&path));
+            } else {
+                skipped += 1;
             }
-
-            if !audio_files.is_empty() {
-                let name = dir
-                    .file_name()
-                    .map(|v| v.to_string_lossy().to_string())
-                    .unwrap_or_else(|| dir.to_string_lossy().to_string());
-                out.push(FolderAudioBucket {
-                    dir: dir.to_string_lossy().to_string(),
-                    name,
-                    audio_files,
-                });
+        } else if meta.is_dir() {
+            match scan_folder(&path, &exts)? {
+                Some(folder) => folders.push(folder),
+                None => skipped += 1,
             }
-
-            for sub in subdirs {
-                queue.push_back((sub, depth + 1));
-            }
+        } else {
+            skipped += 1;
         }
     }
 
-    Ok(out)
+    Ok(ImportDropScan {
+        files,
+        folders,
+        skipped,
+    })
 }
 
 #[tauri::command(async)]
@@ -319,8 +451,124 @@ pub fn find_files_by_names(
 
 #[cfg(test)]
 mod tests {
-    use super::list_image_files_abs;
+    use super::{
+        inspect_import_drop, list_image_files_abs, ImportAudioFile, ImportDropScan, ImportFolder,
+    };
     use std::fs;
+
+    fn write_bytes(path: &std::path::Path, bytes: &[u8]) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn inspect_import_drop_splits_files_and_flattens_nested_groups() {
+        let root = std::env::temp_dir().join(format!("sn-import-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        write_bytes(&root.join("loose.mp3"), b"mp3");
+        write_bytes(&root.join("skip.txt"), b"nope");
+        let folder = root.join("Board");
+        write_bytes(&folder.join("root.wav"), b"wav");
+        fs::create_dir_all(folder.join("empty")).unwrap();
+        write_bytes(&folder.join("Sub").join("nested.ogg"), b"ogg");
+        write_bytes(&folder.join("Sub").join("deep").join("deep.mp3"), b"mp3");
+
+        let scan = inspect_import_drop(
+            vec![
+                root.join("loose.mp3").to_string_lossy().into_owned(),
+                root.join("skip.txt").to_string_lossy().into_owned(),
+                folder.to_string_lossy().into_owned(),
+            ],
+            vec!["mp3".into(), "wav".into(), "ogg".into()],
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&root);
+
+        assert_eq!(scan.files.len(), 1);
+        assert!(scan.files[0].file_name.eq_ignore_ascii_case("loose.mp3"));
+        assert_eq!(scan.skipped, 1);
+        assert_eq!(scan.folders.len(), 1);
+        assert_eq!(scan.folders[0].name, "Board");
+        assert_eq!(scan.folders[0].root_audio.len(), 1);
+        assert_eq!(scan.folders[0].groups.len(), 1);
+        assert_eq!(scan.folders[0].groups[0].name, "Sub");
+        assert_eq!(scan.folders[0].groups[0].audio.len(), 2);
+    }
+
+    #[test]
+    fn inspect_import_drop_empty_folder_counts_as_skipped() {
+        let dir = std::env::temp_dir().join(format!("sn-import-empty-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let scan = inspect_import_drop(
+            vec![dir.to_string_lossy().into_owned()],
+            vec!["mp3".into()],
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert!(scan.files.is_empty());
+        assert!(scan.folders.is_empty());
+        assert_eq!(scan.skipped, 1);
+    }
+
+    #[test]
+    fn inspect_import_drop_root_wav_folder_is_not_skipped() {
+        let dir = std::env::temp_dir().join(format!("sn-import-rootwav-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_bytes(&dir.join("clip.wav"), b"wav");
+        let scan = inspect_import_drop(
+            vec![dir.to_string_lossy().into_owned()],
+            vec!["wav".into()],
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert!(scan.files.is_empty());
+        assert_eq!(scan.folders.len(), 1);
+        assert_eq!(scan.folders[0].root_audio.len(), 1);
+        assert!(scan.folders[0].root_audio[0]
+            .file_name
+            .eq_ignore_ascii_case("clip.wav"));
+        assert_eq!(scan.skipped, 0);
+    }
+
+    #[test]
+    fn import_folder_json_should_use_root_audio_camel_case() {
+        let scan = ImportDropScan {
+            files: vec![],
+            folders: vec![ImportFolder {
+                path: "/tmp/board".into(),
+                name: "board".into(),
+                root_audio: vec![ImportAudioFile {
+                    path: "/tmp/board/a.mp3".into(),
+                    file_name: "a.mp3".into(),
+                }],
+                groups: vec![],
+            }],
+            skipped: 0,
+        };
+        let json = serde_json::to_value(&scan).unwrap();
+        let folder = &json["folders"][0];
+        assert!(folder.get("rootAudio").is_some());
+        assert!(folder.get("root_audio").is_none());
+        assert_eq!(folder["rootAudio"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn inspect_import_drop_empty_exts_still_finds_root_mp3() {
+        let dir = std::env::temp_dir().join(format!("sn-import-defext-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_bytes(&dir.join("hit.mp3"), b"mp3");
+        let scan = inspect_import_drop(vec![dir.to_string_lossy().into_owned()], vec![])
+            .unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(scan.folders.len(), 1);
+        assert_eq!(scan.folders[0].root_audio.len(), 1);
+    }
 
     #[test]
     fn list_image_files_abs_returns_matching_full_paths() {

@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod channel_map;
 pub mod devices;
 pub mod dsp;
 pub mod pcm;

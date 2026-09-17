@@ -46,7 +46,10 @@ impl Shared {
     }
 
     fn set_duration(&self, secs: f64) {
-        if secs.is_finite() && secs > 0.0 {
+        if !secs.is_finite() || secs <= 0.0 {
+            return;
+        }
+        if secs > self.duration_secs() {
             self.duration_bits.store(secs.to_bits(), Ordering::Relaxed);
         }
     }
@@ -85,26 +88,53 @@ pub fn is_pumping(path: &str) -> bool {
         .is_some()
 }
 
+/// True when this path has a live pump that finished publishing every sample.
+pub fn is_pump_done(path: &str) -> bool {
+    active_map()
+        .lock()
+        .ok()
+        .and_then(|m| m.get(path).and_then(|w| w.upgrade()))
+        .map(|s| s.done.load(Ordering::Acquire))
+        .unwrap_or(false)
+}
+
 /// Fold currently published samples into waveform peaks. `None` if this path
 /// has no live pump or not enough audio to be useful yet.
+///
+/// Peaks map onto the metadata/hint timeline when known, so a partial decode
+/// occupies the left of the waveform and the unloaded tail stays empty.
 pub fn active_peaks(path: &str, buckets: usize) -> Option<Vec<f32>> {
     let shared = active_map().lock().ok()?.get(path)?.upgrade()?;
     let ready = shared.samples_ready.load(Ordering::Acquire);
-    if ready < shared.channels.max(1) as usize * 256 {
+    let ch = shared.channels.max(1) as usize;
+    if ready < ch * 256 {
         return None;
     }
+    let ready_frames = (ready / ch).max(1);
+    let timeline_frames = if !shared.done.load(Ordering::Acquire) && shared.duration_secs() > 0.0 {
+        (shared.duration_secs() * shared.sample_rate.max(1) as f64)
+            .round()
+            .max(1.0) as usize
+    } else {
+        ready_frames
+    };
     let chunks = shared.chunks.read().ok()?;
     Some(fold_chunks(
         &chunks,
         shared.channels,
-        ready,
+        timeline_frames,
         buckets.max(1),
     ))
 }
 
-fn fold_chunks(chunks: &[Arc<[f32]>], channels: u16, total_samples: usize, buckets: usize) -> Vec<f32> {
+fn fold_chunks(
+    chunks: &[Arc<[f32]>],
+    channels: u16,
+    timeline_frames: usize,
+    buckets: usize,
+) -> Vec<f32> {
     let ch = channels.max(1) as usize;
-    let total_frames = (total_samples / ch).max(1);
+    let timeline_frames = timeline_frames.max(1);
     let mut mins = vec![0.0f32; buckets];
     let mut maxs = vec![0.0f32; buckets];
     let mut frame = 0usize;
@@ -117,7 +147,7 @@ fn fold_chunks(chunks: &[Arc<[f32]>], channels: u16, total_samples: usize, bucke
                     peak = a;
                 }
             }
-            let b = ((frame as u64 * buckets as u64) / total_frames as u64)
+            let b = ((frame as u64 * buckets as u64) / timeline_frames as u64)
                 .min((buckets - 1) as u64) as usize;
             mins[b] = mins[b].min(-peak);
             maxs[b] = maxs[b].max(peak);
@@ -203,6 +233,9 @@ pub fn start(
         channels: dst_channels.get(),
         path,
     });
+    if let Some(secs) = super::cache::cached_duration(&shared.path) {
+        shared.set_duration(secs);
+    }
     register(&shared);
 
     let pump_shared = Arc::clone(&shared);
@@ -214,6 +247,14 @@ pub fn start(
         .map_err(|e| e.to_string())?;
 
     wait_preroll(&shared)?;
+    // Fallback only: metadata/hint already frozen on Shared when the container
+    // reported a length. Do not let preroll overwrite that timeline.
+    if shared.duration_secs() <= 0.0 {
+        let floor = shared.ready_secs();
+        if floor > 0.0 {
+            shared.set_duration(floor);
+        }
+    }
     Ok(PumpHandle { shared })
 }
 
@@ -355,13 +396,18 @@ fn pump_loop(shared: Arc<Shared>, dst_rate: u32, dst_ch: u16) {
     }
     shared.done.store(true, Ordering::Release);
     promote_if_complete(&shared, dst_rate, dst_ch);
-    unregister(&shared.path);
+    // Keep a finished pump visible so waveform can cache complete peaks
+    // without a second file decode. Dead Weaks are dropped on next register.
+    if shared.cancel.load(Ordering::Relaxed) {
+        unregister(&shared.path);
+    }
 }
 
 fn run_pump(shared: &Shared, dst_rate: u32, dst_ch: u16) -> Result<(), String> {
     let (mut samples, src_rate, src_ch, hint) = open_sample_iter(&shared.path)?;
     if hint > 0.0 {
         shared.set_duration(hint);
+        super::cache::store_duration(&shared.path, hint);
     }
 
     let dst_ch = dst_ch.max(1);
@@ -372,6 +418,7 @@ fn run_pump(shared: &Shared, dst_rate: u32, dst_ch: u16) -> Result<(), String> {
         shared,
         tail: &mut tail,
         chunk_samples,
+        hint,
     };
 
     let same_fmt = src_rate == dst_rate && src_ch == dst_ch;
@@ -408,6 +455,7 @@ struct ChunkPublisher<'a> {
     shared: &'a Shared,
     tail: &'a mut Vec<f32>,
     chunk_samples: usize,
+    hint: f64,
 }
 
 impl ChunkPublisher<'_> {
@@ -437,6 +485,11 @@ impl ChunkPublisher<'_> {
             .samples_ready
             .fetch_add(add, Ordering::Release);
         self.tail.reserve(self.chunk_samples);
+        // Metadata hint is the timeline. Only grow duration from the buffer
+        // when the container did not report a length.
+        if self.hint <= 0.0 {
+            self.shared.set_duration(self.shared.ready_secs());
+        }
     }
 
     fn flush(&mut self) {
@@ -664,5 +717,38 @@ fn interleave(planes: &[Vec<f32>]) -> Vec<f32> {
             }
             out
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fold_chunks;
+    use std::sync::Arc;
+
+    fn chunk_of(samples: &[f32]) -> Arc<[f32]> {
+        Arc::from(samples.to_vec())
+    }
+
+    #[test]
+    fn fold_chunks_should_map_partial_decode_onto_full_timeline() {
+        // 4 mono frames decoded, 8-frame metadata timeline, 4 buckets.
+        // Energy in the left half; unloaded tail stays empty.
+        let chunks = vec![chunk_of(&[1.0, 1.0, 1.0, 1.0])];
+        let peaks = fold_chunks(&chunks, 1, 8, 4);
+        assert_eq!(peaks.len(), 8);
+        assert!(peaks[1] > 0.5);
+        assert!(peaks[3] > 0.5);
+        assert_eq!(peaks[4], 0.0);
+        assert_eq!(peaks[5], 0.0);
+        assert_eq!(peaks[6], 0.0);
+        assert_eq!(peaks[7], 0.0);
+    }
+
+    #[test]
+    fn fold_chunks_should_fill_all_buckets_when_timeline_matches_ready() {
+        let chunks = vec![chunk_of(&[1.0, 1.0, 1.0, 1.0])];
+        let peaks = fold_chunks(&chunks, 1, 4, 4);
+        let maxs: Vec<f32> = peaks.chunks_exact(2).map(|p| p[1]).collect();
+        assert!(maxs.iter().all(|&m| m > 0.5));
     }
 }

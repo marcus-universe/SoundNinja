@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { open } from '@tauri-apps/plugin-dialog'
+import { pickAudioFilesAndPresent, pickFoldersAndPresent } from '~/utils/importDrop'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -160,50 +160,6 @@ async function focusSearchInput() {
   requestAnimationFrame(() => {
     searchInput.value?.focus?.()
   })
-}
-
-async function uploadFiles() {
-  const selected = await open({
-    multiple: true,
-    title: t('native.selectFilesToUpload'),
-    filters: [
-      {
-        name: t('native.addSounds'),
-        extensions: ['mp3', 'wav', 'ogg'],
-      },
-    ],
-  })
-
-  if (Array.isArray(selected)) {
-    const indexLength = jsonStore.configFile.files.length
-    const soundlist = selected.map((file, index) => {
-      const tabs = ['All']
-      if (appStore.currentTab !== 'All') {
-        tabs.push(appStore.currentTab)
-      }
-      return {
-        name: file
-          .replace(/^.*[\\]/, '')
-          .replace('.wav', '')
-          .replace('.mp3', '')
-          .replace('.ogg', '')
-          .replaceAll('_', ' ')
-          .replace(/([A-Z])/g, ' $1')
-          .trim(),
-        path: file,
-        volume: 1,
-        tabs: tabs,
-        active: false,
-        index: index + indexLength,
-      }
-    })
-
-    try {
-      jsonStore.addFiles(soundlist)
-    } catch (err) {
-      console.log(err)
-    }
-  }
 }
 
 const projectTags = computed(() => jsonStore.configFile.tags ?? [])
@@ -244,9 +200,9 @@ function OpenSearch() {
 async function onImportChoice(mode) {
   await nextTick()
   if (mode === 'audio') {
-    await uploadFiles()
+    await pickAudioFilesAndPresent()
   } else if (mode === 'folders') {
-    appStore.setImportFoldersActive(true)
+    await pickFoldersAndPresent()
   }
 }
 
@@ -260,7 +216,7 @@ function IconClicked(icon) {
   } else if (icon === 'filter') {
     appStore.toggleFilterPanel()
   } else if (icon === 'folder') {
-    appStore.setImportFoldersActive(true)
+    pickFoldersAndPresent()
   } else if (icon === 'settings') {
     appStore.setActiveOverlay(appStore.activeOverlay === 'settings' ? null : 'settings')
   } else if (icon === 'about') {

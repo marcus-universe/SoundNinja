@@ -153,6 +153,12 @@
       height: 4.2rem;
       border-radius: 0.65rem;
     }
+
+    .player-float__bar {
+      width: min(32rem, 55vw);
+      max-width: min(32rem, 55vw);
+      height: 0.72rem;
+    }
   }
 
   &__row {
@@ -173,6 +179,27 @@
     background: rgba(0, 0, 0, 0.22);
     cursor: pointer;
     touch-action: none;
+  }
+
+  &__bar {
+    flex: 0 1 auto;
+    position: relative;
+    width: 16rem;
+    max-width: min(16rem, 40vw);
+    height: 0.55rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.22);
+    cursor: pointer;
+    touch-action: none;
+    overflow: hidden;
+  }
+
+  &__bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: var(--primary_color);
+    pointer-events: none;
   }
 
   &__btn {

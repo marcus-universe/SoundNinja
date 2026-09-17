@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { tt } from '~/utils/tt'
 import { useJsonHandelingStore } from './jsonHandeling'
+import type { ImportReviewState } from '~/utils/importReview'
 
 interface ContextMenuState {
   visible: boolean
@@ -31,8 +32,9 @@ export const useAppStore = defineStore('app', {
       SearchbarActive: false,
       SearchbarContent: '',
     },
-    importFoldersActive: false,
     importChooserActive: false,
+    importReview: null as ImportReviewState | null,
+    dropActive: false,
     selectProjectActive: false,
     relinkActive: false,
     multiSelectActive: false,
@@ -179,8 +181,16 @@ export const useAppStore = defineStore('app', {
       return id
     },
 
-    setImportFoldersActive(val: boolean) {
-      this.importFoldersActive = val
+    setImportReview(state: ImportReviewState | null) {
+      this.importReview = state
+    },
+
+    clearImportReview() {
+      this.importReview = null
+    },
+
+    setDropActive(val: boolean) {
+      this.dropActive = !!val
     },
 
     setImportChooserActive(val: boolean) {

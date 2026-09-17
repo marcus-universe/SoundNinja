@@ -97,7 +97,8 @@ src-tauri/                  # Tauri / Rust backend
 ### Audio Playback
 - Playback is Rust-only via **rodio** + **cpal** (`src-tauri/src/audio/`). The frontend never decodes or plays audio itself.
 - A persistent `MixerDeviceSink` / `AudioStream` is kept on the audio thread (no global `SINK`).
-- Decoded PCM is cached (`src-tauri/src/audio/pcm.rs`, LRU) and pre-converted to the output device's sample rate and channel count, so the cpal callback never decodes or resamples. Oversized files fall back to the streaming decoder over the raw byte cache (`audio/cache.rs`).
+- Decoded PCM is cached (`src-tauri/src/audio/pcm.rs`, LRU) and pre-converted to the output device's sample rate and mix channel count (stereo when ASIO L/R mapping is on). Oversized files fall back to the streaming decoder over the raw byte cache (`audio/cache.rs`). ASIO channel scatter lives in `audio/channel_map.rs`.
+- Windows always compiles ASIO (`cpal`/`rodio` **Windows target** features, not a crate-wide feature). Local `tauri:serve` includes it. Needs Steinberg SDK + libclang (`bun run setup:asio`). Never enable `asio` on Linux/macOS deps. Never set `LIBCLANG_PATH` in global `.cargo/config.toml` (breaks unix bindgen).
 - Tauri runs a `#[tauri::command]` on the main thread unless it is `async` or `#[tauri::command(async)]`. Anything touching the filesystem, a device or a codec must be one of those; jobs that can run for seconds go through `crate::task::run_blocking`.
 - Large binary payloads never cross IPC. Write them to a file in Rust and hand the frontend a path for `convertFileSrc` — see `src-tauri/src/gifcache.rs` and `src/utils/gifCache.ts`.
 

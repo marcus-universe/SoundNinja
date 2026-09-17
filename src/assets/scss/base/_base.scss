@@ -72,6 +72,9 @@ body {
   /* Color wash over GIF/image button backgrounds (0 = GIF only, 1 = solid). */
   --gif-overlay: 0.72;
   --gif-overlay-hover: 0.38;
+  /* Title chip padding on GIF/image hover (rem). */
+  --title-chip-pad-x: 0.4rem;
+  --title-chip-pad-y: 0.12rem;
   // Navbar side is driven by the $navbar-position SCSS variable
   --navbar-side: #{$navbar-position};
 
