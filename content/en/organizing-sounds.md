@@ -100,6 +100,7 @@ Right-click a sound to set per-button colors or a background image. That is sepa
 The picker is a **Background image** dialog (PNG, JPEG, GIF, WebP):
 
 - **Local files** — add folders, pick a single file, search filenames, preview the grid, or remove a folder from the library
+- **GifSnap** — search online GIFs with no API key. The first visit asks you to accept GifSnap requests; search results are cached to cut traffic. See [GifSnap](https://gifsnap.com).
 - **KLIPY** — search online GIFs. Set your own API key in **Settings → Behavior**. The key is not stored in project files.
 
 After you pick an image, pan and crop it on the button.

@@ -100,6 +100,7 @@ Rechtsklick auf einen Sound: eigene Farben oder ein Hintergrundbild. Das ist get
 Der Picker ist ein Dialog **Hintergrundbild** (PNG, JPEG, GIF, WebP):
 
 - **Lokale Dateien** — Ordner hinzufügen, einzelne Datei wählen, Dateinamen suchen, Rastervorschau, Ordner aus der Bibliothek entfernen
+- **GifSnap** — GIFs online suchen, ohne API-Key. Beim ersten Besuch musst du GifSnap-Anfragen akzeptieren; Suchergebnisse werden gecacht, um Traffic zu sparen. Siehe [GifSnap](https://gifsnap.com).
 - **KLIPY** — GIFs online suchen. Eigenen API-Key unter **Einstellungen → Verhalten**. Der Key landet nicht in Projektdateien.
 
 Nach der Wahl Bild auf dem Button schieben und zuschneiden.

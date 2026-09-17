@@ -100,6 +100,7 @@ Clic droit sur un son pour régler des couleurs par bouton ou une image de fond.
 Le sélecteur est une boîte **Image de fond** (PNG, JPEG, GIF, WebP) :
 
 - **Fichiers locaux** — ajouter des dossiers, choisir un fichier, chercher par nom, prévisualiser la grille, retirer un dossier de la bibliothèque
+- **GifSnap** — chercher des GIF en ligne sans clé API. La première visite demande d’accepter les requêtes GifSnap ; les résultats sont mis en cache pour limiter le trafic. Voir [GifSnap](https://gifsnap.com).
 - **KLIPY** — chercher des GIF en ligne. Mets ta propre clé API dans **Paramètres → Comportement**. La clé n’est pas stockée dans les fichiers projet.
 
 Après le choix, recadre et décale l’image sur le bouton.

@@ -100,6 +100,7 @@ Clic derecho en un sonido para definir colores por botón o una imagen de fondo.
 El selector es un diálogo **Imagen de fondo** (PNG, JPEG, GIF, WebP):
 
 - **Archivos locales** — añade carpetas, elige un archivo, busca por nombre, previsualiza la cuadrícula o quita una carpeta de la biblioteca
+- **GifSnap** — busca GIFs en línea sin clave API. La primera visita pide aceptar las peticiones a GifSnap; los resultados se cachean para reducir tráfico. Ver [GifSnap](https://gifsnap.com).
 - **KLIPY** — busca GIFs en línea. Pon tu propia clave API en **Ajustes → Comportamiento**. La clave no se guarda en los archivos del proyecto.
 
 Tras elegir, mueve y recorta la imagen en el botón.

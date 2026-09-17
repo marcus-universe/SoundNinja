@@ -31,7 +31,7 @@ SoundNinja sigue en desarrollo temprano. Las funciones marchan, pero no todas la
 - Asignar atajos a sonidos individuales
 - Disparar sonidos desde [Bitfocus Companion](/docs/remote-control)
 - Importar y exportar un soundboard completo para compartirlo
-- Usar GIFs o imágenes en los botones — biblioteca local de carpetas o KLIPY
+- Usar GIFs o imágenes en los botones — biblioteca local de carpetas, GifSnap o KLIPY
 
 ## Licencia
 

@@ -31,7 +31,7 @@ SoundNinja 仍处于早期开发。功能可用，但并非每个平台都经过
 - 为单个音效分配快捷键
 - 通过 [Bitfocus Companion](/docs/remote-control) 触发音效
 - 导入导出完整音效板以便分享
-- 在音效按钮上使用 GIF 或图片 — 本地文件夹库或 KLIPY
+- 在音效按钮上使用 GIF 或图片 — 本地文件夹库、GifSnap 或 KLIPY
 
 ## 许可证
 

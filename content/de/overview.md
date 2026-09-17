@@ -31,7 +31,7 @@ SoundNinja steckt noch in der frühen Entwicklung. Funktionen laufen, aber nicht
 - Hotkeys einzelnen Sounds zuweisen
 - Sounds über [Bitfocus Companion](/docs/remote-control) auslösen
 - Ein komplettes Soundboard importieren und exportieren
-- GIFs oder Bilder auf Sound-Buttons legen — aus lokaler Ordnerbibliothek oder KLIPY
+- GIFs oder Bilder auf Sound-Buttons legen — aus lokaler Ordnerbibliothek, GifSnap oder KLIPY
 
 ## Lizenz
 
