@@ -171,6 +171,7 @@ pub struct ImportFolderGroup {
 pub struct ImportFolder {
     pub path: String,
     pub name: String,
+    #[serde(rename = "rootAudio")]
     pub root_audio: Vec<ImportAudioFile>,
     pub groups: Vec<ImportFolderGroup>,
 }
@@ -184,9 +185,16 @@ pub struct ImportDropScan {
 }
 
 fn normalize_exts(exts: Vec<String>) -> Vec<String> {
-    exts.into_iter()
+    let out: Vec<String> = exts
+        .into_iter()
         .map(|e| e.trim_start_matches('.').to_lowercase())
-        .collect()
+        .filter(|e| !e.is_empty())
+        .collect();
+    if out.is_empty() {
+        vec!["mp3".into(), "wav".into(), "ogg".into()]
+    } else {
+        out
+    }
 }
 
 fn file_ext(path: &Path) -> String {
@@ -195,8 +203,40 @@ fn file_ext(path: &Path) -> String {
         .unwrap_or_default()
 }
 
+fn name_ext(path: &Path) -> String {
+    file_name_string(path)
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.trim().to_lowercase())
+        .unwrap_or_default()
+}
+
 fn matches_ext(path: &Path, exts: &[String]) -> bool {
-    exts.contains(&file_ext(path))
+    let ext = file_ext(path);
+    if !ext.is_empty() && exts.contains(&ext) {
+        return true;
+    }
+    let from_name = name_ext(path);
+    !from_name.is_empty() && exts.contains(&from_name)
+}
+
+fn normalize_import_path(raw: &str) -> PathBuf {
+    let mut s = raw.trim().trim_matches('"').to_string();
+    if let Some(rest) = s.strip_prefix("file:///") {
+        s = rest.to_string();
+    } else if let Some(rest) = s.strip_prefix("file://") {
+        s = rest.to_string();
+    }
+    PathBuf::from(s)
+}
+
+/// Follows symlinks/reparse points. `file_type()` on the DirEntry itself
+/// reports OneDrive placeholders and junctions as neither file nor dir.
+fn meta_is_file(path: &Path) -> bool {
+    fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+}
+
+fn meta_is_dir(path: &Path) -> bool {
+    fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
 }
 
 fn file_name_string(path: &Path) -> String {
@@ -226,12 +266,11 @@ fn collect_audio_recursive(dir: &Path, exts: &[String]) -> Result<Vec<ImportAudi
         for entry_res in entries {
             let entry = entry_res.map_err(|e| read_error(&current, e))?;
             let path = entry.path();
-            let ty = entry.file_type().map_err(|e| read_error(&current, e))?;
-            if ty.is_file() {
+            if meta_is_file(&path) {
                 if matches_ext(&path, exts) {
                     out.push(to_audio(&path));
                 }
-            } else if ty.is_dir() {
+            } else if meta_is_dir(&path) {
                 subdirs.push(path);
             }
         }
@@ -249,12 +288,11 @@ fn scan_folder(dir: &Path, exts: &[String]) -> Result<Option<ImportFolder>, Stri
     for entry_res in entries {
         let entry = entry_res.map_err(|e| read_error(dir, e))?;
         let path = entry.path();
-        let ty = entry.file_type().map_err(|e| read_error(dir, e))?;
-        if ty.is_file() {
+        if meta_is_file(&path) {
             if matches_ext(&path, exts) {
                 root_audio.push(to_audio(&path));
             }
-        } else if ty.is_dir() {
+        } else if meta_is_dir(&path) {
             subdirs.push(path);
         }
     }
@@ -299,7 +337,7 @@ pub fn inspect_import_drop(
     let mut skipped = 0usize;
 
     for raw in paths {
-        let path = PathBuf::from(&raw);
+        let path = normalize_import_path(&raw);
         let Ok(meta) = fs::metadata(&path) else {
             skipped += 1;
             continue;
@@ -413,7 +451,9 @@ pub fn find_files_by_names(
 
 #[cfg(test)]
 mod tests {
-    use super::{inspect_import_drop, list_image_files_abs};
+    use super::{
+        inspect_import_drop, list_image_files_abs, ImportAudioFile, ImportDropScan, ImportFolder,
+    };
     use std::fs;
 
     fn write_bytes(path: &std::path::Path, bytes: &[u8]) {
@@ -472,6 +512,62 @@ mod tests {
         assert!(scan.files.is_empty());
         assert!(scan.folders.is_empty());
         assert_eq!(scan.skipped, 1);
+    }
+
+    #[test]
+    fn inspect_import_drop_root_wav_folder_is_not_skipped() {
+        let dir = std::env::temp_dir().join(format!("sn-import-rootwav-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_bytes(&dir.join("clip.wav"), b"wav");
+        let scan = inspect_import_drop(
+            vec![dir.to_string_lossy().into_owned()],
+            vec!["wav".into()],
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert!(scan.files.is_empty());
+        assert_eq!(scan.folders.len(), 1);
+        assert_eq!(scan.folders[0].root_audio.len(), 1);
+        assert!(scan.folders[0].root_audio[0]
+            .file_name
+            .eq_ignore_ascii_case("clip.wav"));
+        assert_eq!(scan.skipped, 0);
+    }
+
+    #[test]
+    fn import_folder_json_should_use_root_audio_camel_case() {
+        let scan = ImportDropScan {
+            files: vec![],
+            folders: vec![ImportFolder {
+                path: "/tmp/board".into(),
+                name: "board".into(),
+                root_audio: vec![ImportAudioFile {
+                    path: "/tmp/board/a.mp3".into(),
+                    file_name: "a.mp3".into(),
+                }],
+                groups: vec![],
+            }],
+            skipped: 0,
+        };
+        let json = serde_json::to_value(&scan).unwrap();
+        let folder = &json["folders"][0];
+        assert!(folder.get("rootAudio").is_some());
+        assert!(folder.get("root_audio").is_none());
+        assert_eq!(folder["rootAudio"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn inspect_import_drop_empty_exts_still_finds_root_mp3() {
+        let dir = std::env::temp_dir().join(format!("sn-import-defext-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_bytes(&dir.join("hit.mp3"), b"mp3");
+        let scan = inspect_import_drop(vec![dir.to_string_lossy().into_owned()], vec![])
+            .unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(scan.folders.len(), 1);
+        assert_eq!(scan.folders[0].root_audio.len(), 1);
     }
 
     #[test]

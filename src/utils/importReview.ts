@@ -19,6 +19,8 @@ export type ScannedFolder = {
   name: string
   rootAudio: ScannedAudioFile[]
   groups: ScannedFolderGroup[]
+  /** IPC may send snake_case if camelCase rename is skipped. */
+  root_audio?: ScannedAudioFile[]
 }
 
 export type ImportDropScan = {
@@ -41,6 +43,44 @@ export type ImportReviewState = {
   skipped: number
 }
 
+type AudioLike = ScannedAudioFile & { file_name?: string }
+
+function normalizeAudio(file: AudioLike): ScannedAudioFile {
+  return {
+    path: file.path,
+    fileName: file.fileName || file.file_name || '',
+  }
+}
+
+export function folderRootAudio(folder: {
+  rootAudio?: ScannedAudioFile[]
+  root_audio?: ScannedAudioFile[]
+}): ScannedAudioFile[] {
+  return (folder.rootAudio ?? folder.root_audio ?? []).map(normalizeAudio)
+}
+
+export function folderGroups(folder: { groups?: ScannedFolderGroup[] }): ScannedFolderGroup[] {
+  return (folder.groups ?? []).map((g) => ({
+    ...g,
+    audio: (g.audio ?? []).map(normalizeAudio),
+  }))
+}
+
+/** Canonical camelCase arrays after inspect_import_drop IPC. */
+export function normalizeImportScan(scan: ImportDropScan | null | undefined): ImportDropScan {
+  const files = (scan?.files ?? []).map(normalizeAudio)
+  const folders = (scan?.folders ?? []).map((folder) => ({
+    ...folder,
+    rootAudio: folderRootAudio(folder),
+    groups: folderGroups(folder),
+  }))
+  return {
+    files,
+    folders,
+    skipped: scan?.skipped ?? 0,
+  }
+}
+
 export function audioDisplayName(fileName: string): string {
   return String(fileName || '')
     .replace(/\.(wav|mp3|ogg)$/i, '')
@@ -54,5 +94,6 @@ export function pathKey(p: string): string {
 }
 
 export function folderAudioCount(folder: ScannedFolder): number {
-  return folder.rootAudio.length + folder.groups.reduce((n, g) => n + g.audio.length, 0)
+  return folderRootAudio(folder).length
+    + folderGroups(folder).reduce((n, g) => n + g.audio.length, 0)
 }

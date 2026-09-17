@@ -401,6 +401,7 @@
     "assignAllFiles": "すべてのファイルの割り当て先",
     "import": "読み込む",
     "selectFolders": "フォルダーを選択",
+    "addFolder": "フォルダーを追加",
     "fileCount": "{count} ファイル",
     "groupCount": "{count} グループ",
     "skipped": "{count} 件をスキップしました",

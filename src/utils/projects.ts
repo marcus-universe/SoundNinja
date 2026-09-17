@@ -56,18 +56,30 @@ export async function createProjectFolder(projectsPath: string, name: string): P
   return join(folder, PROJECT_BASENAME_SNINJA)
 }
 
-/** Tauri open dialog may return a string, a one-item array, or null. */
-export function pickOpenPath(selected: string | string[] | null | undefined): string | null {
-  if (selected == null) return null
-  if (Array.isArray(selected)) return selected[0] || null
-  return selected || null
+function asPathString(item: unknown): string | null {
+  if (typeof item === 'string' && item) return item
+  if (item && typeof item === 'object' && 'path' in item) {
+    const path = (item as { path?: unknown }).path
+    if (typeof path === 'string' && path) return path
+  }
+  return null
+}
+
+/** Tauri open dialog may return a string, a one-item array, `{ path }`, or null. */
+export function pickOpenPath(selected: unknown): string | null {
+  return pickOpenPaths(selected)[0] ?? null
 }
 
 /** Same as pickOpenPath but keeps every selected path (multi-file dialogs). */
-export function pickOpenPaths(selected: string | string[] | null | undefined): string[] {
+export function pickOpenPaths(selected: unknown): string[] {
   if (selected == null) return []
-  if (Array.isArray(selected)) return selected.filter(Boolean)
-  return selected ? [selected] : []
+  const items = Array.isArray(selected) ? selected : [selected]
+  const out: string[] = []
+  for (const item of items) {
+    const path = asPathString(item)
+    if (path) out.push(path)
+  }
+  return out
 }
 
 /** Native "Open Project" dialog. Lives here so Vue SFCs avoid TSX-generic parse bugs. */

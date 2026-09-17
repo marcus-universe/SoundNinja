@@ -9,6 +9,7 @@ import {
   AUDIO_EXTENSIONS,
   NEW_TAB_DEST,
   audioDisplayName,
+  normalizeImportScan,
   pathKey,
   type ImportDropScan,
   type ImportReviewState,
@@ -49,16 +50,19 @@ function boardPathSet(): Set<string> {
 
 function filterScan(scan: ImportDropScan): ImportDropScan {
   const onBoard = boardPathSet()
-  const keep = (f: ScannedAudioFile) => !onBoard.has(pathKey(f.path))
-  const files = dedupeByPath(scan.files.filter(keep))
-  const folders = dedupeByPath(scan.folders)
+  const keepNew = (f: ScannedAudioFile) => !onBoard.has(pathKey(f.path))
+  // Loose files: skip paths already on the board. Folder rows stay even when
+  // those files already exist (same folder name as a tab) — commit adds tab
+  // membership instead of treating the folder as empty.
+  const files = dedupeByPath((scan.files ?? []).filter(keepNew))
+  const folders = dedupeByPath(scan.folders ?? [])
     .map((folder) => {
-      const groups = folder.groups
-        .map((g) => ({ ...g, audio: dedupeByPath(g.audio.filter(keep)) }))
+      const groups = (folder.groups ?? [])
+        .map((g) => ({ ...g, audio: dedupeByPath(g.audio ?? []) }))
         .filter((g) => g.audio.length > 0)
       return {
         ...folder,
-        rootAudio: dedupeByPath(folder.rootAudio.filter(keep)),
+        rootAudio: dedupeByPath(folder.rootAudio ?? []),
         groups,
       }
     })
@@ -70,10 +74,23 @@ function scanHasItems(scan: ImportDropScan): boolean {
   return scan.files.length > 0 || scan.folders.length > 0
 }
 
-function toReviewState(scan: ImportDropScan, defaultFileTab: string): ImportReviewState {
+function matchingTabName(folderName: string, tabs: { name: string }[]): string | null {
+  const n = String(folderName || '').trim().toLowerCase()
+  if (!n) return null
+  return tabs.find((t) => t.name.toLowerCase() === n)?.name ?? null
+}
+
+function toReviewState(
+  scan: ImportDropScan,
+  defaultFileTab: string,
+  namedTabs: { name: string }[],
+): ImportReviewState {
   return {
     files: scan.files.map((f) => ({ ...f, destTab: defaultFileTab })),
-    folders: scan.folders.map((f) => ({ ...f, destTab: NEW_TAB_DEST })),
+    folders: scan.folders.map((f) => ({
+      ...f,
+      destTab: matchingTabName(f.name, namedTabs) || NEW_TAB_DEST,
+    })),
     skipped: scan.skipped,
   }
 }
@@ -112,7 +129,7 @@ export async function presentImportPaths(paths: string[]) {
 
   let scan: ImportDropScan
   try {
-    scan = await inspectImportDrop(paths)
+    scan = normalizeImportScan(await inspectImportDrop(paths))
   } catch (e) {
     appStore.setErrorActive(String(e))
     return
@@ -132,7 +149,7 @@ export async function presentImportPaths(paths: string[]) {
   }
 
   const defaultFileTab = appStore.currentTab || 'All'
-  const next = toReviewState(scan, defaultFileTab)
+  const next = toReviewState(scan, defaultFileTab, namedTabs)
   if (reviewOpen && appStore.importReview) {
     appStore.setImportReview(mergeReviewState(appStore.importReview, next))
   } else {
@@ -153,7 +170,7 @@ export async function pickAudioFilesAndPresent() {
 export async function pickFoldersAndPresent() {
   const selected = await open({
     directory: true,
-    multiple: true,
+    multiple: false,
     title: tt('importReview.selectFolders'),
   })
   await restoreFocus()

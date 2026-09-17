@@ -401,6 +401,7 @@
     "assignAllFiles": "将所有文件分配到",
     "import": "导入",
     "selectFolders": "选择文件夹",
+    "addFolder": "添加文件夹",
     "fileCount": "{count} 个文件",
     "groupCount": "{count} 个分组",
     "skipped": "已跳过 {count} 项",

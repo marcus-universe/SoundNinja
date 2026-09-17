@@ -74,6 +74,7 @@
     </div>
 
     <div class="flex_c_h gap1 dialog-actions import-review-actions">
+      <UIButton @click="addFolder">{{ $t('importReview.addFolder') }}</UIButton>
       <UIButton @click="close">{{ $t('dialog.cancel') }}</UIButton>
       <UIButton @click="commit">{{ $t('importReview.import') }}</UIButton>
     </div>
@@ -81,7 +82,8 @@
 </template>
 
 <script setup>
-import { NEW_TAB_DEST, audioDisplayName, folderAudioCount } from '~/utils/importReview'
+import { NEW_TAB_DEST, audioDisplayName, folderAudioCount, folderGroups } from '~/utils/importReview'
+import { pickFoldersAndPresent } from '~/utils/importDrop'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -103,7 +105,7 @@ const skippedMessage = computed(() => {
 
 function folderHint(folder) {
   const files = folderAudioCount(folder)
-  const groups = folder.groups?.length ?? 0
+  const groups = folderGroups(folder).length
   const parts = []
   if (files) parts.push(t('importReview.fileCount', { count: files }))
   if (groups) parts.push(t('importReview.groupCount', { count: groups }))
@@ -115,6 +117,10 @@ function assignAllFiles() {
   for (const file of review.value.files) {
     file.destTab = applyAllTab.value
   }
+}
+
+function addFolder() {
+  void pickFoldersAndPresent()
 }
 
 function close() {

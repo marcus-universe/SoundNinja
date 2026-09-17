@@ -11,6 +11,8 @@ import { revokeAllGifUrls } from '~/utils/gifCache'
 import {
   NEW_TAB_DEST,
   audioDisplayName,
+  folderGroups,
+  folderRootAudio,
   pathKey,
   type ImportReviewState,
 } from '~/utils/importReview'
@@ -526,11 +528,30 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         || this.configFile.tabList.some((t) => t.name === name)
         || pendingTabs.has(name)
 
+      const existingTabIgnoreCase = (name: string) => {
+        const n = String(name || '').trim()
+        if (!n) return null
+        if (n.toLowerCase() === 'all') return 'All'
+        return this.configFile.tabList.find((t) => t.name.toLowerCase() === n.toLowerCase())?.name ?? null
+      }
+
       const folderDest = (folder: ImportReviewState['folders'][number]) => {
-        if (folder.destTab === NEW_TAB_DEST) {
-          return (folder.name || '').trim() || 'All'
-        }
-        return folder.destTab || 'All'
+        const raw = folder.destTab === NEW_TAB_DEST
+          ? (folder.name || '').trim() || 'All'
+          : folder.destTab || 'All'
+        return existingTabIgnoreCase(raw) || raw
+      }
+
+      const fileOnBoard = (path: string) =>
+        this.configFile.files.find((f) => pathKey(f.path) === pathKey(path))
+
+      const existingTabAdds: { path: string; destTab: string }[] = []
+      const adoptExisting = (path: string, destTab: string, bucket: string[]) => {
+        const existing = fileOnBoard(path)
+        if (!existing || destTab === 'All') return
+        if (existing.tabs.includes(destTab)) return
+        existingTabAdds.push({ path, destTab })
+        bucket.push(path)
       }
 
       for (const folder of review.folders) {
@@ -553,8 +574,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         const rootPaths: string[] = []
         const allPaths: string[] = []
 
-        for (const audio of folder.rootAudio) {
-          if (!takePath(audio.path)) continue
+        for (const audio of folderRootAudio(folder)) {
+          if (!takePath(audio.path)) {
+            adoptExisting(audio.path, destTab, rootPaths)
+            continue
+          }
           const sound = makeSound(audio.fileName, audio.path, destTab)
           newFiles.push(sound)
           rootPaths.push(sound.path)
@@ -571,10 +595,13 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
           }
         }
 
-        for (const group of folder.groups) {
+        for (const group of folderGroups(folder)) {
           const paths: string[] = []
           for (const audio of group.audio) {
-            if (!takePath(audio.path)) continue
+            if (!takePath(audio.path)) {
+              adoptExisting(audio.path, destTab, paths)
+              continue
+            }
             const sound = makeSound(audio.fileName, audio.path, destTab)
             newFiles.push(sound)
             paths.push(sound.path)
@@ -589,9 +616,14 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         if (destTab !== 'All') appendToEnd('All', allPaths)
       }
 
-      if (!newFiles.length && !newSeps.length && pendingTabs.size === 0) return
+      if (!newFiles.length && !newSeps.length && pendingTabs.size === 0 && !existingTabAdds.length) return
 
       this.pushBeforeChange()
+      for (const { path, destTab } of existingTabAdds) {
+        const file = fileOnBoard(path)
+        if (!file || destTab === 'All') continue
+        if (!file.tabs.includes(destTab)) file.tabs = [...file.tabs, destTab]
+      }
       for (const name of pendingTabs) {
         if (!this.configFile.tabList.some((t) => t.name === name)) {
           this.configFile.tabList.push({ name })

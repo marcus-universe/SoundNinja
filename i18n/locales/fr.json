@@ -401,6 +401,7 @@
     "assignAllFiles": "Assigner tous les fichiers à",
     "import": "Importer",
     "selectFolders": "Sélectionner des dossiers",
+    "addFolder": "Ajouter un dossier",
     "fileCount": "{count} fichiers",
     "groupCount": "{count} groupes",
     "skipped": "{count} éléments ignorés",
