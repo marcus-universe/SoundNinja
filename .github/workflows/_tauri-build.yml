@@ -145,7 +145,7 @@ jobs:
           tauriScript: npm run tauri
           args: ${{ inputs.args }}
 
-      - name: Upload installers and aliases to draft
+      - name: Upload stable installers to draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
@@ -157,20 +157,18 @@ jobs:
 
           workdir="$(mktemp -d)"
           upload=()
-
-          add_file() {
-            local src="$1"
-            upload+=("$src")
-            echo "Upload $(basename "$src")"
-          }
+          keep=()
 
           add_alias() {
             local src="$1"
             local alias_name="$2"
-            local dest="$workdir/$alias_name"
+            keep+=("$alias_name")
             if [ "$(basename "$src")" = "$alias_name" ]; then
+              upload+=("$src")
+              echo "Upload $alias_name"
               return
             fi
+            local dest="$workdir/$alias_name"
             cp "$src" "$dest"
             upload+=("$dest")
             echo "Alias $alias_name"
@@ -183,7 +181,6 @@ jobs:
                 echo "::error::No Windows NSIS installer found"
                 exit 1
               fi
-              add_file "${files[0]}"
               add_alias "${files[0]}" "soundninja-windows-x64-setup.exe"
               ;;
             linux)
@@ -193,9 +190,7 @@ jobs:
                 echo "::error::Linux build missing .deb or .AppImage"
                 exit 1
               fi
-              add_file "${debs[0]}"
               add_alias "${debs[0]}" "soundninja-linux-amd64.deb"
-              add_file "${images[0]}"
               add_alias "${images[0]}" "soundninja-linux-amd64.AppImage"
               ;;
             macos-arm)
@@ -204,7 +199,6 @@ jobs:
                 echo "::error::No macOS arm64 DMG found"
                 exit 1
               fi
-              add_file "${files[0]}"
               add_alias "${files[0]}" "soundninja-macos-arm64.dmg"
               ;;
             macos-intel)
@@ -213,7 +207,6 @@ jobs:
                 echo "::error::No macOS x64 DMG found"
                 exit 1
               fi
-              add_file "${files[0]}"
               add_alias "${files[0]}" "soundninja-macos-x64.dmg"
               ;;
             *)
@@ -224,3 +217,32 @@ jobs:
 
           gh release upload "$TAG" "${upload[@]}" --clobber
           echo "Uploaded ${#upload[@]} file(s) to $TAG"
+
+          is_keep() {
+            local name="$1"
+            local k
+            for k in "${keep[@]}"; do
+              [ "$name" = "$k" ] && return 0
+            done
+            return 1
+          }
+
+          stale=()
+          asset_names="$(gh release view "$TAG" --json assets --jq '.assets[].name // empty')"
+          while IFS= read -r name; do
+            [ -z "$name" ] && continue
+            is_keep "$name" && continue
+            case "$KIND:$name" in
+              windows:*x64-setup.exe) stale+=("$name") ;;
+              linux:*.deb|linux:*.AppImage) stale+=("$name") ;;
+              macos-arm:*_aarch64.dmg) stale+=("$name") ;;
+              macos-intel:*_x64.dmg) stale+=("$name") ;;
+            esac
+          done <<<"$asset_names"
+
+          if [ ${#stale[@]} -gt 0 ]; then
+            for name in "${stale[@]}"; do
+              echo "Delete stale asset $name"
+              gh release delete-asset "$TAG" "$name" --yes
+            done
+          fi

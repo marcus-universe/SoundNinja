@@ -230,21 +230,31 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
  Pop $8
 !macroend
 
-; Push buttons / checkbox / radio: Explorer dark theme (do not SetCtlColors — theme paints).
+; Push buttons: Explorer dark theme. Checkbox / radio / groupbox: strip
+; visual styles so SetCtlColors can paint light text (theme leaves it black).
 !macro DarkenButtonHwnd HWND
+ Push $7
  Push $8
  Push $9
  StrCpy $9 ${HWND}
  ${If} $9 != 0
-  StrCpy $8 $DarkAllowWindow
-  ${If} $8 != 0
-   System::Call '::$8(p r9, i 1)'
+  System::Call 'user32::GetWindowLong(p r9, i -16) i .r7'
+  IntOp $7 $7 & 0xF
+  ${If} $7 <= 1
+   StrCpy $8 $DarkAllowWindow
+   ${If} $8 != 0
+    System::Call '::$8(p r9, i 1)'
+   ${EndIf}
+   System::Call 'uxtheme::SetWindowTheme(p r9, w "Explorer", p 0)'
+   SendMessage $9 ${WM_THEMECHANGED} 0 0
+  ${Else}
+   System::Call 'uxtheme::SetWindowTheme(p r9, w " ", w " ")'
+   SetCtlColors $9 "EEEEEE" "222831"
   ${EndIf}
-  System::Call 'uxtheme::SetWindowTheme(p r9, w "Explorer", p 0)'
-  SendMessage $9 ${WM_THEMECHANGED} 0 0
  ${EndIf}
  Pop $9
  Pop $8
+ Pop $7
 !macroend
 
 !macro DarkenEditHwnd HWND
