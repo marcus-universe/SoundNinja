@@ -55,23 +55,22 @@ jobs:
           }
 
           windows=true
-          if has '*x64-setup.exe' || has 'soundninja-windows-x64-setup.exe'; then
+          if has 'soundninja-windows-x64-setup.exe'; then
             windows=false
           fi
 
           linux=true
-          if { has '*_amd64.deb' || has 'soundninja-linux-amd64.deb'; } \
-             && { has '*_amd64.AppImage' || has 'soundninja-linux-amd64.AppImage'; }; then
+          if has 'soundninja-linux-amd64.deb' && has 'soundninja-linux-amd64.AppImage'; then
             linux=false
           fi
 
           macos_arm=true
-          if has '*_aarch64.dmg' || has 'soundninja-macos-arm64.dmg'; then
+          if has 'soundninja-macos-arm64.dmg'; then
             macos_arm=false
           fi
 
           macos_intel=true
-          if has '*_x64.dmg' || has 'soundninja-macos-x64.dmg'; then
+          if has 'soundninja-macos-x64.dmg'; then
             macos_intel=false
           fi
 
