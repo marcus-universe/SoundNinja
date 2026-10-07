@@ -12,8 +12,31 @@ SIGN="${SIGN:-0}"
 CARCH_BUILD="${CARCH_BUILD:-x86_64}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist-upload}"
 
+# Pacman 7 Landlock sandbox fails inside GitHub Actions Docker
+# ("restricting filesystem access failed" / "switching to sandbox user 'alpm' failed").
+disable_pacman_sandbox() {
+  [[ -f /etc/pacman.conf ]] || return 0
+  if grep -qE '^#?DisableSandbox' /etc/pacman.conf; then
+    sed -i 's/^#DisableSandbox/DisableSandbox/' /etc/pacman.conf
+  else
+    printf '\nDisableSandbox\n' >> /etc/pacman.conf
+  fi
+  if grep -qE '^DownloadUser' /etc/pacman.conf; then
+    sed -i 's/^DownloadUser.*/DownloadUser = root/' /etc/pacman.conf
+  fi
+}
+
+pacman_cmd() {
+  if pacman --help 2>&1 | grep -q -- '--disable-sandbox'; then
+    pacman --disable-sandbox "$@"
+  else
+    pacman "$@"
+  fi
+}
+
 if [[ "$(id -u)" -eq 0 ]]; then
-  pacman -Syu --noconfirm --needed base-devel namcap git python sudo
+  disable_pacman_sandbox
+  pacman_cmd -Syu --noconfirm --needed base-devel namcap git python sudo
   id builder >/dev/null 2>&1 || useradd -m builder
   echo "builder ALL=(ALL) NOPASSWD: ALL" >/etc/sudoers.d/builder
   chmod 440 /etc/sudoers.d/builder
@@ -145,7 +168,11 @@ fi
 shopt -s nullglob
 pkgs=(soundninja-bin-*.pkg.tar.zst soundninja-bin-*.pkg.tar.xz)
 if [[ ${#pkgs[@]} -gt 0 ]] && command -v pacman >/dev/null; then
-  sudo pacman -U --noconfirm "${pkgs[@]}"
+  if pacman --help 2>&1 | grep -q -- '--disable-sandbox'; then
+    sudo pacman --disable-sandbox -U --noconfirm "${pkgs[@]}"
+  else
+    sudo pacman -U --noconfirm "${pkgs[@]}"
+  fi
 fi
 
 # Restore URL-based PKGBUILD with real checksums for the AUR tarball.
