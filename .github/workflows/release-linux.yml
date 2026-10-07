@@ -356,7 +356,8 @@ jobs:
               fingerprint="${{ steps.gpg.outputs.fingerprint }}"
             fi
             gpg --armor --export "$fingerprint" > dist-upload/soundninja-signing-key.asc
-            export GPG_PUBLIC_KEY="$(cat dist-upload/soundninja-signing-key.asc)"
+            GPG_PUBLIC_KEY="$(cat dist-upload/soundninja-signing-key.asc)"
+            export GPG_PUBLIC_KEY
           else
             echo "::warning::GPG_PRIVATE_KEY unset; SHA256SUMS only, no .asc signatures"
           fi

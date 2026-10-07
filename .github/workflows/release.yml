@@ -52,6 +52,8 @@ jobs:
             local pat="$1"
             while IFS= read -r name; do
               [ -z "$name" ] && continue
+              # Intentional glob: callers pass patterns like soundninja-aur-*.tar.gz
+              # shellcheck disable=SC2254
               case "$name" in
                 $pat) return 0 ;;
               esac
@@ -95,13 +97,15 @@ jobs:
           fi
           # glob in has() uses case, so soundninja-aur-*.tar.gz works
 
-          echo "windows=$windows" >> "$GITHUB_OUTPUT"
-          echo "linux=$linux" >> "$GITHUB_OUTPUT"
-          echo "linux_arm64=$linux_arm64" >> "$GITHUB_OUTPUT"
-          echo "linux_armhf=$linux_armhf" >> "$GITHUB_OUTPUT"
-          echo "macos_arm=$macos_arm" >> "$GITHUB_OUTPUT"
-          echo "macos_intel=$macos_intel" >> "$GITHUB_OUTPUT"
-          echo "aur=$aur" >> "$GITHUB_OUTPUT"
+          {
+            echo "windows=$windows"
+            echo "linux=$linux"
+            echo "linux_arm64=$linux_arm64"
+            echo "linux_armhf=$linux_armhf"
+            echo "macos_arm=$macos_arm"
+            echo "macos_intel=$macos_intel"
+            echo "aur=$aur"
+          } >> "$GITHUB_OUTPUT"
 
           echo "Draft ${{ steps.draft.outputs.tag }}"
           echo "windows=$windows linux=$linux linux_arm64=$linux_arm64 linux_armhf=$linux_armhf aur=$aur macos_arm=$macos_arm macos_intel=$macos_intel"
@@ -176,9 +180,13 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          tar=aur-dist/soundninja-aur-*.tar.gz
+          tarballs=(aur-dist/soundninja-aur-*.tar.gz)
+          if [ ${#tarballs[@]} -eq 0 ]; then
+            echo "::error::No soundninja-aur-*.tar.gz in artifact"
+            exit 1
+          fi
           mkdir -p aur-publish
-          tar -xzf $tar -C aur-publish
+          tar -xzf "${tarballs[0]}" -C aur-publish
           ls -la aur-publish
 
       - name: Update AUR package

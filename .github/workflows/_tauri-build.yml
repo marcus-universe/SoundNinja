@@ -155,9 +155,11 @@ jobs:
           if [ -z "$fingerprint" ]; then
             fingerprint="${{ steps.gpg.outputs.fingerprint }}"
           fi
-          echo "SIGN=1" >> "$GITHUB_ENV"
-          echo "SIGN_KEY=$fingerprint" >> "$GITHUB_ENV"
-          echo "APPIMAGETOOL_SIGN_PASSPHRASE=${{ secrets.GPG_PASSPHRASE }}" >> "$GITHUB_ENV"
+          {
+            echo "SIGN=1"
+            echo "SIGN_KEY=$fingerprint"
+            echo "APPIMAGETOOL_SIGN_PASSPHRASE=${{ secrets.GPG_PASSPHRASE }}"
+          } >> "$GITHUB_ENV"
 
       - name: Install frontend dependencies
         run: npm ci
@@ -257,7 +259,7 @@ jobs:
             [ -z "$name" ] && continue
             is_keep "$name" && continue
             case "$name" in
-              *.asc|SHA256SUMS|SHA256SUMS.asc|soundninja-signing-key.asc|*.pkg.tar.*|soundninja-aur-*) continue ;;
+              *.asc|SHA256SUMS|soundninja-signing-key.asc|*.pkg.tar.*|soundninja-aur-*) continue ;;
             esac
             case "$KIND:$name" in
               windows:*x64-setup.exe) stale+=("$name") ;;

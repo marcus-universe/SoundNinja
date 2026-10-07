@@ -47,21 +47,25 @@ jobs:
             soundninja-linux-amd64.AppImage \
             soundninja-linux-arm64.deb \
             soundninja-linux-arm64.AppImage \
-            soundninja-linux-armhf.deb \
-            soundninja-aur-*.tar.gz
+            soundninja-linux-armhf.deb
           do
-            # shell glob for aur tarball
-            if ! ls $f >/dev/null 2>&1; then
+            if [ ! -f "$f" ]; then
               echo "::error::Missing $f"
               exit 1
             fi
           done
-          if ls soundninja-bin-*-x86_64.pkg.tar.* >/dev/null 2>&1; then
-            echo "Have x86_64 pkg"
-          else
+          shopt -s nullglob
+          aur_tarballs=(soundninja-aur-*.tar.gz)
+          if [ ${#aur_tarballs[@]} -eq 0 ]; then
+            echo "::error::Missing soundninja-aur-*.tar.gz"
+            exit 1
+          fi
+          pkgs=(soundninja-bin-*-x86_64.pkg.tar.*)
+          if [ ${#pkgs[@]} -eq 0 ]; then
             echo "::error::Missing x86_64 pkg.tar"
             exit 1
           fi
+          echo "Have ${aur_tarballs[0]} and ${pkgs[0]}"
 
       - name: Verify GPG signatures when present
         run: |
