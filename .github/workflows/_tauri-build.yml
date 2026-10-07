@@ -259,7 +259,7 @@ jobs:
             [ -z "$name" ] && continue
             is_keep "$name" && continue
             case "$name" in
-              *.asc|SHA256SUMS|soundninja-signing-key.asc|*.pkg.tar.*|soundninja-aur-*) continue ;;
+              *.asc|SHA256SUMS|*.pkg.tar.*|soundninja-aur-*) continue ;;
             esac
             case "$KIND:$name" in
               windows:*x64-setup.exe) stale+=("$name") ;;
