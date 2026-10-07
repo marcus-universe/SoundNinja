@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+      - dev
 
 env:
   CARGO_INCREMENTAL: 0
@@ -13,6 +14,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  actionlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run actionlint
+        run: |
+          set -euo pipefail
+          bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
   rust:
     runs-on: ubuntu-24.04
     defaults:

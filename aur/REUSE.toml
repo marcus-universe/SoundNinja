@@ -1,0 +1,15 @@
+version = 1
+
+SPDX-PackageName = "soundninja-bin"
+SPDX-PackageSupplier = "Marcus Universe <contact@marcus-universe.de>"
+SPDX-PackageDownloadLocation = "https://aur.archlinux.org/packages/soundninja-bin"
+
+[[annotations]]
+path = [
+    "PKGBUILD",
+    ".SRCINFO",
+    "LICENSE",
+    "REUSE.toml",
+]
+SPDX-FileCopyrightText = "2026 Marcus Universe <contact@marcus-universe.de>"
+SPDX-License-Identifier = "0BSD"

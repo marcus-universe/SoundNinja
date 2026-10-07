@@ -2,9 +2,10 @@
 name = "app"
 version = "0.8.0"
 description = "Sound Ninja"
-authors = ["you"]
-license = ""
-repository = ""
+authors = ["Marcus Universe <contact@marcus-universe.de>"]
+license = "GPL-3.0-only"
+repository = "https://github.com/marcus-universe/SoundNinja"
+homepage = "https://marcus-universe.github.io/SoundNinja/"
 default-run = "app"
 edition = "2021"
 rust-version = "1.88"

@@ -4,41 +4,387 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version override (e.g. 0.7.0). Leave empty to use src-tauri/tauri.conf.json. Creates a draft if none exists."
+        description: "Version override (e.g. 0.8.0). Leave empty to use src-tauri/tauri.conf.json. Creates a draft if none exists."
         required: false
         type: string
+      build_x64:
+        description: Build linux amd64 (deb + AppImage)
+        required: false
+        type: boolean
+        default: true
+      build_arm64:
+        description: Build linux arm64 / aarch64 (deb + AppImage, Steam Frame)
+        required: false
+        type: boolean
+        default: true
+      build_armhf:
+        description: Build linux armhf / ARMv7 (deb only, no stems)
+        required: false
+        type: boolean
+        default: true
+      publish:
+        description: Upload to the GitHub Release draft
+        required: false
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       version:
         required: false
         type: string
+      build_x64:
+        required: false
+        type: boolean
+        default: true
+      build_arm64:
+        required: false
+        type: boolean
+        default: true
+      build_armhf:
+        required: false
+        type: boolean
+        default: true
+      publish:
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   guard:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
-      tag: ${{ steps.draft.outputs.tag }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
       - name: Require release draft
+        if: inputs.publish
         id: draft
         uses: ./.github/actions/require-release-draft
         with:
           version: ${{ inputs.version }}
 
-  build:
+      - name: Resolve version
+        id: meta
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+          DRAFT_TAG: ${{ steps.draft.outputs.tag }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DRAFT_TAG}" ]; then
+            VER="${DRAFT_TAG#v}"
+            echo "tag=${DRAFT_TAG}" >> "$GITHUB_OUTPUT"
+            echo "version=${VER}" >> "$GITHUB_OUTPUT"
+            echo "Using draft tag=${DRAFT_TAG}"
+            exit 0
+          fi
+          if [ -n "${VERSION_INPUT}" ]; then
+            VER="${VERSION_INPUT#v}"
+          else
+            VER="$(jq -r .version src-tauri/tauri.conf.json)"
+          fi
+          echo "tag=v${VER}" >> "$GITHUB_OUTPUT"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "Using tag=v${VER} publish=${PUBLISH}"
+
+  linux-x64:
     needs: guard
+    if: inputs.build_x64
     uses: ./.github/workflows/_tauri-build.yml
     with:
       tag: ${{ needs.guard.outputs.tag }}
-      runner: ubuntu-24.04
+      runner: ubuntu-22.04
       rust_targets: x86_64-unknown-linux-gnu
       cache_key: linux-x64
       args: "--target x86_64-unknown-linux-gnu --bundles deb,appimage -- --features stems"
-      kind: linux
+      kind: linux-x64
+      publish: ${{ inputs.publish }}
     secrets: inherit
+
+  linux-arm64:
+    needs: guard
+    if: inputs.build_arm64
+    uses: ./.github/workflows/_tauri-build.yml
+    with:
+      tag: ${{ needs.guard.outputs.tag }}
+      runner: ubuntu-22.04-arm
+      rust_targets: aarch64-unknown-linux-gnu
+      cache_key: linux-arm64
+      args: "--target aarch64-unknown-linux-gnu --bundles deb,appimage -- --features stems"
+      kind: linux-arm64
+      publish: ${{ inputs.publish }}
+    secrets: inherit
+
+  linux-armhf:
+    needs: guard
+    if: inputs.build_armhf
+    uses: ./.github/workflows/_tauri-build.yml
+    with:
+      tag: ${{ needs.guard.outputs.tag }}
+      runner: ubuntu-22.04
+      rust_targets: armv7-unknown-linux-gnueabihf
+      cache_key: linux-armhf
+      args: "--target armv7-unknown-linux-gnueabihf --bundles deb"
+      kind: linux-armhf
+      publish: ${{ inputs.publish }}
+      cross: true
+    secrets: inherit
+
+  aur-package:
+    needs: [guard, linux-x64, linux-arm64, linux-armhf]
+    if: ${{ always() && needs.guard.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download linux artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: collected
+          merge-multiple: true
+          pattern: linux-*
+
+      - name: Fetch missing debs from draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p collected
+          cd collected
+          for name in soundninja-linux-amd64.deb soundninja-linux-arm64.deb soundninja-linux-armhf.deb; do
+            if [ -f "$name" ]; then
+              echo "Have $name"
+              continue
+            fi
+            gh release download "$TAG" --pattern "$name" --clobber || echo "::warning::Could not download $name from $TAG"
+          done
+          ls -la
+
+      - name: Build AUR package (x86_64)
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+          SIGN: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p collected dist-upload
+          docker run --rm \
+            -e VERSION -e GPG_FINGERPRINT -e SIGN \
+            -e GITHUB_WORKSPACE=/work \
+            -e ARTIFACT_DIR=/work/collected \
+            -e AUR_DIR=/work/aur \
+            -e OUT_DIR=/work/dist-upload \
+            -e CARCH_BUILD=x86_64 \
+            -v "$PWD":/work \
+            -w /work \
+            archlinux:base-devel \
+            bash /work/.github/scripts/prepare-aur.sh
+
+      - name: Upload AUR artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aur
+          path: dist-upload/*
+          if-no-files-found: error
+
+      - name: Attach AUR assets to draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(dist-upload/*)
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+  aur-package-aarch64:
+    needs: [guard, linux-arm64]
+    if: ${{ always() && needs.guard.result == 'success' && (needs.linux-arm64.result == 'success' || needs.linux-arm64.result == 'skipped') }}
+    runs-on: ubuntu-22.04-arm
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: linux-arm64
+          path: collected
+
+      - name: Fetch arm64 deb from draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          mkdir -p collected
+          if [ -f collected/soundninja-linux-arm64.deb ]; then
+            echo "Have arm64 deb"
+            exit 0
+          fi
+          gh release download "$TAG" --pattern "soundninja-linux-arm64.deb" --dir collected --clobber || true
+
+      - name: Build AUR package (aarch64)
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+          SIGN: "0"
+        run: |
+          set -euo pipefail
+          if [ ! -f collected/soundninja-linux-arm64.deb ]; then
+            echo "::warning::No arm64 deb; skip aarch64 pkg"
+            exit 0
+          fi
+          mkdir -p dist-upload
+          docker run --rm \
+            -e VERSION -e GPG_FINGERPRINT -e SIGN \
+            -e GITHUB_WORKSPACE=/work \
+            -e ARTIFACT_DIR=/work/collected \
+            -e AUR_DIR=/work/aur \
+            -e OUT_DIR=/work/dist-upload \
+            -e CARCH_BUILD=aarch64 \
+            -v "$PWD":/work \
+            -w /work \
+            menci/archlinuxarm:base-devel \
+            bash /work/.github/scripts/prepare-aur.sh
+
+      - name: Upload aarch64 pkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: aur-aarch64
+          path: dist-upload/*
+          if-no-files-found: ignore
+
+      - name: Attach aarch64 pkg to draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          files=(dist-upload/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No aarch64 pkg to attach"
+            exit 0
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+  sign-and-publish:
+    needs: [guard, linux-x64, linux-arm64, linux-armhf, aur-package, aur-package-aarch64]
+    if: ${{ always() && needs.guard.result == 'success' && !contains(needs.linux-x64.result, 'failure') && !contains(needs.linux-arm64.result, 'failure') && !contains(needs.linux-armhf.result, 'failure') && !contains(needs.aur-package.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download all package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-upload
+          merge-multiple: true
+
+      - name: Fetch missing linux assets from draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-upload
+          names="$(gh release view "$TAG" --json assets --jq '.assets[].name // empty')"
+          while IFS= read -r name; do
+            [ -z "$name" ] && continue
+            [ -f "dist-upload/$name" ] && continue
+            case "$name" in
+              soundninja-linux-*|soundninja-bin-*|soundninja-aur-*)
+                gh release download "$TAG" --pattern "$name" --dir dist-upload --clobber
+                ;;
+            esac
+          done <<<"$names"
+          ls -la dist-upload
+
+      - name: Check GPG secret
+        id: gpgcheck
+        env:
+          KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo "has_gpg=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_gpg=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import GPG key
+        id: gpg
+        if: steps.gpgcheck.outputs.has_gpg == 'true'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign assets and write SHA256SUMS
+        env:
+          SIGN: ${{ steps.gpgcheck.outputs.has_gpg }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+          OUT_DIR: dist-upload
+        run: |
+          set -euo pipefail
+          if [ "$SIGN" = "true" ]; then
+            SIGN=1
+            export SIGN
+            fingerprint="${GPG_FINGERPRINT}"
+            if [ -z "$fingerprint" ]; then
+              fingerprint="${{ steps.gpg.outputs.fingerprint }}"
+            fi
+            gpg --armor --export "$fingerprint" > dist-upload/soundninja-signing-key.asc
+            export GPG_PUBLIC_KEY="$(cat dist-upload/soundninja-signing-key.asc)"
+          else
+            echo "::warning::GPG_PRIVATE_KEY unset; SHA256SUMS only, no .asc signatures"
+          fi
+          bash .github/scripts/sign-assets.sh
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist-upload/*
+
+      - name: Upload signed artifact set
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-signed
+          path: dist-upload/*
+          if-no-files-found: error
+
+      - name: Attach signatures to draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(dist-upload/*.asc dist-upload/SHA256SUMS dist-upload/SHA256SUMS.asc dist-upload/soundninja-signing-key.asc)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No signature files to upload"
+            exit 0
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
