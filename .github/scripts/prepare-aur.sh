@@ -11,6 +11,8 @@ VERSION="${VERSION:?VERSION is required}"
 SIGN="${SIGN:-0}"
 CARCH_BUILD="${CARCH_BUILD:-x86_64}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist-upload}"
+# 1: publishable AUR bundle, all three debs required. 0: only build/test the CARCH_BUILD package.
+REQUIRE_ALL_DEBS="${REQUIRE_ALL_DEBS:-1}"
 
 # Pacman 7 Landlock sandbox fails inside GitHub Actions Docker
 # ("restricting filesystem access failed" / "switching to sandbox user 'alpm' failed").
@@ -50,6 +52,7 @@ if [[ "$(id -u)" -eq 0 ]]; then
     SIGN=$(printf %q "$SIGN") \
     CARCH_BUILD=$(printf %q "$CARCH_BUILD") \
     OUT_DIR=$(printf %q "$OUT_DIR") \
+    REQUIRE_ALL_DEBS=$(printf %q "$REQUIRE_ALL_DEBS") \
     GPG_FINGERPRINT=$(printf %q "${GPG_FINGERPRINT:-}") \
     bash $(printf %q "$0")"
 fi
@@ -94,7 +97,7 @@ hash_or_skip() {
 sum_x64="$(hash_or_skip "$AUR_DIR/soundninja-bin-${VERSION}-x86_64.deb")"
 sum_arm64="$(hash_or_skip "$AUR_DIR/soundninja-bin-${VERSION}-aarch64.deb")"
 sum_armhf="$(hash_or_skip "$AUR_DIR/soundninja-bin-${VERSION}-armv7h.deb")"
-if [[ "$sum_x64" == "SKIP" || "$sum_arm64" == "SKIP" || "$sum_armhf" == "SKIP" ]]; then
+if [[ "$REQUIRE_ALL_DEBS" == "1" ]] && [[ "$sum_x64" == "SKIP" || "$sum_arm64" == "SKIP" || "$sum_armhf" == "SKIP" ]]; then
   echo "::error::Incomplete AUR package: need amd64, arm64, and armhf debs (got x64=$sum_x64 arm64=$sum_arm64 armhf=$sum_armhf)"
   ls -la "$ART" "$AUR_DIR" || true
   exit 1
@@ -179,11 +182,13 @@ fi
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$ROOT" checkout -- aur/PKGBUILD
 fi
-apply_metadata
-makepkg --printsrcinfo > .SRCINFO
 
-tar czf "$OUT_DIR/soundninja-aur-${VERSION}.tar.gz" \
-  PKGBUILD .SRCINFO LICENSE REUSE.toml GPL-3.0-only.txt
+if [[ "$REQUIRE_ALL_DEBS" == "1" ]]; then
+  apply_metadata
+  makepkg --printsrcinfo > .SRCINFO
+  tar czf "$OUT_DIR/soundninja-aur-${VERSION}.tar.gz" \
+    PKGBUILD .SRCINFO LICENSE REUSE.toml GPL-3.0-only.txt
+fi
 
 for pkg in soundninja-bin-*.pkg.tar.zst soundninja-bin-*.pkg.tar.xz; do
   [[ -e "$pkg" ]] || continue

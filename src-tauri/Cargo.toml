@@ -95,7 +95,7 @@ rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee9
 tempfile = "3"
 
 [lints.rust]
-future-incompatible = "warn"
+future_incompatible = "warn"
 
 [lints.clippy]
 all = { level = "warn", priority = 10 }

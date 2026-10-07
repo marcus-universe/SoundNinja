@@ -258,6 +258,7 @@ jobs:
             -e AUR_DIR=/work/aur \
             -e OUT_DIR=/work/dist-upload \
             -e CARCH_BUILD=aarch64 \
+            -e REQUIRE_ALL_DEBS=0 \
             -v "$PWD":/work \
             -w /work \
             menci/archlinuxarm:base-devel \
