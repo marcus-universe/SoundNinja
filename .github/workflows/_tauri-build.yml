@@ -80,7 +80,8 @@ jobs:
             libpulse-dev \
             mold \
             xvfb \
-            file
+            file \
+            xdg-utils
 
       - name: Use mold as linker
         if: runner.os == 'Linux' && inputs.kind != 'linux-armhf'

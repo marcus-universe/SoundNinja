@@ -3,7 +3,7 @@
 set -euo pipefail
 
 KIND="${KIND:?KIND is required}"
-OUT="${OUT_DIR:-dist-upload}"
+OUT="$(cd "${OUT_DIR:-dist-upload}" && pwd)"
 
 check_deb_meta() {
   local deb="$1"

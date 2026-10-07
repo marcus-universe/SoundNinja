@@ -62,17 +62,29 @@ sudo apt-get install -y \
   libgtk-3-dev:armhf \
   libglib2.0-dev:armhf \
   libsoup-3.0-dev:armhf \
-  libjavascriptcoregtk-4.1-dev:armhf
+  libjavascriptcoregtk-4.1-dev:armhf \
+  libx11-dev:armhf \
+  libxext-dev:armhf \
+  libxrender-dev:armhf \
+  libgdk-pixbuf-2.0-dev:armhf \
+  x11proto-dev \
+  shared-mime-info
 
 {
   echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc"
   echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc"
   echo "CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++"
   echo "PKG_CONFIG_ALLOW_CROSS=1"
-  echo "PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig"
-  echo "PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig"
-  echo "PKG_CONFIG_SYSROOT_DIR=/"
+  echo "PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig"
   echo "BINDGEN_EXTRA_CLANG_ARGS=--target=arm-linux-gnueabihf -I/usr/include -I/usr/include/arm-linux-gnueabihf"
 } >> "$GITHUB_ENV"
+# PKG_CONFIG_LIBDIR replaces the default search path and hides /usr/share/pkgconfig
+# (xproto.pc etc.). Leave it unset.
+
+if ! PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig pkg-config --exists gdk-3.0; then
+  echo "::error::gdk-3.0.pc still missing after armhf sysroot setup"
+  ls -la /usr/lib/arm-linux-gnueabihf/pkgconfig/gdk*.pc /usr/share/pkgconfig/xproto.pc || true
+  exit 1
+fi
 
 echo "armhf cross toolchain ready ($(pkg-config --modversion libpipewire-0.3 2>/dev/null || echo unknown pipewire))"
