@@ -1,16 +1,44 @@
 #!/usr/bin/env bash
-# Cross-compile sysroot for armv7-unknown-linux-gnueabihf on Ubuntu 22.04 amd64.
+# Cross-compile sysroot for armv7-unknown-linux-gnueabihf.
+# PipeWire/libspa 0.10 bindgen needs Ubuntu 24.04 (noble) headers; jammy is too old.
 set -euo pipefail
 
 sudo dpkg --add-architecture armhf
-
 codename="$(lsb_release -cs)"
-# Keep host arch on archive.ubuntu.com; armhf comes from ports.
-if [[ -f /etc/apt/sources.list ]]; then
+
+# Host packages stay on archive.ubuntu.com; armhf comes from ports.
+if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+  # Ubuntu 24.04+ deb822
+  sudo tee /etc/apt/sources.list.d/ubuntu.sources >/dev/null <<EOF
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: ${codename} ${codename}-updates ${codename}-backports
+Components: main universe restricted multiverse
+Architectures: amd64
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: ${codename}-security
+Components: main universe restricted multiverse
+Architectures: amd64
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+elif [[ -f /etc/apt/sources.list ]]; then
   sudo sed -i -E 's/^deb ([^[])/deb [arch=amd64] \1/' /etc/apt/sources.list
   sudo sed -i -E 's/^deb-src /# deb-src /' /etc/apt/sources.list
 fi
 
+sudo tee /etc/apt/sources.list.d/armhf-ports.sources >/dev/null <<EOF
+Types: deb
+URIs: http://ports.ubuntu.com/ubuntu-ports
+Suites: ${codename} ${codename}-updates ${codename}-security
+Components: main universe restricted multiverse
+Architectures: armhf
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+# Legacy list form as fallback for apt versions that ignore the .sources file name.
 sudo tee /etc/apt/sources.list.d/armhf-ports.list >/dev/null <<EOF
 deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports ${codename} main restricted universe multiverse
 deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports ${codename}-updates main restricted universe multiverse
@@ -47,4 +75,4 @@ sudo apt-get install -y \
   echo "BINDGEN_EXTRA_CLANG_ARGS=--target=arm-linux-gnueabihf -I/usr/include -I/usr/include/arm-linux-gnueabihf"
 } >> "$GITHUB_ENV"
 
-echo "armhf cross toolchain ready"
+echo "armhf cross toolchain ready ($(pkg-config --modversion libpipewire-0.3 2>/dev/null || echo unknown pipewire))"

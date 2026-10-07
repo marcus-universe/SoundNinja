@@ -101,7 +101,7 @@ jobs:
     uses: ./.github/workflows/_tauri-build.yml
     with:
       tag: ${{ needs.guard.outputs.tag }}
-      runner: ubuntu-22.04
+      runner: ubuntu-24.04
       rust_targets: x86_64-unknown-linux-gnu
       cache_key: linux-x64
       args: "--target x86_64-unknown-linux-gnu --bundles deb,appimage -- --features stems"
@@ -115,7 +115,7 @@ jobs:
     uses: ./.github/workflows/_tauri-build.yml
     with:
       tag: ${{ needs.guard.outputs.tag }}
-      runner: ubuntu-22.04-arm
+      runner: ubuntu-24.04-arm
       rust_targets: aarch64-unknown-linux-gnu
       cache_key: linux-arm64
       args: "--target aarch64-unknown-linux-gnu --bundles deb,appimage -- --features stems"
@@ -129,7 +129,7 @@ jobs:
     uses: ./.github/workflows/_tauri-build.yml
     with:
       tag: ${{ needs.guard.outputs.tag }}
-      runner: ubuntu-22.04
+      runner: ubuntu-24.04
       rust_targets: armv7-unknown-linux-gnueabihf
       cache_key: linux-armhf
       args: "--target armv7-unknown-linux-gnueabihf --bundles deb"

@@ -15,17 +15,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04
             rust_targets: x86_64-unknown-linux-gnu
             cache_key: linux-x64
             extra: linux-native
             cargo_args: "--target x86_64-unknown-linux-gnu --features stems"
-          - runner: ubuntu-22.04-arm
+          - runner: ubuntu-24.04-arm
             rust_targets: aarch64-unknown-linux-gnu
             cache_key: linux-arm64
             extra: linux-native
             cargo_args: "--target aarch64-unknown-linux-gnu --features stems"
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04
             rust_targets: armv7-unknown-linux-gnueabihf
             cache_key: linux-armhf
             extra: linux-armhf
