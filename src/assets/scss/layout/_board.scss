@@ -328,7 +328,9 @@
         }
       }
 
-      .Soundbtn {
+      // Sortable's drag ghost is cloned onto <body>, outside this nesting.
+      @at-root #{&} .Soundbtn,
+      body > .Soundbtn.sortable-fallback {
         font-family: var(--font-btn, #{$fontBold});
         font-size: var(--font-size-btn, var(--font-size-md));
         color: var(--sound-text, #{$white});
@@ -465,12 +467,25 @@
           background-color: transparent;
         }
 
+        &.has-gif.gif-title-chip .sound-label::before {
+          content: '';
+          position: absolute;
+          inset: calc(-1 * var(--title-chip-pad-y, 0.12rem)) calc(-1 * var(--title-chip-pad-x, 0.4rem));
+          z-index: -1;
+          border-radius: var(--border-radius);
+          background-color: var(--btn-bg, var(--color-btn));
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          pointer-events: none;
+        }
+
         &.has-gif.gif-title-chip:hover .sound-label,
         &.has-gif.gif-title-chip.active .sound-label {
-          background-color: var(--btn-bg, var(--color-btn));
           color: var(--btn-text, var(--sound-text));
-          padding: var(--title-chip-pad-y, 0.12rem) var(--title-chip-pad-x, 0.4rem);
-          border-radius: var(--border-radius);
+
+          &::before {
+            opacity: 1;
+          }
         }
 
         .sound-id-chip {
@@ -506,6 +521,42 @@
       }
     }
   }
+}
+
+// Other selected buttons while a multi-drag carries them in the stack ghost.
+.Soundbtn.sound-drag-away {
+  display: none;
+}
+
+body > .Soundbtn.sortable-fallback {
+  cursor: grabbing;
+  opacity: 0.92 !important;
+
+  // No progress fill on the ghost.
+  &::before {
+    display: none;
+  }
+}
+
+body > .Soundbtn.sound-drag-stack__card {
+  opacity: 0.85 !important;
+  filter: brightness(0.82);
+}
+
+.sound-drag-stack__count {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 5;
+  min-width: 1.6rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--color-bg, #{$color-bg});
+  background: var(--primary_color);
+  pointer-events: none;
 }
 
 @keyframes sound-spin {

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.8.0"
+version = "0.8.1"
 description = "Sound Ninja"
 authors = ["Marcus Universe <contact@marcus-universe.de>"]
 license = "GPL-3.0-only"

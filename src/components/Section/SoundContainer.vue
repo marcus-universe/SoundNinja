@@ -36,6 +36,7 @@
                 <SoundButton
                     v-for="sound in orphanSounds"
                     :key="'s:' + sound.path"
+                    :class="{ 'sound-drag-away': dragAwayPaths.has(sound.path) }"
                     :sound="sound"
                     :btnStyle="getBtnStyle(sound)"
                     :loading="loadingPaths.has(sound.path)"
@@ -81,6 +82,7 @@
                         <SoundButton
                             v-for="sound in sec.sounds"
                             :key="'s:' + sound.path"
+                            :class="{ 'sound-drag-away': dragAwayPaths.has(sound.path) }"
                             :sound="sound"
                             :btnStyle="getBtnStyle(sound)"
                             :loading="loadingPaths.has(sound.path)"
@@ -366,7 +368,6 @@ const allDisplaySounds = computed(() => {
 
 function reorderDisabled() {
   return jsonStore.configFile?.settings?.allowReorder === false
-    || appStore.multiSelectActive
     || !groupedLayout.value
 }
 
@@ -424,11 +425,116 @@ function onOuterEnd(evt) {
   jsonStore.moveGroupWithMembers(currentTab.value, arr)
 }
 
+/** Paths carried along with the dragged button (multi-select), board order, excluding it. */
+let dragCarried = []
+/** True from drag start until the click/pointerup that ends it has been dispatched. */
+let dragGuard = false
+const dragAwayPaths = reactive(new Set())
+
+function onInnerStart(evt) {
+  dragGuard = true
+  dragCarried = []
+  const path = evt.item?.getAttribute('data-sound-path')
+  const selected = appStore.selectedSoundPaths
+  if (!appStore.multiSelectActive || !path || !selected.includes(path) || selected.length < 2) return
+  const set = new Set(selected)
+  dragCarried = allDisplaySounds.value
+    .map((s) => s.path)
+    .filter((p) => p !== path && set.has(p))
+  if (!dragCarried.length) return
+  buildDragStack(dragCarried)
+  for (const p of dragCarried) dragAwayPaths.add(p)
+}
+
+const STACK_MAX = 6
+const STACK_STEP_PX = 8
+/** @type {HTMLElement[]} */
+let stackCards = []
+let stackRaf = 0
+
+/** Fan copies of the carried buttons out behind Sortable's ghost. */
+function buildDragStack(paths) {
+  const ghost = Sortable.ghost
+  if (!ghost) return
+  const root = boardRef.value
+  const shown = paths.slice(0, STACK_MAX)
+  shown.forEach((p, i) => {
+    const src = root?.querySelector(`.Soundbtn[data-sound-path="${CSS.escape(p)}"]`)
+    if (!src) return
+    const card = src.cloneNode(true)
+    card.classList.remove('drag-over', 'sound-drag-away', 'sortable-chosen')
+    card.classList.add('sortable-fallback', 'sound-drag-stack__card')
+    Object.assign(card.style, {
+      position: ghost.style.position || 'fixed',
+      top: ghost.style.top,
+      left: ghost.style.left,
+      width: ghost.style.width,
+      height: ghost.style.height,
+      margin: '0',
+      boxSizing: 'border-box',
+      pointerEvents: 'none',
+      transition: 'none',
+      zIndex: String(99999 - i),
+    })
+    document.body.appendChild(card)
+    stackCards.push(card)
+  })
+  const rest = paths.length - shown.length
+  if (rest > 0) {
+    const badge = document.createElement('span')
+    badge.className = 'sound-drag-stack__count'
+    badge.textContent = `+${rest}`
+    ghost.appendChild(badge)
+  }
+  const follow = () => {
+    const t = ghost.style.transform || ''
+    stackCards.forEach((card, i) => {
+      const d = (i + 1) * STACK_STEP_PX
+      card.style.transform = `${t} translate(${d}px, ${d}px)`
+    })
+    stackRaf = requestAnimationFrame(follow)
+  }
+  follow()
+}
+
+function endDragStack() {
+  cancelAnimationFrame(stackRaf)
+  stackRaf = 0
+  for (const card of stackCards) card.remove()
+  stackCards = []
+  dragAwayPaths.clear()
+}
+
+/** Replace the dragged path with the whole selection block at its drop slot. */
+function withCarried(layout, draggedPath) {
+  const carried = new Set(dragCarried)
+  const block = allDisplaySounds.value
+    .map((s) => s.path)
+    .filter((p) => p === draggedPath || carried.has(p))
+  const place = (paths) => paths.flatMap((p) => {
+    if (p === draggedPath) return block
+    return carried.has(p) ? [] : [p]
+  })
+  return {
+    orphans: place(layout.orphans),
+    groups: layout.groups.map((g) => ({ id: g.id, paths: place(g.paths) })),
+  }
+}
+
 function onInnerEnd(evt) {
+  const carried = dragCarried.length > 0
+  endDragStack()
+  setTimeout(() => { dragGuard = false }, 0)
   const { oldIndex, newIndex, from, to } = evt
-  if (from === to && (oldIndex === newIndex || oldIndex == null || newIndex == null)) return
+  if (!carried && from === to && (oldIndex === newIndex || oldIndex == null || newIndex == null)) {
+    dragCarried = []
+    return
+  }
   // Read target layout from DOM *before* revert (Sortable already moved the node).
-  const layout = layoutFromDom()
+  let layout = layoutFromDom()
+  const draggedPath = evt.item?.getAttribute('data-sound-path')
+  if (carried && draggedPath) layout = withCarried(layout, draggedPath)
+  dragCarried = []
   revertDom(evt)
   jsonStore.applyBoardLayout(currentTab.value, layout)
 }
@@ -440,11 +546,13 @@ function bindInnerSortable(el) {
     animation: 180,
     forceFallback: true,
     fallbackOnBody: true,
+    fallbackTolerance: 4,
     disabled: reorderDisabled(),
     draggable: '.Soundbtn',
     ghostClass: 'drag-over',
     emptyInsertThreshold: 48,
     swapThreshold: 0.65,
+    onStart: onInnerStart,
     onEnd: onInnerEnd,
   })
   innerSortables.push(s)
@@ -482,6 +590,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  endDragStack()
   destroySortables()
   gifObserver?.disconnect()
   gifObserver = null
@@ -981,6 +1090,7 @@ function onHotkeyStopAll() {
 }
 
 function onSoundClick(sound, e) {
+  if (dragGuard) return
   if (appStore.multiSelectActive) {
     if (e?.shiftKey && appStore.selectionAnchorPath) {
       const paths = allDisplaySounds.value.map((s) => s.path)
@@ -1087,6 +1197,7 @@ function onBoardPointerUp() {
 function onOutsidePointerUp(e) {
   if (!appStore.multiSelectActive) return
   if (e.button !== 0) return
+  if (dragGuard) return
   if (skipOutsideDeselect) {
     skipOutsideDeselect = false
     return
