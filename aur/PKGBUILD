@@ -1,40 +1,57 @@
-# Maintainer: marcus-universe <https://github.com/marcus-universe>
+# Maintainer: Marcus Universe <contact at marcus-universe dot de>
+
 pkgname=soundninja-bin
-pkgver=0.4.0
+pkgver=0.8.0
 pkgrel=1
-pkgdesc="An open-source, cross-platform Soundboard Desktop App"
-arch=('x86_64')
+pkgdesc="Open-source cross-platform soundboard desktop app"
+arch=('x86_64' 'aarch64' 'armv7h')
 url="https://github.com/marcus-universe/SoundNinja"
-license=('MIT')
-depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'alsa-lib')
+license=('GPL-3.0-only')
+depends=(
+    'webkit2gtk-4.1'
+    'gtk3'
+    'libayatana-appindicator'
+    'alsa-lib'
+    'libpipewire'
+    'libpulse'
+    'hicolor-icon-theme'
+)
 provides=('soundninja')
 conflicts=('soundninja')
-source_x86_64=("soundninja-${pkgver}.AppImage::https://github.com/marcus-universe/SoundNinja/releases/download/v${pkgver}/soundninja_${pkgver}_amd64.AppImage"
-               "soundninja.desktop")
-sha256sums_x86_64=('SKIP'
-                   'SKIP')
+options=('!strip' '!debug')
+# Filled by scripts/setup-secrets.ps1 from GPG_FINGERPRINT. Placeholder is ignored
+# until a real 40-char fingerprint is set; CI omits .asc sources until then.
+validpgpkeys=('0000000000000000000000000000000000000000')
 
-prepare() {
-    chmod +x "${srcdir}/soundninja-${pkgver}.AppImage"
-    "${srcdir}/soundninja-${pkgver}.AppImage" --appimage-extract
-}
+source_x86_64=(
+    "${pkgname}-${pkgver}-x86_64.deb::https://github.com/marcus-universe/SoundNinja/releases/download/v${pkgver}/soundninja-linux-amd64.deb"
+)
+source_aarch64=(
+    "${pkgname}-${pkgver}-aarch64.deb::https://github.com/marcus-universe/SoundNinja/releases/download/v${pkgver}/soundninja-linux-arm64.deb"
+)
+source_armv7h=(
+    "${pkgname}-${pkgver}-armv7h.deb::https://github.com/marcus-universe/SoundNinja/releases/download/v${pkgver}/soundninja-linux-armhf.deb"
+)
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+sha256sums_armv7h=('SKIP')
 
 package() {
-    install -d "${pkgdir}/usr/bin"
-    install -d "${pkgdir}/usr/share/applications"
-    install -d "${pkgdir}/usr/share/pixmaps"
+    local _deb="${srcdir}/${pkgname}-${pkgver}-${CARCH}.deb"
+    local _data
+    _data="$(bsdtar -tf "$_deb" | grep '^data\.tar' | head -n1)"
+    bsdtar -xOf "$_deb" "$_data" | bsdtar -x -C "${pkgdir}"
 
-    # Install extracted AppImage contents
-    cp -r "${srcdir}/squashfs-root/usr/"* "${pkgdir}/usr/"
-
-    # Wrapper script to launch the binary
-    cat > "${pkgdir}/usr/bin/soundninja" << 'EOF'
-#!/bin/sh
-exec /usr/lib/soundninja/soundninja "$@"
-EOF
-    chmod +x "${pkgdir}/usr/bin/soundninja"
-
-    # Desktop entry
-    install -Dm644 "${srcdir}/soundninja.desktop" \
-        "${pkgdir}/usr/share/applications/soundninja.desktop"
+    install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+    local _found=0
+    local _cand
+    while IFS= read -r -d '' _cand; do
+        install -Dm644 "$_cand" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+        _found=1
+        break
+    done < <(find "${pkgdir}/usr/share" -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' \) -print0 2>/dev/null)
+    if [[ "$_found" -eq 0 ]]; then
+        printf '%s\n' "GPL-3.0-only: see ${url}/blob/v${pkgver}/LICENSE" \
+            > "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    fi
 }

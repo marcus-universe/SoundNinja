@@ -37,4 +37,18 @@ cargo = cargo.replace(/^(version\s*=\s*)"[\d.]+"(\s*$)/m, `$1"${newVersion}"$2`)
 writeFileSync(cargoPath, cargo);
 console.log("✓ src-tauri/Cargo.toml updated");
 
+// CI builds with --locked, so the lockfile entry for the app crate must match.
+const lockPath = "src-tauri/Cargo.lock";
+const lock = readFileSync(lockPath, "utf8");
+const bumpedLock = lock.replace(
+  /(\[\[package\]\]\r?\nname = "app"\r?\nversion = )"[^"]+"/,
+  `$1"${newVersion}"`,
+);
+if (bumpedLock === lock) {
+  console.error("✗ app package not found in src-tauri/Cargo.lock");
+  process.exit(1);
+}
+writeFileSync(lockPath, bumpedLock);
+console.log("✓ src-tauri/Cargo.lock updated");
+
 console.log(`\nVersion bumped to ${newVersion} ✓`);

@@ -1,0 +1,87 @@
+name: Test Linux packages
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/**"
+      - "aur/**"
+      - "src-tauri/tauri.conf.json"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/Cargo.lock"
+      - ".github/scripts/**"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  packages:
+    uses: ./.github/workflows/release-linux.yml
+    with:
+      publish: false
+      build_x64: true
+      build_arm64: true
+      build_armhf: true
+    secrets: inherit
+
+  verify:
+    needs: packages
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download signed set
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-signed
+          path: dist
+
+      - name: Verify SHA256SUMS and required assets
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -la
+          sha256sum -c SHA256SUMS
+          for f in \
+            soundninja-linux-amd64.deb \
+            soundninja-linux-amd64.AppImage \
+            soundninja-linux-arm64.deb \
+            soundninja-linux-arm64.AppImage \
+            soundninja-linux-armhf.deb
+          do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing $f"
+              exit 1
+            fi
+          done
+          shopt -s nullglob
+          aur_tarballs=(soundninja-aur-*.tar.gz)
+          if [ ${#aur_tarballs[@]} -eq 0 ]; then
+            echo "::error::Missing soundninja-aur-*.tar.gz"
+            exit 1
+          fi
+          pkgs=(soundninja-bin-*-x86_64.pkg.tar.*)
+          if [ ${#pkgs[@]} -eq 0 ]; then
+            echo "::error::Missing x86_64 pkg.tar"
+            exit 1
+          fi
+          echo "Have ${aur_tarballs[0]} and ${pkgs[0]}"
+
+      - name: Verify GPG signatures when present
+        run: |
+          set -euo pipefail
+          cd dist
+          if [ ! -f soundninja-signing-key.asc ]; then
+            echo "No public key in artifacts (GPG secret unset). Skip gpg --verify."
+            exit 0
+          fi
+          gpg --import soundninja-signing-key.asc
+          fail=0
+          for sig in *.asc; do
+            [ "$sig" = "soundninja-signing-key.asc" ] && continue
+            target="${sig%.asc}"
+            if [ -f "$target" ]; then
+              gpg --verify "$sig" "$target" || fail=1
+            fi
+          done
+          exit "$fail"

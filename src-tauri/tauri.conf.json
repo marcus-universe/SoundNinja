@@ -1,7 +1,7 @@
 {
   "productName": "Sound Ninja",
   "mainBinaryName": "soundninja",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "identifier": "com.soundninja.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -46,8 +46,12 @@
       "appimage",
       "dmg"
     ],
-    "category": "DeveloperTool",
-    "copyright": "",
+    "publisher": "Marcus Universe",
+    "homepage": "https://marcus-universe.github.io/SoundNinja/",
+    "category": "Music",
+    "copyright": "Copyright (c) 2026 Marcus Universe",
+    "license": "GPL-3.0-only",
+    "licenseFile": "../LICENSE",
     "externalBin": [],
     "icon": [
       "icons/32x32.png",
@@ -56,7 +60,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "longDescription": "",
+    "longDescription": "Open-source cross-platform soundboard with instant playback, stem separation, and remote control.",
+    "linux": {
+      "deb": {
+        "section": "sound"
+      }
+    },
     "macOS": {
       "entitlements": null,
       "exceptionDomain": "",

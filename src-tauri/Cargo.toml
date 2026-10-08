@@ -1,10 +1,11 @@
 [package]
 name = "app"
-version = "0.8.0"
+version = "0.8.1"
 description = "Sound Ninja"
-authors = ["you"]
-license = ""
-repository = ""
+authors = ["Marcus Universe <contact@marcus-universe.de>"]
+license = "GPL-3.0-only"
+repository = "https://github.com/marcus-universe/SoundNinja"
+homepage = "https://marcus-universe.github.io/SoundNinja/"
 default-run = "app"
 edition = "2021"
 rust-version = "1.88"
@@ -94,7 +95,7 @@ rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee9
 tempfile = "3"
 
 [lints.rust]
-future-incompatible = "warn"
+future_incompatible = "warn"
 
 [lints.clippy]
 all = { level = "warn", priority = 10 }

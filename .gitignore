@@ -12,9 +12,11 @@ nul
 .output
 .cache
 
-# local env files
-.env.local
-.env.*.local
+# local env files (private keys — never commit)
+.env
+.env.*
+!.env.example
+secrets/
 
 # Steinberg ASIO SDK (not redistributable). `bun run setup:asio`
 /vendor/asiosdk/

@@ -4,27 +4,32 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version override (e.g. 0.7.0). Leave empty to use src-tauri/tauri.conf.json. Creates a draft if none exists."
+        description: "Version override (e.g. 0.8.0). Leave empty to use src-tauri/tauri.conf.json. Creates a draft if none exists."
         required: false
         type: string
       update_aur:
-        description: "DISABLED — AUR deploy off until account/secrets exist. Leave false."
+        description: "Push PKGBUILD to AUR (needs AUR_SSH_PRIVATE_KEY + AUR account)."
         required: false
         type: boolean
         default: false
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.draft.outputs.tag }}
       windows: ${{ steps.need.outputs.windows }}
       linux: ${{ steps.need.outputs.linux }}
+      linux_arm64: ${{ steps.need.outputs.linux_arm64 }}
+      linux_armhf: ${{ steps.need.outputs.linux_armhf }}
       macos_arm: ${{ steps.need.outputs.macos_arm }}
       macos_intel: ${{ steps.need.outputs.macos_intel }}
+      aur: ${{ steps.need.outputs.aur }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -47,6 +52,8 @@ jobs:
             local pat="$1"
             while IFS= read -r name; do
               [ -z "$name" ] && continue
+              # Intentional glob: callers pass patterns like soundninja-aur-*.tar.gz
+              # shellcheck disable=SC2254
               case "$name" in
                 $pat) return 0 ;;
               esac
@@ -64,6 +71,16 @@ jobs:
             linux=false
           fi
 
+          linux_arm64=true
+          if has 'soundninja-linux-arm64.deb' && has 'soundninja-linux-arm64.AppImage'; then
+            linux_arm64=false
+          fi
+
+          linux_armhf=true
+          if has 'soundninja-linux-armhf.deb'; then
+            linux_armhf=false
+          fi
+
           macos_arm=true
           if has 'soundninja-macos-arm64.dmg'; then
             macos_arm=false
@@ -74,13 +91,24 @@ jobs:
             macos_intel=false
           fi
 
-          echo "windows=$windows" >> "$GITHUB_OUTPUT"
-          echo "linux=$linux" >> "$GITHUB_OUTPUT"
-          echo "macos_arm=$macos_arm" >> "$GITHUB_OUTPUT"
-          echo "macos_intel=$macos_intel" >> "$GITHUB_OUTPUT"
+          aur=true
+          if has 'soundninja-aur-*.tar.gz' || has 'soundninja-bin-*-x86_64.pkg.tar.zst'; then
+            aur=false
+          fi
+          # glob in has() uses case, so soundninja-aur-*.tar.gz works
+
+          {
+            echo "windows=$windows"
+            echo "linux=$linux"
+            echo "linux_arm64=$linux_arm64"
+            echo "linux_armhf=$linux_armhf"
+            echo "macos_arm=$macos_arm"
+            echo "macos_intel=$macos_intel"
+            echo "aur=$aur"
+          } >> "$GITHUB_OUTPUT"
 
           echo "Draft ${{ steps.draft.outputs.tag }}"
-          echo "windows=$windows linux=$linux macos_arm=$macos_arm macos_intel=$macos_intel"
+          echo "windows=$windows linux=$linux linux_arm64=$linux_arm64 linux_armhf=$linux_armhf aur=$aur macos_arm=$macos_arm macos_intel=$macos_intel"
           if [ -n "$ASSETS" ]; then
             echo "Existing assets:"
             printf '%s\n' "$ASSETS"
@@ -98,10 +126,14 @@ jobs:
 
   linux:
     needs: plan
-    if: needs.plan.outputs.linux == 'true'
+    if: needs.plan.outputs.linux == 'true' || needs.plan.outputs.linux_arm64 == 'true' || needs.plan.outputs.linux_armhf == 'true' || needs.plan.outputs.aur == 'true'
     uses: ./.github/workflows/release-linux.yml
     with:
       version: ${{ inputs.version }}
+      build_x64: ${{ fromJSON(needs.plan.outputs.linux) }}
+      build_arm64: ${{ fromJSON(needs.plan.outputs.linux_arm64) }}
+      build_armhf: ${{ fromJSON(needs.plan.outputs.linux_armhf) }}
+      publish: true
     secrets: inherit
 
   macos-arm:
@@ -120,42 +152,54 @@ jobs:
       version: ${{ inputs.version }}
     secrets: inherit
 
-  # AUR deploy disabled — maintainer not registered on AUR yet.
-  # Re-enable when AUR_USERNAME / AUR_EMAIL / AUR_SSH_PRIVATE_KEY secrets exist.
   aur-update:
-    needs: plan
-    if: false
-    runs-on: ubuntu-latest
+    needs: [plan, linux]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_aur && needs.linux.result == 'success' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Get version
-        id: version
-        shell: bash
+      - name: Require AUR SSH key
+        id: aurcheck
+        env:
+          KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
-            VERSION="${VERSION#v}"
-          else
-            VERSION="$(jq -r .version src-tauri/tauri.conf.json)"
+          if [ -z "$KEY" ]; then
+            echo "::error::AUR_SSH_PRIVATE_KEY unset. Run scripts/setup-secrets.ps1 -GenerateAurSsh -Push"
+            exit 1
           fi
-          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "AUR pkgver=$VERSION"
 
-      - name: Bump PKGBUILD pkgver
+      - name: Download AUR bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: aur
+          path: aur-dist
+
+      - name: Unpack AUR sources
         run: |
-          sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.VERSION }}/" aur/PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=1/" aur/PKGBUILD
+          set -euo pipefail
+          shopt -s nullglob
+          tarballs=(aur-dist/soundninja-aur-*.tar.gz)
+          if [ ${#tarballs[@]} -eq 0 ]; then
+            echo "::error::No soundninja-aur-*.tar.gz in artifact"
+            exit 1
+          fi
+          mkdir -p aur-publish
+          tar -xzf "${tarballs[0]}" -C aur-publish
+          ls -la aur-publish
 
       - name: Update AUR package
         uses: KSXGitHub/github-actions-deploy-aur@v3
         with:
           pkgname: soundninja-bin
-          pkgbuild: ./aur/PKGBUILD
-          assets: ./aur/soundninja.desktop
+          pkgbuild: ./aur-publish/PKGBUILD
+          assets: |
+            ./aur-publish/LICENSE
+            ./aur-publish/REUSE.toml
+            ./aur-publish/GPL-3.0-only.txt
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: "Update to v${{ steps.version.outputs.VERSION }}"
-          updpkgsums: true
+          commit_message: "Update to ${{ needs.plan.outputs.tag }}"
+          updpkgsums: false
