@@ -6,13 +6,25 @@ set -euo pipefail
 sudo dpkg --add-architecture armhf
 codename="$(lsb_release -cs)"
 
-# Host sources keep the runner's mirror (azure.archive.ubuntu.com); only pin them to amd64.
-# armhf comes from ports.ubuntu.com.
+# GitHub's mirror+file list includes http://azure.archive.ubuntu.com, which answers
+# with Ign and makes apt retry until the 6h job limit. https://archive.ubuntu.com
+# answered in the same run. Pin host arch to amd64; armhf comes from ports.
 if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
-  if ! grep -q '^Architectures:' /etc/apt/sources.list.d/ubuntu.sources; then
-    sudo sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
-  fi
-  cat /etc/apt/sources.list.d/ubuntu.sources
+  sudo tee /etc/apt/sources.list.d/ubuntu.sources >/dev/null <<EOF
+Types: deb
+URIs: https://archive.ubuntu.com/ubuntu/
+Suites: ${codename} ${codename}-updates ${codename}-backports
+Components: main universe restricted multiverse
+Architectures: amd64
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: https://security.ubuntu.com/ubuntu/
+Suites: ${codename}-security
+Components: main universe restricted multiverse
+Architectures: amd64
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
 fi
 if [[ -f /etc/apt/sources.list ]]; then
   sudo sed -i -E 's/^deb ([^[])/deb [arch=amd64] \1/' /etc/apt/sources.list
@@ -29,8 +41,9 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF
 sudo rm -f /etc/apt/sources.list.d/armhf-ports.list
 
-sudo apt-get -o Acquire::Retries=5 update
-sudo apt-get -o Acquire::Retries=5 install -y \
+apt_opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+sudo timeout 12m apt-get "${apt_opts[@]}" update
+sudo timeout 20m apt-get "${apt_opts[@]}" install -y \
   gcc-arm-linux-gnueabihf \
   g++-arm-linux-gnueabihf \
   pkg-config \
