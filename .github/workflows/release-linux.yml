@@ -147,7 +147,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download linux artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           path: collected
@@ -193,7 +193,7 @@ jobs:
             bash /work/.github/scripts/prepare-aur.sh
 
       - name: Upload AUR artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aur
           path: dist-upload/*
@@ -220,7 +220,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download arm64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           name: linux-arm64
@@ -265,7 +265,7 @@ jobs:
             bash /work/.github/scripts/prepare-aur.sh
 
       - name: Upload aarch64 pkg
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aur-aarch64
           path: dist-upload/*
@@ -298,7 +298,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download all package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist-upload
           merge-multiple: true
@@ -337,7 +337,7 @@ jobs:
       - name: Import GPG key
         id: gpg
         if: steps.gpgcheck.outputs.has_gpg == 'true'
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -365,12 +365,12 @@ jobs:
           bash .github/scripts/sign-assets.sh
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist-upload/*
 
       - name: Upload signed artifact set
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-signed
           path: dist-upload/*
@@ -383,8 +383,7 @@ jobs:
           TAG: ${{ needs.guard.outputs.tag }}
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          files=(dist-upload/*.asc dist-upload/SHA256SUMS dist-upload/SHA256SUMS.asc dist-upload/soundninja-signing-key.asc)
+          mapfile -t files < <(find dist-upload -maxdepth 1 -type f \( -name '*.asc' -o -name SHA256SUMS \) | sort)
           if [ ${#files[@]} -eq 0 ]; then
             echo "No signature files to upload"
             exit 0

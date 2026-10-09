@@ -74,6 +74,17 @@ smoke_gui() {
   echo "::warning::GUI binary exited $code (headless runner may lack audio/GPU)"
 }
 
+check_no_bundled_wayland() {
+  local root="$1"
+  local found
+  found="$(find "$root" -name 'libwayland-*.so*')"
+  if [[ -n "$found" ]]; then
+    echo "::error::AppImage bundles libwayland (breaks EGL on newer host Mesa):"
+    echo "$found"
+    exit 1
+  fi
+}
+
 case "$KIND" in
   linux-x64)
     check_deb_meta "$OUT/soundninja-linux-amd64.deb" amd64
@@ -86,6 +97,7 @@ case "$KIND" in
     extract_dir="$(mktemp -d)"
     pushd "$extract_dir" >/dev/null
     "$OUT/soundninja-linux-amd64.AppImage" --appimage-extract >/dev/null
+    check_no_bundled_wayland "$extract_dir/squashfs-root"
     img_bin="$(find_bin "$extract_dir/squashfs-root")"
     smoke_gui "$img_bin"
     popd >/dev/null
@@ -108,6 +120,7 @@ case "$KIND" in
     extract_dir="$(mktemp -d)"
     pushd "$extract_dir" >/dev/null
     "$OUT/soundninja-linux-arm64.AppImage" --appimage-extract >/dev/null
+    check_no_bundled_wayland "$extract_dir/squashfs-root"
     img_bin="$(find_bin "$extract_dir/squashfs-root")"
     smoke_gui "$img_bin"
     popd >/dev/null

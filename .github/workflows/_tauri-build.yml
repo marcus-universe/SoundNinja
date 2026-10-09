@@ -145,7 +145,7 @@ jobs:
       - name: Import GPG key (AppImage signing)
         id: gpg
         if: steps.gpgcheck.outputs.has_gpg == 'true'
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -190,6 +190,22 @@ jobs:
           tauriScript: npm run tauri
           args: ${{ inputs.args }}
 
+      - name: Unbundle libwayland from AppImage
+        if: inputs.kind == 'linux-x64' || inputs.kind == 'linux-arm64'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(src-tauri/target/*/release/bundle/appimage/*.AppImage)
+          if [ ${#images[@]} -eq 0 ]; then
+            echo "::error::No AppImage built"
+            exit 1
+          fi
+          bash .github/scripts/appimage-unbundle-wayland.sh "${images[@]}"
+
       - name: Collect release assets
         shell: bash
         env:
@@ -218,7 +234,7 @@ jobs:
         run: bash .github/scripts/smoke-linux.sh
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.kind }}
           path: dist-upload/*

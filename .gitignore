@@ -17,6 +17,10 @@ nul
 .env.*
 !.env.example
 secrets/
+*.asc
+*.gpg
+*.pem
+*.key
 
 # Steinberg ASIO SDK (not redistributable). `bun run setup:asio`
 /vendor/asiosdk/

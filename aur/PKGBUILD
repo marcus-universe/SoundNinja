@@ -19,8 +19,8 @@ depends=(
 provides=('soundninja')
 conflicts=('soundninja')
 options=('!strip' '!debug')
-# Filled by scripts/setup-secrets.ps1 from GPG_FINGERPRINT. Placeholder is ignored
-# until a real 40-char fingerprint is set; CI omits .asc sources until then.
+# Keep the placeholder in git. CI (prepare-aur.sh) fills the real fingerprint
+# from the GPG_FINGERPRINT secret only in the published AUR PKGBUILD.
 validpgpkeys=('0000000000000000000000000000000000000000')
 
 source_x86_64=(
