@@ -7,7 +7,7 @@ alwaysApply: true
 
 Static Nuxt 4 landing page for SoundNinja soundboard.
 Branch: `landing-page` (orphan). Deploy target: GitHub Pages (`gh-pages`).
-Live URL: `https://marcus-universe.github.io/SoundNinja/` (`app.baseURL = '/SoundNinja/'`).
+Live URL: `https://soundninja.marcus-universe.com/` (`app.baseURL = '/'`). Custom domain serves the Pages project at the root; `public/CNAME` keeps the domain across deploys.
 
 ## Stack
 

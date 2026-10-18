@@ -21,7 +21,7 @@ Boundaries: code/commits/PRs written normal.
 ## What this is
 
 Static marketing landing page for **SoundNinja** (Tauri + Nuxt soundboard app).
-Hosted on GitHub Pages at `https://marcus-universe.github.io/SoundNinja/`.
+Hosted on GitHub Pages at `https://soundninja.marcus-universe.com/` (custom domain; `github.io` redirects here).
 
 This branch (`landing-page`) is an **orphan** — no app/Tauri code. Do not mix with `main`/`dev`.
 
@@ -38,7 +38,7 @@ This branch (`landing-page`) is an **orphan** — no app/Tauri code. Do not mix 
 
 1. **No hardcoded UI copy** — chrome strings in `i18n/locales/{en,de,fr,es,ja,zh}.json`. Docs article bodies in `content/{locale}/*.md`. Update all six locales/folders in same edit.
 2. **No Tailwind JS config** — theme tokens live in `app/assets/css/main.css` `@theme` block only.
-3. **Never break `baseURL`** — must stay `/SoundNinja/` for GitHub Pages project site. Use `useRuntimeConfig().app.baseURL` or `<NuxtLink>` for assets/routes.
+3. **`baseURL` stays `/`** — custom domain serves the site at the root. A `/SoundNinja/` prefix 404s JS as `text/html`. Use `useRuntimeConfig().app.baseURL` or `<NuxtLink>` for assets/routes. Keep `public/CNAME` so deploys do not drop the domain.
 4. **Static only** — no server routes, no runtime env secrets, no SSR-only APIs at build for critical content. Client-side GitHub API for release button is OK (with static fallback).
 5. **Keep responsive** — mobile-first; verify 375 / 768 / 1440.
 6. **Impressum placeholders** — do not invent legal name/address. Leave TODO keys until owner fills them.

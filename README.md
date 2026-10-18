@@ -2,7 +2,7 @@
 
 Static marketing site for [SoundNinja](https://github.com/marcus-universe/SoundNinja) — modern, customizable, open source soundboard.
 
-**Live:** https://marcus-universe.github.io/SoundNinja/
+**Live:** https://soundninja.marcus-universe.com/
 
 ## Stack
 
@@ -33,7 +33,10 @@ Push to `landing-page` also triggers GitHub Actions → deploys `gh-pages`.
 1. Repo **Settings → Pages**
 2. Source: **Deploy from a branch**
 3. Branch: `gh-pages` / `/ (root)`
-4. Save
+4. Custom domain: `soundninja.marcus-universe.com` (`public/CNAME` is committed so deploys keep it)
+5. Save
+
+`app.baseURL` is `/`. The custom domain serves this project site at the domain root.
 
 ## Structure
 

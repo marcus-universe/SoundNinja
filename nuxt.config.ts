@@ -58,7 +58,9 @@ export default defineNuxtConfig({
 
   app: {
     pageTransition: { name: 'page', mode: 'out-in' },
-    baseURL: '/SoundNinja/',
+    // Custom domain serves the project site at the domain root.
+    // `/SoundNinja/` was the github.io project path and 404s here (HTML MIME on JS).
+    baseURL: '/',
     head: {
       title: 'SoundNinja — Open Source Soundboard',
       meta: [
