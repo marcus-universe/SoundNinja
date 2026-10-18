@@ -245,6 +245,60 @@ export function mergeTabsFromUsage(config: ProjectConfig): number {
   return extra.length
 }
 
+/** Copy tabs, tags, and missing media from `extra` onto `keep`. */
+export function mergeSoundInto(keep: SoundFile, extra: SoundFile): void {
+  const tabs = [...(keep.tabs ?? ['All'])]
+  for (const tab of extra.tabs ?? []) {
+    if (tab && !tabs.includes(tab)) tabs.push(tab)
+  }
+  keep.tabs = tabs
+  if (!keep.tabIndexes) keep.tabIndexes = {}
+  for (const [tab, idx] of Object.entries(extra.tabIndexes ?? {})) {
+    if (keep.tabIndexes[tab] == null && Number.isFinite(idx)) keep.tabIndexes[tab] = idx
+  }
+  const tagIds = [...(keep.tagIds ?? [])]
+  for (const id of extra.tagIds ?? []) {
+    if (id && !tagIds.includes(id)) tagIds.push(id)
+  }
+  keep.tagIds = tagIds
+  if (!keep.gifId && extra.gifId) {
+    keep.gifId = extra.gifId
+    if (extra.gifPosX != null) keep.gifPosX = extra.gifPosX
+    if (extra.gifPosY != null) keep.gifPosY = extra.gifPosY
+  }
+  if (!keep.color && extra.color) keep.color = extra.color
+  if (!keep.name && extra.name) keep.name = extra.name
+  if (keep.durationSecs == null && extra.durationSecs != null) keep.durationSecs = extra.durationSecs
+  if (keep.fileSize == null && extra.fileSize != null) keep.fileSize = extra.fileSize
+}
+
+/**
+ * Collapse sounds that share the exact `path` string.
+ * SQLite `sounds.path` is the primary key (BINARY). A second row with the
+ * same path fails the save with SQLITE_CONSTRAINT_PRIMARYKEY (1555).
+ * Case-different paths stay separate — Linux filesystems treat them as
+ * different files.
+ */
+export function dedupeSoundsByPath(config: ProjectConfig): number {
+  const files = config.files ?? []
+  const seen = new Map<string, SoundFile>()
+  const next: SoundFile[] = []
+  let removed = 0
+  for (const file of files) {
+    const key = file?.path ?? ''
+    const prev = seen.get(key)
+    if (!prev) {
+      seen.set(key, file)
+      next.push(file)
+      continue
+    }
+    removed++
+    mergeSoundInto(prev, file)
+  }
+  if (removed) config.files = next
+  return removed
+}
+
 /** Drop duplicate tab names so SQLite `tabs.name` PRIMARY KEY cannot fail. */
 export function dedupeTabList(config: ProjectConfig): number {
   const list = config.tabList ?? []
@@ -723,6 +777,7 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
   }
 
   const config = { settings, tabList, files, separators, tags }
+  dedupeSoundsByPath(config)
   mergeTabsFromUsage(config)
   healFolderTabMembership(config)
   return config
@@ -737,7 +792,8 @@ async function batchInsert(
   table: string,
   cols: string[],
   rows: unknown[][],
-  chunkRows = 50
+  chunkRows = 50,
+  verb: 'INSERT' | 'INSERT OR REPLACE' = 'INSERT',
 ): Promise<void> {
   if (rows.length === 0) return
   // SQLite default SQLITE_MAX_VARIABLE_NUMBER is 999. Keep a margin.
@@ -752,7 +808,7 @@ async function batchInsert(
       placeholders.push('(' + cols.map(() => `$${p++}`).join(', ') + ')')
       params.push(...row)
     }
-    await d.execute(`INSERT INTO ${table} (${colSql}) VALUES ${placeholders.join(', ')}`, params)
+    await d.execute(`${verb} INTO ${table} (${colSql}) VALUES ${placeholders.join(', ')}`, params)
   }
 }
 
@@ -823,6 +879,7 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
   await batchInsert(d, 'settings', ['key', 'value'], settingsRows)
 
   dedupeTabList(config)
+  dedupeSoundsByPath(config)
   const tabRows = config.tabList.map((t, i) => [
     t.name,
     t.color ?? null,
@@ -859,7 +916,9 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     d,
     'sounds',
     ['path', 'sound_id', 'name', 'volume', 'color', 'global_index', 'active', 'gif_id', 'gif_pos_x', 'gif_pos_y', 'added_at', 'file_size', 'duration_secs', 'looping'],
-    soundRows
+    soundRows,
+    50,
+    'INSERT OR REPLACE',
   )
   await batchInsert(d, 'sound_tabs', ['sound_path', 'tab', 'tab_index'], soundTabRows)
 

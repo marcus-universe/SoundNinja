@@ -91,6 +91,7 @@
   flex-direction: column;
   width: 22rem;
   flex-shrink: 0;
+  overscroll-behavior: contain;
   background: var(--color-bg-2, rgba(0, 0, 0, 0.25));
   border-right: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 7%, transparent);
   padding: 2.4rem 1.2rem;
@@ -225,6 +226,8 @@
   flex: 1;
   padding: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -277,6 +280,7 @@
   > .settings-row,
   > .settings-select,
   > .settings-input,
+  > .ui-select,
   > .capture-dropdown {
     flex: 1 1 0;
     min-width: 0;
@@ -533,6 +537,122 @@
   }
 }
 
+.ui-select {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.ui-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  height: var(--settings-control-h, var(--control-h));
+  box-sizing: border-box;
+  padding: 0 1.2rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: color-mix(in srgb, var(--color-text, #{$white}) 5%, transparent);
+  background-image: none;
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
+  border-radius: 0.64rem;
+  color: var(--color-text, #{$white});
+  color-scheme: dark;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover,
+  &:focus {
+    border-color: var(--primary_color);
+    outline: none;
+  }
+
+  span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+}
+
+.ui-select__arrow {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.ui-select__list {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  z-index: 300;
+  max-height: 24rem;
+  overflow-y: auto;
+  background-color: var(--color-bg, #{$color-bg});
+  background-image: none;
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
+  border-radius: 0.64rem;
+  box-shadow: 0 0.8rem 2.4rem rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+
+  &::-webkit-scrollbar { width: 0.6rem; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
+    border-radius: 0.3rem;
+  }
+}
+
+.ui-select__sep {
+  padding: 0.85rem 1.2rem 0.55rem;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 90%, transparent);
+  font-family: $fontRegular;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border-bottom: 0.16rem solid var(--btn-border, var(--primary_color));
+  pointer-events: none;
+  user-select: none;
+}
+
+.ui-select__option {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.72rem 1.2rem;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background-color: var(--color-bg, #{$color-bg});
+  background-image: none;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
+  color-scheme: dark;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.1s, color 0.1s;
+
+  &:hover,
+  &.is-key {
+    background: color-mix(in srgb, var(--color-text, #{$white}) 8%, transparent);
+    color: var(--color-text, #{$white});
+  }
+
+  &.active {
+    background: var(--primary_color);
+    color: var(--color-bg, #{$color-bg});
+  }
+}
+
 .settings-select {
   -webkit-appearance: none;
   appearance: none;
@@ -567,7 +687,7 @@
   appearance: none;
   width: 100%;
   height: 0.4rem;
-  border-radius: 2px;
+  border-radius: 0.2rem;
   background: color-mix(in srgb, var(--color-text, #{$white}) 15%, transparent);
   outline: none;
 

@@ -4,10 +4,12 @@
     <ul class="relink-list">
       <li v-for="row in rows" :key="row.from" class="relink-list__item">
         <span class="relink-list__name">{{ row.name }}</span>
-        <select v-if="row.candidates.length" v-model="row.chosen" class="settings-input">
-          <option value="">{{ $t('relink.skip') }}</option>
-          <option v-for="c in row.candidates" :key="c" :value="c">{{ c }}</option>
-        </select>
+        <UISelect
+          v-if="row.candidates.length"
+          v-model="row.chosen"
+          select-class="settings-input"
+          :options="relinkOptions(row)"
+        />
         <span v-else class="relink-list__none">{{ $t('relink.noMatch') }}</span>
       </li>
     </ul>
@@ -32,20 +34,26 @@ const missing = computed(() => jsonStore.missingPaths ?? [])
 const rows = ref([])
 const scanError = ref('')
 
+function relinkOptions(row) {
+  return [
+    { value: '', label: t('relink.skip') },
+    ...row.candidates.map((path) => ({ value: path, label: path })),
+  ]
+}
+
 function basename(p) {
   return String(p).replace(/^.*[\\/]/, '')
 }
 
 function rebuildRows(matchMap = new Map()) {
+  const taken = new Set((jsonStore.configFile.files ?? []).map((f) => f.path).filter(Boolean))
+  for (const path of missing.value) taken.delete(path)
   rows.value = missing.value.map((from) => {
     const name = basename(from)
     const candidates = matchMap.get(name.toLowerCase()) || matchMap.get(name) || []
-    return {
-      from,
-      name,
-      candidates,
-      chosen: candidates[0] || '',
-    }
+    const chosen = candidates.find((c) => c && !taken.has(c)) || ''
+    if (chosen) taken.add(chosen)
+    return { from, name, candidates, chosen }
   })
 }
 
@@ -80,10 +88,12 @@ async function pickFolder() {
 }
 
 function apply() {
+  scanError.value = ''
   const pairs = rows.value
     .filter((r) => r.chosen)
     .map((r) => ({ from: r.from, to: r.chosen }))
-  jsonStore.relinkSounds(pairs)
+  const skipped = jsonStore.relinkSounds(pairs)
+  if (skipped > 0) scanError.value = t('relink.duplicatePath')
   if (!jsonStore.missingPaths.length) close()
   else rebuildRows()
 }

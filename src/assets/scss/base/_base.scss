@@ -3,7 +3,7 @@
 // 62.5% trick: 1rem = 10px at default 16px browser font size
 // This makes rem values easier to reason about and respects user font-size prefs.
 html {
-  font-size: 62.5%;
+  font-size: calc(62.5% * var(--ui-scale, 1));
 }
 
 body {

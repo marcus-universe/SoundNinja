@@ -222,6 +222,8 @@
       "savedThemes": "已保存主题",
       "themeName": "主题名称",
       "themeNameHint": "写入主题文件头并用作保存文件名。",
+      "uiScale": "分辨率缩放",
+      "uiScaleHint": "缩放整个界面。调低后小屏幕能显示更多按钮。不会写入主题。",
       "themeNamePlaceholder": "我的自定义主题",
       "colors": "颜色",
       "hue": "色相",
@@ -339,7 +341,21 @@
       "address": "地址",
       "copy": "复制",
       "copied": "已复制",
-      "firewallHint": "首次启动服务器时，Windows 可能会询问是否允许 Sound Ninja 通过防火墙。"
+      "firewallHint": "首次启动服务器时，Windows 可能会询问是否允许 Sound Ninja 通过防火墙。",
+      "web": {
+        "title": "网页控制",
+        "enable": "启用网页控制",
+        "enableHint": "在另一台设备的浏览器中打开此音效板。声音在这台电脑上播放。",
+        "port": "端口",
+        "token": "访问码",
+        "tokenHint": "必填。链接和二维码都包含它。同一网络中拿到链接的人可以控制音效板。",
+        "generate": "新访问码",
+        "status": "状态",
+        "address": "在其他设备上打开",
+        "qr": "用手机扫描",
+        "security": "访问码就是密码。请把链接当作这台电脑的遥控器。",
+        "open": "打开"
+      }
     },
     "about": {
       "title": "关于",
@@ -424,7 +440,8 @@
     "pickFolder": "选择文件夹",
     "apply": "重新关联所选",
     "skip": "跳过",
-    "noMatch": "尚无匹配"
+    "noMatch": "尚无匹配",
+    "duplicatePath": "该文件已被另一个按钮使用。"
   },
   "bulk": {
     "selected": "已选择 {count} 项",
@@ -478,6 +495,7 @@
     "replaceAudio": "替换音频",
     "showInFolderFailed": "无法在文件管理器中打开此文件",
     "replaceAudioFailed": "无法替换音频文件",
+    "replaceAudioDuplicate": "该文件已被另一个按钮使用。",
     "volume": "音量",
     "loop": "循环"
   },
@@ -656,5 +674,19 @@
     "importing": "正在解压声音板…",
     "exportFailed": "导出声音板失败",
     "importFailed": "导入声音板失败"
+  },
+  "remoteUi": {
+    "connecting": "正在连接…",
+    "closed": "连接已断开，正在重试…",
+    "rejected": "访问码被拒绝。",
+    "hostDown": "电脑上的 SoundNinja 没有响应。",
+    "waiting": "正在等待音效板…",
+    "stopAll": "全部停止",
+    "editLayout": "编辑布局",
+    "editLayoutOn": "完成",
+    "project": "音效板",
+    "keepAwake": "保持屏幕常亮",
+    "keepAwakeHint": "此页面打开时，避免手机进入睡眠。",
+    "settingsBack": "设置"
   }
 }

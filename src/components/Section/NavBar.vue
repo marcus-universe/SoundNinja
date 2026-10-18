@@ -72,7 +72,7 @@
 
       <FilterPanel />
 
-      <template v-for="(navelm, index) in appStore.navbar" :key="navelm">
+      <template v-for="navelm in navItems" :key="navelm">
         <QuickInfo
           v-if="tooltipsOn"
           class="nav-tip"
@@ -80,14 +80,14 @@
           :side="tipSide"
         >
           <Icons
-            :icon="appStore.navbar[index]"
+            :icon="navelm"
             :customClass="navIconClass(navelm)"
             @triggered="IconClicked"
           />
         </QuickInfo>
         <Icons
           v-else
-          :icon="appStore.navbar[index]"
+          :icon="navelm"
           :customClass="navIconClass(navelm)"
           @triggered="IconClicked"
         />
@@ -125,6 +125,7 @@
 
 <script setup>
 import { pickAudioFilesAndPresent, pickFoldersAndPresent } from '~/utils/importDrop'
+import { isRemote } from '~/utils/runtime'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -133,6 +134,11 @@ const appSettings = useAppSettingsStore()
 const searchInput = ref(null)
 
 const tooltipsOn = computed(() => appSettings.navbarTooltips !== false)
+const navItems = computed(() => {
+  if (!isRemote) return appStore.navbar
+  return appStore.navbar.filter((name) => name !== 'add' && name !== 'project')
+})
+
 /** Tip opens toward the content area, opposite the sidebar edge. */
 const tipSide = computed(() => (appSettings.navbarSide === 'right' ? 'left' : 'right'))
 

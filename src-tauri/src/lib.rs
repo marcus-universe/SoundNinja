@@ -7,6 +7,7 @@ pub mod menu;
 pub mod paths;
 pub mod remote;
 pub mod soundboard;
+pub mod webui;
 pub mod task;
 pub mod toolwin;
 
@@ -140,6 +141,9 @@ fn shutdown(app: &tauri::AppHandle) {
     // its listener so the port is free if the app is restarted right away.
     let _ = tauri::async_runtime::block_on(async {
         tokio::time::timeout(std::time::Duration::from_secs(2), remote::remote_stop()).await
+    });
+    let _ = tauri::async_runtime::block_on(async {
+        tokio::time::timeout(std::time::Duration::from_secs(2), webui::webui_stop()).await
     });
 }
 
@@ -278,7 +282,13 @@ pub fn run() {
             remote::remote_stop,
             remote::remote_status,
             remote::remote_publish_state,
-            remote::get_local_ips
+            remote::get_local_ips,
+            webui::webui_start,
+            webui::webui_stop,
+            webui::webui_status,
+            webui::webui_publish,
+            webui::webui_reply,
+            webui::webui_qr_svg
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

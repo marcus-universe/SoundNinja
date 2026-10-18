@@ -168,11 +168,12 @@ export default defineNuxtConfig({
           warn(warning)
         },
         output: {
-          // Split heavy settings/theme-creator panels into separate chunks so
-          // the main soundboard loads without waiting for them.
+          // Vendor splits only. App-level manual chunks pulled NumberSlider
+          // into the theme-creator chunk while a Vue helper stayed in the
+          // settings chunk, and the two imported each other. That cycle
+          // throws before mount in the release build (blank window).
+          // Settings stay lazy via LazySettingsOverlay.
           manualChunks(id) {
-            if (id.includes('SettingsThemeCreator')) return 'chunk-theme-creator'
-            if (id.includes('SettingsAudio') || id.includes('SettingsMain') || id.includes('SettingsAbout') || id.includes('SettingsBehavior') || id.includes('SettingsPerformance') || id.includes('SettingsOverlay')) return 'chunk-settings'
             if (!id.includes('node_modules')) return
             if (id.includes('sortablejs')) return 'vendor-sortable'
             if (id.includes('@tauri-apps')) return 'vendor-tauri'
@@ -198,6 +199,9 @@ export default defineNuxtConfig({
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1.0' },
+      ],
+      link: [
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       ],
     },
   },

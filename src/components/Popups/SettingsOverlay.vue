@@ -5,13 +5,40 @@
       class="settings-overlay"
       @click.self="appStore.setActiveOverlay(null)"
     >
-      <div class="settings-panel">
+      <div class="settings-panel" :class="{ 'is-detail': phoneDetail }">
 
-        <DialogCloseButton :title="$t('settings.close')" @close="appStore.setActiveOverlay(null)" />
+        <header v-if="phone" class="settings-phone-head">
+          <button
+            v-if="phoneDetail"
+            type="button"
+            class="settings-phone-head__back"
+            :aria-label="$t('remoteUi.settingsBack')"
+            @click="detail = false"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span v-else class="settings-phone-head__side" />
+          <h2 class="settings-phone-head__title">{{ phoneDetail ? activeTabLabel : $t('settings.title') }}</h2>
+          <button
+            type="button"
+            class="settings-phone-head__close"
+            :aria-label="$t('settings.close')"
+            @click="appStore.setActiveOverlay(null)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </header>
+        <DialogCloseButton v-if="!phone" :title="$t('settings.close')" @close="appStore.setActiveOverlay(null)" />
 
         <!-- Sidebar -->
-        <aside :class="['settings-sidebar', { 'settings-sidebar--collapsed': sidebarCollapsed }]">
+        <aside :class="['settings-sidebar', { 'settings-sidebar--collapsed': sidebarCollapsed && !phone }]">
           <button
+            v-if="!phone"
             class="settings-collapse-btn"
             :title="sidebarCollapsed ? $t('settings.expand') : $t('settings.collapse')"
             @click="sidebarCollapsed = !sidebarCollapsed"
@@ -23,7 +50,7 @@
             </svg>
           </button>
 
-          <div class="settings-sidebar__header">
+          <div v-if="!phone" class="settings-sidebar__header">
             <span class="settings-sidebar__header-text">{{ $t('settings.title') }}</span>
           </div>
 
@@ -31,18 +58,21 @@
             <button
               v-for="tab in tabs"
               :key="tab.id"
-              :class="['settings-nav__item', { active: activeTab === tab.id }]"
+              :class="['settings-nav__item', { active: !phone && activeTab === tab.id }]"
               :title="tab.label"
-              @click="activeTab = tab.id"
+              @click="selectTab(tab.id)"
             >
               <span class="settings-nav__icon" v-html="tab.icon" />
               <span class="settings-nav__label">{{ tab.label }}</span>
+              <svg v-if="phone" class="settings-nav__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </nav>
         </aside>
 
         <!-- Tab content -->
-        <main class="settings-content">
+        <main ref="contentEl" class="settings-content" tabindex="-1">
           <SettingsMain v-if="activeTab === 'main'" />
           <SettingsBehavior v-else-if="activeTab === 'behavior'" />
           <SettingsHotkeys v-else-if="activeTab === 'hotkeys'" />
@@ -60,13 +90,48 @@
 </template>
 
 <script setup lang="ts">
+import { isRemote } from '~/utils/runtime'
+
 const { t } = useI18n()
 const appStore = useAppStore()
 
+const contentEl = ref<HTMLElement | null>(null)
 const activeTab = ref('main')
-const sidebarCollapsed = ref(false)
 
-const tabs = computed(() => [
+function focusContent() {
+  nextTick(() => {
+    if (appStore.activeOverlay !== 'settings') return
+    contentEl.value?.focus({ preventScroll: true })
+  })
+}
+const sidebarCollapsed = ref(false)
+const narrow = ref(false)
+const detail = ref(false)
+const phone = computed(() => isRemote && narrow.value)
+const phoneDetail = computed(() => phone.value && detail.value)
+const activeTabLabel = computed(() => tabs.value.find((tab) => tab.id === activeTab.value)?.label || '')
+let mq: MediaQueryList | null = null
+
+function onMq() {
+  narrow.value = !!mq?.matches
+  if (!narrow.value) detail.value = false
+}
+
+function selectTab(id: string) {
+  activeTab.value = id
+  if (isRemote && narrow.value) detail.value = true
+  focusContent()
+}
+
+onMounted(() => {
+  mq = window.matchMedia('(max-width: 639px)')
+  onMq()
+  mq.addEventListener('change', onMq)
+})
+onUnmounted(() => mq?.removeEventListener('change', onMq))
+
+const tabs = computed(() => {
+  const all = [
   {
     id: 'main',
     label: t('settings.tabs.main'),
@@ -102,12 +167,22 @@ const tabs = computed(() => [
     label: t('settings.tabs.about'),
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
   },
-])
+  ]
+  return isRemote ? all.filter((tab) => tab.id !== 'remote') : all
+})
 
 watch(() => appStore.activeOverlay, (val) => {
-  if (val === 'settings') {
-    const pending = appStore.consumePendingSettingsTab()
-    if (pending) activeTab.value = pending
+  if (val !== 'settings') {
+    detail.value = false
+    return
   }
+  const pending = appStore.consumePendingSettingsTab()
+  if (pending) {
+    activeTab.value = pending
+    if (narrow.value) detail.value = true
+  } else if (narrow.value) {
+    detail.value = false
+  }
+  focusContent()
 }, { immediate: true })
 </script>

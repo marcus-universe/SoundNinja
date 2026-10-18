@@ -4,20 +4,45 @@
 
     <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.language') }}</label>
-      <select v-model="currentLanguage" @change="changeLanguage" class="settings-select">
-        <option v-for="loc in availableLocales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
-      </select>
+      <UISelect
+        :model-value="currentLanguage"
+        :options="languageOptions"
+        :aria-label="$t('settings.main.language')"
+        @update:model-value="pickLanguage"
+      />
+    </div>
+
+    <div v-if="isRemote" class="settings-group settings-group--stacked">
+      <NumberSlider
+        :label="$t('settings.themeCreator.uiScale')"
+        :model-value="remoteScale"
+        :min="0.5"
+        :max="2"
+        :step="0.01"
+        :reset-value="1"
+        @update:model-value="onRemoteScale"
+      />
+      <p class="settings-hint">{{ $t('settings.themeCreator.uiScaleHint') }}</p>
+    </div>
+
+    <div v-if="isRemote" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('remoteUi.keepAwake') }}</span>
+        <span class="settings-hint">{{ $t('remoteUi.keepAwakeHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="keepAwake" @update:modelValue="onWake" />
     </div>
 
     <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.theme') }}</label>
       <div class="settings-row settings-row--nowrap">
-        <select v-model="selectedTheme" @change="applyTheme" class="settings-select">
-          <option v-for="t in builtinThemes" :key="t.id" :value="t.id">{{ t.label }}</option>
-          <option v-for="t in savedThemes" :key="t" :value="'file:' + t">{{ t.replace('.css', '') }}</option>
-          <option value="custom">{{ $t('settings.main.customCssOption') }}</option>
-        </select>
-        <button class="settings-btn settings-btn--primary settings-btn--icon-only" :title="$t('settings.main.openThemeCreator')" @click="openThemeCreator">
+        <UISelect
+          :model-value="selectedTheme"
+          :options="themeOptions"
+          :aria-label="$t('settings.main.theme')"
+          @update:model-value="pickTheme"
+        />
+        <button v-if="!isRemote" class="settings-btn settings-btn--primary settings-btn--icon-only" :title="$t('settings.main.openThemeCreator')" @click="openThemeCreator">
           <Icons icon="palette" custom-class="settings-btn-icon" />
         </button>
       </div>
@@ -28,7 +53,7 @@
         <label class="settings-label">{{ $t('settings.main.customCss') }}</label>
         <p class="settings-hint">{{ $t('settings.main.importCssHint') }}</p>
         <div class="settings-row" style="margin-top: 0.5rem">
-          <button class="settings-btn" @click="importCustomCssFile">{{ $t('settings.main.importCssFile') }}</button>
+          <button v-if="!isRemote" class="settings-btn" @click="importCustomCssFile">{{ $t('settings.main.importCssFile') }}</button>
         </div>
         <p v-if="importError" class="settings-error" style="margin-top:0.5rem">{{ importError }}</p>
         <p v-if="importSuccess" class="settings-success" style="margin-top:0.5rem">{{ importSuccess }}</p>
@@ -78,6 +103,7 @@ import {
   THEME_TOKEN_DEFAULTS,
 } from '~/utils/themeTokens'
 import { isAppLocale, type AppLocale } from '~/utils/locales'
+import { applyUiScale, clampUiScale, isRemote, REMOTE_LOCALE_KEY, REMOTE_SCALE_KEY, REMOTE_WAKE_KEY, syncWakeLock } from '~/utils/runtime'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
 const appStore = useAppStore()
@@ -106,15 +132,62 @@ const importError = ref('')
 const importSuccess = ref('')
 const checkUpdatesOnStart = ref(true)
 const currentLanguage = ref(locale.value)
+const remoteScale = ref(1)
+const keepAwake = ref(false)
+
+onMounted(() => {
+  if (!isRemote) return
+  const stored = localStorage.getItem(REMOTE_SCALE_KEY)
+  const raw = stored != null ? Number(stored) : 1
+  remoteScale.value = clampUiScale(raw)
+  applyUiScale(remoteScale.value)
+  keepAwake.value = localStorage.getItem(REMOTE_WAKE_KEY) === '1'
+  syncWakeLock().catch(() => {})
+})
+
+function onRemoteScale(value: number) {
+  remoteScale.value = applyUiScale(value)
+  localStorage.setItem(REMOTE_SCALE_KEY, String(remoteScale.value))
+}
+
+function onWake(value: boolean) {
+  keepAwake.value = value
+  localStorage.setItem(REMOTE_WAKE_KEY, value ? '1' : '0')
+  syncWakeLock().catch(() => {})
+}
 
 const nameDialogOpen = ref(false)
 const nameDialogInput = ref('')
 const nameDialogError = ref('')
 const pendingCss = ref('')
 
+const languageOptions = computed(() =>
+  availableLocales.value.map((loc) => ({ value: String(loc.code), label: String(loc.name || loc.code) })),
+)
+
+const themeOptions = computed(() => [
+  ...builtinThemes.map((theme) => ({ value: theme.id, label: theme.label })),
+  ...savedThemes.value.map((name) => ({ value: 'file:' + name, label: name.replace('.css', '') })),
+  { value: 'custom', label: t('settings.main.customCssOption') },
+])
+
+async function pickLanguage(value: string) {
+  currentLanguage.value = value
+  await changeLanguage()
+}
+
+function pickTheme(value: string) {
+  selectedTheme.value = value
+  applyTheme()
+}
+
 async function changeLanguage() {
   const next = (isAppLocale(currentLanguage.value) ? currentLanguage.value : 'en') as AppLocale
   await setLocale(next)
+  if (isRemote) {
+    localStorage.setItem(REMOTE_LOCALE_KEY, next)
+    return
+  }
   await appSettings.setLocale(next)
   try {
     await invoke('rebuild_menu', { lang: next })
@@ -271,6 +344,15 @@ watch(() => appStore.activeOverlay, async (val) => {
   if (val !== 'settings') return
   await syncFromStore()
 })
+
+watch(
+  () => [jsonStore.configFile?.settings?.theme, appSettings.checkUpdatesOnStart],
+  () => {
+    if (appStore.activeOverlay !== 'settings') return
+    selectedTheme.value = normalizeThemeId(jsonStore.configFile?.settings?.theme)
+    checkUpdatesOnStart.value = appSettings.checkUpdatesOnStart !== false
+  },
+)
 
 onMounted(syncFromStore)
 </script>

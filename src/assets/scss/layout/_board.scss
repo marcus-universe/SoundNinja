@@ -28,6 +28,10 @@
     gap: 0;
   }
 
+  &--locked .SoundContainer__scroll {
+    overflow: hidden;
+  }
+
   .TabContainer {
     flex-shrink: 0;
     overflow: hidden;
@@ -865,7 +869,7 @@ body > .Soundbtn.sound-drag-stack__card {
   border: 0.32rem solid var(--primary_color);
   border-radius: 1.2rem;
   padding: calc($padding_1 * 2.5);
-  width: min(1080px, calc(100dvw - 4rem));
+  width: min(108rem, calc(100dvw - 4rem));
   max-height: calc(100dvh - 4rem);
   overflow-y: auto;
   box-sizing: border-box;

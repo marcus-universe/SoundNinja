@@ -101,13 +101,13 @@ fn enqueue_i16(tx: &SyncSender<Vec<f32>>, data: &[i16]) {
     enqueue_f32(tx, &converted);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_input_volume(volume: f32) {
     // Allow up to +6 dB (~2.0) for quiet mics.
     INPUT_VOLUME.store(volume.clamp(0.0, 2.0).to_bits(), Ordering::Relaxed);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_input_volume() -> f32 {
     current_input_volume()
 }

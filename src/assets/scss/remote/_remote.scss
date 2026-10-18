@@ -1,0 +1,356 @@
+// Remote mirror only. Desktop layout is unchanged: every rule hangs off html.sn-remote.
+
+html.sn-remote {
+  --sn-remote-sheet: color-mix(in srgb, var(--color-bg-2, #1a1e25) 86%, var(--color-text, #eee));
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.sn-remote body,
+html.sn-remote .Soundbtn,
+html.sn-remote .tab {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html.sn-remote .Soundbtn,
+html.sn-remote .tab,
+html.sn-remote .navbar svg {
+  touch-action: manipulation;
+}
+
+html.sn-remote .remote-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 80;
+  margin: 0;
+  padding: calc(0.6rem + env(safe-area-inset-top)) 1.2rem 0.6rem;
+  pointer-events: auto;
+  background: var(--sn-remote-sheet);
+  color: var(--color-text, #eee);
+  font-size: var(--font-size-sm, 1.6rem);
+  text-align: center;
+}
+
+@media (max-width: 639px) {
+  html.sn-remote {
+    --navbar-offset: 0px;
+    --topbar_height: 0px;
+  }
+
+  html.sn-remote .soundninja {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  html.sn-remote .main {
+    width: 100%;
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    overflow: hidden;
+    padding-top: calc(0.6rem + env(safe-area-inset-top));
+  }
+
+  html.sn-remote .navbar,
+  html.navbar-right.sn-remote .navbar {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    border: none;
+    border-top: 0.2rem solid var(--primary_color);
+    z-index: 70;
+    background: color-mix(in srgb, var(--color-bg, #222) 94%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  html.sn-remote .navbar .iconContainer {
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    width: 100%;
+    padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  html.sn-remote .navbar .nav-tip--search,
+  html.sn-remote .navbar .nav-tip--multiselect {
+    position: static;
+    transform: none;
+    top: auto;
+    left: auto;
+  }
+
+  html.sn-remote .searchBar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    width: 100%;
+    max-width: none;
+    z-index: 5;
+  }
+
+  html.sn-remote .tab-list .tab {
+    scroll-snap-align: start;
+  }
+
+  html.sn-remote .sound-group,
+  html.sn-remote .tab-separator.sound-group {
+    box-sizing: border-box;
+  }
+
+  html.sn-remote .SoundContainer {
+    padding-bottom: calc(7.2rem + env(safe-area-inset-bottom));
+  }
+
+  html.sn-remote .player-float {
+    bottom: calc(6.4rem + env(safe-area-inset-bottom));
+    max-width: calc(100% - 1.2rem);
+  }
+
+  html.sn-remote .context-menu {
+    top: auto !important;
+    left: 0 !important;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(70dvh, 52rem);
+    overflow: auto;
+    border-radius: var(--radius-panel, 1.2rem) var(--radius-panel, 1.2rem) 0 0;
+    padding-bottom: calc(0.8rem + env(safe-area-inset-bottom));
+    background: var(--sn-remote-sheet);
+  }
+
+  html.sn-remote .settings-overlay {
+    padding: 0;
+    backdrop-filter: none;
+    background: var(--color-bg, #222);
+  }
+
+  html.sn-remote .settings-panel {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    flex-direction: column;
+    box-shadow: none;
+  }
+
+  html.sn-remote .settings-panel > .dialog-close-btn {
+    display: none;
+  }
+
+  html.sn-remote .settings-phone-head {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    min-height: 5.2rem;
+    padding: env(safe-area-inset-top) 0.4rem 0;
+    background: var(--color-bg, #222);
+    border-bottom: 0.1rem solid color-mix(in srgb, var(--color-text, #eee) 12%, transparent);
+  }
+
+  html.sn-remote .settings-phone-head__title {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+    font-family: var(--font-tab, inherit);
+    font-size: var(--font-size-tab, 1.6rem);
+    font-weight: 700;
+    color: var(--color-text, #eee);
+  }
+
+  html.sn-remote .settings-phone-head__back,
+  html.sn-remote .settings-phone-head__close,
+  html.sn-remote .settings-phone-head__side {
+    width: 4.4rem;
+    height: 4.4rem;
+    flex: 0 0 auto;
+  }
+
+  html.sn-remote .settings-phone-head__back,
+  html.sn-remote .settings-phone-head__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--primary_color);
+    cursor: pointer;
+
+    svg {
+      width: 2.4rem;
+      height: 2.4rem;
+    }
+  }
+
+  html.sn-remote .settings-panel:not(.is-detail) .settings-content {
+    display: none;
+  }
+
+  html.sn-remote .settings-panel.is-detail .settings-sidebar {
+    display: none;
+  }
+
+  html.sn-remote .settings-panel.is-detail .settings-content {
+    display: block;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    padding: 1.6rem 1.6rem calc(2.4rem + env(safe-area-inset-bottom));
+    overflow: auto;
+    animation: sn-settings-in 0.2s ease;
+  }
+
+  html.sn-remote .settings-sidebar {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    border: 0;
+    padding: 1.2rem 1.2rem calc(1.6rem + env(safe-area-inset-bottom));
+    overflow: auto;
+    background: transparent;
+  }
+
+  html.sn-remote .settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0.4rem;
+    border-radius: 1.2rem;
+    background: var(--sn-remote-sheet);
+    overflow: hidden;
+  }
+
+  html.sn-remote .settings-nav__item {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    width: 100%;
+    min-height: 5.2rem;
+    padding: 0 1.2rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-text, #eee);
+    text-align: left;
+
+    & + & {
+      border-top: 0.1rem solid color-mix(in srgb, var(--color-text, #eee) 10%, transparent);
+    }
+  }
+
+  html.sn-remote .settings-nav__icon {
+    width: 2.2rem;
+    height: 2.2rem;
+    flex: 0 0 auto;
+
+    svg {
+      width: 2.2rem;
+      height: 2.2rem;
+    }
+  }
+
+  html.sn-remote .settings-nav__label {
+    flex: 1;
+    max-width: none;
+    opacity: 1;
+    font-size: var(--font-size-sm, 1.6rem);
+  }
+
+  html.sn-remote .settings-nav__chevron {
+    width: 1.8rem;
+    height: 1.8rem;
+    flex: 0 0 auto;
+    opacity: 0.55;
+  }
+
+  html.sn-remote .settings-content .settings-group {
+    padding-left: 0;
+  }
+
+  html.sn-remote .settings-content .settings-group:not(.settings-group--toggle) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+
+    > .settings-label,
+    > .settings-label-info {
+      flex: none;
+      width: auto;
+      max-width: none;
+    }
+
+    > .settings-row,
+    > .settings-select,
+    > .ui-select,
+    > .settings-input {
+      width: 100%;
+    }
+  }
+
+  html.sn-remote .settings-content .settings-group--toggle {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  html.sn-remote .settings-content .settings-input,
+  html.sn-remote .settings-content .settings-select,
+  html.sn-remote .settings-content .ui-select,
+  html.sn-remote .settings-content .ui-select__trigger {
+    width: 100%;
+    min-height: 4.4rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  html.sn-remote .sound-section-body.button-gaps,
+  html.sn-remote .sound-orphans.button-gaps {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--btn_width)), 1fr));
+    gap: var(--button-gap, 0.8rem);
+  }
+
+  html.sn-remote .main .SoundContainer .SoundTab .Soundbtn,
+  html.sn-remote .SoundTab .Soundbtn {
+    box-sizing: border-box;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  html.sn-remote .sound-group,
+  html.sn-remote .tab-separator.sound-group {
+    box-sizing: border-box;
+  }
+}
+
+@keyframes sn-settings-in {
+  from {
+    transform: translateX(2.4rem);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.sn-remote .settings-panel.is-detail .settings-content {
+    animation: none;
+  }
+}

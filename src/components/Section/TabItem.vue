@@ -4,7 +4,11 @@
         :class="{ active: isActive }"
         :style="tabStyle"
         :data-tab-name="tabName"
-        @click="$emit('select')"
+        @click="onClick"
+        @pointerdown="onPointerDown"
+        @pointermove="lp.move"
+        @pointerup="lp.end"
+        @pointercancel="lp.end"
         @contextmenu.prevent="(e) => $emit('contextmenu', e)"
     >
         {{ tabName }}
@@ -14,13 +18,26 @@
 <script setup>
 import { parseOverride } from '~/utils/colorOverride'
 import { withAlpha } from '~/utils/themeTokens'
+import { useRemoteLongPress } from '~/utils/longPress'
 
 const props = defineProps({
   tabName: { type: String, required: true },
   isActive: { type: Boolean, default: false },
   tabColor: { type: String, default: '' },
 })
-defineEmits(['select', 'contextmenu'])
+const emit = defineEmits(['select', 'contextmenu'])
+const lp = useRemoteLongPress()
+
+function onPointerDown(e) {
+  lp.start(e, (x, y) => {
+    emit('contextmenu', { preventDefault() {}, stopPropagation() {}, clientX: x, clientY: y })
+  })
+}
+
+function onClick(e) {
+  if (lp.eaten(e)) return
+  emit('select')
+}
 
 // Resolve per-tab override → --tab-* CSS vars (falls back to theme tokens).
 const tabStyle = computed(() => {

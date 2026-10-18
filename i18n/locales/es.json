@@ -222,6 +222,8 @@
       "savedThemes": "Temas guardados",
       "themeName": "Nombre del tema",
       "themeNameHint": "Nombre escrito en la cabecera del archivo de tema y usado como nombre de archivo al guardar.",
+      "uiScale": "Escala de resolución",
+      "uiScaleHint": "Escala toda la interfaz. Un valor más bajo muestra más botones en una pantalla pequeña. No se guarda en el tema.",
       "themeNamePlaceholder": "Mi tema personalizado",
       "colors": "Colores",
       "hue": "Tono",
@@ -339,7 +341,21 @@
       "address": "Direcciones",
       "copy": "Copiar",
       "copied": "Copiado",
-      "firewallHint": "Windows puede pedir permiso para que Sound Ninja atraviese el firewall la primera vez que arranca el servidor."
+      "firewallHint": "Windows puede pedir permiso para que Sound Ninja atraviese el firewall la primera vez que arranca el servidor.",
+      "web": {
+        "title": "Control web",
+        "enable": "Activar control web",
+        "enableHint": "Abre este soundboard en el navegador de otro dispositivo. El sonido suena en este PC.",
+        "port": "Puerto",
+        "token": "Código de acceso",
+        "tokenHint": "Obligatorio. El enlace y el código QR lo incluyen. Quien tenga el enlace en la red controla el tablero.",
+        "generate": "Nuevo código",
+        "status": "Estado",
+        "address": "Abrir en otro dispositivo",
+        "qr": "Escanear con el teléfono",
+        "security": "El código de acceso es la contraseña. Trata el enlace como un mando a distancia de este PC.",
+        "open": "Abrir"
+      }
     },
     "about": {
       "title": "Acerca de",
@@ -424,7 +440,8 @@
     "pickFolder": "Seleccionar carpeta",
     "apply": "Reenlazar seleccionados",
     "skip": "Omitir",
-    "noMatch": "Aún no hay coincidencia"
+    "noMatch": "Aún no hay coincidencia",
+    "duplicatePath": "Ese archivo ya lo usa otro botón."
   },
   "bulk": {
     "selected": "{count} seleccionado(s)",
@@ -478,6 +495,7 @@
     "replaceAudio": "Reemplazar audio",
     "showInFolderFailed": "No se pudo abrir este archivo en el explorador",
     "replaceAudioFailed": "No se pudo reemplazar el archivo de audio",
+    "replaceAudioDuplicate": "Ese archivo ya lo usa otro botón.",
     "volume": "Volumen",
     "loop": "Bucle"
   },
@@ -656,5 +674,19 @@
     "importing": "Descomprimiendo soundboard…",
     "exportFailed": "Error al exportar el soundboard",
     "importFailed": "Error al importar el soundboard"
+  },
+  "remoteUi": {
+    "connecting": "Conectando…",
+    "closed": "Conexión perdida. Reintentando…",
+    "rejected": "El código de acceso fue rechazado.",
+    "hostDown": "SoundNinja en el PC no responde.",
+    "waiting": "Esperando el soundboard…",
+    "stopAll": "Parar todo",
+    "editLayout": "Editar diseño",
+    "editLayoutOn": "Listo",
+    "project": "Soundboard",
+    "keepAwake": "Mantener pantalla encendida",
+    "keepAwakeHint": "Evita que el teléfono se duerma mientras esta página está abierta.",
+    "settingsBack": "Ajustes"
   }
 }

@@ -19,6 +19,7 @@ import {
   type AppHotkeyAction,
 } from '~/utils/hotkeys'
 import { attachGifsnapCache } from '~/utils/gifsnap'
+import { applyUiScale, clampUiScale } from '~/utils/runtime'
 
 const DEFAULT_RECENT_LIMIT = 30
 
@@ -85,6 +86,13 @@ export const useAppSettingsStore = defineStore('appSettings', {
     remotePort: 7331,
     remoteToken: '',
     remoteError: '',
+    /** LAN web UI that mirrors this board in a browser. Sound still plays here. */
+    webuiEnabled: false,
+    webuiPort: 7332,
+    webuiToken: '',
+    webuiError: '',
+    /** Whole-interface scale, like Blender's Resolution Scale. Not part of a theme. */
+    uiScale: 1,
   }),
 
   getters: {
@@ -145,6 +153,15 @@ export const useAppSettingsStore = defineStore('appSettings', {
         : 7331
       this.remoteToken = s.remoteToken || ''
       this.remoteError = ''
+      this.webuiEnabled = s.webuiEnabled === '1' || s.webuiEnabled === 'true'
+      const webPort = s.webuiPort != null ? Number(s.webuiPort) : 7332
+      this.webuiPort = Number.isFinite(webPort) && webPort >= 1 && webPort <= 65535
+        ? Math.round(webPort)
+        : 7332
+      this.webuiToken = s.webuiToken || ''
+      this.webuiError = ''
+      this.uiScale = clampUiScale(s.uiScale != null ? Number(s.uiScale) : 1)
+      applyUiScale(this.uiScale)
       this.audioMigrated = s.audioMigrated === '1' || s.audioMigrated === 'true'
         || s.outputSource != null || s.outputHost != null || s.outputVolume != null
         || s.inputSource != null || s.inputHost != null
@@ -371,6 +388,65 @@ export const useAppSettingsStore = defineStore('appSettings', {
       }
     },
 
+    async setWebuiEnabled(enabled: boolean) {
+      this.webuiEnabled = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'webuiEnabled', this.webuiEnabled ? '1' : '0')
+      await this.applyWebui()
+    },
+
+    async setWebuiPort(port: number) {
+      const next = Number.isFinite(port) ? Math.max(1, Math.min(65535, Math.round(port))) : 7332
+      this.webuiPort = next
+      const d = await this._db()
+      await saveSetting(d, 'webuiPort', String(this.webuiPort))
+      if (this.webuiEnabled) await this.applyWebui()
+    },
+
+    async setWebuiToken(token: string) {
+      this.webuiToken = (token || '').trim()
+      const d = await this._db()
+      await saveSetting(d, 'webuiToken', this.webuiToken)
+      if (this.webuiEnabled) await this.applyWebui()
+    },
+
+    async setUiScale(scale: number) {
+      this.uiScale = clampUiScale(scale)
+      applyUiScale(this.uiScale)
+      const d = await this._db()
+      await saveSetting(d, 'uiScale', String(this.uiScale))
+      try {
+        const { emit } = await import('@tauri-apps/api/event')
+        await emit('sn:chrome-changed', { uiScale: this.uiScale })
+      } catch { /* non-tauri */ }
+    },
+
+    /** Start or stop the browser mirror. Generates an access code the first time. */
+    async applyWebui() {
+      const { webuiStart, webuiStop, makeWebToken } = await import('~/utils/webui')
+      this.webuiError = ''
+      try {
+        if (this.webuiEnabled) {
+          if (!this.webuiToken) {
+            this.webuiToken = makeWebToken()
+            const d = await this._db()
+            await saveSetting(d, 'webuiToken', this.webuiToken)
+          }
+          const status = await webuiStart(this.webuiPort, this.webuiToken)
+          if (status.token && status.token !== this.webuiToken) {
+            this.webuiToken = status.token
+            const d = await this._db()
+            await saveSetting(d, 'webuiToken', this.webuiToken)
+          }
+        } else {
+          await webuiStop()
+        }
+      } catch (e) {
+        this.webuiError = e instanceof Error ? e.message : String(e)
+        throw e
+      }
+    },
+
     async setKlipyApiKey(key: string) {
       this.klipyApiKey = (key || '').trim()
       const d = await this._db()
@@ -415,12 +491,16 @@ export const useAppSettingsStore = defineStore('appSettings', {
     },
 
     /** Apply chrome prefs received from another window (no OS re-invoke, no re-emit). */
-    async applyChromeFromEvent(payload: { titlebarMode?: TitlebarMode; hideTitlebar?: boolean }) {
+    async applyChromeFromEvent(payload: { titlebarMode?: TitlebarMode; hideTitlebar?: boolean; uiScale?: number }) {
       if (payload.titlebarMode === 'system' || payload.titlebarMode === 'styled') {
         this.titlebarMode = payload.titlebarMode
       }
       if (typeof payload.hideTitlebar === 'boolean') {
         this.hideTitlebar = payload.hideTitlebar
+      }
+      if (typeof payload.uiScale === 'number') {
+        this.uiScale = clampUiScale(payload.uiScale)
+        applyUiScale(this.uiScale)
       }
       await this.applyChromeCss()
     },
@@ -459,6 +539,19 @@ export const useAppSettingsStore = defineStore('appSettings', {
       } catch (e) {
         console.error('set_input_volume failed', e)
       }
+    },
+
+    /** Slider drag: update the live mix without a settings-db write. */
+    applyOutputVolumeLive(volume: number) {
+      const vol = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1
+      this.outputVolume = vol
+      return this.applyAudioVolume()
+    },
+
+    applyInputVolumeLive(volume: number) {
+      const vol = Number.isFinite(volume) ? Math.max(0, Math.min(2, volume)) : 1
+      this.inputVolume = vol
+      return this.applyInputVolume()
     },
 
     /**

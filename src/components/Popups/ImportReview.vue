@@ -16,17 +16,11 @@
           <span class="ui-listitem-label">{{ folder.name }}</span>
           <span class="import-review-row__hint">{{ folderHint(folder) }}</span>
         </div>
-        <select v-model="folder.destTab" class="settings-select import-review-select">
-          <option :value="NEW_TAB_DEST">{{ $t('importReview.newTab', { name: folder.name }) }}</option>
-          <option value="All">{{ $t('tabs.all') }}</option>
-          <option
-            v-for="tab in namedTabs"
-            :key="tab.name"
-            :value="tab.name"
-          >
-            {{ tab.name }}
-          </option>
-        </select>
+        <UISelect
+          v-model="folder.destTab"
+          select-class="import-review-select"
+          :options="folderDestOptions(folder)"
+        />
       </li>
       <li
         v-for="file in review.files"
@@ -35,20 +29,12 @@
       >
         <Icons icon="audio-file" custom-class="import-review-row__icon" />
         <span class="ui-listitem-label">{{ audioDisplayName(file.fileName) }}</span>
-        <select
+        <UISelect
           v-if="showFileSelects"
           v-model="file.destTab"
-          class="settings-select import-review-select"
-        >
-          <option value="All">{{ $t('tabs.all') }}</option>
-          <option
-            v-for="tab in namedTabs"
-            :key="tab.name"
-            :value="tab.name"
-          >
-            {{ tab.name }}
-          </option>
-        </select>
+          select-class="import-review-select"
+          :options="fileTabOptions"
+        />
       </li>
     </ul>
 
@@ -56,21 +42,14 @@
       <label class="import-review-apply__label" for="import-review-apply-all">
         {{ $t('importReview.assignAllFiles') }}
       </label>
-      <select
-        id="import-review-apply-all"
-        v-model="applyAllTab"
-        class="settings-select import-review-select"
-        @change="assignAllFiles"
-      >
-        <option value="All">{{ $t('tabs.all') }}</option>
-        <option
-          v-for="tab in namedTabs"
-          :key="tab.name"
-          :value="tab.name"
-        >
-          {{ tab.name }}
-        </option>
-      </select>
+      <UISelect
+        input-id="import-review-apply-all"
+        :model-value="applyAllTab"
+        select-class="import-review-select"
+        :aria-label="$t('importReview.assignAllFiles')"
+        :options="fileTabOptions"
+        @update:model-value="pickApplyAll"
+      />
     </div>
 
     <div class="flex_c_h gap1 dialog-actions import-review-actions">
@@ -110,6 +89,24 @@ function folderHint(folder) {
   if (files) parts.push(t('importReview.fileCount', { count: files }))
   if (groups) parts.push(t('importReview.groupCount', { count: groups }))
   return parts.join(', ')
+}
+
+function folderDestOptions(folder) {
+  return [
+    { value: NEW_TAB_DEST, label: t('importReview.newTab', { name: folder.name }) },
+    { value: 'All', label: t('tabs.all') },
+    ...namedTabs.value.map((tab) => ({ value: tab.name, label: tab.name })),
+  ]
+}
+
+const fileTabOptions = computed(() => [
+  { value: 'All', label: t('tabs.all') },
+  ...namedTabs.value.map((tab) => ({ value: tab.name, label: tab.name })),
+])
+
+function pickApplyAll(value) {
+  applyAllTab.value = value
+  assignAllFiles()
 }
 
 function assignAllFiles() {

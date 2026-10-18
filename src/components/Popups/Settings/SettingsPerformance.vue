@@ -56,6 +56,7 @@
       <UICheckbox :modelValue="preloadGifs" @update:modelValue="onPreloadGifs" />
     </div>
 
+    <template v-if="!isRemote">
     <div class="settings-section-divider">{{ $t('settings.main.stemsSection') }}</div>
 
     <div class="settings-group settings-group--stacked">
@@ -86,6 +87,7 @@
         </span>
       </div>
     </div>
+    </template>
   </section>
 </template>
 
@@ -93,6 +95,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { clearGifsnapCache } from '~/utils/gifsnap'
+import { isRemote } from '~/utils/runtime'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -234,6 +237,20 @@ watch(() => appStore.activeOverlay, async (val) => {
   if (val !== 'settings') return
   await syncFromStore()
 })
+
+watch(
+  () => [
+    jsonStore.configFile?.settings?.cacheMaxSizeMib,
+    jsonStore.configFile?.settings?.cacheMaxEntryMib,
+    jsonStore.configFile?.settings?.preloadGifs,
+  ],
+  () => {
+    if (appStore.activeOverlay !== 'settings') return
+    cacheMaxSizeMib.value = jsonStore.configFile?.settings?.cacheMaxSizeMib ?? 256
+    cacheMaxEntryMib.value = jsonStore.configFile?.settings?.cacheMaxEntryMib ?? 128
+    preloadGifs.value = jsonStore.configFile?.settings?.preloadGifs === true
+  },
+)
 
 onMounted(async () => {
   await syncFromStore()

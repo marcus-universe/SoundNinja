@@ -1,11 +1,13 @@
 # Sound Ninja
 
+**English** · [Deutsch](./README.de.md) · [Español](./README.es.md) · [Français](./README.fr.md) · [日本語](./README.ja.md) · [简体中文](./README.zh-Hans.md)
+
 ![Sound Ninja Logo Animated](./designs/Logo_Animated.gif)
 
 <div align="center">
 
-[![Website](https://img.shields.io/badge/Website-GitHub_Pages-29d4ff?style=for-the-badge)](https://marcus-universe.github.io/SoundNinja/)
-[![Docs](https://img.shields.io/badge/Docs-User_guide-29d4ff?style=for-the-badge)](https://marcus-universe.github.io/SoundNinja/docs)
+[![Website](https://img.shields.io/badge/Website-soundninja.marcus--universe.com-29d4ff?style=for-the-badge)](https://soundninja.marcus-universe.com/)
+[![Docs](https://img.shields.io/badge/Docs-User_guide-29d4ff?style=for-the-badge)](https://soundninja.marcus-universe.com/docs)
 <br>
 ![License](https://img.shields.io/github/license/marcus-universe/SoundNinja?style=for-the-badge.svg)
 ![Version](https://img.shields.io/github/package-json/v/marcus-universe/SoundNinja?style=for-the-badge.svg)
@@ -49,8 +51,8 @@ The core mission was to build a soundboard that empowers you to organize massive
 
 ## Docs
 
-- [Website](https://marcus-universe.github.io/SoundNinja/)
-- [User guide](https://marcus-universe.github.io/SoundNinja/docs)
+- [Website](https://soundninja.marcus-universe.com/)
+- [User guide](https://soundninja.marcus-universe.com/docs)
 - [Build from source](./docs/build-from-source.md)
 - [Development setup](./docs/development.md)
 - [Companion / Remote](./docs/companion.md)

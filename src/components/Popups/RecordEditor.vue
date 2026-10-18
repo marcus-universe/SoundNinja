@@ -254,10 +254,12 @@
 
     <div class="record-editor__footer">
       <span class="record-editor__import-label">{{ $t('recordEditor.importTarget') }}</span>
-      <select v-model="importTab" class="settings-select record-editor__footer-select">
-        <option value="">{{ $t('recordEditor.importCurrentTab') }}</option>
-        <option v-for="t in tabNames" :key="t" :value="t">{{ t }}</option>
-      </select>
+      <UISelect
+        v-model="importTab"
+        select-class="record-editor__footer-select"
+        :aria-label="$t('recordEditor.importTarget')"
+        :options="importTabOptions"
+      />
       <button
         class="record-editor__btn"
         type="button"
@@ -419,6 +421,10 @@ const closePrompt = ref(false)
 const dirty = ref(false)
 const currentTab = ref('All')
 const tabNames = ref<string[]>([])
+const importTabOptions = computed(() => [
+  { value: '', label: t('recordEditor.importCurrentTab') },
+  ...tabNames.value.map((name) => ({ value: name, label: name })),
+])
 const staged = ref<StagedClip[]>([])
 let clipCounter = 0
 
@@ -1293,6 +1299,29 @@ function safeFileName(name: string) {
   return cleaned.endsWith('.wav') ? cleaned : `${cleaned}.wav`
 }
 
+function splitFileName(fileName: string) {
+  const m = fileName.match(/^(.*)(\.[^.]+)$/)
+  if (!m) return { stem: fileName, ext: '' }
+  return { stem: m[1] || fileName, ext: m[2] || '' }
+}
+
+/** Destination that will not overwrite an existing file or another clip in this batch. */
+async function uniqueCopyDest(dir: string, name: string, used: Set<string>) {
+  const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/'
+  const base = dir.replace(/[\\/]+$/, '')
+  const fileName = safeFileName(name)
+  const { stem, ext } = splitFileName(fileName)
+  let n = 2
+  let dest = `${base}${sep}${fileName}`
+  while (used.has(dest) || await invoke<boolean>('path_exists_abs', { path: dest })) {
+    dest = `${base}${sep}${stem}_${n}${ext}`
+    n += 1
+    if (n > 9999) break
+  }
+  used.add(dest)
+  return dest
+}
+
 async function stageClip(startSec: number | null, endSec: number | null, label: string) {
   if (!session.value) return
   busy.value = true
@@ -1385,11 +1414,11 @@ async function importStaged(all: boolean) {
   busy.value = true
   statusText.value = ''
   const tabs = buildTabs()
+  const usedDest = new Set<string>()
   let ok = 0
   try {
     for (const clip of clips) {
-      const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/'
-      const dest = `${dir.replace(/[\\/]+$/, '')}${sep}${safeFileName(clip.name)}`
+      const dest = await uniqueCopyDest(dir, clip.name, usedDest)
       const path = await invoke<string>('copy_file_to_abs', {
         src: clip.path,
         dst: dest,

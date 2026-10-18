@@ -40,6 +40,7 @@
 <script setup>
 import Sortable from 'sortablejs'
 import { parseOverride } from '~/utils/colorOverride'
+import { isRemote } from '~/utils/runtime'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -69,6 +70,7 @@ onMounted(() => {
     animation: 180,
     forceFallback: true,
     fallbackOnBody: true,
+    ...(isRemote ? { delay: 120, delayOnTouchOnly: true, fallbackTolerance: 4 } : {}),
     disabled: !allowReorder.value,
     draggable: '.tab',
     ghostClass: 'drag-over',
@@ -88,9 +90,9 @@ onMounted(() => {
   })
 
   watch(
-    () => jsonStore.configFile?.settings?.allowReorder,
-    (val) => {
-      sortable?.option('disabled', val === false)
+    [() => jsonStore.configFile?.settings?.allowReorder],
+    () => {
+      sortable?.option('disabled', jsonStore.configFile?.settings?.allowReorder === false)
     },
     { immediate: true }
   )

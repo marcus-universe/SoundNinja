@@ -59,7 +59,7 @@
         </button>
       </QuickInfo>
 
-      <QuickInfo :text="$t('player.record')">
+      <QuickInfo v-if="!isRemote" :text="$t('player.record')">
         <button
           class="player-float__btn player-float__btn--record"
           type="button"
@@ -72,7 +72,7 @@
         </button>
       </QuickInfo>
 
-      <QuickInfo v-if="overlapSounds" :text="$t('player.playlist')">
+      <QuickInfo v-if="overlapSounds && !isRemote" :text="$t('player.playlist')">
         <button
           class="player-float__btn"
           type="button"
@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { isRemote } from '~/utils/runtime'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { openSecondaryWindow, PLAYING_LIST, RECORD_EDITOR } from '~/utils/secondaryWindows'
 import { PeakLayer, blitPeaks, drawPlayhead, startThrottledClock } from '~/utils/waveformDraw'

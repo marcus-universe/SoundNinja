@@ -5,7 +5,11 @@
         :style="btnStyle"
         :data-sound-index="sound.index"
         :data-sound-path="sound.path"
-        @click="$emit('play', $event)"
+        @click="onClick"
+        @pointerdown="onPointerDown"
+        @pointermove="lp.move"
+        @pointerup="lp.end"
+        @pointercancel="lp.end"
         @contextmenu.prevent="(e) => $emit('contextmenu', e)"
         @mouseenter="hovered = true"
         @mouseleave="hovered = false"
@@ -40,6 +44,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { copyText } from '~/utils/clipboard'
+import { isRemote } from '~/utils/runtime'
+import { useRemoteLongPress } from '~/utils/longPress'
 
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
@@ -64,7 +70,22 @@ const props = defineProps({
   progressPaused: { type: Boolean, default: false },
   missing: { type: Boolean, default: false },
 })
-defineEmits(['play', 'contextmenu'])
+const emit = defineEmits(['play', 'contextmenu'])
+const lp = useRemoteLongPress()
+
+function onPointerDown(e) {
+  lp.start(e, (x, y) => {
+    emit('contextmenu', { preventDefault() {}, stopPropagation() {}, clientX: x, clientY: y })
+  })
+}
+
+function onClick(e) {
+  if (lp.eaten(e)) return
+  if (isRemote) {
+    try { navigator.vibrate?.(8) } catch { /* unsupported */ }
+  }
+  emit('play', e)
+}
 
 // Hover lives here on purpose. Held in the parent it invalidated a computed
 // spanning every sound, so moving the mouse re-rendered the whole board.

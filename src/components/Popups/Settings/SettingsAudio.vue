@@ -8,9 +8,12 @@
         <label class="settings-label">{{ $t('settings.audio.audioDriver') }}</label>
       </div>
       <div class="settings-row">
-        <select v-model="hostSelected" @change="onHostChange" class="settings-select">
-          <option v-for="h in audioHosts" :key="h" :value="h">{{ h }}</option>
-        </select>
+        <UISelect
+          :model-value="hostSelected"
+          :options="hostOptions"
+          :aria-label="$t('settings.audio.audioDriver')"
+          @update:model-value="pickHost"
+        />
         <Icons v-if="!compact" icon="question" customClass="settings-question-icon" @triggered="asioInfoOpen = true" />
       </div>
     </div>
@@ -23,9 +26,12 @@
     <div class="settings-group" :class="{ 'settings-group--compact': compact }">
       <label class="settings-label">{{ $t('settings.audio.outputDevice') }}</label>
       <div class="settings-row">
-        <select v-model="outputSelected" @change="selectOutputDevice" class="settings-select">
-          <option v-for="device in outputDevices" :key="device" :value="device">{{ device }}</option>
-        </select>
+        <UISelect
+          :model-value="outputSelected"
+          :options="outputOptions"
+          :aria-label="$t('settings.audio.outputDevice')"
+          @update:model-value="pickOutput"
+        />
         <button class="settings-btn settings-btn--icon" @click="loadOutputDevices" :title="$t('settings.audio.refresh')">&#x21BB;</button>
       </div>
     </div>
@@ -98,7 +104,7 @@
               max="100"
               step="1"
               v-model.number="outputVolumePct"
-              @change="onVolumeChange"
+              @change="onVolumeCommit"
             />
             <div class="settings-spin" aria-hidden="true">
               <button type="button" class="settings-spin__btn" tabindex="-1" @click="nudgeOutputVolume(1)">▴</button>
@@ -115,8 +121,8 @@
           step="1"
           v-model.number="outputVolumePct"
           :title="$t('settings.audio.sliderResetHint')"
-          @change="onVolumeChange"
-          @input="onVolumeChange"
+          @input="onVolumeInput"
+          @change="onVolumeCommit"
           @dblclick.prevent="resetOutputVolume"
         />
       </div>
@@ -135,7 +141,7 @@
               max="200"
               step="1"
               v-model.number="inputVolumePct"
-              @change="onInputVolumeChange"
+              @change="onInputVolumeCommit"
             />
             <div class="settings-spin" aria-hidden="true">
               <button type="button" class="settings-spin__btn" tabindex="-1" @click="nudgeInputVolume(1)">▴</button>
@@ -152,8 +158,8 @@
           step="1"
           v-model.number="inputVolumePct"
           :title="$t('settings.audio.sliderResetHint')"
-          @change="onInputVolumeChange"
-          @input="onInputVolumeChange"
+          @input="onInputVolumeInput"
+          @change="onInputVolumeCommit"
           @dblclick.prevent="resetInputVolume"
         />
       </div>
@@ -256,8 +262,10 @@ interface AsioDeviceChannels {
 }
 
 const audioHosts = ref<string[]>([])
+const hostOptions = computed(() => audioHosts.value.map((name) => ({ value: name, label: name })))
 const hostSelected = ref('')
 const outputDevices = ref<string[]>([])
+const outputOptions = computed(() => outputDevices.value.map((name) => ({ value: name, label: name })))
 const outputSelected = ref('')
 const inputDevices = ref<CaptureDeviceInfo[]>([])
 const inputSelected = ref('')
@@ -297,6 +305,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onCaptureDropdownPointerDown, true)
+  if (outputVolumeFrame) cancelAnimationFrame(outputVolumeFrame)
+  if (inputVolumeFrame) cancelAnimationFrame(inputVolumeFrame)
 })
 
 const inputSelectedLabel = computed(() => {
@@ -427,9 +437,14 @@ async function onHostChange() {
   await loadAsioChannels()
 }
 
-async function selectOutputDevice(event: Event) {
-  const val = (event.target as HTMLSelectElement).value
-  await appSettings.setOutputSource(val)
+async function pickHost(value: string) {
+  hostSelected.value = value
+  await onHostChange()
+}
+
+async function pickOutput(value: string) {
+  outputSelected.value = value
+  await appSettings.setOutputSource(value)
   await loadAsioChannels()
 }
 
@@ -446,13 +461,44 @@ async function saveAsioChannels() {
   await appSettings.setAsioInputChannels(asioInLeft.value, asioInRight.value)
 }
 
-async function onVolumeChange() {
+let outputVolumeFrame = 0
+let inputVolumeFrame = 0
+
+function onVolumeInput() {
+  const pct = Math.max(0, Math.min(100, Math.round(outputVolumePct.value)))
+  outputVolumePct.value = pct
+  if (outputVolumeFrame) return
+  outputVolumeFrame = requestAnimationFrame(() => {
+    outputVolumeFrame = 0
+    appSettings.applyOutputVolumeLive(outputVolumePct.value / 100)
+  })
+}
+
+function onInputVolumeInput() {
+  const pct = Math.max(0, Math.min(200, Math.round(inputVolumePct.value)))
+  inputVolumePct.value = pct
+  if (inputVolumeFrame) return
+  inputVolumeFrame = requestAnimationFrame(() => {
+    inputVolumeFrame = 0
+    appSettings.applyInputVolumeLive(inputVolumePct.value / 100)
+  })
+}
+
+async function onVolumeCommit() {
+  if (outputVolumeFrame) {
+    cancelAnimationFrame(outputVolumeFrame)
+    outputVolumeFrame = 0
+  }
   const pct = Math.max(0, Math.min(100, Math.round(outputVolumePct.value)))
   outputVolumePct.value = pct
   await appSettings.setOutputVolume(pct / 100)
 }
 
-async function onInputVolumeChange() {
+async function onInputVolumeCommit() {
+  if (inputVolumeFrame) {
+    cancelAnimationFrame(inputVolumeFrame)
+    inputVolumeFrame = 0
+  }
   const pct = Math.max(0, Math.min(200, Math.round(inputVolumePct.value)))
   inputVolumePct.value = pct
   await appSettings.setInputVolume(pct / 100)
@@ -460,22 +506,22 @@ async function onInputVolumeChange() {
 
 async function nudgeOutputVolume(delta: number) {
   outputVolumePct.value = Math.max(0, Math.min(100, Math.round((outputVolumePct.value || 0) + delta)))
-  await onVolumeChange()
+  await onVolumeCommit()
 }
 
 async function nudgeInputVolume(delta: number) {
   inputVolumePct.value = Math.max(0, Math.min(200, Math.round((inputVolumePct.value || 0) + delta)))
-  await onInputVolumeChange()
+  await onInputVolumeCommit()
 }
 
 async function resetOutputVolume() {
   outputVolumePct.value = 100
-  await onVolumeChange()
+  await onVolumeCommit()
 }
 
 async function resetInputVolume() {
   inputVolumePct.value = 100
-  await onInputVolumeChange()
+  await onInputVolumeCommit()
 }
 
 async function syncFromStore() {
@@ -527,6 +573,33 @@ watch(() => appStore.activeOverlay, (val) => {
   if (val !== 'settings') return
   syncFromStore()
 })
+
+watch(
+  () => [
+    appSettings.outputSource,
+    appSettings.outputHost,
+    appSettings.outputVolume,
+    appSettings.inputSource,
+    appSettings.inputHost,
+    appSettings.inputVolume,
+    appSettings.asioLeftChannel,
+    appSettings.asioRightChannel,
+    appSettings.asioInLeftChannel,
+    appSettings.asioInRightChannel,
+  ],
+  () => {
+    if (props.compact || appStore.activeOverlay !== 'settings') return
+    outputSelected.value = appSettings.outputSource
+    hostSelected.value = appSettings.outputHost || appSettings.inputHost || hostSelected.value
+    inputSelected.value = appSettings.inputSource
+    outputVolumePct.value = Math.round((appSettings.outputVolume ?? 1) * 100)
+    inputVolumePct.value = Math.round((appSettings.inputVolume ?? 1) * 100)
+    asioLeft.value = appSettings.asioLeftChannel
+    asioRight.value = appSettings.asioRightChannel
+    asioInLeft.value = appSettings.asioInLeftChannel
+    asioInRight.value = appSettings.asioInRightChannel
+  },
+)
 
 // Keep compact strip in sync when Settings (or another window) changes volumes/devices.
 watch(

@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import {
   openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
-  healFolderTabMembership, mergeTabsFromUsage,
+  healFolderTabMembership, mergeTabsFromUsage, mergeSoundInto, dedupeSoundsByPath,
   persistSoundIds, ensurePerSoundVolume,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign, type SoundTag, type SortMode, normalizeSortMode,
 } from '~/utils/db'
 import { ensureSoundIds, newSoundId } from '~/utils/soundId'
+import { isRemote } from '~/utils/runtime'
 import { revokeAllGifUrls } from '~/utils/gifCache'
 import {
   NEW_TAB_DEST,
@@ -261,6 +262,10 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     /** Flushes any pending changes to the project DB immediately. */
     async persistNow() {
+      if (isRemote) {
+        this.dirty = false
+        return
+      }
       if (this._persistTimer) {
         clearTimeout(this._persistTimer)
         this._persistTimer = null
@@ -454,23 +459,34 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Sounds ────────────────────────────────────────────────────────────────
     addFiles(files: SoundFile[]) {
       this.pushBeforeChange()
+      const indexByPath = new Map<string, number>()
+      this.configFile.files.forEach((f, i) => {
+        if (f.path && !indexByPath.has(f.path)) indexByPath.set(f.path, i)
+      })
       const used = new Set(this.configFile.files.map((f) => f.id).filter(Boolean))
       const now = Date.now()
-      const withIds = files.map((f) => {
-        const next = {
+      const fresh: SoundFile[] = []
+      for (const f of files) {
+        const path = f.path ?? ''
+        const existingIdx = path ? indexByPath.get(path) : undefined
+        if (existingIdx != null) {
+          const existing = this.configFile.files[existingIdx]
+          if (existing) mergeSoundInto(existing, f)
+          continue
+        }
+        const next: SoundFile = {
           ...f,
           tagIds: f.tagIds ?? [],
           addedAt: f.addedAt ?? now,
+          id: f.id || '',
         }
-        if (next.id) {
-          used.add(next.id)
-          return next
-        }
-        const id = newSoundId(used)
-        used.add(id)
-        return { ...next, id }
-      })
-      this.configFile.files = [...this.configFile.files, ...withIds]
+        if (!next.id) next.id = newSoundId(used)
+        used.add(next.id)
+        if (path) indexByPath.set(path, this.configFile.files.length + fresh.length)
+        fresh.push(next)
+      }
+      if (fresh.length) this.configFile.files = [...this.configFile.files, ...fresh]
+      dedupeSoundsByPath(this.configFile)
       this.normalizeIndexes()
       this.applyBoardFilter()
       this.writeConfig()
@@ -735,15 +751,21 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    /** Swap the audio file on a button. Name, id, color, gif, tabs, volume stay. */
-    replaceSoundPath(soundindex: number, nextPath: string) {
+    /**
+     * Swap the audio file on a button. Name, id, color, gif, tabs, volume stay.
+     * Returns false when `nextPath` is already another button — `sounds.path`
+     * is the primary key, so two buttons cannot share one file path.
+     */
+    replaceSoundPath(soundindex: number, nextPath: string): boolean {
       const file = this.configFile.files[soundindex]
-      if (!file || !nextPath || file.path === nextPath) return
+      if (!file || !nextPath || file.path === nextPath) return false
+      if (this.configFile.files.some((f, i) => i !== soundindex && f.path === nextPath)) return false
       this.pushBeforeChange()
       const old = file.path
       file.path = nextPath
       this.missingPaths = this.missingPaths.filter((p) => p !== old)
       this.writeConfig()
+      return true
     },
 
     // ── Bulk (multi-select) actions, keyed by sound path ──────────────────────
@@ -766,16 +788,41 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.writeConfig()
     },
 
-    relinkSounds(pairs: { from: string; to: string }[]) {
-      if (!pairs.length) return
+    /**
+     * Point missing buttons at found files.
+     * A destination already used by another button is skipped (returns that
+     * count). Two missing files with the same name must not collapse onto
+     * one path — that is SQLITE 1555 on the next save.
+     */
+    relinkSounds(pairs: { from: string; to: string }[]): number {
+      if (!pairs.length) return 0
       this.pushBeforeChange()
-      const map = new Map(pairs.map((p) => [p.from, p.to]))
-      for (const f of this.configFile.files) {
-        const next = map.get(f.path)
-        if (next) f.path = next
+      const reserved = new Set(this.configFile.files.map((f) => f.path))
+      const moved = new Set<string>()
+      let skipped = 0
+      for (const { from, to } of pairs) {
+        if (!from || !to || from === to) continue
+        const file = this.configFile.files.find((f) => f.path === from)
+        if (!file || moved.has(from)) {
+          skipped++
+          continue
+        }
+        if (reserved.has(to)) {
+          skipped++
+          continue
+        }
+        reserved.delete(from)
+        reserved.add(to)
+        file.path = to
+        moved.add(from)
       }
-      this.missingPaths = this.missingPaths.filter((p) => !map.has(p))
+      dedupeSoundsByPath(this.configFile)
+      this.missingPaths = this.missingPaths.filter((p) => {
+        if (!moved.has(p)) return true
+        return this.configFile.files.some((f) => f.path === p)
+      })
       this.writeConfig()
+      return skipped
     },
 
     removeSoundsMany(paths: string[]) {

@@ -48,13 +48,15 @@
 
     <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.navbarSide') }}</label>
-      <select v-model="navbarSide" @change="onNavbarSide" class="settings-select">
-        <option value="left">{{ $t('settings.main.navbarLeft') }}</option>
-        <option value="right">{{ $t('settings.main.navbarRight') }}</option>
-      </select>
+      <UISelect
+        :model-value="navbarSide"
+        :options="navbarSideOptions"
+        :aria-label="$t('settings.main.navbarSide')"
+        @update:model-value="pickNavbarSide"
+      />
     </div>
 
-    <div class="settings-group settings-group--toggle">
+    <div v-if="!isRemote" class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.hideTitlebar') }}</span>
         <span class="settings-hint">{{ $t('settings.main.hideTitlebarHint') }}</span>
@@ -62,7 +64,7 @@
       <UICheckbox :modelValue="hideTitlebar" @update:modelValue="onHideTitlebarToggle" />
     </div>
 
-    <div v-if="!hideTitlebar" class="settings-group settings-group--toggle">
+    <div v-if="!isRemote && !hideTitlebar" class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.systemTitlebar') }}</span>
         <span class="settings-hint">{{ $t('settings.main.systemTitlebarHint') }}</span>
@@ -139,15 +141,15 @@
 
     <div class="settings-group">
       <label class="settings-label">{{ $t('settings.main.tabTransition') }}</label>
-      <select v-model="tabTransition" @change="onTabTransition" class="settings-select">
-        <option value="slide">{{ $t('settings.main.tabTransitionSlide') }}</option>
-        <option value="fade">{{ $t('settings.main.tabTransitionFade') }}</option>
-        <option value="stagger">{{ $t('settings.main.tabTransitionStagger') }}</option>
-        <option value="none">{{ $t('settings.main.tabTransitionNone') }}</option>
-      </select>
+      <UISelect
+        :model-value="tabTransition"
+        :options="tabTransitionOptions"
+        :aria-label="$t('settings.main.tabTransition')"
+        @update:model-value="pickTabTransition"
+      />
     </div>
 
-    <div class="settings-group">
+    <div v-if="!isRemote" class="settings-group">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.recentLimit') }}</span>
         <span class="settings-hint">{{ $t('settings.main.recentLimitHint') }}</span>
@@ -165,7 +167,7 @@
       <UICheckbox :modelValue="gifPlayOnHover" @update:modelValue="onGifPlayOnHover" />
     </div>
 
-    <div id="settings-klipy-api" class="settings-group settings-group--stacked">
+    <div v-if="!isRemote" id="settings-klipy-api" class="settings-group settings-group--stacked">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.klipyApiKey') }}</span>
         <span class="settings-hint">{{ $t('settings.main.klipyApiKeyHint') }}</span>
@@ -212,7 +214,9 @@
 <script setup lang="ts">
 import { KLIPY_DOCS_URL, KLIPY_PARTNER_URL, openInSystemBrowser } from '~/utils/openExternal'
 import { normalizeTabTransition, type TabTransition } from '~/utils/db'
+import { isRemote } from '~/utils/runtime'
 
+const { t } = useI18n()
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
 const appSettings = useAppSettingsStore()
@@ -238,6 +242,28 @@ const hideTitlebarWarnOpen = ref(false)
 const hideTitlebarDontRemind = ref(false)
 const recentLimit = ref(30)
 const navbarSide = ref<'left' | 'right'>('left')
+
+const navbarSideOptions = computed(() => [
+  { value: 'left', label: t('settings.main.navbarLeft') },
+  { value: 'right', label: t('settings.main.navbarRight') },
+])
+
+const tabTransitionOptions = computed(() => [
+  { value: 'slide', label: t('settings.main.tabTransitionSlide') },
+  { value: 'fade', label: t('settings.main.tabTransitionFade') },
+  { value: 'stagger', label: t('settings.main.tabTransitionStagger') },
+  { value: 'none', label: t('settings.main.tabTransitionNone') },
+])
+
+async function pickNavbarSide(value: string) {
+  navbarSide.value = value === 'right' ? 'right' : 'left'
+  await onNavbarSide()
+}
+
+function pickTabTransition(value: string) {
+  tabTransition.value = normalizeTabTransition(value)
+  onTabTransition()
+}
 
 async function onNavbarSide() {
   await appSettings.setNavbarSide(navbarSide.value)
@@ -369,7 +395,11 @@ async function onRecentLimit() {
 }
 
 async function syncFromStore() {
-  if (!appSettings.loaded) await appSettings.load()
+  if (!isRemote && !appSettings.loaded) await appSettings.load()
+  applyBehaviorFields()
+}
+
+function applyBehaviorFields() {
   navbarSide.value = appSettings.navbarSide
   stopOnRetrigger.value = jsonStore.configFile?.settings?.stopOnRetrigger ?? true
   overlapSounds.value = jsonStore.configFile?.settings?.overlapSounds ?? false
@@ -389,6 +419,29 @@ async function syncFromStore() {
   hideTitlebar.value = !!appSettings.hideTitlebar
   recentLimit.value = appSettings.recentLimit ?? 30
 }
+
+watch(
+  () => jsonStore.configFile?.settings,
+  () => {
+    if (appStore.activeOverlay !== 'settings') return
+    applyBehaviorFields()
+  },
+  { deep: true },
+)
+
+watch(
+  () => [
+    appSettings.navbarSide,
+    appSettings.navbarTooltips,
+    appSettings.showTagBadges,
+    appSettings.gifTitleChip,
+    appSettings.basicButtonColors,
+  ],
+  () => {
+    if (appStore.activeOverlay !== 'settings') return
+    applyBehaviorFields()
+  },
+)
 
 watch(() => appStore.activeOverlay, async (val) => {
   if (val !== 'settings') return

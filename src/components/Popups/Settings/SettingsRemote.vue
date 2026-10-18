@@ -73,6 +73,8 @@
       </ul>
       <p v-if="copied" class="settings-success" style="margin-top: 0.4rem">{{ $t('settings.remote.copied') }}</p>
     </div>
+
+    <SettingsWebControl />
   </section>
 </template>
 

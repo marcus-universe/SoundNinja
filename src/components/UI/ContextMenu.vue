@@ -149,7 +149,7 @@
         </li>
         <li v-if="isSound" class="context-menu__sep" role="separator" />
         <li
-          v-if="isSound"
+          v-if="isSound && !isRemote"
           class="context-menu__item"
           role="menuitem"
           @click="showInFolder"
@@ -171,7 +171,7 @@
           <span class="context-menu__label">{{ $t('contextMenu.copyPath') }}</span>
         </li>
         <li
-          v-if="isSound"
+          v-if="isSound && !isRemote"
           class="context-menu__item"
           role="menuitem"
           @click="replaceAudio"
@@ -299,7 +299,7 @@
           <span class="context-menu__chevron">{{ flyoutChevron('colors') }}</span>
         </li>
         <li
-          v-if="appStore.contextMenu.type === 'sound'"
+          v-if="appStore.contextMenu.type === 'sound' && !isRemote"
           class="context-menu__item"
           role="menuitem"
           @click="openGifPicker"
@@ -396,6 +396,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { pickOpenPath } from '~/utils/projects'
 import { invoke } from '@tauri-apps/api/core'
+import { isRemote } from '~/utils/runtime'
 
 const { t: $t } = useI18n()
 const appStore = useAppStore()
@@ -958,7 +959,10 @@ async function replaceAudio() {
     if (sound.id) {
       window.dispatchEvent(new CustomEvent('sn:stop-sound-id', { detail: sound.id }))
     }
-    jsonStore.replaceSoundPath(targetIndex, nextPath)
+    if (!jsonStore.replaceSoundPath(targetIndex, nextPath)) {
+      appStore.setErrorActive($t('contextMenu.replaceAudioDuplicate'))
+      return
+    }
     const selectedPaths = appStore.selectedSoundPaths
     const i = selectedPaths.indexOf(sound.path)
     if (i !== -1) selectedPaths.splice(i, 1, nextPath)

@@ -16,15 +16,12 @@
 
       <div class="flex_c gap1 w100 setting">
         <label>Select Output-Device</label>
-        <select v-model="outputSelected" @change="selectOutputDevice">
-          <option
-            v-for="device in OutputDevices[0]"
-            :key="device"
-            :value="device"
-          >
-            {{ device }}
-          </option>
-        </select>
+        <UISelect
+          :model-value="outputSelected"
+          :options="outputOptions"
+          aria-label="Select Output-Device"
+          @update:model-value="selectOutputDevice"
+        />
       </div>
     </div>
   </div>
@@ -38,6 +35,9 @@ const appSettings = useAppSettingsStore()
 
 const OutputDevices = ref([])
 const outputSelected = ref('')
+const outputOptions = computed(() =>
+  (OutputDevices.value[0] || []).map((device) => ({ value: device, label: device })),
+)
 
 const hueState = computed(() => jsonStore.configFile?.settings?.hue)
 const OutputState = computed(() => appSettings.outputSource)
@@ -67,8 +67,8 @@ async function getOutputDevices() {
 
 getOutputDevices()
 
-const selectOutputDevice = (event) => {
-  const selectedDevice = event.target.value
-  appSettings.setOutputSource(selectedDevice)
+const selectOutputDevice = (value) => {
+  outputSelected.value = value
+  appSettings.setOutputSource(value)
 }
 </script>

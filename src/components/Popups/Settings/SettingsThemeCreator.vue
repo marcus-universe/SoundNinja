@@ -3,20 +3,14 @@
     <!-- Sticky title bar with action icons -->
     <div class="theme-creator-toolbar">
       <h2 class="theme-creator-toolbar__title">{{ $t('settings.themeCreator.title') }}</h2>
-      <select
-        v-model="loadThemeId"
-        class="settings-select theme-creator-toolbar__theme"
+      <UISelect
+        :model-value="loadThemeId"
+        select-class="theme-creator-toolbar__theme"
         :title="$t('settings.themeCreator.loadThemeHint')"
-        @change="onLoadTheme"
-      >
-        <option value="">{{ $t('settings.themeCreator.loadThemePlaceholder') }}</option>
-        <optgroup :label="$t('settings.themeCreator.presets')">
-          <option v-for="p in presets" :key="p.id" :value="'preset:' + p.id">{{ p.label }}</option>
-        </optgroup>
-        <optgroup v-if="savedThemes.length" :label="$t('settings.themeCreator.savedThemes')">
-          <option v-for="f in savedThemes" :key="f" :value="'file:' + f">{{ f.replace('.css', '') }}</option>
-        </optgroup>
-      </select>
+        :aria-label="$t('settings.themeCreator.loadThemeHint')"
+        :options="loadThemeOptions"
+        @update:model-value="pickLoadTheme"
+      />
       <div class="theme-creator-toolbar__actions">
         <button class="tc-toolbar-btn" :title="$t('settings.themeCreator.importCssHint')" @click="importThemeFromFile">
           <Icons icon="upload" customClass="tc-toolbar-icon" />
@@ -53,6 +47,19 @@
           <div class="settings-group settings-group--stacked">
             <SettingsTipLabel fluid :tip="$t('settings.themeCreator.themeNameHint')">{{ $t('settings.themeCreator.themeName') }}</SettingsTipLabel>
             <input type="text" class="settings-input" v-model="themeCreator.name" :placeholder="$t('settings.themeCreator.themeNamePlaceholder')" />
+          </div>
+
+          <div class="settings-group settings-group--stacked">
+            <NumberSlider
+              :label="$t('settings.themeCreator.uiScale')"
+              :model-value="appSettings.uiScale"
+              :min="0.5"
+              :max="2"
+              :step="0.01"
+              :reset-value="1"
+              @update:model-value="onUiScale"
+            />
+            <p class="settings-hint">{{ $t('settings.themeCreator.uiScaleHint') }}</p>
           </div>
 
           <div class="settings-section-divider">{{ $t('settings.themeCreator.colors') }}</div>
@@ -378,6 +385,10 @@ function joinPath(base: string, ...parts: string[]) {
   return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
 }
 
+function onUiScale(value: number) {
+  appSettings.setUiScale(value).catch(() => {})
+}
+
 const LAYOUT_DEFAULTS = {
   btnFontFamily: 'Nunito-Bold',
   tabFontFamily: 'Nunito-Bold',
@@ -509,6 +520,24 @@ const themeCreator = reactive({
 const presets = THEME_PRESETS
 const loadThemeId = ref('')
 const savedThemes = ref<string[]>([])
+const loadThemeOptions = computed(() => [
+  { value: '', label: t('settings.themeCreator.loadThemePlaceholder') },
+  ...presets.map((preset) => ({
+    value: 'preset:' + preset.id,
+    label: preset.label,
+    group: t('settings.themeCreator.presets'),
+  })),
+  ...savedThemes.value.map((file) => ({
+    value: 'file:' + file,
+    label: file.replace('.css', ''),
+    group: t('settings.themeCreator.savedThemes'),
+  })),
+])
+
+function pickLoadTheme(value: string) {
+  loadThemeId.value = value
+  onLoadTheme()
+}
 
 /** Native color input only accepts #rrggbb — strip alpha for the wheel. */
 function colorPickerValue(key: ThemeTokenKey): string {

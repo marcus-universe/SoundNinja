@@ -4,7 +4,8 @@
     :class="isMain ? 'flex_c_h flex_space_between' : 'soundninja--tool'"
   >
     <!-- Styled chrome for main + secondary (Record Editor / Theme Creator). -->
-    <TitleBar />
+    <TitleBar v-if="!isRemote" />
+    <RemoteChrome v-if="isRemote" />
     <Transition name="splash-fade">
       <Splash v-if="isMain && booting" :percent="splashPercent" :label="splashLabel" />
     </Transition>
@@ -115,6 +116,8 @@ import { presentImportPaths, pickAudioFilesAndPresent, pickFoldersAndPresent } f
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { resolveAppLocale } from '~/utils/locales'
 import { publishRemoteState } from '~/utils/remote'
+import { isRemote, REMOTE_LOCALE_KEY } from '~/utils/runtime'
+import { bootRemoteSession, publishThemeFromDom, startWebuiHost } from '~/utils/webuiHost'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
@@ -604,11 +607,13 @@ async function applyPersistedTheme(config) {
         console.error('Failed to load persisted theme file', e)
       }
     }
+    publishThemeFromDom()
     return
   }
   // Builtin / default: the per-project color model is authoritative.
   document.getElementById('sn-custom-theme')?.remove()
   applyThemeTokens(s, getPreset(theme)?.extras)
+  publishThemeFromDom()
 }
 
 async function applyBootLocale(code) {
@@ -634,6 +639,19 @@ function waitForLanguagePick(initial) {
 }
 
 onMounted(async () => {
+  if (isRemote) {
+    splashLabel.value = t('remoteUi.connecting')
+    const savedLocale = localStorage.getItem(REMOTE_LOCALE_KEY)
+    if (savedLocale) {
+      try { await setLocale(savedLocale) } catch { /* unknown code */ }
+    }
+    bootRemoteSession({
+      setLocale: (code) => setLocale(code),
+      onReady: () => { booting.value = false },
+    })
+    settingsEverOpened.value = true
+    return
+  }
   splashLabel.value = t('splash.settings')
   splashPercent.value = 12
   await appSettings.load()
@@ -780,6 +798,11 @@ onMounted(async () => {
     (on) => { if (on) scheduleRemotePublish() },
   ))
 
+  teardown.push(startWebuiHost())
+  if (appSettings.webuiEnabled) {
+    try { await appSettings.applyWebui() } catch { /* webuiError set in store */ }
+  }
+
   // Prompt to save unsaved changes before the window closes.
   const mainWindow = getCurrentWindow()
   let allowClose = false
@@ -800,6 +823,7 @@ onMounted(async () => {
     // inject the preview CSS.
     clearInlineThemeVars()
     injectThemeCss(e.payload)
+    publishThemeFromDom()
   })
   listen('theme_saved', () => applyPersistedTheme(jsonStore.configFile))
   // Theme Creator asks for the currently applied theme so it can open showing

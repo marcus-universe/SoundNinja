@@ -69,6 +69,10 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 axum = { version = "0.8", default-features = false, features = ["ws", "json", "query", "http1", "tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros", "time"] }
 local-ip-address = "0.6"
+# SVG QR for the web-control settings page. No `image` feature — we never rasterize.
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# gzip + brotli for the mirrored SPA. Applied only on the asset router, not the websocket.
+tower-http = { version = "0.6", default-features = false, features = ["compression-gzip", "compression-br"] }
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-global-shortcut = "2"

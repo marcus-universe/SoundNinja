@@ -222,6 +222,8 @@
       "savedThemes": "保存済みテーマ",
       "themeName": "テーマ名",
       "themeNameHint": "テーマファイルのヘッダーに書き込まれ、保存ファイル名としても使われます。",
+      "uiScale": "解像度スケール",
+      "uiScaleHint": "画面全体を拡大縮小します。下げると小さい画面により多くのボタンが入ります。テーマには保存されません。",
       "themeNamePlaceholder": "マイカスタムテーマ",
       "colors": "色",
       "hue": "色相",
@@ -339,7 +341,21 @@
       "address": "アドレス",
       "copy": "コピー",
       "copied": "コピーしました",
-      "firewallHint": "初回起動時、Windows がファイアウォール許可を求めることがあります。"
+      "firewallHint": "初回起動時、Windows がファイアウォール許可を求めることがあります。",
+      "web": {
+        "title": "Web コントロール",
+        "enable": "Web コントロールを有効にする",
+        "enableHint": "別の端末のブラウザでこのサウンドボードを開きます。音はこの PC で再生されます。",
+        "port": "ポート",
+        "token": "アクセスコード",
+        "tokenHint": "必須です。リンクと QR コードに含まれます。ネットワーク上でリンクを持つ人はボードを操作できます。",
+        "generate": "新しいコード",
+        "status": "状態",
+        "address": "別の端末で開く",
+        "qr": "スマートフォンで読み取る",
+        "security": "アクセスコードがパスワードです。リンクはこの PC のリモコンとして扱ってください。",
+        "open": "開く"
+      }
     },
     "about": {
       "title": "情報",
@@ -424,7 +440,8 @@
     "pickFolder": "フォルダーを選択",
     "apply": "選択した項目を再リンク",
     "skip": "スキップ",
-    "noMatch": "まだ一致なし"
+    "noMatch": "まだ一致なし",
+    "duplicatePath": "そのファイルは別のボタンで使われています。"
   },
   "bulk": {
     "selected": "{count} 件選択",
@@ -478,6 +495,7 @@
     "replaceAudio": "音声を差し替え",
     "showInFolderFailed": "ファイルブラウザーで開けませんでした",
     "replaceAudioFailed": "音声ファイルを差し替えできませんでした",
+    "replaceAudioDuplicate": "そのファイルは別のボタンで使われています。",
     "volume": "音量",
     "loop": "ループ"
   },
@@ -656,5 +674,19 @@
     "importing": "サウンドボードを展開しています…",
     "exportFailed": "サウンドボードの書き出しに失敗",
     "importFailed": "サウンドボードの読み込みに失敗"
+  },
+  "remoteUi": {
+    "connecting": "接続中…",
+    "closed": "接続が切れました。再試行しています…",
+    "rejected": "アクセスコードが拒否されました。",
+    "hostDown": "PC の SoundNinja が応答しません。",
+    "waiting": "サウンドボードを待っています…",
+    "stopAll": "すべて停止",
+    "editLayout": "レイアウトを編集",
+    "editLayoutOn": "完了",
+    "project": "サウンドボード",
+    "keepAwake": "画面を点灯したままにする",
+    "keepAwakeHint": "このページを開いている間、スマートフォンがスリープしないようにします。",
+    "settingsBack": "設定"
   }
 }

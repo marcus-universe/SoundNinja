@@ -140,10 +140,13 @@
                             @change="onBulkOverride"
                         />
                     </div>
-                    <select class="bulk-bar__select" v-model="bulkTab" @change="applyBulkTab">
-                        <option value="">{{ $t('bulk.moveToTab') }}</option>
-                        <option v-for="t in tabOptions" :key="t" :value="t">{{ t }}</option>
-                    </select>
+                    <UISelect
+                        select-class="bulk-bar__select"
+                        :model-value="bulkTab"
+                        :aria-label="$t('bulk.moveToTab')"
+                        :options="bulkTabOptions"
+                        @update:model-value="pickBulkTab"
+                    />
                     <button class="bulk-bar__btn bulk-bar__btn--danger" :disabled="appStore.selectedSoundPaths.length === 0" @click="applyBulkDelete">
                         {{ $t('bulk.delete') }}
                     </button>
@@ -162,10 +165,12 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
+import { isRemote } from '~/utils/runtime'
 import { parseOverride, serializeOverride, resolveEffectiveColors, paintOverride } from '~/utils/colorOverride'
 import { normalizeTabTransition } from '~/utils/db'
 import { ensureGifUrls, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
 
+const { t } = useI18n()
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
 const appSettings = useAppSettingsStore()
@@ -371,6 +376,10 @@ function reorderDisabled() {
     || !groupedLayout.value
 }
 
+const touchDrag = isRemote
+  ? { delay: 120, delayOnTouchOnly: true, fallbackTolerance: 4 }
+  : {}
+
 function syncSortableDisabled() {
   const disabled = reorderDisabled()
   outerSortable?.option('disabled', disabled)
@@ -547,6 +556,7 @@ function bindInnerSortable(el) {
     forceFallback: true,
     fallbackOnBody: true,
     fallbackTolerance: 4,
+    ...touchDrag,
     disabled: reorderDisabled(),
     draggable: '.Soundbtn',
     ghostClass: 'drag-over',
@@ -569,6 +579,7 @@ function setupSortables(retry = true) {
     animation: 180,
     forceFallback: true,
     fallbackOnBody: true,
+    ...touchDrag,
     disabled: reorderDisabled(),
     draggable: '.sound-group',
     handle: '.sound-group__name',
@@ -676,6 +687,7 @@ let warmTimer = null
 let warmedSignature = ''
 
 function warmTabSounds() {
+  if (isRemote) return
   const paths = allDisplaySounds.value.map((s) => s.path).filter(Boolean).slice(0, WARM_LIMIT)
   if (!paths.length) return
   const signature = paths.join('|')
@@ -782,7 +794,16 @@ function updateUniformHeight() {
   })
 }
 
-const tabOptions = computed(() => (jsonStore.configFile?.tabList ?? []).map((t) => t.name).filter(Boolean))
+const tabOptions = computed(() => (jsonStore.configFile?.tabList ?? []).map((tab) => tab.name).filter(Boolean))
+const bulkTabOptions = computed(() => [
+  { value: '', label: t('bulk.moveToTab') },
+  ...tabOptions.value.map((name) => ({ value: name, label: name })),
+])
+
+function pickBulkTab(value) {
+  bulkTab.value = value
+  applyBulkTab()
+}
 
 const boardSignature = computed(() => {
   const parts = []
