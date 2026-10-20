@@ -493,6 +493,9 @@ async function initSchema(d: Database): Promise<void> {
   await addColumnIfMissing(d, 'sounds', 'file_size', 'INTEGER')
   await addColumnIfMissing(d, 'sounds', 'duration_secs', 'REAL')
   await addColumnIfMissing(d, 'sounds', 'looping', 'INTEGER')
+  // Older builds wrote this column without migrating existing project files,
+  // so Save died with "no such column: failed_sounds_path".
+  await addColumnIfMissing(d, 'sounds', 'failed_sounds_path', 'TEXT')
   await d.execute(`CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
     name TEXT,
