@@ -3,9 +3,8 @@ import { platform } from '@tauri-apps/plugin-os'
 
 /**
  * OS name. Seeded from the user agent so the first paint already knows Linux.
- * WebKitGTK draws a native `<select>` popup that ignores the theme; waiting
- * on the async plugin left that white menu up on the Steam Frame.
- * The Tauri plugin overwrites this once it answers.
+ * WebKitGTK draws a native `<select>` popup that ignores the theme, so the
+ * first paint must already know Linux. plugin-os `platform()` is synchronous.
  */
 function detectOsSync(): string {
   if (typeof navigator === 'undefined') return ''
@@ -25,7 +24,13 @@ export function ensureOs() {
   if (started || !import.meta.client) return
   started = true
   if (!osName.value) osName.value = detectOsSync()
-  platform()
-    .then((name) => { osName.value = name })
-    .catch(() => { /* keep the sync guess */ })
+  // plugin-os `platform()` is synchronous (a string). Calling `.then` on it
+  // throws in WebKit and the Theme Creator page dies with a 500.
+  try {
+    const name = platform() as string | Promise<string> | undefined
+    if (typeof name === 'string' && name) osName.value = name
+    else if (name && typeof (name as Promise<string>).then === 'function') {
+      ;(name as Promise<string>).then((next) => { osName.value = next }).catch(() => {})
+    }
+  } catch { /* keep the sync guess */ }
 }
