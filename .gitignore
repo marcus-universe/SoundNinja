@@ -47,3 +47,8 @@ agents
 .agent
 agent
 
+# Perch scan output. Keep closed issues and checked-in rules.
+.perch/*
+!.perch/closed.jsonl
+!.perch/rules/
+

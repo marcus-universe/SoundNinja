@@ -1,0 +1,23 @@
+#!/bin/bash
+set -u
+db=/home/steamos/Music/Soundboard/260912_Soundboard.sninja
+echo "=== tables live ==="
+sqlite3 "$db" "SELECT 'tabs', COUNT(*) FROM tabs UNION ALL SELECT 'sounds', COUNT(*) FROM sounds UNION ALL SELECT 'sound_tabs', COUNT(*) FROM sound_tabs UNION ALL SELECT 'separators', COUNT(*) FROM separators UNION ALL SELECT 'tags', COUNT(*) FROM tags UNION ALL SELECT 'sound_tags', COUNT(*) FROM sound_tags;"
+echo "=== tables bak ==="
+sqlite3 "$db.bak" "SELECT 'tabs', COUNT(*) FROM tabs UNION ALL SELECT 'sounds', COUNT(*) FROM sounds UNION ALL SELECT 'sound_tabs', COUNT(*) FROM sound_tabs UNION ALL SELECT 'separators', COUNT(*) FROM separators UNION ALL SELECT 'tags', COUNT(*) FROM tags UNION ALL SELECT 'sound_tags', COUNT(*) FROM sound_tags;"
+echo "=== live tabs ==="
+sqlite3 -header -column "$db" "SELECT name, position, button_align FROM tabs ORDER BY position;"
+echo "=== bak tabs ==="
+sqlite3 -header -column "$db.bak" "SELECT name, position, button_align FROM tabs ORDER BY position;"
+echo "=== live sound_tabs per tab ==="
+sqlite3 -header -column "$db" "SELECT tab, COUNT(*) n FROM sound_tabs GROUP BY tab ORDER BY n DESC;"
+echo "=== bak sound_tabs per tab ==="
+sqlite3 -header -column "$db.bak" "SELECT tab, COUNT(*) n FROM sound_tabs GROUP BY tab ORDER BY n DESC;"
+echo "=== live seps ==="
+sqlite3 -header -column "$db" "SELECT tab, COUNT(*) n FROM separators GROUP BY tab;"
+echo "=== bak seps ==="
+sqlite3 -header -column "$db.bak" "SELECT tab, COUNT(*) n FROM separators GROUP BY tab;"
+echo "=== sounds missing tabs live ==="
+sqlite3 "$db" "SELECT COUNT(*) FROM sounds s LEFT JOIN sound_tabs t ON t.sound_path=s.path WHERE t.sound_path IS NULL;"
+echo "=== sounds missing tabs bak ==="
+sqlite3 "$db.bak" "SELECT COUNT(*) FROM sounds s LEFT JOIN sound_tabs t ON t.sound_path=s.path WHERE t.sound_path IS NULL;"

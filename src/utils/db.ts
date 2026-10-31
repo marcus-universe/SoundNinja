@@ -625,6 +625,8 @@ export async function loadConfig(d: Database): Promise<ProjectConfig> {
         try { settings.selectedTagIds = JSON.parse(value) } catch { settings.selectedTagIds = [] }
         if (!Array.isArray(settings.selectedTagIds)) settings.selectedTagIds = []
         break
+      // Written after sound rows. Not a settings field — see readSoundCountMarker.
+      case 'soundCount': break
       case 'cacheMaxSizeMib': settings.cacheMaxSizeMib = Number(value); break
       case 'cacheMaxEntryMib': settings.cacheMaxEntryMib = Number(value); break
       case 'outputVolume': settings.outputVolume = Number(value); break
@@ -815,13 +817,46 @@ async function batchInsert(
   }
 }
 
-export async function saveConfig(d: Database, config: ProjectConfig): Promise<void> {
+export interface SaveConfigOptions {
+  /** User cleared the board. Without this, an empty list must not wipe existing rows. */
+  allowEmpty?: boolean
+}
+
+/**
+ * Reopen should pull `project.sninja.bak` only when an empty board looks
+ * unfinished. `soundCount === 0` is a completed intentional clear. `null`
+ * (marker missing) or any non-zero marker with zero files is a crashed save.
+ */
+export function shouldRestoreClearedBoard(fileCount: number, marker: number | null): boolean {
+  return fileCount === 0 && marker !== 0
+}
+
+/** `settings.soundCount`, written only after sound rows. `null` if that write never landed. */
+export async function readSoundCountMarker(d: Database): Promise<number | null> {
+  try {
+    const rows = await d.select<{ value: string }[]>(
+      "SELECT value FROM settings WHERE key = 'soundCount'",
+    )
+    const raw = rows?.[0]?.value
+    if (raw == null || raw === '') return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+export async function saveConfig(
+  d: Database,
+  config: ProjectConfig,
+  opts?: SaveConfigOptions,
+): Promise<void> {
   // Do NOT wrap this in BEGIN/COMMIT. tauri-plugin-sql uses an sqlx pool;
   // each execute() may land on a different connection. BEGIN on conn A +
   // DELETE on conn B = SQLITE_BUSY ("database is locked"). An abandoned
   // BEGIN also poisons that pooled connection until the app restarts.
   const incoming = config.files?.length ?? 0
-  if (incoming === 0) {
+  if (incoming === 0 && !opts?.allowEmpty) {
     try {
       const rows = await d.select<{ c: number }[]>('SELECT COUNT(*) AS c FROM sounds')
       const existing = Number(rows?.[0]?.c ?? 0)
@@ -950,6 +985,13 @@ export async function saveConfig(d: Database, config: ProjectConfig): Promise<vo
     'separators',
     ['id', 'tab', 'position', 'name', 'border_color', 'name_color', 'bg_color', 'button_align'],
     sepRows,
+  )
+
+  // After sound rows. A crash between DELETE and this write leaves the marker
+  // missing, so open can still restore from the pre-save backup.
+  await d.execute(
+    `INSERT INTO settings (key, value) VALUES ('soundCount', $1)`,
+    [String(soundRows.length)],
   )
 }
 

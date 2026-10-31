@@ -1,0 +1,16 @@
+ignore:
+  - .nuxt/**
+  - .output/**
+  - src-tauri/target/**
+  - node_modules/**
+
+rules:
+  - name: empty-board-may-save
+    where: src/utils/db.ts
+    each: method
+    min: 65
+    ensure: >-
+      An empty sound list may be persisted only when the caller marks that
+      empty list as intentional. A finished empty save must record soundCount
+      0 after the sound rows, so the next open does not restore the backup.
+      An unmarked empty list over a non-empty sounds table must still be refused.

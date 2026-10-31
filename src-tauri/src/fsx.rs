@@ -452,7 +452,8 @@ pub fn find_files_by_names(
 #[cfg(test)]
 mod tests {
     use super::{
-        inspect_import_drop, list_image_files_abs, ImportAudioFile, ImportDropScan, ImportFolder,
+        copy_file_to_abs, inspect_import_drop, list_image_files_abs, ImportAudioFile,
+        ImportDropScan, ImportFolder,
     };
     use std::fs;
 
@@ -589,5 +590,26 @@ mod tests {
     fn list_image_files_abs_missing_dir_is_empty() {
         let listed = list_image_files_abs(String::from("/this/path/does/not/exist-sn-test")).unwrap();
         assert!(listed.is_empty());
+    }
+
+    #[test]
+    fn copy_file_to_abs_roundtrip_overwrites_destination() {
+        let dir = std::env::temp_dir().join(format!("sn-copy-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("src.bin");
+        let dst = dir.join("nested").join("dst.bin");
+        fs::write(&src, b"one").unwrap();
+        let written = copy_file_to_abs(
+            src.to_string_lossy().into_owned(),
+            dst.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(fs::read(&written).unwrap(), b"one");
+        fs::write(&src, b"two").unwrap();
+        copy_file_to_abs(src.to_string_lossy().into_owned(), dst.to_string_lossy().into_owned())
+            .unwrap();
+        assert_eq!(fs::read(&dst).unwrap(), b"two");
+        let _ = fs::remove_dir_all(&dir);
     }
 }

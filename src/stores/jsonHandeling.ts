@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import {
   openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
   healFolderTabMembership, mergeTabsFromUsage, mergeSoundInto, dedupeSoundsByPath,
-  persistSoundIds, ensurePerSoundVolume,
+  persistSoundIds, ensurePerSoundVolume, readSoundCountMarker, shouldRestoreClearedBoard,
   type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
   type ButtonAlign, type SoundTag, type SortMode, normalizeSortMode,
 } from '~/utils/db'
@@ -53,6 +53,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     _historySuspended: false,
     /** Last color mutation timestamp for burst-undo coalescing. */
     _colorBurstAt: 0,
+    /** Next persist may write zero sounds. Set only by an intentional clear. */
+    _allowEmptyPersist: false,
   }),
 
   getters: {
@@ -97,6 +99,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         this.configFile = clone(snap)
         this.normalizeIndexes()
         this.applyBoardFilter()
+        this.noteIntentionalEmpty()
         this.writeConfig()
       } finally {
         this._historySuspended = false
@@ -121,8 +124,14 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     /** Opens a project DB, loads it into state, and snapshots for Discard. */
     async openProject(dbAbsPath: string) {
       revokeAllGifUrls()
-      let config = await withProjectDb(dbAbsPath, (d) => loadConfig(d))
-      if (!config.files.length) {
+      this._allowEmptyPersist = false
+      const loaded = await withProjectDb(dbAbsPath, async (d) => {
+        const config = await loadConfig(d)
+        const marker = await readSoundCountMarker(d)
+        return { config, marker }
+      })
+      let config = loaded.config
+      if (shouldRestoreClearedBoard(config.files.length, loaded.marker)) {
         config = await this.tryRestoreFromBak(dbAbsPath, config)
       }
       this.configFile = config
@@ -219,6 +228,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.openingSnapshot = clone(this.configFile)
       this.dirty = false
       this.clearHistory()
+      this.noteIntentionalEmpty()
       await this.persistNow()
     },
 
@@ -245,6 +255,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     // ── Persistence ───────────────────────────────────────────────────────────
+    /** Remember a user clear so the next save may persist zero sounds. */
+    noteIntentionalEmpty() {
+      if ((this.configFile.files?.length ?? 0) === 0) this._allowEmptyPersist = true
+    },
+
     /** Debounced save. Does not rebuild the board file list. */
     schedulePersist() {
       this.dirty = true
@@ -280,14 +295,16 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         await invoke('copy_file_to_abs', { src: path, dst: bak })
       } catch { /* first save may have no file yet */ }
       this.saving = true
+      const allowEmpty = this._allowEmptyPersist && (this.configFile.files?.length ?? 0) === 0
       try {
         await withProjectDb(path, async (d) => {
-          await saveConfig(d, this.configFile)
+          await saveConfig(d, this.configFile, allowEmpty ? { allowEmpty: true } : undefined)
           const keep = this.configFile.files.map((f) => f.gifId).filter((id): id is string => !!id)
           await gcOrphanGifs(d, keep)
         })
         this.openingSnapshot = clone(this.configFile)
         this.dirty = false
+        this._allowEmptyPersist = false
       } catch (e) {
         console.error('Failed to persist project', e)
         try {
@@ -345,6 +362,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       }
       this.normalizeIndexes()
       this.applyBoardFilter()
+      this.noteIntentionalEmpty()
       this.writeConfig()
     },
 
@@ -689,6 +707,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.pushBeforeChange()
       this.configFile.files.splice(soundindex, 1)
       this.normalizeIndexes()
+      this.noteIntentionalEmpty()
       this.writeConfig()
     },
 
@@ -830,6 +849,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       const set = new Set(paths)
       this.configFile.files = this.configFile.files.filter((f) => !set.has(f.path))
       this.normalizeIndexes()
+      this.noteIntentionalEmpty()
       this.writeConfig()
     },
 
@@ -1112,6 +1132,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.configFile = emptyConfig()
       this.normalizeIndexes()
       this.filteredFiles = []
+      this.noteIntentionalEmpty()
       this.writeConfig()
     },
 
