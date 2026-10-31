@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "perch-cloud": {
+      "url": "https://dash.perchscan.com/mcp"
+    }
+  }
+}
