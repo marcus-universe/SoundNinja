@@ -218,7 +218,7 @@ export function parentFolderName(filePath: string): string {
   const norm = String(filePath || '').replace(/\\/g, '/').replace(/\/+$/, '')
   const parts = norm.split('/').filter(Boolean)
   if (parts.length < 2) return ''
-  return parts[parts.length - 2]
+  return parts[parts.length - 2] ?? ''
 }
 
 /**

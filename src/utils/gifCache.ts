@@ -112,8 +112,15 @@ export function bytesToB64(bytes: Uint8Array): string {
   return btoa(s)
 }
 
+/** Copy into a plain ArrayBuffer. `Uint8Array` may view a SharedArrayBuffer, which `Blob` and `crypto.subtle` reject. */
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(copy).set(bytes)
+  return copy
+}
+
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const digest = await crypto.subtle.digest('SHA-256', asArrayBuffer(bytes))
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
@@ -153,7 +160,7 @@ export function isAnimatedImageMime(mime: string): boolean {
 /** First-frame PNG from an animated image. Used so hover-off does not keep a GIF decoder alive. */
 export function extractPosterPng(bytes: Uint8Array, mime: string): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const blob = new Blob([bytes], { type: mime })
+    const blob = new Blob([asArrayBuffer(bytes)], { type: mime })
     const url = URL.createObjectURL(blob)
     const img = new Image()
     img.onload = () => {

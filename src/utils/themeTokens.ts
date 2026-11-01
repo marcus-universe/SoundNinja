@@ -106,7 +106,9 @@ export function withAlpha(hex: string, alpha: number): string {
 }
 
 function g(v: unknown, d: string): string {
-  return (v && String(v).trim()) || d
+  if (!v) return d
+  const s = String(v).trim()
+  return s || d
 }
 
 /**
@@ -218,7 +220,10 @@ function parseCssVars(css: string): Record<string, string> {
   const re = /(--[\w-]+)\s*:\s*([^;]+)/g
   let m: RegExpExecArray | null
   while ((m = re.exec(css)) !== null) {
-    result[m[1].trim()] = m[2].trim()
+    const name = m[1]
+    const value = m[2]
+    if (name == null || value == null) continue
+    result[name.trim()] = value.trim()
   }
   return result
 }
@@ -247,7 +252,10 @@ export function cssColorToHex(color: string): string {
     if (!ctx) return c
     ctx.fillStyle = c
     ctx.fillRect(0, 0, 1, 1)
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+    const px = ctx.getImageData(0, 0, 1, 1).data
+    const r = px[0] ?? 0
+    const g = px[1] ?? 0
+    const b = px[2] ?? 0
     return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')
   } catch {
     return c
@@ -314,5 +322,5 @@ export function parseThemeCss(css: string): Partial<ThemeTokens> {
 
 export function parseThemeName(css: string): string {
   const m = css.match(/\/\*\s*SoundNinja Theme:\s*(.+?)\s*\*\//i)
-  return m ? m[1].trim() : ''
+  return m?.[1]?.trim() ?? ''
 }

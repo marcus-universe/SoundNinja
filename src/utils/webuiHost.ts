@@ -182,13 +182,14 @@ function writeAt(root: Record<string, unknown>, parts: string[], op: Op) {
   let cur: unknown = root
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i]
-    if (!cur || typeof cur !== 'object') return
+    if (key == null || !cur || typeof cur !== 'object') return
     const obj = cur as Record<string, unknown>
     if (obj[key] == null || typeof obj[key] !== 'object') obj[key] = {}
     cur = obj[key]
   }
   if (!cur || typeof cur !== 'object') return
   const leaf = parts[parts.length - 1]
+  if (leaf == null) return
   const obj = cur as Record<string, unknown>
   if (op.op === 'del') delete obj[leaf]
   else obj[leaf] = op.value
@@ -366,7 +367,8 @@ async function onHostMessage(msg: {
   store?: string
   name?: string
   args?: unknown
-  id?: number
+  /** RPC ids are numbers. Play and stop ids are sound ids (strings). */
+  id?: number | string
   cmd?: string
   payload?: unknown
 }) {
@@ -376,7 +378,7 @@ async function onHostMessage(msg: {
     }
     return
   }
-  if (msg.type === 'rpc' && msg.cmd && msg.id) {
+  if (msg.type === 'rpc' && msg.cmd && typeof msg.id === 'number' && msg.id) {
     const args = (msg.args && typeof msg.args === 'object') ? msg.args as Record<string, unknown> : {}
     if (!pathAllowed(msg.cmd, args)) {
       await invoke('webui_reply', { id: msg.id, result: null, error: 'Path is not available to remote' })
@@ -392,14 +394,14 @@ async function onHostMessage(msg: {
     }
     return
   }
-  if (msg.type === 'play' && typeof (msg as { id?: string }).id === 'string') {
-    window.dispatchEvent(new CustomEvent('sn:play-sound-id', { detail: (msg as { id: string }).id }))
+  if (msg.type === 'play' && typeof msg.id === 'string' && msg.id) {
+    window.dispatchEvent(new CustomEvent('sn:play-sound-id', { detail: msg.id }))
     return
   }
   if (msg.type === 'stop') {
-    const id = (msg as { id?: string }).id
-    if (id) window.dispatchEvent(new CustomEvent('sn:stop-sound-id', { detail: id }))
-    else {
+    if (typeof msg.id === 'string' && msg.id) {
+      window.dispatchEvent(new CustomEvent('sn:stop-sound-id', { detail: msg.id }))
+    } else {
       invoke('stop_all').catch(() => {})
       window.dispatchEvent(new CustomEvent('sn:stop-all'))
     }

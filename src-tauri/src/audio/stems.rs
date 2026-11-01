@@ -214,6 +214,15 @@ fn split_session_blocking(
     if BUSY.swap(true, Ordering::SeqCst) {
         return Err("Stem separation already running".into());
     }
+    // A panic in the ONNX / STFT path used to leave BUSY set, so the next
+    // split was rejected until restart.
+    struct ClearBusy;
+    impl Drop for ClearBusy {
+        fn drop(&mut self) {
+            BUSY.store(false, Ordering::SeqCst);
+        }
+    }
+    let _clear = ClearBusy;
     let result = (|| {
         if !crate::audio::roformer::model_ready(&app) {
             crate::audio::roformer::download_model(&app)?;
@@ -243,7 +252,6 @@ fn split_session_blocking(
         mark_asked(&app)?;
         super::dsp::session_info(&session_id)
     })();
-    BUSY.store(false, Ordering::SeqCst);
     result
 }
 

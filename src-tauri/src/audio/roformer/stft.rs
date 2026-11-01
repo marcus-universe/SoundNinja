@@ -184,7 +184,9 @@ pub fn apply_mask(
             let m_base_l = (i_l * n_frames + t) * 2;
             let m_base_r = (i_r * n_frames + t) * 2;
 
-            if s_base_l + 1 >= stft_repr.len() || m_base_l + 1 >= mask.len() {
+            // Right channel sits `n_frames` bins past the left. Checking only
+            // the left pair still panics when the mask or STFT is short.
+            if s_base_r + 1 >= stft_repr.len() || m_base_r + 1 >= mask.len() {
                 continue;
             }
             let sr = Complex::new(stft_repr[s_base_l], stft_repr[s_base_l + 1]);
@@ -207,50 +209,65 @@ fn hann_periodic(len: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Torch/numpy `reflect` pad (edge not repeated). Requires `pad < n` for audio chunks.
+/// Numpy/torch `reflect` index. Edge sample is not repeated.
+/// `2 * (n - 1) - k` on a `usize` underflows once `pad >= n`, which is every
+/// clip shorter than `N_FFT / 2` (1024 samples).
+fn reflect_index(idx: isize, n: usize) -> usize {
+    if n <= 1 {
+        return 0;
+    }
+    let period = (2 * (n - 1)) as isize;
+    let mut i = idx % period;
+    if i < 0 {
+        i += period;
+    }
+    if i >= n as isize {
+        i = period - i;
+    }
+    i as usize
+}
+
+/// Torch/numpy `reflect` pad (edge not repeated). Safe when `pad >= n`.
 fn reflect_pad(samples: &[f32], pad: usize, out: &mut Vec<f32>) {
     out.clear();
     let n = samples.len();
+    if pad == 0 {
+        out.extend_from_slice(samples);
+        return;
+    }
     if n == 0 {
         out.resize(2 * pad, 0.0);
         return;
     }
-    if n == 1 {
-        out.resize(n + 2 * pad, samples[0]);
-        return;
-    }
-    // Left: samples[pad], samples[pad-1], …, samples[1]
-    for i in (1..=pad).rev() {
-        let idx = {
-            let mut k = i;
-            while k >= n {
-                k = 2 * (n - 1) - k;
-                if k >= n {
-                    k = (k % (2 * (n - 1))).min(n - 1);
-                    break;
-                }
-            }
-            k.min(n - 1)
-        };
-        out.push(samples[idx]);
+    out.reserve(n + 2 * pad);
+    for p in 0..pad {
+        out.push(samples[reflect_index(p as isize - pad as isize, n)]);
     }
     out.extend_from_slice(samples);
-    // Right: samples[n-2], samples[n-3], …, samples[n-pad-1]
-    for i in 1..=pad {
-        let idx = {
-            let mut k = n - 1 - i;
-            if (k as isize) < 0 {
-                k = i % (n - 1);
-            }
-            k.min(n - 1)
-        };
-        out.push(samples[idx]);
+    for p in 0..pad {
+        out.push(samples[reflect_index(n as isize + p as isize, n)]);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reflect_pad_matches_numpy_when_pad_exceeds_length() {
+        let mut out = Vec::new();
+        reflect_pad(&[0.0, 1.0, 2.0, 3.0, 4.0], 3, &mut out);
+        assert_eq!(out, vec![3.0, 2.0, 1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0]);
+        reflect_pad(&[0.0, 1.0, 2.0], 5, &mut out);
+        assert_eq!(
+            out,
+            vec![1.0, 0.0, 1.0, 2.0, 1.0, 0.0, 1.0, 2.0, 1.0, 0.0, 1.0, 2.0, 1.0]
+        );
+        // STFT always pads by N_FFT/2. A click shorter than that must stay in range.
+        reflect_pad(&[0.25; 10], N_FFT / 2, &mut out);
+        assert_eq!(out.len(), 10 + N_FFT);
+        assert!(out.iter().all(|s| *s == 0.25));
+    }
 
     #[test]
     fn hann_peak_is_one() {

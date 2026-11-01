@@ -76,8 +76,8 @@ export function paintPeaks(
   const step = cssW / pairs
   ctx.fillStyle = MUTED
   for (let i = 0; i < pairs; i++) {
-    const minV = data[i * 2]
-    const maxV = data[i * 2 + 1]
+    const minV = data[i * 2] ?? 0
+    const maxV = data[i * 2 + 1] ?? 0
     const y1 = mid + minV * mid
     const y2 = mid + maxV * mid
     ctx.fillRect(i * step, y1, Math.max(1, step * 0.85), Math.max(1, y2 - y1))

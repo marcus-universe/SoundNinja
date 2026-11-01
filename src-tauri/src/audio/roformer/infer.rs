@@ -359,7 +359,11 @@ fn resample_planes(
         .map_err(|e| e.to_string())?;
         let waves_in = vec![plane.as_slice()];
         let waves_out = resampler.process(&waves_in, None).map_err(|e| e.to_string())?;
-        out.push(waves_out.into_iter().next().unwrap_or_default());
+        let wave = waves_out
+            .into_iter()
+            .next()
+            .ok_or_else(|| "resampler returned no channel".to_string())?;
+        out.push(wave);
     }
     Ok(out)
 }

@@ -387,14 +387,22 @@ pub fn get_live_record_peaks(
     let start_s = start_sec.unwrap_or(0.0).clamp(0.0, duration);
     let end_s = end_sec.unwrap_or(duration).clamp(start_s, duration);
     let start_frame = ((start_s * rec.sample_rate as f64).round() as usize).min(frames);
-    let end_frame = ((end_s * rec.sample_rate as f64).round() as usize)
-        .min(frames)
-        .max(start_frame + 1);
+    let end_frame = ((end_s * rec.sample_rate as f64).round() as usize).min(frames);
+    if end_frame <= start_frame {
+        return Ok((duration, vec![0.0; buckets * 2]));
+    }
     let span = end_frame - start_frame;
     let mut peaks = Vec::with_capacity(buckets * 2);
     for b in 0..buckets {
         let start = start_frame + b * span / buckets;
-        let end = (start_frame + (b + 1) * span / buckets).max(start + 1);
+        let end = (start_frame + (b + 1) * span / buckets)
+            .max(start + 1)
+            .min(end_frame);
+        if end <= start {
+            peaks.push(0.0);
+            peaks.push(0.0);
+            continue;
+        }
         let mut min_v = 0.0f32;
         let mut max_v = 0.0f32;
         for f in start..end {

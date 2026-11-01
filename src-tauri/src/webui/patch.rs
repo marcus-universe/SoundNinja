@@ -5,22 +5,20 @@ use serde_json::{Map, Value};
 
 fn decode_token(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
-    let b = raw.as_bytes();
-    let mut i = 0;
-    while i < b.len() {
-        if b[i] == b'~' && i + 1 < b.len() {
-            match b[i + 1] {
-                b'0' => out.push('~'),
-                b'1' => out.push('/'),
-                other => {
+    let mut chars = raw.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '~' {
+            match chars.next() {
+                Some('0') => out.push('~'),
+                Some('1') => out.push('/'),
+                Some(other) => {
                     out.push('~');
-                    out.push(other as char);
+                    out.push(other);
                 }
+                None => out.push('~'),
             }
-            i += 2;
         } else {
-            out.push(b[i] as char);
-            i += 1;
+            out.push(c);
         }
     }
     out
@@ -186,5 +184,12 @@ mod tests {
         let mut root = json!({});
         assert!(set_pointer(&mut root, "/config/tab~1name", json!("x")));
         assert_eq!(root["config"]["tab/name"], json!("x"));
+    }
+
+    #[test]
+    fn pointer_keeps_unicode_key() {
+        let mut root = json!({});
+        assert!(set_pointer(&mut root, "/config/音声", json!(1)));
+        assert_eq!(root["config"]["音声"], json!(1));
     }
 }

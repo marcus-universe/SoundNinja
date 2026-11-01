@@ -236,14 +236,22 @@ fn peaks_from_samples(
     let start_s = start_sec.unwrap_or(0.0).clamp(0.0, dur);
     let end_s = end_sec.unwrap_or(dur).clamp(start_s, dur);
     let start_frame = ((start_s * sample_rate as f64).round() as usize).min(frames);
-    let end_frame = ((end_s * sample_rate as f64).round() as usize)
-        .min(frames)
-        .max(start_frame + 1);
+    let end_frame = ((end_s * sample_rate as f64).round() as usize).min(frames);
+    if end_frame <= start_frame {
+        return vec![0.0; buckets * 2];
+    }
     let span = end_frame - start_frame;
     let mut peaks = Vec::with_capacity(buckets * 2);
     for b in 0..buckets {
         let start = start_frame + b * span / buckets;
-        let end = (start_frame + (b + 1) * span / buckets).max(start + 1);
+        let end = (start_frame + (b + 1) * span / buckets)
+            .max(start + 1)
+            .min(end_frame);
+        if end <= start {
+            peaks.push(0.0);
+            peaks.push(0.0);
+            continue;
+        }
         let mut min_v = 0.0f32;
         let mut max_v = 0.0f32;
         for frame in start..end {
@@ -887,8 +895,8 @@ pub(crate) fn insert_test_session(
 #[cfg(test)]
 mod tests {
     use super::{
-        delete_range, fold_peaks_one_pass, insert_test_session, normalize_session, session_info,
-        trim_session, undo_session,
+        delete_range, fold_peaks_one_pass, insert_test_session, normalize_session, peaks_from_samples,
+        session_info, trim_session, undo_session,
     };
 
     fn sine_session() -> String {
@@ -950,5 +958,13 @@ mod tests {
         let peaks = fold_peaks_one_pass(samples.into_iter(), 2, 4);
         assert_eq!(peaks.len(), 8);
         assert!(peaks[1] > peaks[7]);
+    }
+
+    #[test]
+    fn peaks_at_end_of_clip_stay_in_range() {
+        let samples = vec![0.5f32; 8];
+        let peaks = peaks_from_samples(&samples, 8, 1, 4, Some(1.0), Some(1.0));
+        assert_eq!(peaks.len(), 8);
+        assert!(peaks.iter().all(|p| *p == 0.0));
     }
 }

@@ -44,7 +44,10 @@ fn emit_progress(app: &AppHandle, event: &str, current: u32, total: u32) {
 
 pub(crate) fn sanitize_zip_rel(rel: &str) -> Result<String, String> {
     let norm = rel.replace('\\', "/");
-    if norm.starts_with('/') || norm.contains("..") {
+    if norm.starts_with('/') || norm.contains('\0') || norm.contains(':') {
+        return Err(format!("invalid zip path: {rel}"));
+    }
+    if norm.split('/').any(|seg| seg.is_empty() || seg == "." || seg == "..") {
         return Err(format!("invalid zip path: {rel}"));
     }
     Ok(norm)
@@ -209,10 +212,14 @@ mod tests {
     fn sanitize_zip_rel_rejects_parent_dir() {
         assert!(sanitize_zip_rel("../etc/passwd").is_err());
         assert!(sanitize_zip_rel("/abs").is_err());
+        assert!(sanitize_zip_rel("a/../../etc/passwd").is_err());
+        assert!(sanitize_zip_rel("C:/Windows/system.ini").is_err());
+        assert!(sanitize_zip_rel("foo/./bar.wav").is_err());
     }
 
     #[test]
     fn sanitize_zip_rel_normalizes_slashes() {
         assert_eq!(sanitize_zip_rel("a\\b\\c.wav").unwrap(), "a/b/c.wav");
+        assert_eq!(sanitize_zip_rel("foo..bar.wav").unwrap(), "foo..bar.wav");
     }
 }

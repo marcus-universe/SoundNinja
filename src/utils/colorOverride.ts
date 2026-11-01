@@ -113,7 +113,10 @@ export function resolveOpaqueColor(cssColor: string, underlay = '#222831'): stri
     ctx.fillRect(0, 0, 1, 1)
     ctx.fillStyle = c
     ctx.fillRect(0, 0, 1, 1)
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+    const px = ctx.getImageData(0, 0, 1, 1).data
+    const r = px[0] ?? 0
+    const g = px[1] ?? 0
+    const b = px[2] ?? 0
     return (
       '#' +
       [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')

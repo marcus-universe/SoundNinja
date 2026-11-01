@@ -19,7 +19,6 @@ pub(crate) fn host_allowed(host: &str) -> bool {
         || h.ends_with(".klipy.com")
         || h == "klipycdn.com"
         || h.ends_with(".klipycdn.com")
-        || (h.contains("klipy") && !h.contains("localhost"))
         || h == "gifsnap.com"
         || h.ends_with(".gifsnap.com")
         || is_gifsnap_r2(&h)
@@ -119,6 +118,9 @@ mod tests {
     #[test]
     fn host_allowed_rejects_other_host() {
         assert!(!host_allowed("example.com"));
+        assert!(!host_allowed("notklipy.com"));
+        assert!(!host_allowed("klipy.evil.com"));
+        assert!(!host_allowed("evil-klipy.com"));
     }
 
     #[test]

@@ -14,7 +14,6 @@ use std::io::BufReader;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
-use rayon::prelude::*;
 use rodio::buffer::SamplesBuffer;
 use rodio::{ChannelCount, SampleRate, Source};
 
@@ -232,7 +231,7 @@ pub fn load(
         .ok_or_else(|| format!("Cannot stat '{path}'"))?;
 
     let (samples, src_rate, src_channels) = decode_file(path)?;
-    let samples = convert(samples, src_rate, src_channels, rate.get(), channels.get());
+    let samples = convert(samples, src_rate, src_channels, rate.get(), channels.get())?;
     if samples.is_empty() {
         return Err(format!("Decoded zero samples from '{path}'"));
     }
@@ -397,11 +396,11 @@ fn convert(
     src_channels: u16,
     dst_rate: u32,
     dst_channels: u16,
-) -> Vec<f32> {
+) -> Result<Vec<f32>, String> {
     let src_ch = src_channels.max(1);
     let dst_ch = dst_channels.max(1);
     if src_rate == dst_rate && src_ch == dst_ch {
-        return samples;
+        return Ok(samples);
     }
 
     let mut planes = deinterleave(&samples, src_ch);
@@ -411,15 +410,18 @@ fn convert(
         planes = remap_channels(planes, dst_ch);
     }
     if src_rate != dst_rate {
-        planes = planes
-            .par_iter()
-            .map(|plane| resample_mono(plane, src_rate, dst_rate).unwrap_or_else(|_| plane.clone()))
-            .collect();
+        let mut next = Vec::with_capacity(planes.len());
+        for plane in &planes {
+            // A failed resample must not fall back to the original-rate plane.
+            // That plane is the wrong length and plays at the wrong speed.
+            next.push(resample_mono(plane, src_rate, dst_rate)?);
+        }
+        planes = next;
     }
     if dst_ch > src_ch {
         planes = remap_channels(planes, dst_ch);
     }
-    interleave(&planes)
+    Ok(interleave(&planes))
 }
 
 /// Down-mix to mono by averaging, up-mix by cycling the existing planes.
@@ -492,29 +494,40 @@ pub fn resample_mono(input: &[f32], from: u32, to: u32) -> Result<Vec<f32>, Stri
         oversampling_factor: 256,
         window: WindowFunction::BlackmanHarris2,
     };
-    let mut resampler = SincFixedIn::<f32>::new(to as f64 / from as f64, 2.0, params, 1024, 1)
+    // A fixed 1024-frame chunk zero-pads anything shorter, so a click comes
+    // back about 1024 frames long. Size the chunk to the input when it fits.
+    let chunk = input.len().clamp(1, 1024);
+    let mut resampler = SincFixedIn::<f32>::new(to as f64 / from as f64, 2.0, params, chunk, 1)
         .map_err(|e| e.to_string())?;
 
-    let chunk = resampler.input_frames_next();
     let expected = (input.len() as f64 * to as f64 / from as f64) as usize + chunk;
     let mut out = Vec::with_capacity(expected);
     let mut scratch = vec![vec![0.0f32; chunk]];
     let mut pos = 0;
     while pos + chunk <= input.len() {
         scratch[0].copy_from_slice(&input[pos..pos + chunk]);
-        let waves_out = resampler
+        let wave = resampler
             .process(&scratch, None)
-            .map_err(|e| e.to_string())?;
-        out.extend_from_slice(&waves_out[0]);
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .next()
+            .ok_or_else(|| "resampler returned no channel".to_string())?;
+        out.extend_from_slice(&wave);
         pos += chunk;
     }
     if pos < input.len() {
         let tail = &input[pos..];
         scratch[0][..tail.len()].copy_from_slice(tail);
         scratch[0][tail.len()..].fill(0.0);
-        if let Ok(waves_out) = resampler.process(&scratch, None) {
-            out.extend_from_slice(&waves_out[0]);
-        }
+        let wave = resampler
+            .process(&scratch, None)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .next()
+            .ok_or_else(|| "resampler returned no channel".to_string())?;
+        // Keep only the frames that belong to the real tail, not the zero pad.
+        let keep = ((tail.len() as f64 * to as f64 / from as f64).round() as usize).min(wave.len());
+        out.extend_from_slice(&wave[..keep]);
     }
     Ok(out)
 }
@@ -537,5 +550,14 @@ mod tests {
     #[test]
     fn resample_mono_empty_stays_empty() {
         assert!(resample_mono(&[], 44_100, 48_000).unwrap().is_empty());
+    }
+
+    #[test]
+    fn resample_mono_short_input_is_not_padded_to_chunk() {
+        let input = vec![0.2f32; 32];
+        let out = resample_mono(&input, 44_100, 48_000).unwrap();
+        let expect = (32.0f64 * 48_000.0 / 44_100.0).round() as usize;
+        let delta = (out.len() as isize - expect as isize).unsigned_abs();
+        assert!(delta < 64, "len {} vs about {}", out.len(), expect);
     }
 }

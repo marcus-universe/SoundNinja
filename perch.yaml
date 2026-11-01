@@ -14,3 +14,11 @@ rules:
       empty list as intentional. A finished empty save must record soundCount
       0 after the sound rows, so the next open does not restore the backup.
       An unmarked empty list over a non-empty sounds table must still be refused.
+  - name: no-customer-data-in-logs
+    each: method
+    where: "{src,src-tauri}/**/*.{ts,vue,js,rs}"
+    ensure: >-
+      A method that does not write a log passes. A log of a sound path, a
+      project path, a device name, or error text passes. A log fails only when
+      it includes a person's name, an email address, a postal address, or a
+      payment detail.
