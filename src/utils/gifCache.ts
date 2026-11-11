@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import type { InjectionKey } from 'vue'
 import type { GifBlobRow } from '~/utils/db'
 
 export type GifUrls = {
@@ -15,6 +16,16 @@ type GifCacheEntry = {
   path: string
   posterPath: string
 }
+
+/**
+ * Board → SoundButton channel for per-button GIF state. Each button reads only
+ * its own keys, so a visibility change re-renders one button, not the board.
+ */
+export type BoardGifState = {
+  visibleByPath: Record<string, boolean>
+  gifUrls: Record<string, GifUrls>
+}
+export const BOARD_GIF_KEY: InjectionKey<BoardGifState> = Symbol('board-gif')
 
 const cache = new Map<string, GifUrls>()
 const inflight = new Map<string, Promise<void>>()

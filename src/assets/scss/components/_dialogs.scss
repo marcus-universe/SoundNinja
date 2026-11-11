@@ -157,23 +157,82 @@
 }
 
 // "What goes into the project file" checkboxes.
+// One column, one left edge: intro, two option rows, actions on the right.
 .save-options {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
-  max-width: 44rem;
+  gap: 0.8rem;
+  width: min(40rem, calc(100dvw - 8rem));
+  text-align: left;
+}
 
-  .ui-checkbox {
-    align-items: flex-start;
-    gap: 1rem;
+.save-options__intro {
+  margin: 0 0 0.4rem;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 75%, transparent);
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+// Whole row is the click target; border picks up the accent when on.
+.ui-checkbox.save-options__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.2rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1.2rem 1.4rem;
+  border: 0.16rem solid color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+  border-radius: 0.8rem;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-text, #{$white}) 4%, transparent);
+  }
+
+  &.is-on {
+    border-color: var(--primary_color);
+    background: color-mix(in srgb, var(--primary_color) 8%, transparent);
+  }
+
+  &:has(.ui-checkbox__input:focus-visible) {
+    outline: 0.16rem solid var(--primary_color);
+    outline-offset: 0.2rem;
+  }
+
+  // Align the box with the first line of the label.
+  .ui-checkbox__box {
+    margin-top: 0.1rem;
   }
 }
 
 .save-options__text {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  text-align: left;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.save-options__label {
+  color: var(--color-text, #{$white});
+  font-family: $fontBold;
+  font-size: var(--font-size-sm);
+  line-height: 1.3;
+}
+
+.save-options__hint {
+  color: color-mix(in srgb, var(--color-text, #{$white}) 55%, transparent);
+  font-family: $fontRegular;
+  font-size: 1.24rem;
+  line-height: 1.45;
+}
+
+.save-options__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.8rem;
 }
 
 .import-chooser-actions {

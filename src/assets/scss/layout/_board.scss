@@ -145,6 +145,11 @@
       scroll-behavior: smooth;
       // Room for floating player chip above the bottom edge.
       padding-bottom: 5rem;
+
+      // Set by SoundContainer while scrolling: no hover churn under the pointer.
+      &.is-scrolling .SoundTab {
+        pointer-events: none;
+      }
     }
 
     .SoundTab-wrap {

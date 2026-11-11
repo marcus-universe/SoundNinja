@@ -19,6 +19,7 @@
             class="sound-gif"
             :src="gifSrc"
             alt=""
+            decoding="async"
             draggable="false"
             :style="{ objectPosition: gifPosX + '% ' + gifPosY + '%' }"
         />
@@ -42,8 +43,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { copyText } from '~/utils/clipboard'
+import { BOARD_GIF_KEY, peekGifUrls } from '~/utils/gifCache'
 import { isRemote } from '~/utils/runtime'
 import { useRemoteLongPress } from '~/utils/longPress'
 
@@ -56,13 +58,9 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   selected: { type: Boolean, default: false },
   multiSelect: { type: Boolean, default: false },
-  /** Animated file URL, shown while this button plays its GIF. */
-  gifAnimSrc: { type: String, default: '' },
-  /** Still first frame, shown the rest of the time so no decoder stays alive. */
-  gifPosterSrc: { type: String, default: '' },
-  /** Animate unconditionally (the "play GIFs always" setting). */
+  /** Animate while on screen (the "play GIFs always" setting). */
   gifAnimate: { type: Boolean, default: false },
-  /** Animate while the pointer is over this button. */
+  /** Animate while the pointer is over this button and it is on screen. */
   gifAnimateOnHover: { type: Boolean, default: false },
   gifPosX: { type: Number, default: 50 },
   gifPosY: { type: Number, default: 50 },
@@ -91,10 +89,25 @@ function onClick(e) {
 // spanning every sound, so moving the mouse re-rendered the whole board.
 const hovered = ref(false)
 
+// Per-button reads of the board's maps: only this button re-renders when its
+// own visibility or URL changes.
+const boardGif = inject(BOARD_GIF_KEY, null)
+
+const gifUrls = computed(() => {
+  const id = props.sound.gifId
+  if (!id) return null
+  return boardGif?.gifUrls[id] || peekGifUrls(id)
+})
+
+const onScreen = computed(() => !!boardGif?.visibleByPath[props.sound.path])
+
 const gifSrc = computed(() => {
-  if (!props.gifAnimSrc) return ''
-  const animating = props.gifAnimate || (props.gifAnimateOnHover && hovered.value)
-  return animating ? props.gifAnimSrc : props.gifPosterSrc || props.gifAnimSrc
+  const urls = gifUrls.value
+  if (!urls?.animUrl) return ''
+  const animating = onScreen.value
+    && (props.gifAnimate || (props.gifAnimateOnHover && hovered.value))
+  // Animated file only while it plays; the still frame otherwise so no decoder stays alive.
+  return animating ? urls.animUrl : urls.posterUrl || urls.animUrl
 })
 
 function copyId() {

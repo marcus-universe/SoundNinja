@@ -42,10 +42,8 @@
                     :loading="loadingPaths.has(sound.path)"
                     :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
                     :multi-select="appStore.multiSelectActive"
-                    :gifAnimSrc="gifAnimSrcFor(sound)"
-                    :gifPosterSrc="gifPosterSrcFor(sound)"
-                    :gifAnimate="animatesAlways(sound)"
-                    :gifAnimateOnHover="animatesOnHover(sound)"
+                    :gifAnimate="gifAnimateAlways"
+                    :gifAnimateOnHover="gifAnimateOnHover"
                     :gifPosX="sound.gifPosX ?? 50"
                     :gifPosY="sound.gifPosY ?? 50"
                     :hasGif="!!sound.gifId"
@@ -88,10 +86,8 @@
                             :loading="loadingPaths.has(sound.path)"
                             :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
                             :multi-select="appStore.multiSelectActive"
-                            :gifAnimSrc="gifAnimSrcFor(sound)"
-                            :gifPosterSrc="gifPosterSrcFor(sound)"
-                            :gifAnimate="animatesAlways(sound)"
-                            :gifAnimateOnHover="animatesOnHover(sound)"
+                            :gifAnimate="gifAnimateAlways"
+                            :gifAnimateOnHover="gifAnimateOnHover"
                             :gifPosX="sound.gifPosX ?? 50"
                             :gifPosY="sound.gifPosY ?? 50"
                             :hasGif="!!sound.gifId"
@@ -161,14 +157,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sortable from 'sortablejs'
 import { isRemote } from '~/utils/runtime'
 import { parseOverride, serializeOverride, resolveEffectiveColors, paintOverride } from '~/utils/colorOverride'
 import { normalizeTabTransition } from '~/utils/db'
-import { ensureGifUrls, peekGifUrls, revokeGifUrls } from '~/utils/gifCache'
+import { BOARD_GIF_KEY, ensureGifUrls, peekGifUrls } from '~/utils/gifCache'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -605,6 +601,9 @@ onUnmounted(() => {
   destroySortables()
   gifObserver?.disconnect()
   gifObserver = null
+  if (visibilityFrame) cancelAnimationFrame(visibilityFrame)
+  scrollRef.value?.removeEventListener('scroll', onBoardScroll)
+  clearTimeout(scrollIdleTimer)
   bulkBarObserver?.disconnect()
   bulkBarObserver = null
   endMarqueeListeners()
@@ -614,35 +613,17 @@ onUnmounted(() => {
 
 const gifPlayOnHover = computed(() => Settings.value?.gifPlayOnHover !== false)
 const preloadGifs = computed(() => Settings.value?.preloadGifs === true)
+// Read per key inside each SoundButton (see provide below). The board template
+// must not read these: one button scrolling into view would otherwise
+// re-render every button on the tab.
 const visibleByPath = reactive({})
 const gifUrls = reactive({})
 let gifObserver = null
+provide(BOARD_GIF_KEY, { visibleByPath, gifUrls })
 
-/** A button may animate at all only while on screen and the window has focus. */
-function gifEligible(sound) {
-  return !!sound.gifId && windowFocused.value && !!visibleByPath[sound.path]
-}
-
-function animatesAlways(sound) {
-  return gifEligible(sound) && !gifPlayOnHover.value
-}
-
-function animatesOnHover(sound) {
-  return gifEligible(sound) && gifPlayOnHover.value
-}
-
-function gifUrlsFor(sound) {
-  if (!sound.gifId) return null
-  return gifUrls[sound.gifId] || peekGifUrls(sound.gifId)
-}
-
-function gifAnimSrcFor(sound) {
-  return gifUrlsFor(sound)?.animUrl ?? ''
-}
-
-function gifPosterSrcFor(sound) {
-  return gifUrlsFor(sound)?.posterUrl ?? ''
-}
+/** Same for every button; per-button visibility is checked in SoundButton. */
+const gifAnimateAlways = computed(() => windowFocused.value && !gifPlayOnHover.value)
+const gifAnimateOnHover = computed(() => windowFocused.value && gifPlayOnHover.value)
 
 async function loadGifIds(ids) {
   const path = jsonStore.currentProjectPath
@@ -665,7 +646,7 @@ async function loadVisibleGifs() {
   }
   const ids = []
   for (const sound of allDisplaySounds.value) {
-    if (!sound.gifId) continue
+    if (!sound.gifId || gifUrls[sound.gifId]) continue
     if (!visibleByPath[sound.path]) continue
     ids.push(sound.gifId)
   }
@@ -707,36 +688,46 @@ function warmTabSounds() {
   }, 400)
 }
 
-function releaseOffscreenGif(soundPath) {
-  if (preloadGifs.value) return
-  const file = jsonStore.configFile?.files?.find((f) => f.path === soundPath)
-  const id = file?.gifId
-  if (!id) return
-  const stillVisible = jsonStore.configFile.files.some(
-    (f) => f.gifId === id && f.path !== soundPath && visibleByPath[f.path],
-  )
-  if (stillVisible) return
-  revokeGifUrls(id)
-  delete gifUrls[id]
+// Visibility changes arrive in bursts while scrolling. Collect them and apply
+// once per frame; then fetch only GIFs not resolved yet. Off-screen buttons
+// keep their poster URL (a file path), so scrolling back costs nothing — the
+// old release-on-leave made every pass re-request and re-decode each image.
+const pendingVisibility = new Map()
+let visibilityFrame = 0
+
+function flushVisibility() {
+  visibilityFrame = 0
+  let gained = false
+  for (const [path, on] of pendingVisibility) {
+    if (on) {
+      if (!visibleByPath[path]) {
+        visibleByPath[path] = true
+        gained = true
+      }
+    } else if (visibleByPath[path]) {
+      delete visibleByPath[path]
+    }
+  }
+  pendingVisibility.clear()
+  if (gained) loadVisibleGifs()
 }
 
 function setupGifObserver() {
   gifObserver?.disconnect()
+  pendingVisibility.clear()
+  if (visibilityFrame) cancelAnimationFrame(visibilityFrame)
+  visibilityFrame = 0
   const root = boardRef.value?.closest('.SoundContainer__scroll') || null
   gifObserver = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
         const path = e.target.getAttribute('data-sound-path')
-        if (!path) continue
-        if (e.isIntersecting) visibleByPath[path] = true
-        else {
-          delete visibleByPath[path]
-          releaseOffscreenGif(path)
-        }
+        if (path) pendingVisibility.set(path, e.isIntersecting)
       }
-      loadVisibleGifs()
+      if (!visibilityFrame) visibilityFrame = requestAnimationFrame(flushVisibility)
     },
-    { root, rootMargin: '80px', threshold: 0.01 },
+    // Load a bit ahead of the viewport so posters are ready when they arrive.
+    { root, rootMargin: '240px 0px', threshold: 0 },
   )
   nextTick(() => {
     boardRef.value?.querySelectorAll('.Soundbtn').forEach((el) => gifObserver.observe(el))
@@ -1029,7 +1020,26 @@ function syncWindowFocus() {
   windowFocused.value = !document.hidden && document.hasFocus()
 }
 
+// While the board moves under a resting pointer (wheel, or a controller stick
+// mapped to the wheel), every button it passes would fire hover: style
+// recalcs plus a GIF swap to its animated file. Switch pointer events off for
+// the duration of the scroll. Plain classList, so Vue does not re-render.
+const SCROLL_IDLE_MS = 140
+let scrollIdleTimer = 0
+
+function onBoardScroll() {
+  const el = scrollRef.value
+  if (!el) return
+  if (!scrollIdleTimer) el.classList.add('is-scrolling')
+  else clearTimeout(scrollIdleTimer)
+  scrollIdleTimer = setTimeout(() => {
+    scrollIdleTimer = 0
+    scrollRef.value?.classList.remove('is-scrolling')
+  }, SCROLL_IDLE_MS)
+}
+
 onMounted(async () => {
+  scrollRef.value?.addEventListener('scroll', onBoardScroll, { passive: true })
   setupGifObserver()
   document.addEventListener('visibilitychange', syncWindowFocus)
   window.addEventListener('focus', syncWindowFocus)

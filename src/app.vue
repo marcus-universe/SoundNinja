@@ -49,26 +49,34 @@
         :title="$t('saveOptions.title')"
         @close="appStore.resolveSaveOptions(null)"
       >
-        <p class="dialog-text">
-          {{ appStore.saveOptionsPrompt.firstSave ? $t('saveOptions.firstSaveHint') : $t('saveOptions.hint') }}
-        </p>
         <div class="save-options">
-          <UICheckbox v-model="saveOptions.embedAudio">
+          <p class="save-options__intro">
+            {{ appStore.saveOptionsPrompt.firstSave ? $t('saveOptions.firstSaveHint') : $t('saveOptions.hint') }}
+          </p>
+          <UICheckbox
+            v-model="saveOptions.embedAudio"
+            class="save-options__option"
+            :class="{ 'is-on': saveOptions.embedAudio }"
+          >
             <span class="save-options__text">
-              <span class="settings-label">{{ $t('saveOptions.embedAudio') }}</span>
-              <span class="settings-hint">{{ $t('saveOptions.embedAudioHint') }}</span>
+              <span class="save-options__label">{{ $t('saveOptions.embedAudio') }}</span>
+              <span class="save-options__hint">{{ $t('saveOptions.embedAudioHint') }}</span>
             </span>
           </UICheckbox>
-          <UICheckbox v-model="saveOptions.embedGifs">
+          <UICheckbox
+            v-model="saveOptions.embedGifs"
+            class="save-options__option"
+            :class="{ 'is-on': saveOptions.embedGifs }"
+          >
             <span class="save-options__text">
-              <span class="settings-label">{{ $t('saveOptions.embedGifs') }}</span>
-              <span class="settings-hint">{{ $t('saveOptions.embedGifsHint') }}</span>
+              <span class="save-options__label">{{ $t('saveOptions.embedGifs') }}</span>
+              <span class="save-options__hint">{{ $t('saveOptions.embedGifsHint') }}</span>
             </span>
           </UICheckbox>
-        </div>
-        <div class="flex_c_h gap1 dialog-actions">
-          <UIButton @click="appStore.resolveSaveOptions({ ...saveOptions })">{{ $t('dialog.save') }}</UIButton>
-          <UIButton @click="appStore.resolveSaveOptions(null)">{{ $t('dialog.cancel') }}</UIButton>
+          <div class="save-options__actions">
+            <UIButton @click="appStore.resolveSaveOptions(null)">{{ $t('dialog.cancel') }}</UIButton>
+            <UIButton @click="appStore.resolveSaveOptions({ ...saveOptions })">{{ $t('dialog.save') }}</UIButton>
+          </div>
         </div>
       </DialogField>
       <LazyRelinkDialog v-if="appStore.relinkActive" />
