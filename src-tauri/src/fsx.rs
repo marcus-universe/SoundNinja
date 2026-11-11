@@ -277,7 +277,7 @@ fn collect_audio_recursive(dir: &Path, exts: &[String]) -> Result<Vec<ImportAudi
         subdirs.sort();
         queue.extend(subdirs);
     }
-    out.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+    out.sort_by_key(|a| a.file_name.to_lowercase());
     Ok(out)
 }
 
@@ -296,7 +296,7 @@ fn scan_folder(dir: &Path, exts: &[String]) -> Result<Option<ImportFolder>, Stri
             subdirs.push(path);
         }
     }
-    root_audio.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+    root_audio.sort_by_key(|a| a.file_name.to_lowercase());
     subdirs.sort();
 
     let mut groups = Vec::new();

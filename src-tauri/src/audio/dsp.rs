@@ -3,16 +3,15 @@
 use hound::{WavSpec, WavWriter};
 use nnnoiseless::DenoiseState;
 use rayon::prelude::*;
-use rodio::Source;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
+use super::decode::SampleSource;
+use super::peaks::PeakAcc;
 use super::playback::{pause_all, resume_all, stop_all};
 
 #[derive(Clone)]
@@ -271,8 +270,19 @@ fn peaks_from_samples(
     peaks
 }
 
-#[tauri::command(async)]
-pub fn get_waveform_peaks(
+/// Folds the visible range of the session; long takes make this too heavy
+/// for a tokio worker.
+#[tauri::command]
+pub async fn get_waveform_peaks(
+    session_id: String,
+    buckets: usize,
+    start_sec: Option<f64>,
+    end_sec: Option<f64>,
+) -> Result<Vec<f32>, String> {
+    run_blocking(move || get_waveform_peaks_blocking(session_id, buckets, start_sec, end_sec)).await
+}
+
+fn get_waveform_peaks_blocking(
     session_id: String,
     buckets: usize,
     start_sec: Option<f64>,
@@ -290,211 +300,256 @@ pub fn get_waveform_peaks(
     })
 }
 
-/// Cache of streamed waveform peaks: (path, mtime_secs, buckets) → min/max pairs.
-static PEAKS_CACHE: OnceLock<Mutex<HashMap<(String, u64, usize), Vec<f32>>>> = OnceLock::new();
+// ── File waveform (player scrubber) ───────────────────────────────────────────
 
-fn peaks_cache() -> &'static Mutex<HashMap<(String, u64, usize), Vec<f32>>> {
-    PEAKS_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+/// Waveform of a sound file for the scrubber.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileWaveform {
+    /// Interleaved `[min, max]` pairs, `2 * buckets` long.
+    pub peaks: Vec<f32>,
+    /// True while a pump for this path is still decoding: `peaks` covers only
+    /// the start of the timeline and the caller should ask again.
+    pub pumping: bool,
+    /// Best known duration, `0` if unknown.
+    pub duration_secs: f64,
 }
 
-fn file_mtime_secs(path: &str) -> u64 {
-    std::fs::metadata(path)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+/// Upper bound for one request, so a bad argument cannot allocate gigabytes.
+const MAX_WAVEFORM_BUCKETS: usize = 1 << 16;
+/// Finished waveforms kept for reuse.
+const WAVEFORM_CACHE_ENTRIES: usize = 64;
+/// Source frames decoded per batch when a waveform needs the file itself.
+const WAVEFORM_BATCH_FRAMES: usize = 4096;
+
+/// Complete peaks of one file. Holds the accumulator rather than buckets, so
+/// one entry serves every bucket count the UI asks for.
+struct CachedWaveform {
+    /// `(mtime, size)` of the file the peaks were computed from.
+    stamp: (u64, u64),
+    peaks: Arc<PeakAcc>,
+    duration_secs: f64,
+    /// Value of the cache clock at the last hit, for LRU eviction.
+    last_used: u64,
 }
 
-/// Fold interleaved samples into fixed bucket min/max peaks without retaining PCM.
-fn fold_peaks_from_iter<I>(mut samples: I, channels: u16, total_frames: usize, buckets: usize) -> Vec<f32>
-where
-    I: Iterator<Item = f32>,
-{
-    let buckets = buckets.max(1);
-    let ch = channels.max(1) as usize;
-    if total_frames == 0 {
-        return vec![0.0; buckets * 2];
+#[derive(Default)]
+struct WaveformCache {
+    entries: HashMap<String, CachedWaveform>,
+    clock: u64,
+}
+
+impl WaveformCache {
+    fn get(&mut self, path: &str, stamp: (u64, u64)) -> Option<(Arc<PeakAcc>, f64)> {
+        self.clock += 1;
+        let clock = self.clock;
+        let entry = self.entries.get_mut(path).filter(|e| e.stamp == stamp)?;
+        entry.last_used = clock;
+        Some((Arc::clone(&entry.peaks), entry.duration_secs))
     }
-    let mut mins = vec![0.0f32; buckets];
-    let mut maxs = vec![0.0f32; buckets];
-    let mut frame = 0usize;
-    while frame < total_frames {
-        let mut frame_peak = 0.0f32;
-        for _ in 0..ch {
-            let s = samples.next().unwrap_or(0.0).abs();
-            if s > frame_peak {
-                frame_peak = s;
+
+    fn put(&mut self, path: &str, stamp: (u64, u64), peaks: Arc<PeakAcc>, duration_secs: f64) {
+        self.clock += 1;
+        if !self.entries.contains_key(path) && self.entries.len() >= WAVEFORM_CACHE_ENTRIES {
+            let oldest = self
+                .entries
+                .iter()
+                .min_by_key(|(_, e)| e.last_used)
+                .map(|(p, _)| p.clone());
+            if let Some(oldest) = oldest {
+                self.entries.remove(&oldest);
             }
         }
-        let b = ((frame as u64 * buckets as u64) / total_frames as u64).min((buckets - 1) as u64)
-            as usize;
-        mins[b] = mins[b].min(-frame_peak);
-        maxs[b] = maxs[b].max(frame_peak);
-        frame += 1;
-    }
-    interleave_minmax(&mins, &maxs)
-}
-
-const PEAK_WINDOW_FRAMES: usize = 1024;
-
-/// One-pass fold: peak per 1024-frame window, then downsample to `buckets`.
-/// Does not trust container `total_duration()` (wrong/missing on many MP3s).
-fn fold_peaks_one_pass<I>(samples: I, channels: u16, buckets: usize) -> Vec<f32>
-where
-    I: Iterator<Item = f32>,
-{
-    let buckets = buckets.max(1);
-    let ch = channels.max(1) as usize;
-    let mut windows: Vec<f32> = Vec::new();
-    let mut window_peak = 0.0f32;
-    let mut in_window = 0usize;
-    let mut ch_i = 0usize;
-    let mut frame_peak = 0.0f32;
-
-    for s in samples {
-        let a = s.abs();
-        if a > frame_peak {
-            frame_peak = a;
-        }
-        ch_i += 1;
-        if ch_i < ch {
-            continue;
-        }
-        if frame_peak > window_peak {
-            window_peak = frame_peak;
-        }
-        frame_peak = 0.0;
-        ch_i = 0;
-        in_window += 1;
-        if in_window >= PEAK_WINDOW_FRAMES {
-            windows.push(window_peak);
-            window_peak = 0.0;
-            in_window = 0;
-        }
-    }
-    if in_window > 0 || windows.is_empty() {
-        windows.push(window_peak);
-    }
-    downsample_window_peaks(&windows, buckets)
-}
-
-fn downsample_window_peaks(windows: &[f32], buckets: usize) -> Vec<f32> {
-    let buckets = buckets.max(1);
-    let n = windows.len().max(1);
-    let mut mins = vec![0.0f32; buckets];
-    let mut maxs = vec![0.0f32; buckets];
-    for (i, &peak) in windows.iter().enumerate() {
-        let b = ((i as u64 * buckets as u64) / n as u64).min((buckets - 1) as u64) as usize;
-        mins[b] = mins[b].min(-peak);
-        maxs[b] = maxs[b].max(peak);
-    }
-    interleave_minmax(&mins, &maxs)
-}
-
-fn interleave_minmax(mins: &[f32], maxs: &[f32]) -> Vec<f32> {
-    let mut peaks = Vec::with_capacity(mins.len() * 2);
-    for b in 0..mins.len() {
-        peaks.push(mins[b]);
-        peaks.push(maxs[b]);
-    }
-    peaks
-}
-
-fn peaks_from_wav_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
-    let mut reader = hound::WavReader::open(path).map_err(|e| e.to_string())?;
-    let spec = reader.spec();
-    let channels = spec.channels;
-    let total_frames = reader.duration() as usize;
-    if total_frames == 0 {
-        return Ok(vec![0.0; buckets.max(1) * 2]);
-    }
-    match spec.sample_format {
-        hound::SampleFormat::Float => {
-            let iter = reader.samples::<f32>().map(|r| r.unwrap_or(0.0));
-            Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
-        }
-        hound::SampleFormat::Int => {
-            let bits = spec.bits_per_sample;
-            let iter = reader
-                .samples::<i32>()
-                .map(|r| r.map(|s| super::pcm::int_sample_to_f32(s, bits)).unwrap_or(0.0));
-            Ok(fold_peaks_from_iter(iter, channels, total_frames, buckets))
-        }
+        self.entries.insert(
+            path.to_owned(),
+            CachedWaveform {
+                stamp,
+                peaks,
+                duration_secs,
+                last_used: self.clock,
+            },
+        );
     }
 }
 
-fn peaks_from_rodio_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
-    let file = File::open(path).map_err(|e| e.to_string())?;
-    let decoder =
-        rodio::Decoder::new(BufReader::with_capacity(64 * 1024, file)).map_err(|e| e.to_string())?;
-    let channels: u16 = decoder.channels().into();
-    Ok(fold_peaks_one_pass(decoder, channels, buckets))
+static WAVEFORM_CACHE: OnceLock<Mutex<WaveformCache>> = OnceLock::new();
+
+fn waveform_cache() -> &'static Mutex<WaveformCache> {
+    WAVEFORM_CACHE.get_or_init(|| Mutex::new(WaveformCache::default()))
 }
 
-fn peaks_from_file_streaming(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
-    let buckets = buckets.max(1);
-    if path.to_lowercase().ends_with(".wav") {
-        if let Ok(peaks) = peaks_from_wav_streaming(path, buckets) {
-            return Ok(peaks);
+/// Paths whose file is being decoded for a waveform right now. A second
+/// request for the same file waits for the first instead of decoding it again
+/// (the scrubber polls while a long file is still being read).
+struct WaveformDecodes {
+    paths: Mutex<HashSet<String>>,
+    finished: Condvar,
+}
+
+static WAVEFORM_DECODES: OnceLock<WaveformDecodes> = OnceLock::new();
+
+fn waveform_decodes() -> &'static WaveformDecodes {
+    WAVEFORM_DECODES.get_or_init(|| WaveformDecodes {
+        paths: Mutex::new(HashSet::new()),
+        finished: Condvar::new(),
+    })
+}
+
+/// Marks `path` as being decoded until dropped.
+struct DecodeTurn<'a> {
+    path: &'a str,
+}
+
+impl<'a> DecodeTurn<'a> {
+    /// Wait until nobody else decodes `path`, then take the turn.
+    fn take(path: &'a str) -> Result<Self, String> {
+        let decodes = waveform_decodes();
+        let mut busy = decodes.paths.lock().map_err(|e| e.to_string())?;
+        while busy.contains(path) {
+            busy = decodes.finished.wait(busy).map_err(|e| e.to_string())?;
         }
+        busy.insert(path.to_owned());
+        Ok(Self { path })
     }
-    peaks_from_rodio_streaming(path, buckets)
 }
 
-/// Waveform peaks for an on-disk sound file (player scrubber).
-/// Streams decode into buckets (O(buckets) memory) on a blocking pool thread.
+impl Drop for DecodeTurn<'_> {
+    fn drop(&mut self) {
+        let decodes = waveform_decodes();
+        if let Ok(mut busy) = decodes.paths.lock() {
+            busy.remove(self.path);
+        }
+        decodes.finished.notify_all();
+    }
+}
+
+/// Decode a whole file into peaks without keeping the PCM. Also yields the
+/// exact duration, which container headers often get wrong.
+fn decode_file_peaks(path: &str) -> Result<(PeakAcc, f64), String> {
+    let mut opened = SampleSource::open(path)?;
+    let channels = opened.channels.max(1);
+    let batch_samples = WAVEFORM_BATCH_FRAMES * channels as usize;
+    let mut batch = Vec::with_capacity(batch_samples);
+    let mut peaks = PeakAcc::new();
+    loop {
+        batch.clear();
+        if opened.source.read(&mut batch, batch_samples) == 0 {
+            break;
+        }
+        peaks.push(&batch, channels);
+    }
+    let duration_secs = peaks.frames() as f64 / opened.sample_rate.max(1) as f64;
+    Ok((peaks, duration_secs))
+}
+
+fn cached_waveform(path: &str, stamp: (u64, u64)) -> Option<(Arc<PeakAcc>, f64)> {
+    waveform_cache().lock().ok()?.get(path, stamp)
+}
+
+fn remember_waveform(path: &str, stamp: (u64, u64), peaks: &Arc<PeakAcc>, duration_secs: f64) {
+    if let Ok(mut cache) = waveform_cache().lock() {
+        cache.put(path, stamp, Arc::clone(peaks), duration_secs);
+    }
+}
+
+fn complete_waveform(peaks: &PeakAcc, buckets: usize, duration_secs: f64) -> FileWaveform {
+    FileWaveform {
+        peaks: peaks.to_buckets(buckets, peaks.frames()),
+        pumping: false,
+        duration_secs,
+    }
+}
+
+/// Cheapest source first: finished peaks, the decoded PCM cache entry, a live
+/// pump, and only then a decode of the file. Returns the waveform and the
+/// name of the source that served it.
+fn file_waveform_blocking(path: &str, buckets: usize) -> Result<(FileWaveform, &'static str), String> {
+    let buckets = buckets.clamp(1, MAX_WAVEFORM_BUCKETS);
+    let stamp = super::pcm::file_stamp(path).ok_or_else(|| format!("Cannot stat '{path}'"))?;
+
+    if let Some((peaks, duration)) = cached_waveform(path, stamp) {
+        return Ok((complete_waveform(&peaks, buckets, duration), "peak-cache"));
+    }
+    if let Some((peaks, duration)) = super::pcm::peek_peaks(path) {
+        remember_waveform(path, stamp, &peaks, duration);
+        return Ok((complete_waveform(&peaks, buckets, duration), "pcm-cache"));
+    }
+    if let Some(live) = super::stream::pump_waveform(path) {
+        if live.decoding {
+            // Map the decoded part onto the metadata timeline, so it fills the
+            // left of the waveform and the tail still to come stays empty.
+            let hinted = (live.duration_secs * live.sample_rate as f64).round() as usize;
+            let timeline = hinted.max(live.peaks.frames()).max(1);
+            let waveform = FileWaveform {
+                peaks: live.peaks.to_buckets(buckets, timeline),
+                pumping: true,
+                duration_secs: live.duration_secs,
+            };
+            return Ok((waveform, "pump-live"));
+        }
+        let peaks = Arc::new(live.peaks);
+        remember_waveform(path, stamp, &peaks, live.duration_secs);
+        return Ok((complete_waveform(&peaks, buckets, live.duration_secs), "pump-done"));
+    }
+
+    let _turn = DecodeTurn::take(path)?;
+    // Whoever held the turn before may have just finished this very file.
+    if let Some((peaks, duration)) = cached_waveform(path, stamp) {
+        return Ok((complete_waveform(&peaks, buckets, duration), "peak-cache"));
+    }
+    let (peaks, duration) = decode_file_peaks(path)?;
+    if duration > 0.0 {
+        super::cache::store_duration(path, duration);
+    }
+    let peaks = Arc::new(peaks);
+    remember_waveform(path, stamp, &peaks, duration);
+    Ok((complete_waveform(&peaks, buckets, duration), "file-decode"))
+}
+
+fn file_waveform_timed(path: &str, buckets: usize) -> Result<FileWaveform, String> {
+    let started = Instant::now();
+    let (waveform, source) = file_waveform_blocking(path, buckets)?;
+    crate::perf::log(|| {
+        format!(
+            "waveform source={source} buckets={buckets} {:.2}ms '{path}'",
+            crate::perf::ms_since(started)
+        )
+    });
+    Ok(waveform)
+}
+
+/// Waveform, decode state and duration of an on-disk sound file in one call.
+/// Runs on the blocking pool: the fallback decodes the whole file.
+#[tauri::command]
+pub async fn get_file_waveform(path: String, buckets: usize) -> Result<FileWaveform, String> {
+    run_blocking(move || file_waveform_timed(&path, buckets)).await
+}
+
+/// Waveform peaks only. Kept for callers that predate [`get_file_waveform`].
 #[tauri::command]
 pub async fn get_file_waveform_peaks(path: String, buckets: usize) -> Result<Vec<f32>, String> {
-    let buckets = buckets.max(1);
-    let mtime = file_mtime_secs(&path);
-    let key = (path.clone(), mtime, buckets);
-    if let Ok(cache) = peaks_cache().lock() {
-        if let Some(hit) = cache.get(&key) {
-            return Ok(hit.clone());
-        }
-    }
-
-    let path_for_worker = path.clone();
-    let (peaks, cacheable) = tauri::async_runtime::spawn_blocking(move || {
-        let pumping = super::stream::is_pumping(&path_for_worker);
-        let done = super::stream::is_pump_done(&path_for_worker);
-        if pumping && !done {
-            if let Some(p) = super::stream::active_peaks(&path_for_worker, buckets) {
-                return Ok((p, false));
-            }
-            return Ok((vec![0.0; buckets * 2], false));
-        }
-        if pumping && done {
-            if let Some(p) = super::stream::active_peaks(&path_for_worker, buckets) {
-                return Ok((p, true));
-            }
-        }
-        let p = peaks_from_file_streaming(&path_for_worker, buckets)?;
-        Ok::<(Vec<f32>, bool), String>((p, true))
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-
-    if cacheable {
-        if let Ok(mut cache) = peaks_cache().lock() {
-            if cache.len() >= 16 {
-                cache.clear();
-            }
-            cache.insert(key, peaks.clone());
-        }
-    }
-    Ok(peaks)
+    run_blocking(move || file_waveform_timed(&path, buckets).map(|w| w.peaks)).await
 }
 
 /// True while a progressive decode pump is still filling this path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn is_sound_pumping(path: String) -> bool {
-    super::stream::is_pumping(&path) && !super::stream::is_pump_done(&path)
+    super::stream::is_decoding(&path)
 }
 
-#[tauri::command(async)]
-pub fn trim_session(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
+// ── Session edits ─────────────────────────────────────────────────────────────
+//
+// Each edit copies or rewrites the session buffer (minutes of audio for a long
+// take), so the commands hand off to the blocking pool instead of occupying a
+// tokio worker. The `*_blocking` functions hold the logic and are what the
+// tests call.
+
+#[tauri::command]
+pub async fn trim_session(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
+    run_blocking(move || trim_session_blocking(session_id, start_sec, end_sec)).await
+}
+
+fn trim_session_blocking(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let start = sec_to_frame(start_sec, sess.sample_rate, sess.channels);
         let end = sec_to_frame(end_sec, sess.sample_rate, sess.channels)
@@ -512,8 +567,12 @@ pub fn trim_session(session_id: String, start_sec: f64, end_sec: f64) -> Result<
     })
 }
 
-#[tauri::command(async)]
-pub fn delete_range(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
+#[tauri::command]
+pub async fn delete_range(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
+    run_blocking(move || delete_range_blocking(session_id, start_sec, end_sec)).await
+}
+
+fn delete_range_blocking(session_id: String, start_sec: f64, end_sec: f64) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let start = sec_to_frame(start_sec, sess.sample_rate, sess.channels);
         let end = sec_to_frame(end_sec, sess.sample_rate, sess.channels)
@@ -534,8 +593,18 @@ pub fn delete_range(session_id: String, start_sec: f64, end_sec: f64) -> Result<
     })
 }
 
-#[tauri::command(async)]
-pub fn normalize_session(
+#[tauri::command]
+pub async fn normalize_session(
+    session_id: String,
+    target_peak_db: Option<f32>,
+    start_sec: Option<f64>,
+    end_sec: Option<f64>,
+) -> Result<SessionInfo, String> {
+    run_blocking(move || normalize_session_blocking(session_id, target_peak_db, start_sec, end_sec))
+        .await
+}
+
+fn normalize_session_blocking(
     session_id: String,
     target_peak_db: Option<f32>,
     start_sec: Option<f64>,
@@ -623,8 +692,12 @@ fn denoise_session_blocking(
     })
 }
 
-#[tauri::command(async)]
-pub fn undo_session(session_id: String) -> Result<SessionInfo, String> {
+#[tauri::command]
+pub async fn undo_session(session_id: String) -> Result<SessionInfo, String> {
+    run_blocking(move || undo_session_blocking(session_id)).await
+}
+
+fn undo_session_blocking(session_id: String) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let (samples, sr, ch) = sess.undo.take().ok_or("Nothing to undo")?;
         sess.redo = Some((sess.samples.clone(), sess.sample_rate, sess.channels));
@@ -641,8 +714,12 @@ pub fn undo_session(session_id: String) -> Result<SessionInfo, String> {
     })
 }
 
-#[tauri::command(async)]
-pub fn redo_session(session_id: String) -> Result<SessionInfo, String> {
+#[tauri::command]
+pub async fn redo_session(session_id: String) -> Result<SessionInfo, String> {
+    run_blocking(move || redo_session_blocking(session_id)).await
+}
+
+fn redo_session_blocking(session_id: String) -> Result<SessionInfo, String> {
     with_session_mut(&session_id, |sess| {
         let (samples, sr, ch) = sess.redo.take().ok_or("Nothing to redo")?;
         sess.undo = Some((sess.samples.clone(), sess.sample_rate, sess.channels));
@@ -682,10 +759,19 @@ pub struct StagedClipInfo {
 }
 
 /// Export a full session or a time range into a temp staged WAV for the batch list.
-#[tauri::command(async)]
-pub fn stage_session_clip(
+#[tauri::command]
+pub async fn stage_session_clip(
     app: AppHandle,
     session_id: String,
+    start_sec: Option<f64>,
+    end_sec: Option<f64>,
+) -> Result<StagedClipInfo, String> {
+    run_blocking(move || stage_session_clip_blocking(&app, &session_id, start_sec, end_sec)).await
+}
+
+fn stage_session_clip_blocking(
+    app: &AppHandle,
+    session_id: &str,
     start_sec: Option<f64>,
     end_sec: Option<f64>,
 ) -> Result<StagedClipInfo, String> {
@@ -702,7 +788,7 @@ pub fn stage_session_clip(
         .unwrap_or(0);
     let path = dir.join(format!("clip_{ts}.wav"));
 
-    with_session_mut(&session_id, |sess| {
+    with_session_mut(session_id, |sess| {
         let start = sec_to_frame(start_sec.unwrap_or(0.0).max(0.0), sess.sample_rate, sess.channels)
             .min(sess.samples.len());
         let end = match end_sec {
@@ -725,16 +811,31 @@ pub fn stage_session_clip(
     })
 }
 
-#[tauri::command(async)]
-pub fn preview_session(
+/// Writes the preview WAV and starts it. Both the write and the preroll wait
+/// in `enqueue_play` block, so the whole command runs on the blocking pool.
+#[tauri::command]
+pub async fn preview_session(
     app: AppHandle,
     session_id: String,
     device_name: String,
     host_name: Option<String>,
     start_sec: Option<f64>,
 ) -> Result<(), String> {
-    let path = temp_preview_path(&app)?;
-    with_session_mut(&session_id, |sess| {
+    run_blocking(move || {
+        preview_session_blocking(&app, &session_id, device_name, host_name, start_sec)
+    })
+    .await
+}
+
+fn preview_session_blocking(
+    app: &AppHandle,
+    session_id: &str,
+    device_name: String,
+    host_name: Option<String>,
+    start_sec: Option<f64>,
+) -> Result<(), String> {
+    let path = temp_preview_path(app)?;
+    with_session_mut(session_id, |sess| {
         let start = sec_to_frame(start_sec.unwrap_or(0.0).max(0.0), sess.sample_rate, sess.channels)
             .min(sess.samples.len());
         write_wav(
@@ -895,9 +996,14 @@ pub(crate) fn insert_test_session(
 #[cfg(test)]
 mod tests {
     use super::{
-        delete_range, fold_peaks_one_pass, insert_test_session, normalize_session, peaks_from_samples,
-        session_info, trim_session, undo_session,
+        decode_file_peaks, delete_range_blocking as delete_range, file_waveform_blocking,
+        insert_test_session, normalize_session_blocking as normalize_session, peaks_from_samples,
+        redo_session_blocking as redo_session, session_info, trim_session_blocking as trim_session,
+        undo_session_blocking as undo_session, WaveformCache,
     };
+    use crate::audio::decode::test_support::write_wav;
+    use crate::audio::peaks::PeakAcc;
+    use std::sync::Arc;
 
     fn sine_session() -> String {
         let sr = 8_000u32;
@@ -908,7 +1014,7 @@ mod tests {
     #[test]
     fn trim_session_should_keep_range() {
         let id = sine_session();
-        let info = trim_session(id.clone(), 0.25, 0.75).unwrap();
+        let info = trim_session(id, 0.25, 0.75).unwrap();
         assert!((info.duration_secs - 0.5).abs() < 0.02);
     }
 
@@ -945,19 +1051,85 @@ mod tests {
     }
 
     #[test]
-    fn fold_peaks_one_pass_keeps_loud_then_quiet() {
-        let mut samples = Vec::new();
-        for _ in 0..1024 {
-            samples.push(0.9);
-            samples.push(0.9);
-        }
-        for _ in 0..1024 {
-            samples.push(0.05);
-            samples.push(0.05);
-        }
-        let peaks = fold_peaks_one_pass(samples.into_iter(), 2, 4);
+    fn redo_session_should_reapply_an_undone_edit() {
+        let id = sine_session();
+        trim_session(id.clone(), 0.0, 0.2).unwrap();
+        undo_session(id.clone()).unwrap();
+        let redone = redo_session(id).unwrap().duration_secs;
+        assert!((redone - 0.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_file_peaks_keeps_loud_then_quiet() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("loud-quiet.wav");
+        write_wav(&path, 8_000, 2, 2_048, |i, _| if i < 1_024 { 0.9 } else { 0.05 });
+        let (acc, duration) = decode_file_peaks(&path.to_string_lossy()).unwrap();
+        assert!((duration - 0.256).abs() < 1e-9);
+        let peaks = acc.to_buckets(4, acc.frames());
         assert_eq!(peaks.len(), 8);
-        assert!(peaks[1] > peaks[7]);
+        assert!(peaks[1] > 0.8 && peaks[3] > 0.8);
+        assert!(peaks[5] < 0.1 && peaks[7] < 0.1);
+    }
+
+    #[test]
+    fn file_waveform_decodes_once_then_serves_any_bucket_count_from_the_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("wave.wav");
+        write_wav(&path, 8_000, 1, 800, |i, _| if i < 400 { 0.8 } else { 0.2 });
+        let path = path.to_string_lossy().into_owned();
+
+        let (first, source) = file_waveform_blocking(&path, 10).unwrap();
+        assert_eq!(source, "file-decode");
+        assert_eq!(first.peaks.len(), 20);
+        assert!(!first.pumping);
+        assert!((first.duration_secs - 0.1).abs() < 1e-9);
+        // A short clip has no zero buckets inside the audio.
+        assert!(first.peaks.chunks_exact(2).all(|p| p[1] > 0.1));
+
+        let (second, source) = file_waveform_blocking(&path, 200).unwrap();
+        assert_eq!(source, "peak-cache");
+        assert_eq!(second.peaks.len(), 400);
+        assert!(second.peaks[1] > 0.7 && second.peaks[399] < 0.3);
+    }
+
+    #[test]
+    fn file_waveform_notices_a_rewritten_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rewritten.wav");
+        write_wav(&path, 8_000, 1, 800, |_, _| 0.2);
+        let path_str = path.to_string_lossy().into_owned();
+        let (quiet, _) = file_waveform_blocking(&path_str, 4).unwrap();
+        assert!(quiet.peaks[1] < 0.3);
+
+        // Different size, so the stamp changes even within the same second.
+        write_wav(&path, 8_000, 1, 1_600, |_, _| 0.9);
+        let (loud, source) = file_waveform_blocking(&path_str, 4).unwrap();
+        assert_eq!(source, "file-decode");
+        assert!(loud.peaks[1] > 0.8);
+        assert!((loud.duration_secs - 0.2).abs() < 1e-9);
+    }
+
+    #[test]
+    fn file_waveform_fails_for_a_missing_file() {
+        assert!(file_waveform_blocking("/no/such/sound.wav", 8).is_err());
+    }
+
+    #[test]
+    fn waveform_cache_evicts_the_least_recently_used_entry() {
+        let mut cache = WaveformCache::default();
+        let peaks = Arc::new(PeakAcc::new());
+        for i in 0..super::WAVEFORM_CACHE_ENTRIES {
+            cache.put(&format!("p{i}"), (1, 1), Arc::clone(&peaks), 1.0);
+        }
+        // Touch the oldest entry, then overflow by one.
+        assert!(cache.get("p0", (1, 1)).is_some());
+        cache.put("extra", (1, 1), Arc::clone(&peaks), 1.0);
+        assert_eq!(cache.entries.len(), super::WAVEFORM_CACHE_ENTRIES);
+        assert!(cache.get("p0", (1, 1)).is_some());
+        assert!(cache.get("p1", (1, 1)).is_none());
+        // A changed file stamp is a miss even though the path is known.
+        assert!(cache.get("extra", (2, 1)).is_none());
     }
 
     #[test]

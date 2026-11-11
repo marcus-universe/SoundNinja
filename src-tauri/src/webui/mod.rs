@@ -463,6 +463,7 @@ pub(crate) fn rpc_allowed(cmd: &str) -> bool {
             | "get_playing_sounds"
             | "get_sound_duration"
             | "get_file_waveform_peaks"
+            | "get_file_waveform"
             | "is_sound_pumping"
             | "get_audio_hosts"
             | "get_out_devices"

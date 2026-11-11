@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 
 use super::devices::{is_default_name, resolve_output_device};
@@ -41,13 +41,13 @@ pub fn get_sound_duration(sound_path: String) -> Result<f64, String> {
 }
 
 /// Track length from container metadata. Builds a decoder but never pulls
-/// samples through it, so this only parses headers.
+/// samples through it, so this only parses headers — a few buffered reads,
+/// not the whole file.
 fn probe_duration(sound_path: &str) -> Result<f64, String> {
     if let Some(secs) = super::cache::cached_duration(sound_path) {
         return Ok(secs);
     }
-    let cursor = super::cache::open_cursor(sound_path)?;
-    let decoder = rodio::Decoder::new(cursor).map_err(|e| e.to_string())?;
+    let decoder = super::decode::open_decoder(sound_path)?;
     let secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
     if secs > 0.0 {
         super::cache::store_duration(sound_path, secs);
@@ -79,6 +79,102 @@ pub fn mix_output_format(rate: SampleRate, channels: ChannelCount) -> (SampleRat
     (rate, super::channel_map::mix_channels(channels))
 }
 
+// --- Identity of the open stream ---
+
+/// What the open output stream was opened for and the format it runs at.
+/// Published by the audio thread so `prepare_play` and the cache warmer can
+/// pick the decode format without enumerating devices again (on PipeWire that
+/// enumeration is a full server connect, on every play).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct StreamIdent {
+    /// Resolved display name of the device, never the "default" sentinel.
+    device_name: String,
+    host_name: Option<String>,
+    /// True when the stream was opened with ASIO L/R mapping (max channels).
+    mapped: bool,
+    rate: SampleRate,
+    channels: ChannelCount,
+}
+
+static STREAM_IDENT: Mutex<Option<StreamIdent>> = Mutex::new(None);
+
+fn set_stream_ident(ident: Option<StreamIdent>) {
+    // Poisoning cannot leave this plain value half-written; keep going.
+    *STREAM_IDENT.lock().unwrap_or_else(|e| e.into_inner()) = ident;
+}
+
+/// True when a stream described by `ident` can serve a request for
+/// `device_name` / `host_name` with the current channel-map setting. The
+/// "default" sentinel matches whatever device is open on that host.
+fn stream_matches(
+    ident: &StreamIdent,
+    device_name: &str,
+    host_name: Option<&str>,
+    mapped: bool,
+) -> bool {
+    let host_same = ident.host_name.as_deref() == host_name;
+    let device_same = ident.device_name == device_name || is_default_name(device_name);
+    host_same && device_same && ident.mapped == mapped
+}
+
+/// Device format of the open stream when it serves this device/host, else `None`.
+pub(crate) fn stream_format_for(
+    device_name: &str,
+    host_name: Option<&str>,
+) -> Option<(SampleRate, ChannelCount)> {
+    let mapped = super::channel_map::output_enabled();
+    let guard = STREAM_IDENT.lock().unwrap_or_else(|e| e.into_inner());
+    guard
+        .as_ref()
+        .filter(|ident| stream_matches(ident, device_name, host_name, mapped))
+        .map(|ident| (ident.rate, ident.channels))
+}
+
+/// Decode target for a play on this device: `(rate, channels, from_stream)`.
+/// The open stream's own format wins; otherwise the device is asked.
+fn resolve_play_format(
+    device_name: &str,
+    host_name: Option<&str>,
+) -> Option<(SampleRate, ChannelCount, bool)> {
+    if let Some((rate, channels)) = stream_format_for(device_name, host_name) {
+        let (rate, channels) = mix_output_format(rate, channels);
+        return Some((rate, channels, true));
+    }
+    // Do not ASIOInit a driver just to pick a decode format — that races the
+    // audio thread and is a common Windows heap-corruption trigger.
+    let (rate, device_ch) = if super::devices::is_asio_host_name(host_name) {
+        output_format().or_else(|| Some((SampleRate::new(48_000)?, ChannelCount::new(2)?)))
+    } else {
+        super::devices::default_output_format(device_name, host_name).or_else(output_format)
+    }?;
+    let (rate, channels) = mix_output_format(rate, device_ch);
+    Some((rate, channels, false))
+}
+
+/// Format the cache warmer should decode to so its keys match what a later
+/// play asks for. Unlike a play this never guesses a format for ASIO: warming
+/// a whole board into a guessed rate would be wasted work.
+pub(crate) fn warm_format(
+    device_name: Option<&str>,
+    host_name: Option<&str>,
+) -> Option<(SampleRate, ChannelCount)> {
+    let Some(name) = device_name else {
+        return output_format().map(|(rate, ch)| mix_output_format(rate, ch));
+    };
+    if super::devices::is_asio_host_name(host_name) && stream_format_for(name, host_name).is_none()
+    {
+        return output_format().map(|(rate, ch)| mix_output_format(rate, ch));
+    }
+    resolve_play_format(name, host_name).map(|(rate, channels, _)| (rate, channels))
+}
+
+fn unix_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 // --- Playing list snapshot (shared with frontend) ---
 
 #[derive(Clone, Serialize)]
@@ -89,6 +185,13 @@ pub struct PlayingInfo {
     pub position_secs: f64,
     pub looping: bool,
     pub duration_secs: f64,
+    /// True when `duration_secs` is the real decoded length (cached PCM, or a
+    /// pump that decoded the whole file). False while it is header metadata,
+    /// an estimate, or still growing.
+    pub duration_exact: bool,
+    /// Unix epoch milliseconds at which `position_secs` was sampled, so the
+    /// frontend can extrapolate the playhead without polling.
+    pub as_of_ms: u64,
 }
 
 static PLAYING_LIST: OnceLock<Mutex<Vec<PlayingInfo>>> = OnceLock::new();
@@ -108,6 +211,8 @@ fn sync_playing_list(app: &tauri::AppHandle, playing: &[PlayingSound]) {
             position_secs: s.position_origin_secs + s.player.get_pos().as_secs_f64(),
             looping: s.looping,
             duration_secs: s.duration_secs,
+            duration_exact: s.duration_exact,
+            as_of_ms: unix_millis(),
         })
         .collect();
     if let Ok(mut guard) = playing_list().lock() {
@@ -132,6 +237,14 @@ pub enum AudioMsg {
         volume: f32,
         /// Restart from the start when this instance ends.
         looping: bool,
+        /// When the message was queued; only read for `SN_PERF` timings.
+        queued_at: Instant,
+    },
+    /// Open the output stream ahead of the first play so that play does not
+    /// pay for the device open. Ignored while anything is playing.
+    Prewarm {
+        device_name: String,
+        host_name: Option<String>,
     },
     /// Stop a single playing sound matched by its file path.
     StopOne {
@@ -189,15 +302,9 @@ fn send_msg(msg: AudioMsg) -> Result<(), String> {
 /// Multiple Player instances connected to the same mixer play simultaneously.
 struct AudioStream {
     device_sink: MixerDeviceSink,
-    device_name: String,
-    host_name: Option<String>,
-    /// Output format sources are pre-converted to, so the mixer never resamples.
-    #[allow(dead_code)]
-    sample_rate: SampleRate,
-    #[allow(dead_code)]
-    channels: ChannelCount,
-    /// True when this stream was opened with ASIO L/R mapping (max channels).
-    mapped: bool,
+    /// Device, host, channel-map state and the output format sources are
+    /// pre-converted to, so the mixer never resamples.
+    ident: StreamIdent,
 }
 
 impl AudioStream {
@@ -210,9 +317,14 @@ impl AudioStream {
         let device = resolve_output_device(device_name, host_name).map_err(|e| e.to_string())?;
         let resolved_name = super::devices::device_display_name(&device)
             .unwrap_or_else(|| device_name.to_owned());
-        let outs = super::devices::max_output_channels(&device).unwrap_or(0);
-        let ins = super::devices::max_input_channels(&device).unwrap_or(0);
-        super::devices::cache_asio_device_channels(&resolved_name, outs, ins);
+        // The channel counts only feed the ASIO channel picker. Probing them on
+        // other hosts cost two config queries per open and put non-ASIO device
+        // names into the ASIO metadata list.
+        if asio {
+            let outs = super::devices::max_output_channels(&device).unwrap_or(0);
+            let ins = super::devices::max_input_channels(&device).unwrap_or(0);
+            super::devices::cache_asio_device_channels(&resolved_name, outs, ins);
+        }
         // rodio's from_device() pins a 50ms Fixed buffer. ASIO drivers reject
         // or heap-corrupt on sizes outside their quantum — use Default instead.
         let mut builder = DeviceSinkBuilder::from_device(device).map_err(|e| e.to_string())?;
@@ -223,15 +335,23 @@ impl AudioStream {
         let sample_rate = device_sink.config().sample_rate();
         let channels = device_sink.config().channel_count();
         publish_output_format(sample_rate, channels);
-        Ok(Self {
-            device_sink,
+        let ident = StreamIdent {
             device_name: resolved_name,
             host_name: host_name.map(str::to_owned),
-            sample_rate,
-            channels,
             mapped,
-        })
+            rate: sample_rate,
+            channels,
+        };
+        set_stream_ident(Some(ident.clone()));
+        Ok(Self { device_sink, ident })
     }
+}
+
+/// Drop the stream and withdraw its published identity in one step, so no
+/// caller can pick a decode format from a stream that is already gone.
+fn close_stream(stream: &mut Option<AudioStream>) {
+    *stream = None;
+    set_stream_ident(None);
 }
 
 // --- Playing sound slot ---
@@ -244,6 +364,8 @@ struct PlayingSound {
     looping: bool,
     /// Known duration used to clamp seeks away from EOF (avoids empty source).
     duration_secs: f64,
+    /// `duration_secs` is the decoded length, not a header value or estimate.
+    duration_exact: bool,
     /// Absolute file offset corresponding to player position 0 (set on seek).
     position_origin_secs: f64,
     ready: Ready,
@@ -265,18 +387,52 @@ impl Ready {
         }
     }
 
+    /// Swap a finished pump for the buffer it stored in the PCM cache and
+    /// return that buffer's exact duration. Restarts (loops) then share the
+    /// cached samples instead of copying the pump's chunks every time.
+    /// `None` when there is nothing to swap: already cached, still decoding,
+    /// or the result was too large to be kept.
+    fn settle(&mut self) -> Option<f64> {
+        let Self::Growing(h) = self else { return None };
+        if !h.is_done() {
+            return None;
+        }
+        let (rate, channels) = h.format();
+        let (buffer, duration) = super::pcm::peek(h.path(), rate, channels)?;
+        *self = Self::Cached(buffer);
+        Some(duration)
+    }
+
+    /// Queue this sound from its start. Both variants share their samples:
+    /// a cached buffer by `Arc`, a pump through its published chunks.
     fn append_to(&self, player: &Player, dst_ch: ChannelCount) {
         match self {
             Self::Cached(buf) => append_mapped(player, buf.clone(), dst_ch),
-            Self::Growing(h) => {
-                if let Some(buf) = h.snapshot() {
-                    append_mapped(player, buf, dst_ch);
-                } else {
-                    append_mapped(player, h.source(), dst_ch);
-                }
-            }
+            Self::Growing(h) => append_mapped(player, h.source(), dst_ch),
         }
     }
+}
+
+/// Follow the pump's view of the track length. While it decodes, the length
+/// only grows (metadata, then the buffer); once the whole file is decoded the
+/// real length replaces the estimate, even when that is shorter. Returns
+/// whether anything the frontend sees changed.
+fn adopt_pump_duration(s: &mut PlayingSound) -> bool {
+    let Ready::Growing(h) = &s.ready else {
+        return false;
+    };
+    let duration = h.duration_secs();
+    if h.is_complete() && duration > 0.0 {
+        let changed = !s.duration_exact || duration != s.duration_secs;
+        s.duration_secs = duration;
+        s.duration_exact = true;
+        return changed;
+    }
+    if duration > s.duration_secs {
+        s.duration_secs = duration;
+        return true;
+    }
+    false
 }
 
 fn append_mapped<S: Source + Send + 'static>(player: &Player, source: S, dst_ch: ChannelCount) {
@@ -295,27 +451,33 @@ pub fn prepare_play(
     device_name: &str,
     host_name: Option<&str>,
 ) -> Result<(Ready, f64), String> {
-    // Do not ASIOInit a driver just to pick a decode format — that races the
-    // audio thread and is a common Windows heap-corruption trigger.
-    let (rate, device_ch) = if super::devices::is_asio_host_name(host_name) {
-        output_format().or_else(|| {
-            Some((
-                SampleRate::new(48_000)?,
-                ChannelCount::new(2)?,
-            ))
-        })
-    } else {
-        super::devices::default_output_format(device_name, host_name).or_else(output_format)
-    }
-    .ok_or_else(|| "Cannot resolve output format".to_string())?;
-    let (rate, channels) = mix_output_format(rate, device_ch);
+    let started = Instant::now();
+    let (rate, channels, from_stream) = resolve_play_format(device_name, host_name)
+        .ok_or_else(|| "Cannot resolve output format".to_string())?;
+    let format_ms = crate::perf::ms_since(started);
     if let Some((buffer, duration)) = super::pcm::peek(path, rate, channels) {
         if duration > 0.0 {
             super::cache::store_duration(path, duration);
         }
+        crate::perf::log(|| {
+            format!(
+                "prepare_play cache=hit format={format_ms:.2}ms (from open stream: {from_stream}) \
+                 total={:.2}ms '{path}'",
+                crate::perf::ms_since(started)
+            )
+        });
         return Ok((Ready::Cached(buffer), duration));
     }
+    let preroll_started = Instant::now();
     let handle = super::stream::start(path.to_owned(), rate, channels)?;
+    crate::perf::log(|| {
+        format!(
+            "prepare_play cache=miss format={format_ms:.2}ms (from open stream: {from_stream}) \
+             preroll={:.2}ms total={:.2}ms '{path}'",
+            crate::perf::ms_since(preroll_started),
+            crate::perf::ms_since(started)
+        )
+    });
     let duration = handle
         .duration_secs()
         .max(super::cache::cached_duration(path).unwrap_or(0.0));
@@ -333,27 +495,55 @@ fn ensure_stream(
 ) -> Result<(), String> {
     let mapped = super::channel_map::output_enabled();
     let asio = super::devices::is_asio_host_name(host_name);
-    let needs_new = stream
+    let reusable = stream
         .as_ref()
-        .map(|s| {
-            let host_changed = s.host_name.as_deref() != host_name;
-            let device_changed = s.device_name != device_name && !is_default_name(device_name);
-            let map_changed = s.mapped != mapped;
-            host_changed || device_changed || map_changed
-        })
-        .unwrap_or(true);
-
-    if !needs_new {
+        .is_some_and(|s| stream_matches(&s.ident, device_name, host_name, mapped));
+    if reusable {
         return Ok(());
     }
 
     let had_stream = stream.is_some();
-    *stream = None;
+    close_stream(stream);
     if had_stream {
         thread::sleep(Duration::from_millis(if asio { 250 } else { 100 }));
     }
     *stream = Some(AudioStream::open(device_name, host_name)?);
     Ok(())
+}
+
+/// Pause after stopping players in a non-overlap play. See the Play handler.
+const STOP_SETTLE: Duration = Duration::from_millis(10);
+
+/// Whether opening the output stream ahead of the first play is safe on this
+/// host. ASIO drivers are exclusive and must only be loaded for a real play.
+/// On Linux only the sound servers share a device; a raw ALSA or JACK stream
+/// would hold the device (or a JACK port) while the app sits idle.
+fn prewarm_allowed(os: &str, host_name: Option<&str>) -> bool {
+    if super::devices::is_asio_host_name(host_name) {
+        return false;
+    }
+    match os {
+        "windows" | "macos" => true,
+        "linux" => host_name.map(str::trim).is_some_and(|h| {
+            h.eq_ignore_ascii_case("pipewire") || h.eq_ignore_ascii_case("pulseaudio")
+        }),
+        _ => false,
+    }
+}
+
+/// True when a `Prewarm` sent now would be acted on: the host allows it and
+/// nothing is playing. The cache warmer uses this to decide whether waiting
+/// for the stream's format is worthwhile.
+pub(crate) fn prewarm_expected(host_name: Option<&str>) -> bool {
+    prewarm_allowed(std::env::consts::OS, host_name)
+        && playing_list().lock().map(|g| g.is_empty()).unwrap_or(false)
+}
+
+/// Diagnostics that are only useful while developing; silent in release builds.
+fn debug_log(message: impl FnOnce() -> String) {
+    if cfg!(debug_assertions) {
+        eprintln!("{}", message());
+    }
 }
 
 /// Non-blocking recv when sounds are playing; blocking recv when idle.
@@ -382,14 +572,9 @@ fn coalesce_seeks(batch: &mut Vec<AudioMsg>) {
             _ => None,
         };
         let Some(key_i) = key_i else { continue };
-        for j in (i + 1)..batch.len() {
-            if let AudioMsg::Seek { path, .. } = &batch[j] {
-                if *path == key_i {
-                    drop_idx[i] = true;
-                    break;
-                }
-            }
-        }
+        drop_idx[i] = batch[i + 1..]
+            .iter()
+            .any(|later| matches!(later, AudioMsg::Seek { path, .. } if *path == key_i));
     }
     let mut kept = Vec::with_capacity(batch.len());
     for (i, msg) in batch.drain(..).enumerate() {
@@ -418,14 +603,8 @@ fn seek_playing_slot(
     position_secs: f64,
 ) {
     let was_paused = playing[i].player.is_paused();
+    adopt_pump_duration(&mut playing[i]);
     let mut duration_secs = playing[i].duration_secs;
-    if let Ready::Growing(h) = &playing[i].ready {
-        let hinted = h.duration_secs();
-        if hinted > duration_secs {
-            duration_secs = hinted;
-            playing[i].duration_secs = hinted;
-        }
-    }
     // Audio can only land inside decoded samples while the pump is still
     // filling. Timeline duration (metadata) stays on PlayingSound; seek target
     // is clamped to ready so the emitted playhead is not a fake 100%.
@@ -474,14 +653,14 @@ fn seek_playing_slot(
             let mut source = buf.clone();
             match source.try_seek(target) {
                 Ok(()) => {
-                    append_mapped(&new_player, source, stream.channels);
+                    append_mapped(&new_player, source, stream.ident.channels);
                     clamped
                 }
                 Err(_) if clamped < 2.0 => {
                     append_mapped(
                         &new_player,
                         buf.clone().skip_duration(Duration::from_secs_f64(clamped)),
-                        stream.channels,
+                        stream.ident.channels,
                     );
                     clamped
                 }
@@ -494,7 +673,7 @@ fn seek_playing_slot(
         Ready::Growing(h) => {
             let mut source = h.source();
             let _ = source.try_seek(target);
-            append_mapped(&new_player, source, stream.channels);
+            append_mapped(&new_player, source, stream.ident.channels);
             clamped
         }
     };
@@ -503,6 +682,7 @@ fn seek_playing_slot(
         new_player.pause();
     }
     let sound_volume = playing[i].sound_volume;
+    let duration_exact = playing[i].duration_exact;
     let old = std::mem::replace(
         &mut playing[i],
         PlayingSound {
@@ -510,6 +690,7 @@ fn seek_playing_slot(
             path: file_path,
             looping,
             duration_secs,
+            duration_exact,
             position_origin_secs: origin,
             ready,
             sound_volume,
@@ -529,8 +710,15 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
         let mut playing: Vec<PlayingSound> = Vec::new();
 
         loop {
-            // Drain naturally-finished sounds and notify frontend.
             let mut finished_any = false;
+            // Adopt metadata/hint, or the exact length once the pump reached
+            // EOF. Runs before the restart pass below, which may replace a
+            // finished pump with its cached buffer.
+            for s in &mut playing {
+                finished_any |= adopt_pump_duration(s);
+            }
+
+            // Drain naturally-finished sounds and notify frontend.
             let mut i = 0;
             while i < playing.len() {
                 if playing[i].player.empty() {
@@ -538,7 +726,11 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                         let was_paused = playing[i].player.is_paused();
                         let sink_pos = playing[i].player.get_pos().as_secs_f64();
                         playing[i].position_origin_secs = -sink_pos;
-                        let dst_ch = stream.as_ref().map(|s| s.channels);
+                        if let Some(exact) = playing[i].ready.settle() {
+                            playing[i].duration_secs = exact;
+                            playing[i].duration_exact = true;
+                        }
+                        let dst_ch = stream.as_ref().map(|s| s.ident.channels);
                         if let Some(ch) = dst_ch {
                             playing[i].ready.append_to(&playing[i].player, ch);
                         }
@@ -554,17 +746,6 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     }
                 } else {
                     i += 1;
-                }
-            }
-            for s in &mut playing {
-                if let Ready::Growing(h) = &s.ready {
-                    // Adopt metadata/hint (or exact EOF). Never drop to ready_secs
-                    // while the pump is still filling — that shrinks the timeline.
-                    let d = h.duration_secs();
-                    if d > s.duration_secs {
-                        s.duration_secs = d;
-                        finished_any = true;
-                    }
                 }
             }
             if finished_any {
@@ -639,24 +820,33 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     device_name,
                     host_name,
                     overlap,
-                    ready,
-                    duration_secs,
+                    mut ready,
+                    mut duration_secs,
                     volume,
                     looping,
+                    queued_at,
                 } => {
-                    if !overlap {
+                    if !overlap && !playing.is_empty() {
                         for s in playing.drain(..) {
                             s.ready.cancel();
                             s.player.stop();
                             let _ = app_handle.emit("sound_finished", s.path);
                         }
-                        thread::sleep(Duration::from_millis(50));
+                        // The mixer stays open across sounds, so there is no
+                        // device to wait for. A short pause only lets the
+                        // stopped players leave the mixer before the new one
+                        // starts; with nothing stopped there is nothing to wait on.
+                        thread::sleep(STOP_SETTLE);
                     }
 
                     if let Err(e) = ensure_stream(&mut stream, &device_name, host_name.as_deref()) {
                         eprintln!("Failed to open audio device: {}", e);
                         ready.cancel();
                         let _ = app_handle.emit("sound_error", e);
+                        // The frontend marked this sound active when it sent the
+                        // play; without this it would stay lit forever.
+                        let _ = app_handle.emit("sound_finished", path);
+                        sync_playing_list(&app_handle, &playing);
                         continue;
                     }
 
@@ -664,18 +854,32 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                     let new_player = Player::connect_new(st.device_sink.mixer());
                     let sound_volume = volume.clamp(0.0, 1.0);
                     new_player.set_volume(effective_volume(sound_volume));
-                    ready.append_to(&new_player, st.channels);
+                    // Cached PCM is the whole decoded file. A pump only knows
+                    // the real length once it reaches the end; a short clip
+                    // may already be there (and in the cache) by now.
+                    let mut duration_exact = matches!(ready, Ready::Cached(_));
+                    if let Some(exact) = ready.settle() {
+                        duration_secs = exact;
+                        duration_exact = true;
+                    }
+                    ready.append_to(&new_player, st.ident.channels);
+                    crate::perf::log(|| {
+                        format!(
+                            "play message->appended {:.2}ms '{path}'",
+                            crate::perf::ms_since(queued_at)
+                        )
+                    });
                     playing.push(PlayingSound {
                         player: new_player,
                         path: path.clone(),
                         looping,
                         duration_secs,
+                        duration_exact,
                         position_origin_secs: 0.0,
                         ready,
                         sound_volume,
                     });
                     let keep: Vec<String> = playing.iter().map(|s| s.path.clone()).collect();
-                    super::cache::evict_idle(&keep);
                     super::pcm::evict_idle(&keep);
                     sync_playing_list(&app_handle, &playing);
                 }
@@ -729,12 +933,29 @@ pub fn init_audio_thread(app_handle: tauri::AppHandle) {
                 AudioMsg::ApplyChannelMap => {
                     if playing.is_empty() && stream.is_some() {
                         thread::sleep(Duration::from_millis(100));
-                        stream = None;
+                        close_stream(&mut stream);
+                    }
+                }
+
+                AudioMsg::Prewarm {
+                    device_name,
+                    host_name,
+                } => {
+                    let host = host_name.as_deref();
+                    if playing.is_empty() && prewarm_allowed(std::env::consts::OS, host) {
+                        // Best effort: a device that cannot be opened now is
+                        // reported by the play that actually needs it.
+                        if let Err(e) = ensure_stream(&mut stream, &device_name, host) {
+                            debug_log(|| format!("[audio] prewarm skipped: {e}"));
+                        }
                     }
                 }
             }
             } // for msg in batch
         }
+        // The command channel closed (shutdown): withdraw the stream's
+        // identity together with the stream itself.
+        close_stream(&mut stream);
     });
 }
 
@@ -760,8 +981,17 @@ pub fn enqueue_play(
         duration_secs: duration,
         volume,
         looping,
+        queued_at: Instant::now(),
     })?;
     Ok(duration)
+}
+
+/// Ask the audio thread to open the output stream for this device now.
+pub(crate) fn request_prewarm(device_name: &str, host_name: Option<&str>) {
+    let _ = send_msg(AudioMsg::Prewarm {
+        device_name: device_name.to_owned(),
+        host_name: host_name.map(str::to_owned),
+    });
 }
 
 #[tauri::command]
@@ -854,4 +1084,107 @@ pub fn set_asio_channel_map(
     super::channel_map::configure(enabled, out_left, out_right, in_left, in_right);
     let _ = send_msg(AudioMsg::ApplyChannelMap);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        close_stream, ensure_stream, prewarm_allowed, resolve_play_format, stream_format_for,
+        stream_matches, StreamIdent,
+    };
+    use rodio::{ChannelCount, SampleRate};
+
+    fn ident(device: &str, host: Option<&str>, mapped: bool) -> StreamIdent {
+        StreamIdent {
+            device_name: device.to_owned(),
+            host_name: host.map(str::to_owned),
+            mapped,
+            rate: SampleRate::new(48_000).unwrap(),
+            channels: ChannelCount::new(2).unwrap(),
+        }
+    }
+
+    #[test]
+    fn stream_matches_follows_device_host_and_channel_map() {
+        let open = ident("Speakers", Some("Wasapi"), false);
+        // (requested device, requested host, requested map, expected)
+        let cases = [
+            ("Speakers", Some("Wasapi"), false, true),
+            // The sentinel means "whatever is open on this host".
+            ("default", Some("Wasapi"), false, true),
+            ("", Some("Wasapi"), false, true),
+            ("Headphones", Some("Wasapi"), false, false),
+            ("Speakers", Some("ASIO"), false, false),
+            ("Speakers", None, false, false),
+            ("default", Some("ASIO"), false, false),
+            ("Speakers", Some("Wasapi"), true, false),
+        ];
+        for (device, host, mapped, expected) in cases {
+            assert_eq!(
+                stream_matches(&open, device, host, mapped),
+                expected,
+                "device={device:?} host={host:?} mapped={mapped}"
+            );
+        }
+    }
+
+    #[test]
+    fn stream_matches_treats_missing_host_as_its_own_host() {
+        let open = ident("Speakers", None, true);
+        assert!(stream_matches(&open, "default", None, true));
+        assert!(!stream_matches(&open, "default", Some("Wasapi"), true));
+    }
+
+    /// Opens the real default output device (silently, nothing is queued).
+    /// Needs audio hardware, so it only runs with `RUN_SLOW_TESTS` set, like
+    /// the device listing test in `devices.rs`.
+    #[test]
+    fn open_stream_publishes_the_format_a_play_resolves_to() {
+        if std::env::var("RUN_SLOW_TESTS").is_err() {
+            return;
+        }
+        let mut stream = None;
+        if let Err(e) = ensure_stream(&mut stream, "default", None) {
+            eprintln!("skip: no usable output device ({e})");
+            return;
+        }
+        let opened = stream.as_ref().map(|s| s.ident.clone()).unwrap();
+        let format = Some((opened.rate, opened.channels));
+        assert_eq!(stream_format_for("default", None), format);
+        assert_eq!(stream_format_for(&opened.device_name, None), format);
+        assert_eq!(stream_format_for("default", Some("ASIO")), None);
+
+        // A play on this device takes its format from the stream, without
+        // asking the device again.
+        let (rate, _, from_stream) = resolve_play_format("default", None).unwrap();
+        assert!(from_stream);
+        assert_eq!(rate, opened.rate);
+
+        // Asking again for the same device keeps the stream.
+        ensure_stream(&mut stream, "default", None).unwrap();
+        assert_eq!(stream.as_ref().map(|s| s.ident.clone()), Some(opened));
+
+        close_stream(&mut stream);
+        assert_eq!(stream_format_for("default", None), None);
+    }
+
+    #[test]
+    fn prewarm_allowed_only_for_shared_hosts() {
+        let cases = [
+            ("windows", Some("Wasapi"), true),
+            ("windows", None, true),
+            ("windows", Some("ASIO"), false),
+            ("macos", None, true),
+            ("linux", Some("PipeWire"), true),
+            ("linux", Some("pulseaudio"), true),
+            ("linux", Some("Alsa"), false),
+            ("linux", Some("Jack"), false),
+            // Unknown host on Linux may resolve to raw ALSA.
+            ("linux", None, false),
+            ("freebsd", None, false),
+        ];
+        for (os, host, expected) in cases {
+            assert_eq!(prewarm_allowed(os, host), expected, "os={os} host={host:?}");
+        }
+    }
 }

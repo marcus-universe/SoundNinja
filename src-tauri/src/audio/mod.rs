@@ -1,9 +1,12 @@
 pub mod cache;
 pub mod channel_map;
+pub mod decode;
 pub mod devices;
 pub mod dsp;
 pub mod pcm;
+pub mod peaks;
 pub mod playback;
+pub mod resample;
 pub mod stream;
 pub mod record;
 #[cfg(feature = "stems")]

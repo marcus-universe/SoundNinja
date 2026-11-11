@@ -20,7 +20,7 @@ pub(crate) fn is_usable_ipv4(ip: &IpAddr) -> bool {
 }
 
 pub fn list_local_ips() -> Vec<LocalIpInfo> {
-    let primary = local_ip().ok().filter(|ip| is_usable_ipv4(ip));
+    let primary = local_ip().ok().filter(is_usable_ipv4);
     let ifaces = list_afinet_netifas().unwrap_or_default();
     let mut out = Vec::new();
     for (name, ip) in ifaces {

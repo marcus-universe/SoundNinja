@@ -139,7 +139,7 @@ fn asio_registry_names() -> Vec<String> {
 fn asio_host() -> Option<cpal::Host> {
     let id = cpal::available_hosts()
         .into_iter()
-        .find(|id| host_id_is_asio(id))?;
+        .find(host_id_is_asio)?;
     cpal::host_from_id(id).ok()
 }
 
@@ -551,7 +551,9 @@ fn channel_labels(count: u16) -> Vec<String> {
 /// Output and input channel names for an ASIO device.
 /// Empty lists on non-Windows (no ASIO host).
 #[tauri::command(async)]
-#[allow(unused_variables)]
+// The explicit `return` ends the Windows block; without it the cfg'd block
+// would have to be the tail expression, which attributes do not allow.
+#[allow(unused_variables, clippy::needless_return)]
 pub fn get_asio_device_channels(
     device_name: String,
     input_device_name: Option<String>,

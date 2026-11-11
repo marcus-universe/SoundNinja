@@ -1,245 +1,37 @@
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
-use std::sync::{Arc, Mutex, OnceLock};
+//! Cache control: warming, duration lookups and the cache commands.
+//!
+//! Decoded audio lives in [`super::pcm`]. This module decides what gets
+//! decoded ahead of time and remembers track lengths.
+
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// Maximum total RAM used by the cache (64 MiB).
-const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
-/// Maximum size of a single cached entry (16 MiB).
-/// Files larger than this are streamed from disk and never cached.
-const MAX_FILE_ENTRY: usize = 16 * 1024 * 1024;
-/// Drop unused entries after this idle time (unless currently playing).
-const ENTRY_TTL: Duration = Duration::from_secs(90);
+use rodio::{ChannelCount, SampleRate};
 
-// ---------------------------------------------------------------------------
-// Streaming cursor (cache hit = memory, miss = disk)
-// ---------------------------------------------------------------------------
+use super::pcm::Prefetch;
 
-pub enum AudioCursor {
-    Mem(Cursor<Arc<[u8]>>),
-    Disk(BufReader<File>),
-}
-
-impl Read for AudioCursor {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            Self::Mem(c) => c.read(buf),
-            Self::Disk(c) => c.read(buf),
-        }
-    }
-}
-
-impl Seek for AudioCursor {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        match self {
-            Self::Mem(c) => c.seek(pos),
-            Self::Disk(c) => c.seek(pos),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// LRU cache
-// ---------------------------------------------------------------------------
-
-struct CacheEntry {
-    data: Arc<[u8]>,
-    last_used: Instant,
-}
-
-pub struct SoundCache {
-    entries: HashMap<String, CacheEntry>,
-    total_size: usize,
-    pub max_size: usize,
-    max_entry: usize,
-}
-
-impl SoundCache {
-    pub fn new() -> Self {
-        Self {
-            entries: HashMap::new(),
-            total_size: 0,
-            max_size: MAX_CACHE_SIZE,
-            max_entry: MAX_FILE_ENTRY,
-        }
-    }
-
-    pub fn peek(&self, path: &str) -> Option<Arc<[u8]>> {
-        self.entries.get(path).map(|e| e.data.clone())
-    }
-
-    /// Return cached bytes and refresh the entry's LRU stamp. `O(1)` — the
-    /// recency lives in the entry, so there is no access-order list to rewrite.
-    pub fn get(&mut self, path: &str) -> Option<Arc<[u8]>> {
-        let entry = self.entries.get_mut(path)?;
-        entry.last_used = Instant::now();
-        Some(entry.data.clone())
-    }
-
-    /// Store bytes in the cache (LRU eviction when full).
-    /// Files exceeding `max_entry` are returned as an `Arc` but never stored.
-    pub fn insert(&mut self, path: String, data: Vec<u8>) -> Arc<[u8]> {
-        if let Some(existing) = self.entries.get_mut(&path) {
-            existing.last_used = Instant::now();
-            return existing.data.clone();
-        }
-
-        let arc: Arc<[u8]> = data.into();
-        let size = arc.len();
-
-        if size > self.max_entry {
-            return arc;
-        }
-
-        while self.total_size + size > self.max_size {
-            let lru = self
-                .entries
-                .iter()
-                .min_by_key(|(_, e)| e.last_used)
-                .map(|(p, _)| p.clone());
-            match lru {
-                Some(path) => self.invalidate(&path),
-                None => break,
-            }
-        }
-
-        self.total_size += size;
-        self.entries.insert(
-            path,
-            CacheEntry {
-                data: arc.clone(),
-                last_used: Instant::now(),
-            },
-        );
-        arc
-    }
-
-    pub fn clear(&mut self) {
-        self.entries.clear();
-        self.total_size = 0;
-    }
-
-    /// Drop one path so the next `load_bytes` re-reads from disk.
-    pub fn invalidate(&mut self, path: &str) {
-        if let Some(evicted) = self.entries.remove(path) {
-            self.total_size = self.total_size.saturating_sub(evicted.data.len());
-        }
-    }
-
-    /// Drop entries idle longer than TTL and not in `keep`.
-    pub fn evict_idle(&mut self, keep: &HashSet<String>) {
-        let now = Instant::now();
-        let stale: Vec<String> = self
-            .entries
-            .iter()
-            .filter(|(p, e)| !keep.contains(*p) && now.duration_since(e.last_used) > ENTRY_TTL)
-            .map(|(p, _)| p.clone())
-            .collect();
-        for path in stale {
-            self.invalidate(&path);
-        }
-    }
-
-    pub fn set_limits(&mut self, max_size: usize, max_entry: usize) {
-        self.max_size = max_size;
-        self.max_entry = max_entry;
-        while self.total_size > self.max_size {
-            let lru = self
-                .entries
-                .iter()
-                .min_by_key(|(_, e)| e.last_used)
-                .map(|(p, _)| p.clone());
-            match lru {
-                Some(path) => self.invalidate(&path),
-                None => break,
-            }
-        }
-    }
-
-    pub fn stats(&self) -> CacheStats {
-        CacheStats {
-            cached_count: self.entries.len(),
-            total_size_bytes: self.total_size,
-            max_size_bytes: self.max_size,
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Global instance
-// ---------------------------------------------------------------------------
-
-static SOUND_CACHE: OnceLock<Mutex<SoundCache>> = OnceLock::new();
-
-pub fn sound_cache() -> &'static Mutex<SoundCache> {
-    SOUND_CACHE.get_or_init(|| Mutex::new(SoundCache::new()))
-}
-
-/// Evict a single path from both caches (e.g. a rewritten preview WAV).
+/// Evict a single path from the cache (e.g. a rewritten preview WAV).
 pub fn invalidate_path(path: &str) {
-    if let Ok(mut cache) = sound_cache().lock() {
-        cache.invalidate(path);
-    }
     super::pcm::invalidate(path);
-}
-
-pub fn peek_bytes(path: &str) -> Option<Arc<[u8]>> {
-    sound_cache().lock().ok()?.peek(path)
-}
-
-/// Open a decoder cursor: memory if cached, otherwise stream the file.
-/// Cache miss also kicks a background warm so the next play is a hit.
-pub fn open_cursor(path: &str) -> Result<AudioCursor, String> {
-    if let Some(data) = peek_bytes(path) {
-        if let Ok(mut cache) = sound_cache().lock() {
-            let _ = cache.get(path);
-        }
-        return Ok(AudioCursor::Mem(Cursor::new(data)));
-    }
-    let file = File::open(path).map_err(|e| format!("Failed to open '{}': {}", path, e))?;
-    warm_in_background(path.to_string());
-    Ok(AudioCursor::Disk(BufReader::with_capacity(64 * 1024, file)))
-}
-
-pub fn evict_idle(keep: &[String]) {
-    let set: HashSet<String> = keep.iter().cloned().collect();
-    if let Ok(mut cache) = sound_cache().lock() {
-        cache.evict_idle(&set);
-    }
-}
-
-/// Return the raw bytes of a sound file (used by duration fallback / warm).
-pub fn load_bytes(path: &str) -> Result<Arc<[u8]>, String> {
-    {
-        let mut cache = sound_cache().lock().map_err(|e| e.to_string())?;
-        if let Some(data) = cache.get(path) {
-            return Ok(data);
-        }
-    }
-
-    let data =
-        std::fs::read(path).map_err(|e| format!("Failed to read '{}': {}", path, e))?;
-
-    let mut cache = sound_cache().lock().map_err(|e| e.to_string())?;
-    Ok(cache.insert(path.to_string(), data))
-}
-
-fn warm_in_background(path: String) {
-    std::thread::spawn(move || {
-        if let Err(e) = load_bytes(&path) {
-            eprintln!("[cache] warm failed '{}': {}", path, e);
-        }
-    });
 }
 
 // ---------------------------------------------------------------------------
 // Duration cache (path + mtime + size)
 // ---------------------------------------------------------------------------
 
-static DURATION_CACHE: OnceLock<Mutex<HashMap<String, (u64, u64, f64)>>> = OnceLock::new();
+/// Entries kept before the map is reset. Sized for several large boards: a
+/// reset below the board size would throw away durations the warmer just
+/// stored, and every lookup after that reopens its file.
+const MAX_DURATION_ENTRIES: usize = 4096;
 
-fn duration_cache() -> &'static Mutex<HashMap<String, (u64, u64, f64)>> {
+/// Path → `(mtime, size, duration in seconds)`.
+type DurationMap = HashMap<String, (u64, u64, f64)>;
+
+static DURATION_CACHE: OnceLock<Mutex<DurationMap>> = OnceLock::new();
+
+fn duration_cache() -> &'static Mutex<DurationMap> {
     DURATION_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -267,11 +59,87 @@ pub fn cached_duration(path: &str) -> Option<f64> {
 
 pub fn store_duration(path: &str, secs: f64) {
     if let (Some((mtime, size)), Ok(mut guard)) = (file_stamp(path), duration_cache().lock()) {
-        if guard.len() > 256 {
+        if guard.len() > MAX_DURATION_ENTRIES {
             guard.clear();
         }
         guard.insert(path.to_string(), (mtime, size, secs));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Warming
+// ---------------------------------------------------------------------------
+
+/// Bumped by every warm request. Workers of an older request stop before
+/// their next file, so switching tabs quickly does not queue up whole boards.
+static WARM_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// How long the warmer waits for the prewarmed stream to publish its format.
+const PREWARM_WAIT: Duration = Duration::from_millis(1500);
+
+/// Decode threads for warming. Leaves one core for playback and the UI, and
+/// stays low on ARM boards where every core is busy and thermals are tight.
+fn warm_threads() -> usize {
+    let cap = if cfg!(any(target_arch = "aarch64", target_arch = "arm")) {
+        3
+    } else if cfg!(target_arch = "x86_64") {
+        4
+    } else {
+        2
+    };
+    let cores = std::thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(1);
+    cores.saturating_sub(1).clamp(1, cap)
+}
+
+/// Decode target for warming. Prefers the format of the open (or just
+/// prewarmed) stream, because that is the key a later play looks up; falls
+/// back to asking the device.
+fn resolve_warm_format(
+    device_name: Option<&str>,
+    host_name: Option<&str>,
+) -> Option<(SampleRate, ChannelCount)> {
+    if let Some(name) = device_name {
+        let deadline = Instant::now() + PREWARM_WAIT;
+        while super::playback::stream_format_for(name, host_name).is_none()
+            && super::playback::prewarm_expected(host_name)
+            && Instant::now() < deadline
+        {
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    }
+    super::playback::warm_format(device_name, host_name)
+}
+
+/// Decode `paths` with `threads` workers until done or until `keep_going`
+/// turns false. Workers take the next index from a shared counter, so files
+/// are started strictly in input order (the visible tab comes first).
+/// Returns how many files were handed to `decode`.
+fn warm_paths<D, K>(paths: &[String], threads: usize, decode: D, keep_going: K) -> usize
+where
+    D: Fn(&str) + Sync,
+    K: Fn() -> bool + Sync,
+{
+    let next = AtomicUsize::new(0);
+    let started = AtomicUsize::new(0);
+    let worker = || {
+        while keep_going() {
+            let Some(path) = paths.get(next.fetch_add(1, Ordering::Relaxed)) else {
+                break;
+            };
+            started.fetch_add(1, Ordering::Relaxed);
+            decode(path);
+        }
+    };
+    std::thread::scope(|scope| {
+        for _ in 1..threads.clamp(1, paths.len().max(1)) {
+            scope.spawn(worker);
+        }
+        // The calling thread is the first worker.
+        worker();
+    });
+    started.into_inner()
 }
 
 // ---------------------------------------------------------------------------
@@ -286,43 +154,73 @@ pub struct CacheStats {
 }
 
 /// Pre-decode a list of sound files so the first press is instant and the audio
-/// callback never has to decode. Runs across the rayon pool; returns immediately.
+/// callback never has to decode. Returns immediately; the work runs on its own
+/// threads. A newer call replaces an older one that is still running.
 ///
-/// `device_name` / `host_name` decide the target format. When they cannot be
-/// resolved the files are only warmed as raw bytes.
+/// `device_name` / `host_name` decide the target format. When that cannot be
+/// resolved nothing is decoded; the first play of each sound then decodes it.
 #[tauri::command(async)]
 pub fn warm_sound_cache(paths: Vec<String>, device_name: Option<String>, host_name: Option<String>) {
-    let format = super::playback::output_format()
-        .or_else(|| {
-            if super::devices::is_asio_host_name(host_name.as_deref()) {
-                return None;
-            }
-            let name = device_name.as_deref()?;
-            super::devices::default_output_format(name, host_name.as_deref())
-        })
-        .map(|(rate, channels)| super::playback::mix_output_format(rate, channels));
+    let generation = WARM_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    // These are the pads on screen: keep their buffers past the idle TTL.
+    super::pcm::set_pinned(&paths);
+    // Open the output stream now: the first play then skips the device open,
+    // and the warmer below can decode to the format that stream really runs at.
+    if let Some(name) = device_name.as_deref() {
+        super::playback::request_prewarm(name, host_name.as_deref());
+    }
 
-    std::thread::spawn(move || match format {
-        Some((rate, channels)) => super::pcm::prefetch(&paths, rate, channels),
-        None => {
-            for path in &paths {
-                if let Err(e) = load_bytes(path) {
-                    eprintln!("[cache] warm failed '{path}': {e}");
-                }
-            }
-        }
-    });
+    let spawned = std::thread::Builder::new()
+        .name("sn-warm".into())
+        .spawn(move || {
+            let started = Instant::now();
+            let current = || WARM_GENERATION.load(Ordering::SeqCst) == generation;
+            // Resolved here rather than in the command: the fallback enumerates
+            // devices, which is too slow for a tokio worker.
+            let Some((rate, channels)) =
+                resolve_warm_format(device_name.as_deref(), host_name.as_deref())
+            else {
+                crate::perf::log(|| "warm skipped: output format unknown".to_string());
+                return;
+            };
+            let decoded = AtomicUsize::new(0);
+            let threads = warm_threads();
+            let visited = warm_paths(
+                &paths,
+                threads,
+                |path| {
+                    if super::pcm::prefetch_one(path, rate, channels) == Prefetch::Decoded {
+                        decoded.fetch_add(1, Ordering::Relaxed);
+                    }
+                },
+                current,
+            );
+            crate::perf::log(|| {
+                format!(
+                    "warm files={} visited={visited} decoded={} threads={threads} \
+                     format={}Hz/{}ch superseded={} total={:.1}ms",
+                    paths.len(),
+                    decoded.load(Ordering::Relaxed),
+                    rate.get(),
+                    channels.get(),
+                    !current(),
+                    crate::perf::ms_since(started)
+                )
+            });
+        });
+    if let Err(e) = spawned {
+        eprintln!("[cache] warm thread failed to start: {e}");
+    }
 }
 
 /// Evict every cached sound, freeing RAM immediately.
 #[tauri::command(async)]
 pub fn clear_sound_cache() -> Result<(), String> {
-    sound_cache().lock().map_err(|e| e.to_string())?.clear();
     super::pcm::clear();
     Ok(())
 }
 
-/// Return current cache usage statistics (decoded PCM, the dominant consumer).
+/// Return current cache usage statistics (decoded PCM).
 #[tauri::command(async)]
 pub fn get_cache_stats() -> Result<CacheStats, String> {
     let (cached_count, total_size_bytes, max_size_bytes) = super::pcm::stats();
@@ -335,41 +233,76 @@ pub fn get_cache_stats() -> Result<CacheStats, String> {
 
 /// Update the cache size limits at runtime.
 /// `max_size_mib`  – total RAM limit in MiB (min 32, max 4096).
-/// `max_entry_mib` – per-file limit in MiB; files above this stream from disk.
+/// `max_entry_mib` – per-file limit in MiB; files above this are never kept.
 #[tauri::command(async)]
 pub fn set_cache_config(max_size_mib: u64, max_entry_mib: u64) -> Result<(), String> {
     let max_size = (max_size_mib as usize).saturating_mul(1024 * 1024);
     let max_entry = (max_entry_mib as usize).saturating_mul(1024 * 1024);
     super::pcm::set_limits(max_size, max_entry);
-    // The byte cache only backs the streaming fallback, so it keeps a small
-    // slice of the budget instead of competing with decoded PCM for RAM.
-    sound_cache()
-        .lock()
-        .map_err(|e| e.to_string())?
-        .set_limits(max_size / 4, max_entry);
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::SoundCache;
+    use super::{warm_paths, warm_threads};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
 
-    #[test]
-    fn insert_should_evict_when_over_budget() {
-        let mut cache = SoundCache::new();
-        cache.set_limits(6, 8);
-        cache.insert("a".into(), vec![1, 2, 3, 4]);
-        cache.insert("b".into(), vec![5, 6, 7, 8]);
-        assert!(cache.peek("a").is_none());
-        assert!(cache.peek("b").is_some());
+    fn paths(n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("sound-{i:03}")).collect()
     }
 
     #[test]
-    fn insert_should_skip_store_when_over_entry_limit() {
-        let mut cache = SoundCache::new();
-        cache.set_limits(1024, 2);
-        cache.insert("big".into(), vec![1, 2, 3, 4]);
-        assert!(cache.peek("big").is_none());
-        assert_eq!(cache.stats().cached_count, 0);
+    fn warm_threads_stays_within_the_per_architecture_cap() {
+        let threads = warm_threads();
+        assert!(threads >= 1);
+        assert!(threads <= 4);
+    }
+
+    #[test]
+    fn warm_paths_visits_every_path_exactly_once() {
+        let input = paths(50);
+        let seen = Mutex::new(Vec::new());
+        let visited = warm_paths(
+            &input,
+            4,
+            |path| seen.lock().unwrap().push(path.to_owned()),
+            || true,
+        );
+        assert_eq!(visited, 50);
+        let mut seen = seen.into_inner().unwrap();
+        seen.sort();
+        assert_eq!(seen, input);
+    }
+
+    #[test]
+    fn warm_paths_starts_files_in_input_order_on_one_thread() {
+        let input = paths(10);
+        let seen = Mutex::new(Vec::new());
+        warm_paths(&input, 1, |path| seen.lock().unwrap().push(path.to_owned()), || true);
+        assert_eq!(seen.into_inner().unwrap(), input);
+    }
+
+    #[test]
+    fn warm_paths_stops_between_files_when_superseded() {
+        let input = paths(100);
+        let keep_going = AtomicBool::new(true);
+        let visited = warm_paths(
+            &input,
+            1,
+            // A newer warm request arrives while the third file decodes.
+            |path| {
+                if path == "sound-002" {
+                    keep_going.store(false, Ordering::SeqCst);
+                }
+            },
+            || keep_going.load(Ordering::SeqCst),
+        );
+        assert_eq!(visited, 3);
+    }
+
+    #[test]
+    fn warm_paths_handles_an_empty_list() {
+        assert_eq!(warm_paths(&[], 4, |_| {}, || true), 0);
     }
 }

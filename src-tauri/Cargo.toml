@@ -42,7 +42,7 @@ sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runti
 # (interfaces, HDMI, virtual sinks) appear in Audio Settings.
 # rodio brings its own symphonia; decoding goes through it so the tree holds a
 # single codec stack instead of two.
-rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4"] }
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "simd"] }
 anyhow = "1.0.102"
 # Work-stealing pool for decode/resample/prefetch — keeps CPU-heavy audio prep
 # off both the main thread and the cpal callback.
@@ -82,18 +82,18 @@ winreg = "0.56"
 # ASIO is Windows-only (Steinberg SDK + asio-sys). Never put `asio` on the
 # crate-wide cpal/rodio deps — that would try to build asio-sys on Linux/macOS.
 cpal = { version = "0.18", features = ["asio"] }
-rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "asio"] }
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "simd", "asio"] }
 
 # PipeWire / PulseAudio hosts only exist on Linux; declaring them globally made
 # every platform build the libspa bindings.
 [target.'cfg(target_os = "linux")'.dependencies]
 cpal = { version = "0.18", features = ["pipewire", "pulseaudio"] }
-rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "pipewire", "pulseaudio"] }
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "simd", "pipewire", "pulseaudio"] }
 
 # Core Audio only. No `asio` feature — the Steinberg SDK does not apply here.
 [target.'cfg(target_os = "macos")'.dependencies]
 cpal = { version = "0.18" }
-rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4"] }
+rodio = { git = "https://github.com/RustAudio/rodio", rev = "c5f1e94290922fe4ee963ce6f85754ea6ba36243", default-features = false, features = ["playback", "recording", "wav", "mp3", "flac", "vorbis", "mp4", "simd"] }
 
 [dev-dependencies]
 tempfile = "3"

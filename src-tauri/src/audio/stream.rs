@@ -1,28 +1,33 @@
 //! Progressive decode: preroll, play, fill ahead of the playhead.
 //!
 //! The WASAPI/cpal callback only ever copies from published `Arc` chunks.
-//! A single pump thread decodes and (if needed) cheaply resamples. After the
-//! first ~300 ms the rest is paced so one core stays near realtime.
+//! A single pump thread decodes and (if needed) converts to the output format
+//! with the same converter the PCM cache uses. After the first ~300 ms the
+//! rest is paced so one core stays near realtime.
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use rodio::buffer::SamplesBuffer;
 use rodio::source::SeekError;
 use rodio::{ChannelCount, SampleRate, Source};
-use rubato::{FastFixedIn, PolynomialDegree, Resampler};
 
-use super::pcm::int_sample_to_f32;
+use super::decode::SampleSource;
+use super::peaks::PeakAcc;
+use super::resample::FormatConverter;
 
 const CHUNK_FRAMES: usize = 8192;
 const PREROLL_SECS: f64 = 0.30;
 const PACE_AHEAD_SECS: f64 = 6.0;
 const PREROLL_TIMEOUT: Duration = Duration::from_millis(2000);
+/// Source frames decoded per batch. Cancel and pacing are checked once per
+/// batch; with the 20 ms pace sleep this holds a paced pump near realtime.
+const PUMP_BATCH_FRAMES: usize = 1024;
+/// Most chunk slots reserved up front (about 45 min of 48 kHz audio). The
+/// length comes from a file header, which a damaged file can inflate.
+const MAX_RESERVED_CHUNKS: usize = 16_384;
 
 // ---------------------------------------------------------------------------
 // Shared buffer
@@ -32,12 +37,19 @@ struct Shared {
     chunks: RwLock<Vec<Arc<[f32]>>>,
     samples_ready: AtomicUsize,
     consumed: AtomicUsize,
+    /// The pump thread has stopped publishing (end of file, error or cancel).
     done: AtomicBool,
+    /// The whole file was decoded: `duration_secs` is exact and the published
+    /// samples are the complete clip. Set before `done`.
+    complete: AtomicBool,
     cancel: AtomicBool,
     duration_bits: AtomicU64,
-    sample_rate: u32,
-    channels: u16,
+    sample_rate: SampleRate,
+    channels: ChannelCount,
     path: String,
+    /// Waveform peaks of everything published so far. Only the pump thread and
+    /// waveform requests take this lock; the audio callback never does.
+    peaks: Mutex<PeakAcc>,
 }
 
 impl Shared {
@@ -45,6 +57,8 @@ impl Shared {
         f64::from_bits(self.duration_bits.load(Ordering::Relaxed))
     }
 
+    /// Raise the duration estimate. Never lowers it: while the pump is still
+    /// filling, a shrinking timeline would make the playhead jump.
     fn set_duration(&self, secs: f64) {
         if !secs.is_finite() || secs <= 0.0 {
             return;
@@ -54,10 +68,22 @@ impl Shared {
         }
     }
 
+    /// Replace the estimate with the decoded length once the file is fully
+    /// decoded. Header durations are often wrong (VBR MP3, truncated files),
+    /// in either direction, so this may also lower the value.
+    fn finish_duration(&self, exact_secs: f64) {
+        if exact_secs.is_finite() && exact_secs > 0.0 {
+            self.duration_bits
+                .store(exact_secs.to_bits(), Ordering::Relaxed);
+        }
+    }
+
+    fn samples_per_sec(&self) -> f64 {
+        self.sample_rate.get() as f64 * self.channels.get() as f64
+    }
+
     fn ready_secs(&self) -> f64 {
-        let ch = self.channels.max(1) as f64;
-        let rate = self.sample_rate.max(1) as f64;
-        self.samples_ready.load(Ordering::Acquire) as f64 / (rate * ch)
+        self.samples_ready.load(Ordering::Acquire) as f64 / self.samples_per_sec()
     }
 }
 
@@ -80,86 +106,42 @@ fn unregister(path: &str) {
     }
 }
 
-pub fn is_pumping(path: &str) -> bool {
-    active_map()
-        .lock()
-        .ok()
-        .and_then(|m| m.get(path).and_then(|w| w.upgrade()))
-        .is_some()
+fn active_pump(path: &str) -> Option<Arc<Shared>> {
+    active_map().lock().ok()?.get(path)?.upgrade()
 }
 
-/// True when this path has a live pump that finished publishing every sample.
-pub fn is_pump_done(path: &str) -> bool {
-    active_map()
-        .lock()
-        .ok()
-        .and_then(|m| m.get(path).and_then(|w| w.upgrade()))
-        .map(|s| s.done.load(Ordering::Acquire))
-        .unwrap_or(false)
+/// True while a pump for this path is still decoding.
+pub fn is_decoding(path: &str) -> bool {
+    active_pump(path).is_some_and(|s| !s.done.load(Ordering::Acquire))
 }
 
-/// Fold currently published samples into waveform peaks. `None` if this path
-/// has no live pump or not enough audio to be useful yet.
+/// Waveform state of a live pump.
+pub(crate) struct PumpWaveform {
+    pub peaks: PeakAcc,
+    /// The pump is still filling; `peaks` covers only the start of the clip.
+    pub decoding: bool,
+    pub duration_secs: f64,
+    pub sample_rate: u32,
+}
+
+/// Peaks of the audio a pump has published for `path`. `None` when no pump is
+/// registered, or when it stopped without decoding the whole file (its peaks
+/// would pass a truncated clip off as the full waveform).
 ///
-/// Peaks map onto the metadata/hint timeline when known, so a partial decode
-/// occupies the left of the waveform and the unloaded tail stays empty.
-pub fn active_peaks(path: &str, buckets: usize) -> Option<Vec<f32>> {
-    let shared = active_map().lock().ok()?.get(path)?.upgrade()?;
-    let ready = shared.samples_ready.load(Ordering::Acquire);
-    let ch = shared.channels.max(1) as usize;
-    if ready < ch * 256 {
+/// The peak lock is held only to copy the accumulator, never across a fold.
+pub(crate) fn pump_waveform(path: &str) -> Option<PumpWaveform> {
+    let shared = active_pump(path)?;
+    let decoding = !shared.done.load(Ordering::Acquire);
+    if !decoding && !shared.complete.load(Ordering::Acquire) {
         return None;
     }
-    let ready_frames = (ready / ch).max(1);
-    let timeline_frames = if !shared.done.load(Ordering::Acquire) && shared.duration_secs() > 0.0 {
-        (shared.duration_secs() * shared.sample_rate.max(1) as f64)
-            .round()
-            .max(1.0) as usize
-    } else {
-        ready_frames
-    };
-    let chunks = shared.chunks.read().ok()?;
-    Some(fold_chunks(
-        &chunks,
-        shared.channels,
-        timeline_frames,
-        buckets.max(1),
-    ))
-}
-
-fn fold_chunks(
-    chunks: &[Arc<[f32]>],
-    channels: u16,
-    timeline_frames: usize,
-    buckets: usize,
-) -> Vec<f32> {
-    let ch = channels.max(1) as usize;
-    let timeline_frames = timeline_frames.max(1);
-    let mut mins = vec![0.0f32; buckets];
-    let mut maxs = vec![0.0f32; buckets];
-    let mut frame = 0usize;
-    for chunk in chunks {
-        for frame_s in chunk.chunks_exact(ch) {
-            let mut peak = 0.0f32;
-            for &s in frame_s {
-                let a = s.abs();
-                if a > peak {
-                    peak = a;
-                }
-            }
-            let b = ((frame as u64 * buckets as u64) / timeline_frames as u64)
-                .min((buckets - 1) as u64) as usize;
-            mins[b] = mins[b].min(-peak);
-            maxs[b] = maxs[b].max(peak);
-            frame += 1;
-        }
-    }
-    let mut out = Vec::with_capacity(buckets * 2);
-    for b in 0..buckets {
-        out.push(mins[b]);
-        out.push(maxs[b]);
-    }
-    out
+    let peaks = shared.peaks.lock().ok()?.clone();
+    Some(PumpWaveform {
+        peaks,
+        decoding,
+        duration_secs: shared.duration_secs(),
+        sample_rate: shared.sample_rate.get(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +171,11 @@ impl PumpHandle {
         self.shared.done.load(Ordering::Acquire)
     }
 
+    /// The whole file was decoded and `duration_secs` is its exact length.
+    pub fn is_complete(&self) -> bool {
+        self.shared.complete.load(Ordering::Acquire)
+    }
+
     pub fn duration_secs(&self) -> f64 {
         self.shared.duration_secs()
     }
@@ -197,22 +184,13 @@ impl PumpHandle {
         self.shared.ready_secs()
     }
 
-    /// Flatten published chunks into a `SamplesBuffer` once the pump finished.
-    pub fn snapshot(&self) -> Option<SamplesBuffer> {
-        if !self.is_done() {
-            return None;
-        }
-        let chunks = self.shared.chunks.read().ok()?;
-        let mut samples = Vec::with_capacity(self.shared.samples_ready.load(Ordering::Acquire));
-        for c in chunks.iter() {
-            samples.extend_from_slice(c);
-        }
-        if samples.is_empty() {
-            return None;
-        }
-        let rate = SampleRate::new(self.shared.sample_rate)?;
-        let ch = ChannelCount::new(self.shared.channels)?;
-        Some(SamplesBuffer::new(ch, rate, samples))
+    pub fn path(&self) -> &str {
+        &self.shared.path
+    }
+
+    /// Output format the pump decodes to (the PCM cache key of its result).
+    pub fn format(&self) -> (SampleRate, ChannelCount) {
+        (self.shared.sample_rate, self.shared.channels)
     }
 }
 
@@ -227,11 +205,13 @@ pub fn start(
         samples_ready: AtomicUsize::new(0),
         consumed: AtomicUsize::new(0),
         done: AtomicBool::new(false),
+        complete: AtomicBool::new(false),
         cancel: AtomicBool::new(false),
         duration_bits: AtomicU64::new(0),
-        sample_rate: dst_rate.get(),
-        channels: dst_channels.get(),
+        sample_rate: dst_rate,
+        channels: dst_channels,
         path,
+        peaks: Mutex::new(PeakAcc::new()),
     });
     if let Some(secs) = super::cache::cached_duration(&shared.path) {
         shared.set_duration(secs);
@@ -241,9 +221,7 @@ pub fn start(
     let pump_shared = Arc::clone(&shared);
     thread::Builder::new()
         .name("sn-pcm-pump".into())
-        .spawn(move || {
-            pump_loop(pump_shared, dst_rate.get(), dst_channels.get());
-        })
+        .spawn(move || pump_loop(&pump_shared))
         .map_err(|e| e.to_string())?;
 
     wait_preroll(&shared)?;
@@ -259,8 +237,8 @@ pub fn start(
 }
 
 fn wait_preroll(shared: &Shared) -> Result<(), String> {
-    let need = ((PREROLL_SECS * shared.sample_rate as f64 * shared.channels.max(1) as f64) as usize)
-        .max(shared.channels.max(1) as usize * 64);
+    let channels = shared.channels.get() as usize;
+    let need = ((PREROLL_SECS * shared.samples_per_sec()) as usize).max(channels * 64);
     let t0 = Instant::now();
     loop {
         if shared.cancel.load(Ordering::Relaxed) {
@@ -296,7 +274,7 @@ pub struct GrowingSource {
 
 impl GrowingSource {
     fn chunk_len(&self) -> usize {
-        CHUNK_FRAMES * self.shared.channels.max(1) as usize
+        CHUNK_FRAMES * self.shared.channels.get() as usize
     }
 
     fn sample_at(&mut self, pos: usize) -> f32 {
@@ -324,7 +302,7 @@ impl Iterator for GrowingSource {
         if self.pos < ready {
             let s = self.sample_at(self.pos);
             self.pos += 1;
-            if self.pos % 64 == 0 {
+            if self.pos.is_multiple_of(64) {
                 self.shared.consumed.store(self.pos, Ordering::Relaxed);
             }
             return Some(s);
@@ -350,15 +328,11 @@ impl Source for GrowingSource {
     }
 
     fn channels(&self) -> ChannelCount {
-        ChannelCount::new(self.shared.channels.max(1))
-            .or_else(|| ChannelCount::new(1))
-            .expect("ChannelCount 1 is always valid")
+        self.shared.channels
     }
 
     fn sample_rate(&self) -> SampleRate {
-        SampleRate::new(self.shared.sample_rate.max(1))
-            .or_else(|| SampleRate::new(48_000))
-            .expect("SampleRate 48000 is always valid")
+        self.shared.sample_rate
     }
 
     fn total_duration(&self) -> Option<Duration> {
@@ -371,11 +345,10 @@ impl Source for GrowingSource {
     }
 
     fn try_seek(&mut self, pos: Duration) -> Result<(), SeekError> {
-        let ch = self.shared.channels.max(1) as f64;
-        let rate = self.shared.sample_rate.max(1) as f64;
-        let target = (pos.as_secs_f64() * rate * ch) as usize;
+        let channels = self.shared.channels.get() as usize;
+        let target = (pos.as_secs_f64() * self.shared.samples_per_sec()) as usize;
         let ready = self.shared.samples_ready.load(Ordering::Acquire);
-        self.pos = target.min(ready.saturating_sub(ch as usize));
+        self.pos = target.min(ready.saturating_sub(channels));
         self.cached_idx = usize::MAX;
         self.cached = None;
         self.shared.consumed.store(self.pos, Ordering::Relaxed);
@@ -387,88 +360,124 @@ impl Source for GrowingSource {
 // Pump
 // ---------------------------------------------------------------------------
 
-fn pump_loop(shared: Arc<Shared>, dst_rate: u32, dst_ch: u16) {
-    let result = run_pump(&shared, dst_rate, dst_ch);
-    if let Err(e) = result {
-        if !shared.cancel.load(Ordering::Relaxed) {
-            eprintln!("[pcm-pump] '{}': {e}", shared.path);
+fn pump_loop(shared: &Shared) {
+    let complete = match run_pump(shared) {
+        Ok(complete) => complete,
+        Err(e) => {
+            if !shared.cancel.load(Ordering::Relaxed) {
+                eprintln!("[pcm-pump] '{}': {e}", shared.path);
+            }
+            false
         }
-    }
+    };
+    shared.complete.store(complete, Ordering::Release);
     shared.done.store(true, Ordering::Release);
-    promote_if_complete(&shared, dst_rate, dst_ch);
-    // Keep a finished pump visible so waveform can cache complete peaks
-    // without a second file decode. Dead Weaks are dropped on next register.
-    if shared.cancel.load(Ordering::Relaxed) {
+    if complete {
+        // Keep a finished pump visible so the waveform can use its peaks
+        // without a second file decode. Dead Weaks are dropped on next register.
+        promote(shared, super::pcm::max_entry_bytes());
+    } else {
+        // Cancelled or failed: what was published is not the whole clip.
         unregister(&shared.path);
     }
 }
 
-fn run_pump(shared: &Shared, dst_rate: u32, dst_ch: u16) -> Result<(), String> {
-    let (mut samples, src_rate, src_ch, hint) = open_sample_iter(&shared.path)?;
+/// Decode the file into published chunks. `Ok(true)` when the whole file was
+/// decoded, `Ok(false)` when the pump was cancelled first.
+fn run_pump(shared: &Shared) -> Result<bool, String> {
+    let mut opened = SampleSource::open(&shared.path)?;
+    let hint = opened.duration_hint_secs;
     if hint > 0.0 {
         shared.set_duration(hint);
         super::cache::store_duration(&shared.path, hint);
     }
 
-    let dst_ch = dst_ch.max(1);
-    let src_ch = src_ch.max(1);
-    let chunk_samples = CHUNK_FRAMES * dst_ch as usize;
-    let mut tail: Vec<f32> = Vec::with_capacity(chunk_samples);
-    let mut publisher = ChunkPublisher {
-        shared,
-        tail: &mut tail,
-        chunk_samples,
-        hint,
-    };
+    let src_ch = opened.channels.max(1);
+    let mut converter = FormatConverter::new(
+        opened.sample_rate,
+        src_ch,
+        shared.sample_rate.get(),
+        shared.channels.get(),
+    )?;
+    let mut publisher = ChunkPublisher::new(shared, hint);
+    publisher.reserve_chunks(hint);
 
-    let same_fmt = src_rate == dst_rate && src_ch == dst_ch;
-    if same_fmt {
-        for s in samples.by_ref() {
-            if shared.cancel.load(Ordering::Relaxed) {
-                return Ok(());
-            }
-            publisher.push(s);
-            publisher.maybe_pace();
+    let batch_samples = PUMP_BATCH_FRAMES * src_ch as usize;
+    let mut batch: Vec<f32> = Vec::with_capacity(batch_samples);
+    let mut converted: Vec<f32> = Vec::new();
+    loop {
+        if shared.cancel.load(Ordering::Relaxed) {
+            return Ok(false);
         }
-        publisher.flush();
-    } else {
-        pump_convert(
-            shared,
-            &mut samples,
-            src_rate,
-            src_ch,
-            dst_rate,
-            dst_ch,
-            &mut publisher,
-        )?;
+        batch.clear();
+        if opened.source.read(&mut batch, batch_samples) == 0 {
+            break;
+        }
+        if converter.is_passthrough() {
+            publisher.push_slice(&batch);
+        } else {
+            converted.clear();
+            converter.push(&batch, &mut converted)?;
+            publisher.push_slice(&converted);
+        }
+        publisher.maybe_pace();
     }
+    converted.clear();
+    converter.finish(&mut converted)?;
+    publisher.push_slice(&converted);
+    publisher.flush();
 
     let exact = shared.ready_secs();
     if exact > 0.0 {
-        shared.set_duration(exact);
+        shared.finish_duration(exact);
         super::cache::store_duration(&shared.path, exact);
     }
-    Ok(())
+    Ok(true)
 }
 
 struct ChunkPublisher<'a> {
     shared: &'a Shared,
-    tail: &'a mut Vec<f32>,
+    /// Samples of the chunk being filled. Reused across chunks.
+    tail: Vec<f32>,
     chunk_samples: usize,
     hint: f64,
 }
 
-impl ChunkPublisher<'_> {
-    fn push(&mut self, s: f32) {
-        self.tail.push(s);
-        if self.tail.len() >= self.chunk_samples {
-            self.publish();
+impl<'a> ChunkPublisher<'a> {
+    fn new(shared: &'a Shared, hint: f64) -> Self {
+        let chunk_samples = CHUNK_FRAMES * shared.channels.get() as usize;
+        Self {
+            shared,
+            tail: Vec::with_capacity(chunk_samples),
+            chunk_samples,
+            hint,
+        }
+    }
+
+    /// Size the chunk list for the expected length up front, so publishing a
+    /// chunk does not reallocate the list while holding the write lock the
+    /// audio callback's reads wait on.
+    fn reserve_chunks(&self, duration_secs: f64) {
+        if duration_secs <= 0.0 {
+            return;
+        }
+        let samples = duration_secs * self.shared.samples_per_sec();
+        let chunks = (samples / self.chunk_samples as f64).ceil() as usize + 1;
+        if let Ok(mut g) = self.shared.chunks.write() {
+            g.reserve(chunks.min(MAX_RESERVED_CHUNKS));
         }
     }
 
     fn push_slice(&mut self, samples: &[f32]) {
-        for &s in samples {
-            self.push(s);
+        let mut rest = samples;
+        while !rest.is_empty() {
+            let room = self.chunk_samples - self.tail.len();
+            let (head, tail) = rest.split_at(room.min(rest.len()));
+            self.tail.extend_from_slice(head);
+            rest = tail;
+            if self.tail.len() >= self.chunk_samples {
+                self.publish();
+            }
         }
     }
 
@@ -476,7 +485,13 @@ impl ChunkPublisher<'_> {
         if self.tail.is_empty() {
             return;
         }
-        let chunk: Arc<[f32]> = std::mem::take(self.tail).into();
+        // Peaks first, while the samples are still a plain slice. Waveform
+        // requests then never need to walk the published chunks.
+        if let Ok(mut peaks) = self.shared.peaks.lock() {
+            peaks.push(&self.tail, self.shared.channels.get());
+        }
+        let chunk: Arc<[f32]> = Arc::from(self.tail.as_slice());
+        self.tail.clear();
         let add = chunk.len();
         if let Ok(mut g) = self.shared.chunks.write() {
             g.push(chunk);
@@ -484,7 +499,6 @@ impl ChunkPublisher<'_> {
         self.shared
             .samples_ready
             .fetch_add(add, Ordering::Release);
-        self.tail.reserve(self.chunk_samples);
         // Metadata hint is the timeline. Only grow duration from the buffer
         // when the container did not report a length.
         if self.hint <= 0.0 {
@@ -501,254 +515,236 @@ impl ChunkPublisher<'_> {
         if ready < PACE_AHEAD_SECS {
             return;
         }
-        let ch = self.shared.channels.max(1) as f64;
-        let rate = self.shared.sample_rate.max(1) as f64;
-        let consumed = self.shared.consumed.load(Ordering::Relaxed) as f64 / (rate * ch);
+        let consumed =
+            self.shared.consumed.load(Ordering::Relaxed) as f64 / self.shared.samples_per_sec();
         if ready - consumed > PACE_AHEAD_SECS {
             thread::sleep(Duration::from_millis(20));
         }
     }
 }
 
-fn pump_convert(
-    shared: &Shared,
-    samples: &mut dyn Iterator<Item = f32>,
-    src_rate: u32,
-    src_ch: u16,
-    dst_rate: u32,
-    dst_ch: u16,
-    pubr: &mut ChunkPublisher<'_>,
-) -> Result<(), String> {
-    let resample_ch = src_ch.min(dst_ch).max(1) as usize;
-    let need_resample = src_rate != dst_rate;
-    let mut resampler = if need_resample {
-        Some(
-            FastFixedIn::<f32>::new(
-                dst_rate as f64 / src_rate as f64,
-                1.0,
-                PolynomialDegree::Linear,
-                1024,
-                resample_ch,
-            )
-            .map_err(|e| e.to_string())?,
-        )
-    } else {
-        None
-    };
-
-    loop {
-        if shared.cancel.load(Ordering::Relaxed) {
-            return Ok(());
-        }
-        let pull_frames = resampler
-            .as_ref()
-            .map(|r| r.input_frames_next())
-            .unwrap_or(1024);
-        let Some(mut planes) = pull_planar(samples, pull_frames, src_ch) else {
-            break;
-        };
-        if dst_ch < src_ch {
-            planes = remap_channels(planes, dst_ch);
-        }
-        if let Some(rs) = resampler.as_mut() {
-            let needed = rs.input_frames_next();
-            for p in &mut planes {
-                if p.len() < needed {
-                    p.resize(needed, 0.0);
-                }
-            }
-            let out = rs.process(&planes, None).map_err(|e| e.to_string())?;
-            planes = out;
-        }
-        if dst_ch > src_ch {
-            planes = remap_channels(planes, dst_ch);
-        }
-        let interleaved = interleave(&planes);
-        pubr.push_slice(&interleaved);
-        pubr.maybe_pace();
-    }
-    pubr.flush();
-    Ok(())
-}
-
-fn promote_if_complete(shared: &Shared, dst_rate: u32, dst_ch: u16) {
+/// Store a fully decoded pump in the PCM cache. Returns whether it was stored.
+///
+/// A result above `max_entry_bytes` would be rejected by the cache anyway, so
+/// it is not even flattened: that copy is the size of the whole decoded file.
+fn promote(shared: &Shared, max_entry_bytes: usize) -> bool {
     if shared.cancel.load(Ordering::Relaxed) {
-        return;
+        return false;
     }
-    let Some(rate) = SampleRate::new(dst_rate) else {
-        return;
+    let total = shared.samples_ready.load(Ordering::Acquire);
+    if total == 0 || total.saturating_mul(std::mem::size_of::<f32>()) > max_entry_bytes {
+        return false;
+    }
+    // Copy the chunk handles (cheap `Arc` bumps) and release the lock before
+    // the flatten, so the audio callback is never held up behind it.
+    let chunks: Vec<Arc<[f32]>> = match shared.chunks.read() {
+        Ok(g) => g.clone(),
+        Err(_) => return false,
     };
-    let Some(ch) = ChannelCount::new(dst_ch) else {
-        return;
-    };
-    let Ok(chunks) = shared.chunks.read() else {
-        return;
-    };
-    let mut samples = Vec::with_capacity(shared.samples_ready.load(Ordering::Acquire));
-    for c in chunks.iter() {
-        samples.extend_from_slice(c);
+    let mut samples = Vec::with_capacity(total);
+    for chunk in &chunks {
+        samples.extend_from_slice(chunk);
     }
     drop(chunks);
-    if samples.is_empty() {
-        return;
-    }
-    let duration = shared.duration_secs();
-    super::pcm::store(&shared.path, rate, ch, samples, duration);
-}
-
-// ---------------------------------------------------------------------------
-// Decode iterators
-// ---------------------------------------------------------------------------
-
-fn open_sample_iter(
-    path: &str,
-) -> Result<(Box<dyn Iterator<Item = f32> + Send>, u32, u16, f64), String> {
-    if path.to_lowercase().ends_with(".wav") {
-        if let Ok(wav) = WavIter::open(path) {
-            let rate = wav.rate;
-            let ch = wav.channels;
-            let dur = wav.duration_secs;
-            return Ok((Box::new(wav), rate, ch, dur));
-        }
-    }
-    let file = File::open(path).map_err(|e| format!("Failed to open '{path}': {e}"))?;
-    let decoder =
-        rodio::Decoder::new(BufReader::with_capacity(64 * 1024, file)).map_err(|e| e.to_string())?;
-    let rate: u32 = decoder.sample_rate().into();
-    let ch: u16 = decoder.channels().into();
-    let dur = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
-    Ok((Box::new(decoder), rate, ch, dur))
-}
-
-struct WavIter {
-    reader: hound::WavReader<BufReader<File>>,
-    bits: u16,
-    float: bool,
-    rate: u32,
-    channels: u16,
-    duration_secs: f64,
-}
-
-impl WavIter {
-    fn open(path: &str) -> Result<Self, String> {
-        let reader = hound::WavReader::open(path).map_err(|e| e.to_string())?;
-        let spec = reader.spec();
-        let duration_secs = reader.duration() as f64 / spec.sample_rate.max(1) as f64;
-        Ok(Self {
-            bits: spec.bits_per_sample,
-            float: spec.sample_format == hound::SampleFormat::Float,
-            rate: spec.sample_rate,
-            channels: spec.channels,
-            duration_secs,
-            reader,
-        })
-    }
-}
-
-impl Iterator for WavIter {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<f32> {
-        if self.float {
-            self.reader.samples::<f32>().next().map(|r| r.unwrap_or(0.0))
-        } else {
-            let bits = self.bits;
-            self.reader
-                .samples::<i32>()
-                .next()
-                .map(|r| r.map(|s| int_sample_to_f32(s, bits)).unwrap_or(0.0))
-        }
-    }
-}
-
-fn pull_planar(
-    iter: &mut dyn Iterator<Item = f32>,
-    frames: usize,
-    src_ch: u16,
-) -> Option<Vec<Vec<f32>>> {
-    let ch = src_ch.max(1) as usize;
-    let mut planes = vec![Vec::with_capacity(frames); ch];
-    let mut got = 0usize;
-    'outer: for _ in 0..frames {
-        for c in 0..ch {
-            match iter.next() {
-                Some(s) => planes[c].push(s),
-                None => break 'outer,
-            }
-        }
-        got += 1;
-    }
-    if got == 0 {
-        return None;
-    }
-    Some(planes)
-}
-
-fn remap_channels(planes: Vec<Vec<f32>>, dst_ch: u16) -> Vec<Vec<f32>> {
-    let dst = dst_ch.max(1) as usize;
-    if planes.is_empty() || planes.len() == dst {
-        return planes;
-    }
-    if dst == 1 {
-        let len = planes.iter().map(Vec::len).min().unwrap_or(0);
-        let scale = 1.0 / planes.len() as f32;
-        let mut mono = vec![0.0f32; len];
-        for plane in &planes {
-            for (out, &s) in mono.iter_mut().zip(plane.iter()) {
-                *out += s * scale;
-            }
-        }
-        return vec![mono];
-    }
-    (0..dst).map(|i| planes[i % planes.len()].clone()).collect()
-}
-
-fn interleave(planes: &[Vec<f32>]) -> Vec<f32> {
-    match planes {
-        [] => Vec::new(),
-        [mono] => mono.clone(),
-        _ => {
-            let frames = planes.iter().map(Vec::len).min().unwrap_or(0);
-            let mut out = Vec::with_capacity(frames * planes.len());
-            for i in 0..frames {
-                for plane in planes {
-                    out.push(plane[i]);
-                }
-            }
-            out
-        }
-    }
+    // Reuse the pump's peaks only when they cover exactly these samples.
+    let frames = total / shared.channels.get() as usize;
+    let peaks = shared
+        .peaks
+        .lock()
+        .ok()
+        .filter(|p| p.frames() == frames)
+        .map(|p| p.clone());
+    super::pcm::store(&shared.path, shared.sample_rate, shared.channels, samples, peaks);
+    true
 }
 
 #[cfg(test)]
 mod tests {
-    use super::fold_chunks;
-    use std::sync::Arc;
+    use super::*;
+    use crate::audio::decode::test_support::write_wav;
 
-    fn chunk_of(samples: &[f32]) -> Arc<[f32]> {
-        Arc::from(samples.to_vec())
+    fn rate(hz: u32) -> SampleRate {
+        SampleRate::new(hz).unwrap()
+    }
+
+    fn channels(n: u16) -> ChannelCount {
+        ChannelCount::new(n).unwrap()
+    }
+
+    /// Run a pump to the end and return everything it published.
+    fn pump_to_end(path: &str, dst_rate: u32, dst_ch: u16) -> (PumpHandle, Vec<f32>) {
+        let handle = start(path.to_owned(), rate(dst_rate), channels(dst_ch)).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !handle.is_done() {
+            assert!(Instant::now() < deadline, "pump did not finish");
+            thread::sleep(Duration::from_millis(5));
+        }
+        let samples: Vec<f32> = handle.source().collect();
+        (handle, samples)
+    }
+
+    fn tone(frame: usize, channel: u16) -> f32 {
+        let phase = frame as f32 * 0.02 * (channel as f32 + 1.0);
+        phase.sin() * 0.6
     }
 
     #[test]
-    fn fold_chunks_should_map_partial_decode_onto_full_timeline() {
-        // 4 mono frames decoded, 8-frame metadata timeline, 4 buckets.
-        // Energy in the left half; unloaded tail stays empty.
-        let chunks = vec![chunk_of(&[1.0, 1.0, 1.0, 1.0])];
-        let peaks = fold_chunks(&chunks, 1, 8, 4);
-        assert_eq!(peaks.len(), 8);
-        assert!(peaks[1] > 0.5);
-        assert!(peaks[3] > 0.5);
-        assert_eq!(peaks[4], 0.0);
-        assert_eq!(peaks[5], 0.0);
-        assert_eq!(peaks[6], 0.0);
-        assert_eq!(peaks[7], 0.0);
+    fn pump_output_equals_cache_decode_when_resampling() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("resampled.wav");
+        // Longer than one published chunk, so chunk boundaries are covered.
+        write_wav(&path, 44_100, 2, 30_000, tone);
+        let path = path.to_string_lossy().into_owned();
+
+        let (handle, pumped) = pump_to_end(&path, 48_000, 2);
+        let cached = super::super::pcm::decode_to_format(&path, 48_000, 2).unwrap();
+
+        assert!(handle.is_complete());
+        assert_eq!(pumped.len(), cached.len());
+        let worst = pumped
+            .iter()
+            .zip(&cached)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        assert!(worst < 1e-6, "largest difference {worst}");
+        super::super::pcm::invalidate(&path);
     }
 
     #[test]
-    fn fold_chunks_should_fill_all_buckets_when_timeline_matches_ready() {
-        let chunks = vec![chunk_of(&[1.0, 1.0, 1.0, 1.0])];
-        let peaks = fold_chunks(&chunks, 1, 4, 4);
-        let maxs: Vec<f32> = peaks.chunks_exact(2).map(|p| p[1]).collect();
-        assert!(maxs.iter().all(|&m| m > 0.5));
+    fn pump_output_equals_cache_decode_when_only_channels_differ() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mono.wav");
+        write_wav(&path, 48_000, 1, 10_000, tone);
+        let path = path.to_string_lossy().into_owned();
+
+        let (_, pumped) = pump_to_end(&path, 48_000, 2);
+        let cached = super::super::pcm::decode_to_format(&path, 48_000, 2).unwrap();
+        assert_eq!(pumped, cached);
+        super::super::pcm::invalidate(&path);
+    }
+
+    /// Compressed input goes through rodio instead of hound, and here also
+    /// through the resampler and the mono → stereo up-mix.
+    #[test]
+    fn pump_output_equals_cache_decode_for_an_mp3() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("tone-1s.mp3")
+            .to_string_lossy()
+            .into_owned();
+
+        let (handle, pumped) = pump_to_end(&path, 48_000, 2);
+        let cached = super::super::pcm::decode_to_format(&path, 48_000, 2).unwrap();
+        assert!(handle.is_complete());
+        assert_eq!(pumped, cached);
+        // About one second of audio, and the duration is the decoded length.
+        let decoded_secs = pumped.len() as f64 / (48_000.0 * 2.0);
+        assert!((decoded_secs - 1.0).abs() < 0.1, "decoded {decoded_secs}s");
+        assert!((handle.duration_secs() - decoded_secs).abs() < 1e-9);
+        super::super::pcm::invalidate(&path);
+    }
+
+    #[test]
+    fn pump_replaces_the_header_duration_with_the_decoded_length() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("exact.wav");
+        write_wav(&path, 8_000, 1, 4_000, tone);
+        let path = path.to_string_lossy().into_owned();
+        // A stale, too-long estimate, as a VBR MP3 header would give.
+        super::super::cache::store_duration(&path, 9.0);
+
+        let (handle, _) = pump_to_end(&path, 8_000, 1);
+        assert!(handle.is_complete());
+        assert!((handle.duration_secs() - 0.5).abs() < 1e-9);
+        let cached = super::super::cache::cached_duration(&path).unwrap();
+        assert!((cached - 0.5).abs() < 1e-9);
+        super::super::pcm::invalidate(&path);
+    }
+
+    #[test]
+    fn pump_promotes_a_finished_decode_into_the_pcm_cache_with_peaks() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("promote.wav");
+        write_wav(&path, 8_000, 1, 1_600, |i, _| if i < 800 { 0.8 } else { 0.1 });
+        let path = path.to_string_lossy().into_owned();
+
+        let (handle, pumped) = pump_to_end(&path, 8_000, 1);
+        // The pump stores its result right after it reports done.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let (buffer, duration) = loop {
+            if let Some(hit) = super::super::pcm::peek(&path, rate(8_000), channels(1)) {
+                break hit;
+            }
+            assert!(Instant::now() < deadline, "pump result never reached the cache");
+            thread::sleep(Duration::from_millis(5));
+        };
+        assert_eq!(buffer.collect::<Vec<f32>>(), pumped);
+        assert!((duration - 0.2).abs() < 1e-9);
+
+        let live = pump_waveform(&path).unwrap();
+        assert!(!live.decoding);
+        let buckets = live.peaks.to_buckets(2, live.peaks.frames());
+        assert!(buckets[1] > 0.7 && buckets[3] < 0.2, "{buckets:?}");
+        drop(handle);
+        super::super::pcm::invalidate(&path);
+    }
+
+    #[test]
+    fn promote_skips_a_decode_larger_than_the_per_file_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("big.wav");
+        write_wav(&path, 8_000, 1, 2_000, tone);
+        let path = path.to_string_lossy().into_owned();
+
+        // Not started as a pump: `promote` is called by hand with a tiny limit.
+        let shared = Shared {
+            chunks: RwLock::new(vec![Arc::from(vec![0.5f32; 2_000])]),
+            samples_ready: AtomicUsize::new(2_000),
+            consumed: AtomicUsize::new(0),
+            done: AtomicBool::new(true),
+            complete: AtomicBool::new(true),
+            cancel: AtomicBool::new(false),
+            duration_bits: AtomicU64::new(0),
+            sample_rate: rate(8_000),
+            channels: channels(1),
+            path: path.clone(),
+            peaks: Mutex::new(PeakAcc::new()),
+        };
+        let limit = 1_999 * std::mem::size_of::<f32>();
+        assert!(!promote(&shared, limit));
+        assert!(super::super::pcm::peek(&path, rate(8_000), channels(1)).is_none());
+
+        assert!(promote(&shared, limit + std::mem::size_of::<f32>()));
+        assert!(super::super::pcm::peek(&path, rate(8_000), channels(1)).is_some());
+        super::super::pcm::invalidate(&path);
+    }
+
+    #[test]
+    fn cancelled_pump_is_not_reported_as_a_waveform_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cancel.wav");
+        write_wav(&path, 8_000, 1, 4_000, tone);
+        let path = path.to_string_lossy().into_owned();
+
+        let shared = Arc::new(Shared {
+            chunks: RwLock::new(Vec::new()),
+            samples_ready: AtomicUsize::new(0),
+            consumed: AtomicUsize::new(0),
+            done: AtomicBool::new(false),
+            complete: AtomicBool::new(false),
+            cancel: AtomicBool::new(true),
+            duration_bits: AtomicU64::new(0),
+            sample_rate: rate(8_000),
+            channels: channels(1),
+            path: path.clone(),
+            peaks: Mutex::new(PeakAcc::new()),
+        });
+        register(&shared);
+        assert!(is_decoding(&path));
+        pump_loop(&shared);
+        assert!(!is_decoding(&path));
+        assert!(pump_waveform(&path).is_none());
+        assert!(super::super::pcm::peek(&path, rate(8_000), channels(1)).is_none());
     }
 }

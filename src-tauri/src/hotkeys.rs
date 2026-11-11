@@ -15,8 +15,8 @@ pub struct GlobalSoundBinding {
 static LAST_ACCELS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 fn to_accelerator(combo: &str) -> String {
-    if combo.starts_with("Ctrl+") {
-        format!("CommandOrControl+{}", &combo["Ctrl+".len()..])
+    if let Some(rest) = combo.strip_prefix("Ctrl+") {
+        format!("CommandOrControl+{rest}")
     } else {
         combo.to_string()
     }

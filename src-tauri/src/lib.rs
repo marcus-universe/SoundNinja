@@ -5,6 +5,7 @@ pub mod hotkeys;
 pub mod httpx;
 pub mod menu;
 pub mod paths;
+pub mod perf;
 pub mod project;
 pub mod remote;
 pub mod soundboard;
@@ -224,6 +225,7 @@ pub fn run() {
             audio::dsp::load_edit_session,
             audio::dsp::get_waveform_peaks,
             audio::dsp::get_file_waveform_peaks,
+            audio::dsp::get_file_waveform,
             audio::dsp::is_sound_pumping,
             audio::dsp::trim_session,
             audio::dsp::delete_range,
@@ -244,6 +246,8 @@ pub fn run() {
             audio::stems::split_session,
             audio::stems::stems_busy,
             get_system_fonts,
+            perf::perf_flags,
+            perf::perf_log,
             open_external_url,
             toolwin::open_tool_window,
             menu::rebuild_menu,
