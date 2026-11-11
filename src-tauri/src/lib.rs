@@ -5,6 +5,7 @@ pub mod hotkeys;
 pub mod httpx;
 pub mod menu;
 pub mod paths;
+pub mod project;
 pub mod remote;
 pub mod soundboard;
 pub mod webui;
@@ -274,6 +275,11 @@ pub fn run() {
             gifcache::gif_cache_paths,
             gifcache::gif_cache_put,
             gifcache::gif_cache_clear,
+            project::project_inspect,
+            project::project_query,
+            project::project_commit,
+            project::project_copy,
+            project::project_extract_media,
             soundboard::make_temp_dir,
             soundboard::export_soundboard_zip,
             soundboard::import_soundboard_zip,

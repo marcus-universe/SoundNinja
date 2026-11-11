@@ -52,6 +52,8 @@ export function buildPortableExport(config: ProjectConfig): {
     used.add(destRel.toLowerCase())
     if (file.path) entries.push({ src: file.path, destRel })
     file.path = destRel
+    // Where the sound sits next to project.sninja once the ZIP is unpacked.
+    file.relPath = destRel
   }
 
   return { portable, entries }

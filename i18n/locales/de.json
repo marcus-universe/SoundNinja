@@ -179,7 +179,13 @@
       "stemsUnavailable": "Nicht in diesem Build",
       "stemsInstallHint": "{model} ({size}) herunterladen, um Stimme/Musik im Record Editor zu trennen.",
       "stemsInstalledHint": "{model} ({size}) ist für den Record Editor bereit.",
-      "stemsUnavailableHint": "Dieser Build wurde ohne Stem-Engine gebaut. Neu bauen mit --features stems."
+      "stemsUnavailableHint": "Dieser Build wurde ohne Stem-Engine gebaut. Neu bauen mit --features stems.",
+      "autosave": "Automatisch speichern",
+      "autosaveHint": "Projekt nach Änderungen automatisch speichern. Wenn aus, werden Änderungen nur über „Speichern“ geschrieben.",
+      "autosaveInterval": "Intervall für automatisches Speichern",
+      "autosaveInstant": "Nach jeder Änderung",
+      "autosaveSeconds": "Alle {count} s",
+      "autosaveMinutes": "Alle {count} min"
     },
     "audio": {
       "title": "Audio",
@@ -379,7 +385,19 @@
     "duplicateNameError": "Ein Projekt mit diesem Namen existiert bereits.",
     "removeRecent": "Aus Liste entfernen",
     "create": "Erstellen",
-    "newPlaceholder": "Neuer Projektname…"
+    "newPlaceholder": "Neuer Projektname…",
+    "upgradeTitle": "Älteres Projektformat",
+    "upgradeMessage": "Dieses Projekt wurde mit einer älteren Version von Sound Ninja gespeichert. Es muss umgewandelt werden, bevor es in dieser Version geöffnet werden kann.",
+    "upgradeCopy": "Kopie umwandeln",
+    "upgradeCopyHint": "Die Originaldatei bleibt unverändert. Empfohlen.",
+    "upgradeInPlace": "Diese Datei umwandeln",
+    "upgradeInPlaceHint": "Eine Sicherung des Originals wird daneben abgelegt.",
+    "newerTitle": "Projekt aus einer neueren Version",
+    "newerMessage": "Dieses Projekt wurde mit einer neueren Version von Sound Ninja ({version}) gespeichert. Teile davon werden hier eventuell nicht angezeigt. Zum Schutz des Originals kann es nur als Kopie geöffnet werden.",
+    "newerCopy": "Kopie öffnen",
+    "recoveredTitle": "Projekt wiederhergestellt",
+    "recoveredSnapshot": "Die Projektdatei war unvollständig. {count} Sounds wurden aus der im Projekt gespeicherten Sicherungskopie wiederhergestellt.",
+    "recoveredBackup": "Die Projektdatei war beschädigt. {count} Sounds wurden aus der Backup-Datei wiederhergestellt."
   },
   "common": {
     "saving": "Speichern…",
@@ -688,5 +706,15 @@
     "keepAwake": "Bildschirm anlassen",
     "keepAwakeHint": "Verhindert, dass das Handy einschläft, solange diese Seite offen ist.",
     "settingsBack": "Einstellungen"
+  },
+  "saveOptions": {
+    "title": "Speicheroptionen",
+    "firstSaveHint": "Wähle, was in der Projektdatei gespeichert wird. Das lässt sich später über „Speichern unter“ ändern.",
+    "hint": "Wähle, was in der Projektdatei gespeichert wird.",
+    "embedAudio": "Sounddateien im Projekt speichern",
+    "embedAudioHint": "Die Projektdatei enthält alle Audiodateien und lässt sich als einzelne Datei teilen. Die Datei wird größer.",
+    "embedGifs": "GIFs und Bilder im Projekt speichern",
+    "embedGifsHint": "Button-Hintergründe wandern mit der Projektdatei mit. Wenn aus, bleiben sie nur auf diesem Computer.",
+    "embedMissing": "{count} Sounddateien konnten nicht im Projekt gespeichert werden, weil sie nicht gefunden wurden:"
   }
 }

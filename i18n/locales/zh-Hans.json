@@ -179,7 +179,13 @@
       "stemsUnavailable": "此构建中不可用",
       "stemsInstallHint": "下载 {model}（{size}）以在录音编辑器中启用“保留人声 / 保留伴奏”。",
       "stemsInstalledHint": "{model}（{size}）已可用于录音编辑器。",
-      "stemsUnavailableHint": "此构建未包含分轨引擎。请使用 --features stems 重新编译。"
+      "stemsUnavailableHint": "此构建未包含分轨引擎。请使用 --features stems 重新编译。",
+      "autosave": "自动保存",
+      "autosaveHint": "更改后自动保存项目。关闭后，仅在选择“保存”时写入更改。",
+      "autosaveInterval": "自动保存间隔",
+      "autosaveInstant": "每次更改后",
+      "autosaveSeconds": "每 {count} 秒",
+      "autosaveMinutes": "每 {count} 分钟"
     },
     "audio": {
       "title": "音频",
@@ -379,7 +385,19 @@
     "duplicateNameError": "已存在同名项目。",
     "removeRecent": "从列表移除",
     "create": "创建",
-    "newPlaceholder": "新项目名称…"
+    "newPlaceholder": "新项目名称…",
+    "upgradeTitle": "旧版项目格式",
+    "upgradeMessage": "此项目由旧版 Sound Ninja 保存。需要先转换，才能在当前版本中打开。",
+    "upgradeCopy": "转换副本",
+    "upgradeCopyHint": "原文件保持不变。推荐。",
+    "upgradeInPlace": "转换此文件",
+    "upgradeInPlaceHint": "原文件的备份会保留在旁边。",
+    "newerTitle": "来自更新版本的项目",
+    "newerMessage": "此项目由更新版本的 Sound Ninja（{version}）保存。部分内容可能无法在此显示。为保护原文件，只能以副本方式打开。",
+    "newerCopy": "打开副本",
+    "recoveredTitle": "项目已恢复",
+    "recoveredSnapshot": "项目文件不完整。已从项目内保存的恢复副本中还原 {count} 个音效。",
+    "recoveredBackup": "项目文件已损坏。已从备份文件中还原 {count} 个音效。"
   },
   "common": {
     "saving": "保存中…",
@@ -688,5 +706,15 @@
     "keepAwake": "保持屏幕常亮",
     "keepAwakeHint": "此页面打开时，避免手机进入睡眠。",
     "settingsBack": "设置"
+  },
+  "saveOptions": {
+    "title": "保存选项",
+    "firstSaveHint": "选择要保存在项目文件中的内容。之后可通过“另存为”更改。",
+    "hint": "选择要保存在项目文件中的内容。",
+    "embedAudio": "将音效文件保存在项目中",
+    "embedAudioHint": "项目文件包含全部音频，可作为单个文件分享。文件会变大。",
+    "embedGifs": "将 GIF 和图片保存在项目中",
+    "embedGifsHint": "按钮背景随项目文件一起移动。关闭后仅保留在此电脑上。",
+    "embedMissing": "有 {count} 个音效文件未找到，无法保存到项目中："
   }
 }

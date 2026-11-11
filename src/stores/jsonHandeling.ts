@@ -1,11 +1,18 @@
 import { defineStore } from 'pinia'
 import {
-  openDb, withProjectDb, reopenDb, loadConfig, saveConfig, emptyConfig, gcOrphanGifs,
+  ensureSchema, withProjectDb, commitProject, copyProject, forgetProject, loadProject,
+  extractProjectMedia, saveConfig, saveMeta, saveHistory, saveSnapshot, loadLatestSnapshot,
+  emptyConfig, defaultMeta, gcOrphanGifs, sanitizeConfig,
   healFolderTabMembership, mergeTabsFromUsage, mergeSoundInto, dedupeSoundsByPath,
-  persistSoundIds, ensurePerSoundVolume, readSoundCountMarker, shouldRestoreClearedBoard,
-  type ProjectConfig, type SoundFile, type TabEntry, type Separator, type Settings,
-  type ButtonAlign, type SoundTag, type SortMode, normalizeSortMode,
+  ensurePerSoundVolume, shouldRestoreClearedBoard, PROJECT_FORMAT_VERSION,
+  type ProjectConfig, type ProjectMeta, type SoundFile, type TabEntry, type Separator, type Settings,
+  type ButtonAlign, type SoundTag, type SortMode, type CommitReport, type LoadedProject, normalizeSortMode,
 } from '~/utils/db'
+import {
+  applyBoardLayout, boardTabNames, captureBoardLayout, mergeHiddenIntoLayout,
+  setSoundOrderOnTab, soundOrderOnTab, type BoardLayout,
+} from '~/utils/boardLayout'
+import { dirOf, resolveMovedPaths, toRelativePath } from '~/utils/pathPortability'
 import { ensureSoundIds, newSoundId } from '~/utils/soundId'
 import { isRemote } from '~/utils/runtime'
 import { revokeAllGifUrls } from '~/utils/gifCache'
@@ -28,6 +35,48 @@ function clone<T>(v: T): T {
 const MAX_HISTORY = 50
 /** Color-wheel ticks within this window share one undo snapshot. */
 const COLOR_BURST_MS = 400
+
+/** Debounce for "save after every change". */
+const AUTOSAVE_DEBOUNCE_MS = 200
+
+/** What happened while a project was opened — shown to the user when notable. */
+export interface OpenReport {
+  /** The board came from a recovery copy instead of the live tables. */
+  recovered: 'snapshot' | 'backup' | null
+  /** Sounds found again relative to the project file (moved folder / other OS). */
+  relinked: number
+  /** Sounds unpacked from audio stored inside the project. */
+  extracted: number
+  /** File was written by an older format and has been brought up to date. */
+  upgraded: boolean
+}
+
+function emptyOpenReport(): OpenReport {
+  return { recovered: null, relinked: 0, extracted: 0, upgraded: false }
+}
+
+/** History entries already in the project file: id → JSON size. */
+let storedHistory = new Map<number, number>()
+
+let appVersionCache: string | null = null
+async function appVersion(): Promise<string> {
+  if (appVersionCache != null) return appVersionCache
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app')
+    appVersionCache = await getVersion()
+  } catch {
+    appVersionCache = ''
+  }
+  return appVersionCache
+}
+
+function newProjectId(): string {
+  try {
+    return crypto.randomUUID()
+  } catch {
+    return `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+  }
+}
 
 /** Lowercase + strip spaces/punctuation so "alf" matches "A L F". */
 function compactSearch(s: string): string {
@@ -55,6 +104,27 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     _colorBurstAt: 0,
     /** Next persist may write zero sounds. Set only by an intentional clear. */
     _allowEmptyPersist: false,
+    /** Embed options + stable id of the open project. */
+    projectMeta: defaultMeta() as ProjectMeta,
+    /** Save automatically after changes (app setting). Off = manual Save only. */
+    autosave: true,
+    /** 0 = right after every change, otherwise at most every N seconds. */
+    autosaveIntervalSec: 0,
+    /** Message of the last failed background save. Cleared by the next good one. */
+    saveError: null as string | null,
+    /** Result of the last save (embedded audio counts, files that were missing). */
+    lastSaveReport: null as CommitReport | null,
+    /** What the last `openProject` had to do (recover, relink, unpack). */
+    lastOpenReport: emptyOpenReport() as OpenReport,
+    /** Undo/redo stacks as of the last save — what Discard goes back to. */
+    _savedUndo: [] as ProjectConfig[],
+    _savedRedo: [] as ProjectConfig[],
+    /** Source of undo/redo entry ids. */
+    _hidSeq: 0,
+    /** Bumped by every change; tells a finishing save whether it is already stale. */
+    _changeSeq: 0,
+    /** First save of a session writes a `.bak` and an in-file snapshot. */
+    _sessionSaved: false,
   }),
 
   getters: {
@@ -69,10 +139,17 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
   actions: {
     // ── Undo / redo ───────────────────────────────────────────────────────────
+    /** Copy of the live board, tagged with a fresh history id. */
+    takeSnapshot(): ProjectConfig {
+      const snap = clone(this.configFile)
+      snap._hid = ++this._hidSeq
+      return snap
+    },
+
     /** Snapshot current config before a tracked mutation. Clears redo. */
     pushBeforeChange() {
       if (this._historySuspended) return
-      this.undoStack.push(clone(this.configFile))
+      this.undoStack.push(this.takeSnapshot())
       if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift()
       this.redoStack = []
     },
@@ -96,7 +173,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     applySnapshot(snap: ProjectConfig) {
       this._historySuspended = true
       try {
-        this.configFile = clone(snap)
+        const next = clone(snap)
+        delete next._hid
+        // History may come from disk or an older build: never trust its shape.
+        sanitizeConfig(next)
+        this.configFile = next
         this.normalizeIndexes()
         this.applyBoardFilter()
         this.noteIntentionalEmpty()
@@ -108,92 +189,240 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     undo() {
       if (!this.undoStack.length) return false
-      this.redoStack.push(clone(this.configFile))
+      this.redoStack.push(this.takeSnapshot())
       this.applySnapshot(this.undoStack.pop()!)
       return true
     },
 
     redo() {
       if (!this.redoStack.length) return false
-      this.undoStack.push(clone(this.configFile))
+      this.undoStack.push(this.takeSnapshot())
       this.applySnapshot(this.redoStack.pop()!)
       return true
     },
 
     // ── Project lifecycle ─────────────────────────────────────────────────────
-    /** Opens a project DB, loads it into state, and snapshots for Discard. */
+    /**
+     * Opens a project file and loads it into state.
+     *
+     * Order matters: read (recovering from a backup if the file is unreadable
+     * or its board was lost), normalise, then make the project work on THIS
+     * machine — find moved sounds next to the project file and unpack embedded
+     * audio — and finally write back whatever had to be repaired.
+     */
     async openProject(dbAbsPath: string) {
       revokeAllGifUrls()
       this._allowEmptyPersist = false
-      const loaded = await withProjectDb(dbAbsPath, async (d) => {
-        const config = await loadConfig(d)
-        const marker = await readSoundCountMarker(d)
-        return { config, marker }
-      })
+      if (this._persistTimer) {
+        clearTimeout(this._persistTimer)
+        this._persistTimer = null
+      }
+      const report = emptyOpenReport()
+
+      let loaded: LoadedProject
+      try {
+        loaded = await loadProject(dbAbsPath)
+      } catch (e) {
+        loaded = await this.recoverUnreadable(dbAbsPath, e)
+        report.recovered = 'backup'
+      }
+
       let config = loaded.config
       if (shouldRestoreClearedBoard(config.files.length, loaded.marker)) {
-        config = await this.tryRestoreFromBak(dbAbsPath, config)
+        const restored = await this.recoverEmptyBoard(dbAbsPath)
+        if (restored) {
+          config = restored.config
+          report.recovered = restored.source
+        }
       }
+
       this.configFile = config
       if (!this.configFile.tags) this.configFile.tags = []
-      this.normalizeIndexes()
+      // The board as found on disk. The first save of the session stores it
+      // as a recovery snapshot (and, for an old file, as its pre-upgrade state).
+      this.openingSnapshot = clone(config)
+      this.projectMeta = { ...defaultMeta(), ...loaded.meta }
       this.currentProjectPath = dbAbsPath
-      this.openingSnapshot = clone(this.configFile)
-      this.dirty = false
       this.missingPaths = []
-      this.clearHistory()
-      this.syncFilterSessionFromSettings()
-      this.applyBoardFilter()
+      this.saveError = null
+      this.lastSaveReport = null
+      // After a recovery the file on disk is the damaged one. Copying it over
+      // `.bak` would destroy the very backup the board was just read from.
+      this._sessionSaved = !!report.recovered
+
+      // Undo/redo come back with the project. After a recovery the stored
+      // history describes a different board, so it is dropped.
+      const history = report.recovered ? { undo: [], redo: [], sizes: new Map<number, number>() } : loaded.history
+      this.undoStack = history.undo.slice(-MAX_HISTORY)
+      this.redoStack = history.redo.slice(-MAX_HISTORY)
+      storedHistory = new Map(history.sizes)
+      this._hidSeq = Math.max(0, ...history.sizes.keys())
+
+      this.normalizeIndexes()
       const idsChanged = ensureSoundIds(this.configFile.files)
       const volumeMigrated = ensurePerSoundVolume(this.configFile)
-      if (volumeMigrated) {
+      const needsStamp = loaded.formatVersion !== PROJECT_FORMAT_VERSION || !this.projectMeta.projectId
+      report.upgraded = loaded.formatVersion !== PROJECT_FORMAT_VERSION && config.files.length > 0
+
+      this.syncFilterSessionFromSettings()
+      this.applyBoardFilter()
+
+      try {
+        report.relinked = await this.relinkMovedSounds()
+        if (this.projectMeta.embedAudio) {
+          // Unpacking reads paths from the file, so relinked ones go in first.
+          if (report.relinked) await this.persistNow()
+          report.extracted = await this.extractEmbeddedSounds()
+        }
+      } catch (e) {
+        console.error('Failed to resolve sound locations', e)
+      }
+
+      const repaired = !!report.recovered || report.relinked > 0 || report.extracted > 0
+      if (repaired || needsStamp || idsChanged || volumeMigrated) {
         try {
           await this.persistNow()
         } catch (e) {
-          console.error('Failed to persist per-sound volume migration', e)
-        }
-      } else if (idsChanged) {
-        try {
-          await withProjectDb(dbAbsPath, (d) => persistSoundIds(d, this.configFile.files))
-        } catch (e) {
-          console.error('Failed to persist sound ids', e)
+          console.error('Failed to write back the opened project', e)
         }
       }
+      this.openingSnapshot = clone(this.configFile)
+      this._savedUndo = [...this.undoStack]
+      this._savedRedo = [...this.redoStack]
+      this.dirty = false
+      this.lastOpenReport = report
+
       void this.warmSoundMeta()
       if (normalizeSortMode(this.configFile.settings.sortMode) === 'duration') {
         void this.warmDurations()
       }
     },
 
-    /** If a failed save emptied `sounds`, recover files from project.sninja.bak. */
-    async tryRestoreFromBak(dbAbsPath: string, current: ProjectConfig): Promise<ProjectConfig> {
+    /**
+     * The project file itself cannot be read (truncated copy, disk error).
+     * Put the damaged file aside and continue from `<file>.bak`.
+     */
+    async recoverUnreadable(dbAbsPath: string, cause: unknown): Promise<LoadedProject> {
       const bak = dbAbsPath + '.bak'
-      const restored = dbAbsPath.replace(/\.sninja$/i, '.restored.sninja')
+      const { invoke } = await import('@tauri-apps/api/core')
+      const hasBak = await invoke<boolean>('path_exists_abs', { path: bak }).catch(() => false)
+      if (!hasBak) throw cause
+      let fromBak: LoadedProject
+      try {
+        fromBak = await loadProject(bak)
+      } catch {
+        throw cause
+      }
+      console.error('Project unreadable, restoring from backup', cause)
+      try {
+        await invoke('copy_file_to_abs', { src: dbAbsPath, dst: `${dbAbsPath}.damaged` })
+      } catch { /* keeping the damaged copy is best effort */ }
+      for (const suffix of ['', '-wal', '-shm', '-journal']) {
+        try { await invoke('delete_file_abs', { path: dbAbsPath + suffix }) } catch { /* ignore */ }
+      }
+      forgetProject(dbAbsPath)
+      await copyProject(bak, dbAbsPath)
+      try {
+        return await loadProject(dbAbsPath)
+      } catch {
+        return fromBak
+      }
+    },
+
+    /**
+     * The file opens but holds no sounds although the last save expected some
+     * (an interrupted save by a build without atomic saves). Look for the board
+     * in the in-file snapshots, then in the backup files next to the project.
+     */
+    async recoverEmptyBoard(
+      dbAbsPath: string,
+    ): Promise<{ config: ProjectConfig; source: 'snapshot' | 'backup' } | null> {
+      try {
+        const snap = await withProjectDb(dbAbsPath, (d) => loadLatestSnapshot(d))
+        if (snap?.files.length) return { config: snap, source: 'snapshot' }
+      } catch (e) {
+        console.error('Failed to read project snapshots', e)
+      }
+      const candidates = [dbAbsPath + '.bak', dbAbsPath.replace(/\.sninja$/i, '.restored.sninja')]
       try {
         const { invoke } = await import('@tauri-apps/api/core')
-        const candidates: string[] = []
-        if (await invoke<boolean>('path_exists_abs', { path: bak })) candidates.push(bak)
-        if (await invoke<boolean>('path_exists_abs', { path: restored })) candidates.push(restored)
-        if (!candidates.length) return current
-        let bakConfig: ProjectConfig | null = null
         for (const source of candidates) {
-          const loaded = await withProjectDb(source, (d) => loadConfig(d))
-          if (loaded.files.length) {
-            bakConfig = loaded
-            break
+          if (source === dbAbsPath) continue
+          if (!(await invoke<boolean>('path_exists_abs', { path: source }))) continue
+          try {
+            const loaded = await loadProject(source)
+            if (loaded.config.files.length) return { config: loaded.config, source: 'backup' }
+          } catch (e) {
+            console.error('Backup unreadable', source, e)
           }
         }
-        await reopenDb(dbAbsPath)
-        if (!bakConfig?.files.length) return current
-        this.configFile = bakConfig
-        this.currentProjectPath = dbAbsPath
-        await this.persistNow()
-        return this.configFile
       } catch (e) {
         console.error('Failed to restore project from backup', e)
-        try { await reopenDb(dbAbsPath) } catch { /* ignore */ }
-        return current
       }
+      return null
+    },
+
+    /** Rewrite sound paths in the live board and in every history entry. */
+    remapSoundPaths(map: Map<string, string>) {
+      if (!map.size) return
+      const apply = (config: ProjectConfig): boolean => {
+        let changed = false
+        for (const f of config.files ?? []) {
+          const to = map.get(f.path)
+          if (to) { f.path = to; changed = true }
+        }
+        return changed
+      }
+      apply(this.configFile)
+      for (const snap of [...this.undoStack, ...this.redoStack]) {
+        // A rewritten entry differs from its stored copy: send it again.
+        if (apply(snap) && snap._hid != null) storedHistory.delete(snap._hid)
+      }
+      dedupeSoundsByPath(this.configFile)
+    },
+
+    /**
+     * Sounds whose absolute path does not exist here (project moved, other
+     * computer, other OS) are looked up relative to the project file.
+     * Returns how many were found.
+     */
+    async relinkMovedSounds(): Promise<number> {
+      const path = this.currentProjectPath
+      const files = this.configFile.files
+      if (isRemote || !path || !files.length) return 0
+      const { invoke } = await import('@tauri-apps/api/core')
+      const exists = (paths: string[]) => invoke<boolean[]>('paths_exist_abs', { paths })
+      const flags = await exists(files.map((f) => f.path))
+      const missing = files.filter((_, i) => !flags[i])
+      if (!missing.length) return 0
+      const present = files.filter((_, i) => flags[i]).map((f) => f.path)
+      const map = await resolveMovedPaths(
+        missing.map((f) => ({ path: f.path, relPath: f.relPath })),
+        dirOf(path),
+        present,
+        exists,
+      )
+      this.remapSoundPaths(map)
+      return map.size
+    },
+
+    /** Unpack audio stored in the project for sounds still missing on disk. */
+    async extractEmbeddedSounds(): Promise<number> {
+      const path = this.currentProjectPath
+      if (isRemote || !path) return 0
+      const extracted = await extractProjectMedia(path, this.projectMeta.projectId || 'project')
+      if (!extracted.length) return 0
+      const byId = new Map(extracted.map((e) => [e.soundId, e.path]))
+      const taken = new Set(this.configFile.files.map((f) => f.path))
+      const map = new Map<string, string>()
+      for (const f of this.configFile.files) {
+        const to = f.id ? byId.get(f.id) : undefined
+        if (!to || to === f.path || taken.has(to)) continue
+        taken.add(to)
+        map.set(f.path, to)
+      }
+      this.remapSoundPaths(map)
+      return map.size
     },
 
     async validateSoundPaths() {
@@ -205,11 +434,13 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.missingPaths = paths.filter((_, i) => !exists[i])
     },
 
-    /** Loads config into an already-open project DB (used by JSON import/migration). */
+    /** Loads config into a project file (used by JSON import/migration). */
     async importConfig(config: ProjectConfig, dbAbsPath?: string) {
       if (dbAbsPath) {
-        await openDb(dbAbsPath)
+        await ensureSchema(dbAbsPath)
         this.currentProjectPath = dbAbsPath
+        this.projectMeta = defaultMeta()
+        this._sessionSaved = false
       }
       this.configFile = {
         settings: config.settings,
@@ -217,7 +448,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         files: config.files ?? [],
         separators: config.separators ?? [],
         tags: config.tags ?? [],
+        ...(config.extraSettings ? { extraSettings: config.extraSettings } : {}),
       }
+      sanitizeConfig(this.configFile, { resetActive: true })
       mergeTabsFromUsage(this.configFile)
       healFolderTabMembership(this.configFile)
       ensureSoundIds(this.configFile.files)
@@ -225,9 +458,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.normalizeIndexes()
       this.syncFilterSessionFromSettings()
       this.applyBoardFilter()
-      this.openingSnapshot = clone(this.configFile)
-      this.dirty = false
       this.clearHistory()
+      storedHistory = new Map()
       this.noteIntentionalEmpty()
       await this.persistNow()
     },
@@ -242,11 +474,39 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.syncFilterSessionFromSettings()
       this.applyBoardFilter()
       this.dirty = false
-      this.clearHistory()
+      // Back to the history that belongs to the saved board, so undo/redo
+      // keep matching what is on disk.
+      this.undoStack = [...this._savedUndo]
+      this.redoStack = [...this._savedRedo]
+      if (this._persistTimer) {
+        clearTimeout(this._persistTimer)
+        this._persistTimer = null
+      }
     },
 
     setCurrentProjectPath(p: string | null) {
       this.currentProjectPath = p
+    },
+
+    /** Autosave preference from the app settings. */
+    setAutosave(enabled: boolean, intervalSec = 0) {
+      this.autosave = !!enabled
+      this.autosaveIntervalSec = Number.isFinite(intervalSec) && intervalSec > 0 ? Math.round(intervalSec) : 0
+      if (this._persistTimer) {
+        clearTimeout(this._persistTimer)
+        this._persistTimer = null
+      }
+      if (this.autosave && this.dirty) this.schedulePersist()
+    },
+
+    /** Whether sound files / GIFs are stored inside the project file. */
+    setSaveOptions(opts: { embedAudio: boolean; embedGifs: boolean }) {
+      this.projectMeta = {
+        ...this.projectMeta,
+        embedAudio: !!opts.embedAudio,
+        embedGifs: !!opts.embedGifs,
+        saveOptionsSet: true,
+      }
     },
 
     /** @deprecated legacy no-op kept for the old settings page. */
@@ -260,22 +520,42 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       if ((this.configFile.files?.length ?? 0) === 0) this._allowEmptyPersist = true
     },
 
-    /** Debounced save. Does not rebuild the board file list. */
-    schedulePersist() {
-      this.dirty = true
+    /**
+     * Note a change. With autosave on this schedules a save: right away
+     * (debounced) or, with an interval, at most once per interval. With
+     * autosave off the project just becomes "unsaved".
+     *
+     * `silent` is for housekeeping the user did not do (cached durations, file
+     * sizes): it is written with the next save but never asks to be saved.
+     */
+    schedulePersist(opts?: { silent?: boolean }) {
+      this._changeSeq++
+      if (!opts?.silent) this.dirty = true
+      if (!this.autosave) return
+      const interval = this.autosaveIntervalSec > 0
+      // Interval mode: the first change starts the clock, later ones ride along.
+      if (interval && this._persistTimer) return
       if (this._persistTimer) clearTimeout(this._persistTimer)
       this._persistTimer = setTimeout(() => {
-        this.persistNow().catch((e) => console.error('Failed to persist project', e))
-      }, 200)
+        this._persistTimer = null
+        this.persistNow().catch((e) => {
+          console.error('Failed to persist project', e)
+          this.saveError = e instanceof Error ? e.message : String(e)
+        })
+      }, interval ? this.autosaveIntervalSec * 1000 : AUTOSAVE_DEBOUNCE_MS)
     },
 
     /** Public compat alias — rebuilds the filtered board, then schedules a save. */
-    writeConfig() {
+    writeConfig(opts?: { silent?: boolean }) {
       this.applyBoardFilter()
-      this.schedulePersist()
+      this.schedulePersist(opts)
     },
 
-    /** Flushes any pending changes to the project DB immediately. */
+    /**
+     * Writes the project to disk now, as one atomic transaction: board,
+     * project options, undo/redo history and (first save of a session) a
+     * recovery snapshot. On failure the file is left exactly as it was.
+     */
     async persistNow() {
       if (isRemote) {
         this.dirty = false
@@ -289,28 +569,62 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         throw new Error('No project database is open.')
       }
       const path = this.currentProjectPath
-      const bak = path + '.bak'
-      const { invoke } = await import('@tauri-apps/api/core')
-      try {
-        await invoke('copy_file_to_abs', { src: path, dst: bak })
-      } catch { /* first save may have no file yet */ }
-      this.saving = true
+      const seq = this._changeSeq
+      const version = await appVersion()
       const allowEmpty = this._allowEmptyPersist && (this.configFile.files?.length ?? 0) === 0
+
+      // Remember where each sound sits relative to the project file, so the
+      // project still finds it after moving to another machine.
+      const dir = dirOf(path)
+      for (const f of this.configFile.files) {
+        const rel = toRelativePath(f.path, dir)
+        if (rel) {
+          if (f.relPath !== rel) f.relPath = rel
+        } else if (f.relPath != null) {
+          delete f.relPath
+        }
+      }
+      if (!this.projectMeta.projectId) {
+        this.projectMeta = { ...this.projectMeta, projectId: newProjectId() }
+      }
+      for (const snap of [...this.undoStack, ...this.redoStack]) {
+        if (snap._hid == null) snap._hid = ++this._hidSeq
+      }
+
+      const firstOfSession = !this._sessionSaved
+      const before = firstOfSession && this.openingSnapshot?.files?.length ? this.openingSnapshot : null
+      const meta = this.projectMeta
+      this.saving = true
       try {
-        await withProjectDb(path, async (d) => {
-          await saveConfig(d, this.configFile, allowEmpty ? { allowEmpty: true } : undefined)
-          const keep = this.configFile.files.map((f) => f.gifId).filter((id): id is string => !!id)
-          await gcOrphanGifs(d, keep)
+        let sizes = storedHistory
+        const { report } = await commitProject(path, async (d) => {
+          await saveConfig(d, this.configFile, { ...(allowEmpty ? { allowEmpty: true } : {}), appVersion: version })
+          // History entries may bring a button background back on undo: keep those images.
+          const keep = new Set<string>()
+          for (const config of [this.configFile, ...this.undoStack, ...this.redoStack]) {
+            for (const f of config.files ?? []) if (f.gifId) keep.add(f.gifId)
+          }
+          await gcOrphanGifs(d, [...keep])
+          await saveMeta(d, meta)
+          sizes = await saveHistory(d, this.undoStack, this.redoStack, storedHistory)
+          if (before) await saveSnapshot(d, before, 'session', version)
+        }, {
+          embedAudio: meta.embedAudio,
+          embedGifs: meta.embedGifs,
+          backup: firstOfSession,
         })
+        storedHistory = sizes
+        this._sessionSaved = true
+        this.lastSaveReport = report
         this.openingSnapshot = clone(this.configFile)
-        this.dirty = false
+        this._savedUndo = [...this.undoStack]
+        this._savedRedo = [...this.redoStack]
+        // A change that arrived while the save ran is still unsaved.
+        this.dirty = this._changeSeq !== seq
         this._allowEmptyPersist = false
+        this.saveError = null
       } catch (e) {
         console.error('Failed to persist project', e)
-        try {
-          await invoke('copy_file_to_abs', { src: bak, dst: path })
-          await reopenDb(path)
-        } catch { /* restore best-effort */ }
         throw e
       } finally {
         this.saving = false
@@ -318,37 +632,34 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     /**
-     * Save As: flush live DB, then copy the SQLite file (gif_blobs included).
-     * Avoids pulling every GIF across IPC and rewriting the whole DB.
+     * Save As: copy the project file (images, stored audio and history come
+     * along), switch to the copy, then write the current board into it. The
+     * original keeps the state of its last save.
      */
-    async saveAs(dbAbsPath: string) {
+    async saveAs(dbAbsPath: string, options?: { embedAudio: boolean; embedGifs: boolean }) {
       const { ensureProjectParentDir, removeInvalidProjectPlaceholder } = await import('~/utils/projects')
-      const { invoke } = await import('@tauri-apps/api/core')
       await ensureProjectParentDir(dbAbsPath)
       await removeInvalidProjectPlaceholder(dbAbsPath)
 
       const src = this.currentProjectPath
       if (!src) {
         await this.importConfig(clone(this.configFile), dbAbsPath)
+        if (options) {
+          this.setSaveOptions(options)
+          await this.persistNow()
+        }
         return
       }
 
       const same = src.replace(/\\/g, '/').toLowerCase() === dbAbsPath.replace(/\\/g, '/').toLowerCase()
-      if (same) {
-        await this.persistNow()
-        return
+      if (!same) {
+        await copyProject(src, dbAbsPath)
+        this.currentProjectPath = dbAbsPath
+        // The copy is new: no backup of "its previous state" to take.
+        this._sessionSaved = true
       }
-
+      if (options) this.setSaveOptions(options)
       await this.persistNow()
-      await withProjectDb(src, async (d) => {
-        try { await d.execute('PRAGMA wal_checkpoint(TRUNCATE)') } catch { /* copy main file anyway */ }
-      })
-      await invoke('copy_file_to_abs', { src, dst: dbAbsPath })
-      await reopenDb(dbAbsPath)
-      this.currentProjectPath = dbAbsPath
-      this.openingSnapshot = clone(this.configFile)
-      this.dirty = false
-      this.clearHistory()
     },
 
     updateConfigFile(contents: ProjectConfig) {
@@ -359,7 +670,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         files: contents.files ?? [],
         separators: contents.separators ?? [],
         tags: contents.tags ?? [],
+        ...(this.configFile.extraSettings ? { extraSettings: this.configFile.extraSettings } : {}),
       }
+      sanitizeConfig(this.configFile)
       this.normalizeIndexes()
       this.applyBoardFilter()
       this.noteIntentionalEmpty()
@@ -372,7 +685,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
      * (0..n) steals those slots and shuffles group membership on load.
      */
     normalizeIndexes() {
-      const files = this.configFile.files
+      const config = this.configFile
+      const files = config.files
       if (!files) return
 
       for (const f of files) {
@@ -384,25 +698,25 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         }
       }
 
-      const tabs = ['All', ...(this.configFile.tabList ?? []).map((t) => t.name)]
-      for (const tab of tabs) {
+      for (const tab of boardTabNames(config)) {
         const inTab = files.filter((f) => f.tabs?.includes(tab))
-        const seps = (this.configFile.separators ?? []).filter((s) => s.tab === tab)
+        const seps = (config.separators ?? []).filter((s) => s.tab === tab)
         let max = -1
-        for (const f of inTab) {
-          const o = this.soundOrderOnTab(f, tab)
-          if (Number.isFinite(o)) max = Math.max(max, o)
-        }
-        for (const s of seps) {
-          if (Number.isFinite(s.position)) max = Math.max(max, s.position)
-        }
+        const isSet = (v: unknown): v is number =>
+          typeof v === 'number' && Number.isFinite(v) && v < Number.MAX_SAFE_INTEGER
         for (const f of inTab) {
           const raw = tab === 'All' ? f.index : f.tabIndexes[tab]
-          if (raw == null || !Number.isFinite(Number(raw))) {
-            this.setSoundOrderOnTab(f, tab, ++max)
-          }
+          if (isSet(raw)) max = Math.max(max, raw)
         }
-        this.applyBoardLayoutSilent(tab, this.captureBoardLayout(tab))
+        for (const s of seps) {
+          if (isSet(s.position)) max = Math.max(max, s.position)
+        }
+        // A sound new to this tab has no slot yet: it goes to the end.
+        for (const f of inTab) {
+          const raw = tab === 'All' ? f.index : f.tabIndexes[tab]
+          if (!isSet(raw)) setSoundOrderOnTab(f, tab, ++max)
+        }
+        applyBoardLayout(config, tab, captureBoardLayout(config, tab))
       }
     },
 
@@ -512,7 +826,6 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     },
 
     commitImportReview(review: ImportReviewState) {
-      type BoardLayout = { orphans: string[]; groups: { id: string; paths: string[] }[] }
       const usedPaths = new Set(this.configFile.files.map((f) => pathKey(f.path)))
       const takePath = (path: string) => {
         const key = pathKey(path)
@@ -691,8 +1004,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     setActiveSound({ soundindex, status }: { soundindex: number; status: boolean }) {
       const file = this.configFile.files[soundindex]
       if (!file) return
+      // Playback state only. Saving on every play/stop cost a full project
+      // write per click and could leave a button stored as "playing".
       file.active = status
-      this.writeConfig()
     },
 
     renameSound(soundindex: number, newName: string) {
@@ -855,32 +1169,21 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     reorderSounds(draggedIdx: number, targetIdx: number, tab: string) {
       const files = this.configFile.files
-      if (tab === 'All') {
-        const sorted = [...files].sort((a, b) => a.index - b.index)
-        const from = sorted.findIndex((f) => f.index === draggedIdx)
-        const to = sorted.findIndex((f) => f.index === targetIdx)
-        if (from === -1 || to === -1 || from === to) return
-        this.pushBeforeChange()
-        const [item] = sorted.splice(from, 1)
-        if (!item) return
-        sorted.splice(to, 0, item)
-        sorted.forEach((f, i) => { f.index = i })
-      } else {
-        const inTab = files
-          .filter((f) => f.tabs.includes(tab))
-          .sort((a, b) => (a.tabIndexes?.[tab] ?? 0) - (b.tabIndexes?.[tab] ?? 0))
-        const from = inTab.findIndex((f) => f.index === draggedIdx)
-        const to = inTab.findIndex((f) => f.index === targetIdx)
-        if (from === -1 || to === -1 || from === to) return
-        this.pushBeforeChange()
-        const [item] = inTab.splice(from, 1)
-        if (!item) return
-        inTab.splice(to, 0, item)
-        inTab.forEach((f, i) => {
-          if (!f.tabIndexes) f.tabIndexes = {}
-          f.tabIndexes[tab] = i
-        })
-      }
+      const dragged = files.find((f) => f.tabs.includes(tab) && f.index === draggedIdx)
+      const target = files.find((f) => f.tabs.includes(tab) && f.index === targetIdx)
+      if (!dragged || !target || dragged === target) return
+      // Move within the tab's layout so group markers keep their own slots —
+      // renumbering sounds alone lets them collide with the markers.
+      const layout = captureBoardLayout(this.configFile, tab)
+      const sections = [layout.orphans, ...layout.groups.map((g) => g.paths)]
+      const to = sections.find((sec) => sec.includes(target.path))
+      const from = sections.find((sec) => sec.includes(dragged.path))
+      if (!to || !from) return
+      const at = to.indexOf(target.path)
+      from.splice(from.indexOf(dragged.path), 1)
+      to.splice(at, 0, dragged.path)
+      this.pushBeforeChange()
+      applyBoardLayout(this.configFile, tab, layout)
       this.writeConfig()
     },
 
@@ -898,6 +1201,12 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       this.pushBeforeChange()
       this.configFile.tabList = this.configFile.tabList.filter((t) => t.name !== name)
       this.configFile.separators = (this.configFile.separators ?? []).filter((s) => s.tab !== name)
+      // Sounds must drop the tab too. A leftover reference made the deleted
+      // tab reappear on the next open (tabs are rebuilt from what sounds use).
+      for (const f of this.configFile.files) {
+        if (f.tabs?.includes(name)) f.tabs = f.tabs.filter((t) => t !== name)
+        if (f.tabIndexes && name in f.tabIndexes) delete f.tabIndexes[name]
+      }
       this.writeConfig()
     },
 
@@ -954,6 +1263,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         position,
         ...(name ? { name } : {}),
       })
+      // Callers pass a slot between two sounds (e.g. 2.5). Renumber the tab so
+      // the marker owns a whole number like everything else.
+      applyBoardLayout(this.configFile, tab, captureBoardLayout(this.configFile, tab))
       this.writeConfig()
     },
 
@@ -1015,49 +1327,30 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     /** Tab order key for a sound (global index on "All"). */
     soundOrderOnTab(sound: SoundFile, tab: string): number {
-      if (tab === 'All') return sound.index ?? 0
-      return sound.tabIndexes?.[tab] ?? 0
+      return soundOrderOnTab(sound, tab)
     },
 
     setSoundOrderOnTab(sound: SoundFile, tab: string, order: number) {
-      if (tab === 'All') {
-        sound.index = order
-        return
-      }
-      if (!sound.tabIndexes) sound.tabIndexes = {}
-      sound.tabIndexes[tab] = order
+      setSoundOrderOnTab(sound, tab, order)
     },
 
     /**
      * Rewrite dense interleaved order for a tab: orphan sounds, then each
      * group marker + its members. Keeps relative membership from `layout`.
      */
-    applyBoardLayoutSilent(
-      tab: string,
-      layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
-    ) {
-      const byPath = new Map(this.configFile.files.map((f) => [f.path, f]))
-      let seq = 0
-      for (const path of layout.orphans) {
-        const f = byPath.get(path)
-        if (f) this.setSoundOrderOnTab(f, tab, seq++)
-      }
-      for (const g of layout.groups) {
-        const sep = (this.configFile.separators ?? []).find((s) => s.id === g.id)
-        if (sep) sep.position = seq++
-        for (const path of g.paths) {
-          const f = byPath.get(path)
-          if (f) this.setSoundOrderOnTab(f, tab, seq++)
-        }
-      }
+    applyBoardLayoutSilent(tab: string, layout: BoardLayout) {
+      applyBoardLayout(this.configFile, tab, layout)
     },
 
-    applyBoardLayout(
-      tab: string,
-      layout: { orphans: string[]; groups: { id: string; paths: string[] }[] },
-    ) {
+    /**
+     * Apply a layout read from the screen. With a search or tag filter active
+     * the screen shows only part of the tab; the hidden sounds keep their
+     * place instead of colliding with the renumbered visible ones.
+     */
+    applyBoardLayout(tab: string, layout: BoardLayout) {
+      const merged = mergeHiddenIntoLayout(captureBoardLayout(this.configFile, tab), layout)
       this.pushBeforeChange()
-      this.applyBoardLayoutSilent(tab, layout)
+      applyBoardLayout(this.configFile, tab, merged)
       this.writeConfig()
     },
 
@@ -1066,47 +1359,13 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
      * Call after cross-group drops so float anchors never drift.
      */
     normalizeBoardOrder(tab: string) {
-      const layout = this.captureBoardLayout(tab)
+      const layout = captureBoardLayout(this.configFile, tab)
       this.applyBoardLayout(tab, layout)
     },
 
     /** Snapshot orphans + groups with member paths from current positions. */
-    captureBoardLayout(tab: string): { orphans: string[]; groups: { id: string; paths: string[] }[] } {
-      const sounds = this.configFile.files
-        .filter((f) => f.tabs.includes(tab))
-        .sort((a, b) => this.soundOrderOnTab(a, tab) - this.soundOrderOnTab(b, tab))
-      const seps = (this.configFile.separators ?? [])
-        .filter((s) => s.tab === tab)
-        .slice()
-        .sort((a, b) => a.position - b.position)
-
-      if (seps.length === 0) {
-        return { orphans: sounds.map((s) => s.path), groups: [] }
-      }
-
-      const orphans: string[] = []
-      const groups: { id: string; paths: string[] }[] = seps.map((s) => ({ id: s.id, paths: [] }))
-
-      for (const sound of sounds) {
-        const order = this.soundOrderOnTab(sound, tab)
-        let placed = false
-        for (let i = 0; i < seps.length; i++) {
-          const sep = seps[i]
-          if (!sep) continue
-          const start = sep.position
-          const nextSep = seps[i + 1]
-          const end = nextSep ? nextSep.position : Number.POSITIVE_INFINITY
-          if (order >= start && order < end) {
-            groups[i]?.paths.push(sound.path)
-            placed = true
-            break
-          }
-        }
-        const firstSep = seps[0]
-        if (!placed && firstSep && order < firstSep.position) orphans.push(sound.path)
-        else if (!placed) orphans.push(sound.path)
-      }
-      return { orphans, groups }
+    captureBoardLayout(tab: string): BoardLayout {
+      return captureBoardLayout(this.configFile, tab)
     },
 
     /**
@@ -1129,7 +1388,9 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Bulk / misc ───────────────────────────────────────────────────────────
     resetAll() {
       this.pushBeforeChange()
+      const extra = this.configFile.extraSettings
       this.configFile = emptyConfig()
+      if (extra) this.configFile.extraSettings = extra
       this.normalizeIndexes()
       this.filteredFiles = []
       this.noteIntentionalEmpty()
@@ -1138,7 +1399,6 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
 
     ReturnStatusAll() {
       this.configFile.files.forEach((file) => { file.active = false })
-      this.writeConfig()
     },
 
     // ── Tags / filter / sort ─────────────────────────────────────────────────
@@ -1282,7 +1542,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
             changed = true
           }
         }
-        if (changed) this.writeConfig()
+        if (changed) this.writeConfig({ silent: true })
       } catch (e) {
         console.error('Failed to warm sound file meta', e)
       }
@@ -1302,7 +1562,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
           }
         } catch { /* missing / undecodable */ }
       }
-      if (changed) this.writeConfig()
+      if (changed) this.writeConfig({ silent: true })
     },
   },
 })

@@ -12,6 +12,30 @@ interface ContextMenuState {
   targetIndex: number
 }
 
+export interface ChoiceOption {
+  id: string
+  label: string
+  /** Hint shown under the button label. */
+  hint?: string
+}
+
+export interface ChoicePrompt {
+  title: string
+  message: string
+  choices: ChoiceOption[]
+  /** Returned when the dialog is dismissed (close button / backdrop). */
+  cancelId: string
+}
+
+export interface SaveOptions {
+  embedAudio: boolean
+  embedGifs: boolean
+}
+
+// Promise resolvers live outside the store: functions are not state.
+let choiceResolver: ((id: string) => void) | null = null
+let saveOptionsResolver: ((value: SaveOptions | null) => void) | null = null
+
 export const useAppStore = defineStore('app', {
   state: () => ({
     navbar: ['add', 'project', 'filter', 'settings', 'about'] as string[],
@@ -45,6 +69,10 @@ export const useAppStore = defineStore('app', {
     draggingTabName: null as string | null,
     /** Sound array index whose GIF picker is open, or null. */
     gifPickerIndex: null as number | null,
+    /** Question dialog awaiting an answer (see `askChoice`). */
+    choicePrompt: null as ChoicePrompt | null,
+    /** "What goes into the project file" dialog (see `askSaveOptions`). */
+    saveOptionsPrompt: null as (SaveOptions & { firstSave: boolean }) | null,
     contextMenu: {
       visible: false,
       x: 0,
@@ -256,6 +284,36 @@ export const useAppStore = defineStore('app', {
 
     closeGifPicker() {
       this.gifPickerIndex = null
+    },
+
+    /** Show a question dialog. Resolves with the id of the chosen option. */
+    askChoice(prompt: ChoicePrompt): Promise<string> {
+      // A second question replaces the first, which then counts as cancelled.
+      if (choiceResolver && this.choicePrompt) choiceResolver(this.choicePrompt.cancelId)
+      this.choicePrompt = prompt
+      return new Promise((resolve) => { choiceResolver = resolve })
+    },
+
+    resolveChoice(id?: string) {
+      const prompt = this.choicePrompt
+      const resolve = choiceResolver
+      this.choicePrompt = null
+      choiceResolver = null
+      if (resolve) resolve(id ?? prompt?.cancelId ?? 'cancel')
+    },
+
+    /** Ask what the project file should contain. Null = cancelled. */
+    askSaveOptions(initial: SaveOptions, firstSave: boolean): Promise<SaveOptions | null> {
+      if (saveOptionsResolver) saveOptionsResolver(null)
+      this.saveOptionsPrompt = { ...initial, firstSave }
+      return new Promise((resolve) => { saveOptionsResolver = resolve })
+    },
+
+    resolveSaveOptions(value: SaveOptions | null) {
+      const resolve = saveOptionsResolver
+      this.saveOptionsPrompt = null
+      saveOptionsResolver = null
+      if (resolve) resolve(value)
     },
   },
 })

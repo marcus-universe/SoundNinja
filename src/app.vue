@@ -26,15 +26,49 @@
       <LazyGifPickerDialog v-if="appStore.gifPickerIndex != null" />
       <UpdateDialog ref="updateDialogRef" />
       <DialogField
-        v-if="unsavedPrompt"
-        :title="$t('dialog.unsavedTitle')"
-        @close="resolveUnsaved('cancel')"
+        v-if="appStore.choicePrompt"
+        :title="appStore.choicePrompt.title"
+        @close="appStore.resolveChoice()"
       >
-        <p class="dialog-text">{{ $t('dialog.unsavedMessage') }}</p>
+        <p class="dialog-text">{{ appStore.choicePrompt.message }}</p>
+        <ul v-if="choiceHints.length" class="choice-hints">
+          <li v-for="choice in choiceHints" :key="choice.id">
+            <strong>{{ choice.label }}</strong> — {{ choice.hint }}
+          </li>
+        </ul>
+        <div class="flex_c_h gap1 dialog-actions dialog-actions--wrap">
+          <UIButton
+            v-for="choice in appStore.choicePrompt.choices"
+            :key="choice.id"
+            @click="appStore.resolveChoice(choice.id)"
+          >{{ choice.label }}</UIButton>
+        </div>
+      </DialogField>
+      <DialogField
+        v-if="appStore.saveOptionsPrompt"
+        :title="$t('saveOptions.title')"
+        @close="appStore.resolveSaveOptions(null)"
+      >
+        <p class="dialog-text">
+          {{ appStore.saveOptionsPrompt.firstSave ? $t('saveOptions.firstSaveHint') : $t('saveOptions.hint') }}
+        </p>
+        <div class="save-options">
+          <UICheckbox v-model="saveOptions.embedAudio">
+            <span class="save-options__text">
+              <span class="settings-label">{{ $t('saveOptions.embedAudio') }}</span>
+              <span class="settings-hint">{{ $t('saveOptions.embedAudioHint') }}</span>
+            </span>
+          </UICheckbox>
+          <UICheckbox v-model="saveOptions.embedGifs">
+            <span class="save-options__text">
+              <span class="settings-label">{{ $t('saveOptions.embedGifs') }}</span>
+              <span class="settings-hint">{{ $t('saveOptions.embedGifsHint') }}</span>
+            </span>
+          </UICheckbox>
+        </div>
         <div class="flex_c_h gap1 dialog-actions">
-          <UIButton @click="resolveUnsaved('save')">{{ $t('dialog.save') }}</UIButton>
-          <UIButton @click="resolveUnsaved('discard')">{{ $t('dialog.discard') }}</UIButton>
-          <UIButton @click="resolveUnsaved('cancel')">{{ $t('dialog.cancel') }}</UIButton>
+          <UIButton @click="appStore.resolveSaveOptions({ ...saveOptions })">{{ $t('dialog.save') }}</UIButton>
+          <UIButton @click="appStore.resolveSaveOptions(null)">{{ $t('dialog.cancel') }}</UIButton>
         </div>
       </DialogField>
       <LazyRelinkDialog v-if="appStore.relinkActive" />
@@ -87,7 +121,8 @@ import { emit, listen as tauriListen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPath } from '@tauri-apps/plugin-opener'
-import { defaultSettings, saveConfig, loadGifBlobsByIds, upsertGifBlob, withProjectDb, reopenDb } from '~/utils/db'
+import { defaultSettings, defaultMeta, saveConfig, saveMeta, loadGifBlobsByIds, upsertGifBlob, withProjectDb } from '~/utils/db'
+import { openProjectFlow, settleUnsavedChanges } from '~/utils/projectOpen'
 import { eventToCombo } from '~/utils/hotkeys'
 import {
   buildPortableExport,
@@ -310,33 +345,36 @@ function isValidConfig(obj) {
 }
 
 // ── Project bootstrap ─────────────────────────────────────────────────────────
-// Opens a project DB and records it in the recent-projects list.
-async function openProjectPath(dbPath) {
-  await jsonStore.openProject(dbPath)
-  try {
-    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
-  } catch (e) {
-    // Project open is primary action; recents update failure should not abort flow.
-    console.error('Failed to update recent projects', e)
-  }
-  await jsonStore.validateSoundPaths()
-  if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
+// Opens a project (converting old formats on request) and records it as recent.
+// Resolves false when the user cancelled.
+function openProjectPath(dbPath, opts) {
+  return openProjectFlow(dbPath, opts)
+}
+
+async function createFreshProject() {
+  const existing = await listProjects(appSettings.projectsPath)
+  const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
+  let name = t('common.newProject')
+  let n = 2
+  while (names.has(safeProjectName(name).toLowerCase())) name = `${t('common.newProject')} ${n++}`
+  const dbPath = await createProjectFolder(appSettings.projectsPath, name)
+  await openProjectPath(dbPath, { settleUnsaved: false })
 }
 
 async function bootstrapProject() {
   // 1. Re-open the last project when it still exists.
-  if (appSettings.lastProjectPath) {
-    const exists = await invoke('path_exists_abs', { path: appSettings.lastProjectPath })
-    if (exists) {
-      await openProjectPath(appSettings.lastProjectPath)
-      return
-    }
+  const last = appSettings.lastProjectPath
+  if (last) {
+    const exists = await invoke('path_exists_abs', { path: last })
+    if (exists && await openProjectPath(last, { settleUnsaved: false })) return
   }
   // 2. First launch after upgrade — migrate the old AppData config.json.
-  if (await tryMigrateOldConfig()) return
+  if (!last && await tryMigrateOldConfig()) return
   // 3. Otherwise open/create the Default project.
   const dbPath = await createProjectFolder(appSettings.projectsPath, 'Default')
-  await openProjectPath(dbPath)
+  if (dbPath !== last && await openProjectPath(dbPath, { settleUnsaved: false })) return
+  // 4. The user declined to convert what was found: start with an empty board.
+  await createFreshProject()
 }
 
 async function tryMigrateOldConfig() {
@@ -360,25 +398,15 @@ async function tryMigrateOldConfig() {
 }
 
 // ── Menu handlers ─────────────────────────────────────────────────────────────
-// Unsaved-changes prompt (Save / Discard / Cancel). Resolves the pending promise
-// so callers can await the user's decision before continuing.
-const unsavedPrompt = ref(false)
-let unsavedResolver = null
+// Dialog state for "what goes into the project file".
+const saveOptions = reactive({ embedAudio: false, embedGifs: true })
+watch(() => appStore.saveOptionsPrompt, (prompt) => {
+  if (!prompt) return
+  saveOptions.embedAudio = !!prompt.embedAudio
+  saveOptions.embedGifs = !!prompt.embedGifs
+})
 
-function confirmUnsaved() {
-  return new Promise((resolve) => {
-    if (!jsonStore.dirty) { resolve('discard'); return }
-    unsavedResolver = resolve
-    unsavedPrompt.value = true
-  })
-}
-
-function resolveUnsaved(choice) {
-  unsavedPrompt.value = false
-  const resolve = unsavedResolver
-  unsavedResolver = null
-  if (resolve) resolve(choice)
-}
+const choiceHints = computed(() => (appStore.choicePrompt?.choices ?? []).filter((c) => c.hint))
 
 async function withSavePopup(work) {
   if (savePopupTimer) {
@@ -403,18 +431,24 @@ async function persistOrReport() {
   return withSavePopup(() => jsonStore.persistNow())
 }
 
+/** After a manual save: say so if audio meant to be stored in the project was missing. */
+function reportSaveIssues() {
+  const missing = jsonStore.lastSaveReport?.missingAudio ?? []
+  if (!missing.length) return
+  const shown = missing.slice(0, 8).join('\n')
+  const more = missing.length > 8 ? '\n…' : ''
+  appStore.setErrorActive(`${t('saveOptions.embedMissing', { count: missing.length })}\n\n${shown}${more}`)
+}
+
+function currentSaveOptions() {
+  const meta = jsonStore.projectMeta ?? defaultMeta()
+  return { embedAudio: !!meta.embedAudio, embedGifs: meta.embedGifs !== false }
+}
+
 async function handleMenuNewProject() {
-  const choice = await confirmUnsaved()
-  if (choice === 'cancel') return
-  if (choice === 'save' && !(await persistOrReport())) return
+  if (!(await settleUnsavedChanges())) return
   try {
-    const existing = await listProjects(appSettings.projectsPath)
-    const names = new Set(existing.map((p) => safeProjectName(p.name).toLowerCase()))
-    let name = t('common.newProject')
-    let n = 2
-    while (names.has(safeProjectName(name).toLowerCase())) name = `${t('common.newProject')} ${n++}`
-    const dbPath = await createProjectFolder(appSettings.projectsPath, name)
-    await openProjectPath(dbPath)
+    await createFreshProject()
   } catch (e) {
     console.error('Failed to create project', e)
     appStore.setErrorActive(`${t('common.failedCreateProject')}\n\n${formatError(e)}`)
@@ -431,12 +465,8 @@ function formatError(e) {
 async function handleMenuOpenProject() {
   const dbPath = await pickProjectFile()
   if (!dbPath) return
-  const choice = await confirmUnsaved()
-  if (choice === 'cancel') return
-  if (choice === 'save' && !(await persistOrReport())) return
   try {
-    await openProjectPath(dbPath)
-    await applyPersistedTheme(jsonStore.configFile)
+    if (await openProjectPath(dbPath)) await applyPersistedTheme(jsonStore.configFile)
   } catch (e) {
     console.error('Failed to open project', e)
     appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(e)}`)
@@ -444,16 +474,25 @@ async function handleMenuOpenProject() {
 }
 
 async function handleMenuSave() {
-  await persistOrReport()
+  // First save of a project: choose what the file should contain.
+  if (!jsonStore.projectMeta?.saveOptionsSet) {
+    const picked = await appStore.askSaveOptions(currentSaveOptions(), true)
+    if (!picked) return
+    jsonStore.setSaveOptions(picked)
+  }
+  if (await persistOrReport()) reportSaveIssues()
 }
 
 async function handleMenuSaveAs() {
+  const picked = await appStore.askSaveOptions(currentSaveOptions(), false)
+  if (!picked) return
   const dbPath = await pickSaveProjectFile()
   if (!dbPath) return
-  await withSavePopup(async () => {
-    await jsonStore.saveAs(dbPath)
+  const saved = await withSavePopup(async () => {
+    await jsonStore.saveAs(dbPath, picked)
     await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
   })
+  if (saved) reportSaveIssues()
 }
 
 async function handleMenuImportAudio() {
@@ -480,7 +519,8 @@ async function handleMenuExportSoundboard() {
   let tempDir = null
   const livePath = jsonStore.currentProjectPath
   try {
-    if (jsonStore.dirty) await jsonStore.persistNow()
+    // The export is built from the board in memory; nothing has to be saved
+    // first (with autosave off that would silently commit unsaved changes).
     const { portable, entries } = buildPortableExport(jsonStore.configFile)
     tempDir = await invoke('make_temp_dir')
     const tempDb = joinOsPath(tempDir, 'project.sninja')
@@ -489,10 +529,12 @@ async function handleMenuExportSoundboard() {
     if (livePath && gifIds.length) {
       blobs = await withProjectDb(livePath, (d) => loadGifBlobsByIds(d, gifIds))
     }
+    // An exported board always carries its images, wherever this project keeps them.
     await withProjectDb(tempDb, async (d) => {
-      await saveConfig(d, portable)
+      await saveConfig(d, portable, portable.files.length ? undefined : { allowEmpty: true })
+      await saveMeta(d, { ...defaultMeta(), embedGifs: true, saveOptionsSet: true })
       for (const row of blobs) await upsertGifBlob(d, row)
-    })
+    }, { embedGifs: true })
     const allEntries = [{ src: tempDb, destRel: 'project.sninja' }, ...entries]
     await invoke('export_soundboard_zip', { zipPath, entries: allEntries })
   } catch (e) {
@@ -501,9 +543,6 @@ async function handleMenuExportSoundboard() {
   } finally {
     unlisten()
     transferPopup.value = null
-    if (livePath) {
-      try { await reopenDb(livePath) } catch { /* restore best-effort */ }
-    }
     if (tempDir) {
       try { await invoke('delete_dir_abs', { path: tempDir }) } catch { /* ignore */ }
     }
@@ -511,9 +550,7 @@ async function handleMenuExportSoundboard() {
 }
 
 async function handleMenuImportSoundboard() {
-  const choice = await confirmUnsaved()
-  if (choice === 'cancel') return
-  if (choice === 'save' && !(await persistOrReport())) return
+  if (!(await settleUnsavedChanges())) return
 
   const selected = await openDialog({
     title: t('soundboard.importTitle'),
@@ -535,10 +572,12 @@ async function handleMenuImportSoundboard() {
     const folder = uniqueProjectFolderName(names, zipBase || t('common.newProject'))
     const destDir = joinOsPath(appSettings.projectsPath, folder)
     const dbPath = await invoke('import_soundboard_zip', { zipPath, destDir })
-    await jsonStore.openProject(dbPath)
-    resolveImportedPaths(jsonStore.configFile, parentDir(dbPath))
+    // Sounds in the archive are stored relative to project.sninja; opening
+    // resolves them against the folder the ZIP was unpacked to.
+    if (!(await openProjectPath(dbPath, { settleUnsaved: false }))) return
+    const opened = jsonStore.currentProjectPath || dbPath
+    resolveImportedPaths(jsonStore.configFile, parentDir(opened))
     await jsonStore.persistNow()
-    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
     await jsonStore.validateSoundPaths()
     if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
     await applyPersistedTheme(jsonStore.configFile)
@@ -686,6 +725,7 @@ onMounted(async () => {
       await applyBootLocale(picked)
     }
   }
+  jsonStore.setAutosave(appSettings.autosave, appSettings.autosaveIntervalSec)
   splashLabel.value = t('splash.fonts')
   splashPercent.value = 48
   // Register any uploaded custom fonts so themed fonts render everywhere.
@@ -724,9 +764,6 @@ onMounted(async () => {
   listen('menu_open_recent', async (e) => {
     const path = e?.payload
     if (!path || typeof path !== 'string') return
-    const choice = await confirmUnsaved()
-    if (choice === 'cancel') return
-    if (choice === 'save' && !(await persistOrReport())) return
     const stillExists = await invoke('path_exists_abs', { path })
     if (!stillExists) {
       await appSettings.removeRecentProject(path)
@@ -734,8 +771,7 @@ onMounted(async () => {
       return
     }
     try {
-      await openProjectPath(path)
-      await applyPersistedTheme(jsonStore.configFile)
+      if (await openProjectPath(path)) await applyPersistedTheme(jsonStore.configFile)
     } catch (err) {
       console.error('Failed to open project', err)
       appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(err)}`)
@@ -773,6 +809,17 @@ onMounted(async () => {
 
   window.addEventListener('keydown', onHotkeyKeydown, true)
   await syncGlobalSoundHotkeys()
+  teardown.push(watch(
+    () => [appSettings.autosave, appSettings.autosaveIntervalSec],
+    () => { jsonStore.setAutosave(appSettings.autosave, appSettings.autosaveIntervalSec) },
+  ))
+  // A background save that failed must not go unnoticed.
+  teardown.push(watch(
+    () => jsonStore.saveError,
+    (message) => {
+      if (message) appStore.setErrorActive(`${t('common.failedSaveProject')}\n\n${message}`)
+    },
+  ))
   // Created after an await, so Vue no longer binds them to this instance —
   // their stop handles have to be collected by hand.
   teardown.push(watch(
@@ -809,9 +856,8 @@ onMounted(async () => {
   mainWindow.onCloseRequested(async (event) => {
     if (allowClose || !jsonStore.dirty) return
     event.preventDefault()
-    const choice = await confirmUnsaved()
-    if (choice === 'cancel') return
-    if (choice === 'save' && !(await persistOrReport())) return
+    // Autosave on: flush quietly. Off: Save / Discard / Cancel.
+    if (!(await settleUnsavedChanges())) return
     allowClose = true
     await mainWindow.destroy()
   })

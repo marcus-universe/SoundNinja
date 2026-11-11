@@ -79,6 +79,26 @@
       </div>
     </DialogField>
 
+    <div v-if="!isRemote" class="settings-group settings-group--toggle">
+      <div class="settings-toggle-text">
+        <span class="settings-label">{{ $t('settings.main.autosave') }}</span>
+        <span class="settings-hint">{{ $t('settings.main.autosaveHint') }}</span>
+      </div>
+      <UICheckbox :modelValue="autosave" @update:modelValue="onAutosave" />
+    </div>
+
+    <Transition name="fade">
+      <div v-if="!isRemote && autosave" class="settings-group">
+        <label class="settings-label">{{ $t('settings.main.autosaveInterval') }}</label>
+        <UISelect
+          :model-value="String(autosaveInterval)"
+          :options="autosaveIntervalOptions"
+          :aria-label="$t('settings.main.autosaveInterval')"
+          @update:model-value="onAutosaveInterval"
+        />
+      </div>
+    </Transition>
+
     <div class="settings-group settings-group--toggle">
       <div class="settings-toggle-text">
         <span class="settings-label">{{ $t('settings.main.checkUpdatesOnStart') }}</span>
@@ -103,6 +123,7 @@ import {
   THEME_TOKEN_DEFAULTS,
 } from '~/utils/themeTokens'
 import { isAppLocale, type AppLocale } from '~/utils/locales'
+import { AUTOSAVE_INTERVALS } from '~/stores/appSettings'
 import { applyUiScale, clampUiScale, isRemote, REMOTE_LOCALE_KEY, REMOTE_SCALE_KEY, REMOTE_WAKE_KEY, syncWakeLock } from '~/utils/runtime'
 
 const { t, locale, locales: availableLocales, setLocale } = useI18n()
@@ -131,7 +152,30 @@ const savedThemes = ref<string[]>([])
 const importError = ref('')
 const importSuccess = ref('')
 const checkUpdatesOnStart = ref(true)
+const autosave = ref(true)
+const autosaveInterval = ref(0)
 const currentLanguage = ref(locale.value)
+
+const autosaveIntervalOptions = computed(() =>
+  AUTOSAVE_INTERVALS.map((seconds) => ({
+    value: String(seconds),
+    label: seconds === 0
+      ? t('settings.main.autosaveInstant')
+      : seconds < 60
+        ? t('settings.main.autosaveSeconds', { count: seconds })
+        : t('settings.main.autosaveMinutes', { count: seconds / 60 }),
+  })),
+)
+
+async function onAutosave(val: boolean) {
+  autosave.value = val
+  await appSettings.setAutosave(val)
+}
+
+async function onAutosaveInterval(value: string) {
+  autosaveInterval.value = Number(value) || 0
+  await appSettings.setAutosaveIntervalSec(autosaveInterval.value)
+}
 const remoteScale = ref(1)
 const keepAwake = ref(false)
 
@@ -336,6 +380,8 @@ async function syncFromStore() {
   await loadSavedThemes()
   selectedTheme.value = normalizeThemeId(jsonStore.configFile?.settings?.theme)
   checkUpdatesOnStart.value = appSettings.checkUpdatesOnStart !== false
+  autosave.value = appSettings.autosave !== false
+  autosaveInterval.value = appSettings.autosaveIntervalSec || 0
   currentLanguage.value = locale.value
   applyTheme()
 }

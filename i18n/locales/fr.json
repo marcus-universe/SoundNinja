@@ -179,7 +179,13 @@
       "stemsUnavailable": "Absent de cette compilation",
       "stemsInstallHint": "Télécharge {model} ({size}) pour activer Garder les voix / Garder la musique dans l’éditeur d’enregistrement.",
       "stemsInstalledHint": "{model} ({size}) est prêt pour l’éditeur d’enregistrement.",
-      "stemsUnavailableHint": "Cette compilation a été créée sans le moteur de stems. Recompile avec --features stems."
+      "stemsUnavailableHint": "Cette compilation a été créée sans le moteur de stems. Recompile avec --features stems.",
+      "autosave": "Enregistrement automatique",
+      "autosaveHint": "Enregistre automatiquement le projet après chaque modification. Si désactivé, les modifications ne sont écrites qu’avec Enregistrer.",
+      "autosaveInterval": "Intervalle d’enregistrement automatique",
+      "autosaveInstant": "Après chaque modification",
+      "autosaveSeconds": "Toutes les {count} s",
+      "autosaveMinutes": "Toutes les {count} min"
     },
     "audio": {
       "title": "Audio",
@@ -379,7 +385,19 @@
     "duplicateNameError": "Un projet portant ce nom existe déjà.",
     "removeRecent": "Retirer de la liste",
     "create": "Créer",
-    "newPlaceholder": "Nom du nouveau projet…"
+    "newPlaceholder": "Nom du nouveau projet…",
+    "upgradeTitle": "Ancien format de projet",
+    "upgradeMessage": "Ce projet a été enregistré avec une version antérieure de Sound Ninja. Il doit être converti avant de pouvoir être ouvert dans cette version.",
+    "upgradeCopy": "Convertir une copie",
+    "upgradeCopyHint": "Le fichier d’origine reste intact. Recommandé.",
+    "upgradeInPlace": "Convertir ce fichier",
+    "upgradeInPlaceHint": "Une sauvegarde de l’original est conservée à côté.",
+    "newerTitle": "Projet d’une version plus récente",
+    "newerMessage": "Ce projet a été enregistré avec une version plus récente de Sound Ninja ({version}). Certaines parties peuvent ne pas s’afficher ici. Pour protéger l’original, il ne peut être ouvert que sous forme de copie.",
+    "newerCopy": "Ouvrir une copie",
+    "recoveredTitle": "Projet récupéré",
+    "recoveredSnapshot": "Le fichier du projet était incomplet. {count} sons ont été restaurés depuis la copie de récupération stockée dans le projet.",
+    "recoveredBackup": "Le fichier du projet était endommagé. {count} sons ont été restaurés depuis le fichier de sauvegarde."
   },
   "common": {
     "saving": "Enregistrement…",
@@ -688,5 +706,15 @@
     "keepAwake": "Garder l’écran allumé",
     "keepAwakeHint": "Empêche le téléphone de se mettre en veille tant que cette page est ouverte.",
     "settingsBack": "Réglages"
+  },
+  "saveOptions": {
+    "title": "Options d’enregistrement",
+    "firstSaveHint": "Choisissez ce qui est stocké dans le fichier du projet. Vous pourrez le modifier plus tard avec Enregistrer sous.",
+    "hint": "Choisissez ce qui est stocké dans le fichier du projet.",
+    "embedAudio": "Stocker les fichiers audio dans le projet",
+    "embedAudioHint": "Le fichier du projet contient tout l’audio et peut être partagé en un seul fichier. Le fichier devient plus volumineux.",
+    "embedGifs": "Stocker les GIF et les images dans le projet",
+    "embedGifsHint": "Les arrière-plans des boutons suivent le fichier du projet. Si désactivé, ils restent uniquement sur cet ordinateur.",
+    "embedMissing": "{count} fichiers audio n’ont pas pu être stockés dans le projet car ils sont introuvables :"
   }
 }

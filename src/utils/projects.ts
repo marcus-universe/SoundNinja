@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { tt } from '~/utils/tt'
+import { inspectProject } from '~/utils/db'
 
 export interface ProjectInfo {
   name: string
@@ -131,16 +132,14 @@ export async function ensureProjectParentDir(absPath: string): Promise<void> {
 }
 
 /**
- * Save dialogs on Windows often create a 0-byte placeholder. SQLite then fails
- * with "file is not a database". Delete that placeholder so open can recreate.
+ * Save dialogs on Windows often create a 0-byte placeholder. Remove it so the
+ * project is created from scratch. Only ever deletes an empty file — the size
+ * comes from a stat, the file itself is not read.
  */
 export async function removeInvalidProjectPlaceholder(absPath: string): Promise<void> {
   try {
-    const exists = await invoke<boolean>('path_exists_abs', { path: absPath })
-    if (!exists) return
-    // Tiny probe: base64 of empty file is "" — only delete empties, never real DBs.
-    const b64 = await invoke<string>('read_file_base64_abs', { path: absPath })
-    if (!b64) {
+    const info = await inspectProject(absPath)
+    if (info.exists && info.sizeBytes === 0) {
       await invoke('delete_file_abs', { path: absPath })
     }
   } catch { /* ignore */ }

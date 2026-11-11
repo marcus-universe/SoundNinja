@@ -179,7 +179,13 @@
       "stemsUnavailable": "このビルドにはありません",
       "stemsInstallHint": "{model}（{size}）をダウンロードすると、録音エディターで「ボーカルを残す / 音楽を残す」が使えます。",
       "stemsInstalledHint": "{model}（{size}）は録音エディターで利用できます。",
-      "stemsUnavailableHint": "このビルドはステムエンジンなしでコンパイルされています。--features stems で再ビルドしてください。"
+      "stemsUnavailableHint": "このビルドはステムエンジンなしでコンパイルされています。--features stems で再ビルドしてください。",
+      "autosave": "自動保存",
+      "autosaveHint": "変更後にプロジェクトを自動的に保存します。オフの場合、「保存」を選んだときだけ書き込まれます。",
+      "autosaveInterval": "自動保存の間隔",
+      "autosaveInstant": "変更のたびに",
+      "autosaveSeconds": "{count} 秒ごと",
+      "autosaveMinutes": "{count} 分ごと"
     },
     "audio": {
       "title": "オーディオ",
@@ -379,7 +385,19 @@
     "duplicateNameError": "同じ名前のプロジェクトが既にあります。",
     "removeRecent": "リストから削除",
     "create": "作成",
-    "newPlaceholder": "新しいプロジェクト名…"
+    "newPlaceholder": "新しいプロジェクト名…",
+    "upgradeTitle": "古いプロジェクト形式",
+    "upgradeMessage": "このプロジェクトは古いバージョンの Sound Ninja で保存されています。このバージョンで開くには変換が必要です。",
+    "upgradeCopy": "コピーを変換",
+    "upgradeCopyHint": "元のファイルは変更されません。推奨。",
+    "upgradeInPlace": "このファイルを変換",
+    "upgradeInPlaceHint": "元のファイルのバックアップが同じ場所に残ります。",
+    "newerTitle": "新しいバージョンのプロジェクト",
+    "newerMessage": "このプロジェクトは新しいバージョンの Sound Ninja（{version}）で保存されています。一部が表示されない場合があります。元のファイルを保護するため、コピーとしてのみ開けます。",
+    "newerCopy": "コピーを開く",
+    "recoveredTitle": "プロジェクトを復元しました",
+    "recoveredSnapshot": "プロジェクトファイルが不完全でした。プロジェクト内の復元用コピーから {count} 個のサウンドを復元しました。",
+    "recoveredBackup": "プロジェクトファイルが破損していました。バックアップファイルから {count} 個のサウンドを復元しました。"
   },
   "common": {
     "saving": "保存中…",
@@ -688,5 +706,15 @@
     "keepAwake": "画面を点灯したままにする",
     "keepAwakeHint": "このページを開いている間、スマートフォンがスリープしないようにします。",
     "settingsBack": "設定"
+  },
+  "saveOptions": {
+    "title": "保存オプション",
+    "firstSaveHint": "プロジェクトファイルに保存する内容を選んでください。後から「名前を付けて保存」で変更できます。",
+    "hint": "プロジェクトファイルに保存する内容を選んでください。",
+    "embedAudio": "サウンドファイルをプロジェクトに保存",
+    "embedAudioHint": "プロジェクトファイルにすべての音声が含まれ、1 つのファイルとして共有できます。ファイルサイズは大きくなります。",
+    "embedGifs": "GIF と画像をプロジェクトに保存",
+    "embedGifsHint": "ボタンの背景がプロジェクトファイルと一緒に移動します。オフの場合、このコンピューターにのみ残ります。",
+    "embedMissing": "{count} 個のサウンドファイルが見つからないため、プロジェクトに保存できませんでした:"
   }
 }

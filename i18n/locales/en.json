@@ -179,7 +179,13 @@
       "stemsUnavailable": "Not in this build",
       "stemsInstallHint": "Download {model} ({size}) to enable Keep Vocals / Keep Music in the Record Editor.",
       "stemsInstalledHint": "{model} ({size}) is ready for the Record Editor.",
-      "stemsUnavailableHint": "This build was compiled without the stem engine. Rebuild with --features stems."
+      "stemsUnavailableHint": "This build was compiled without the stem engine. Rebuild with --features stems.",
+      "autosave": "Autosave",
+      "autosaveHint": "Save the project automatically after changes. If off, changes are only written when you choose Save.",
+      "autosaveInterval": "Autosave interval",
+      "autosaveInstant": "After every change",
+      "autosaveSeconds": "Every {count} s",
+      "autosaveMinutes": "Every {count} min"
     },
     "audio": {
       "title": "Audio",
@@ -379,7 +385,19 @@
     "duplicateNameError": "A project with this name already exists.",
     "removeRecent": "Remove from list",
     "create": "Create",
-    "newPlaceholder": "New project name…"
+    "newPlaceholder": "New project name…",
+    "upgradeTitle": "Older project format",
+    "upgradeMessage": "This project was saved with an older version of Sound Ninja. It has to be converted before it can be opened in this version.",
+    "upgradeCopy": "Convert a copy",
+    "upgradeCopyHint": "The original file stays untouched. Recommended.",
+    "upgradeInPlace": "Convert this file",
+    "upgradeInPlaceHint": "A backup of the original is kept next to it.",
+    "newerTitle": "Project from a newer version",
+    "newerMessage": "This project was saved with a newer version of Sound Ninja ({version}). Parts of it may not show up here. To keep the original safe, it can only be opened as a copy.",
+    "newerCopy": "Open a copy",
+    "recoveredTitle": "Project recovered",
+    "recoveredSnapshot": "The project file was incomplete. {count} sounds were restored from the recovery copy stored inside the project.",
+    "recoveredBackup": "The project file was damaged. {count} sounds were restored from the backup file."
   },
   "common": {
     "saving": "Saving…",
@@ -688,5 +706,15 @@
     "keepAwake": "Keep screen on",
     "keepAwakeHint": "Stop the phone from sleeping while this page is open.",
     "settingsBack": "Settings"
+  },
+  "saveOptions": {
+    "title": "Save options",
+    "firstSaveHint": "Choose what is stored inside the project file. You can change this later with Save As.",
+    "hint": "Choose what is stored inside the project file.",
+    "embedAudio": "Store sound files in the project",
+    "embedAudioHint": "The project file contains all audio and can be shared as a single file. The file gets larger.",
+    "embedGifs": "Store GIFs and images in the project",
+    "embedGifsHint": "Button backgrounds travel with the project file. If off, they stay on this computer only.",
+    "embedMissing": "{count} sound files could not be stored in the project because they were not found:"
   }
 }

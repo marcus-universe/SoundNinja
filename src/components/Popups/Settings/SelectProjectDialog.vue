@@ -68,10 +68,10 @@ import { invoke } from '@tauri-apps/api/core'
 import {
   createProjectFolder,
   projectDbPath,
-  projectNameFromDbPath,
   pickProjectFile,
   type ProjectInfo,
 } from '~/utils/projects'
+import { openProjectFlow } from '~/utils/projectOpen'
 
 const { t } = useI18n()
 
@@ -107,11 +107,7 @@ async function selectProject(proj: ProjectInfo) {
       await appSettings.removeRecentProject(proj.dbPath)
       return
     }
-    await jsonStore.openProject(proj.dbPath)
-    await appSettings.touchRecent(proj.dbPath, proj.name)
-    await jsonStore.validateSoundPaths()
-    if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
-    closeDialog()
+    if (await openProjectFlow(proj.dbPath)) closeDialog()
   } catch (e) {
     console.error('Failed to load project', e)
     errorMessage.value = String(e)
@@ -132,11 +128,7 @@ async function openExisting() {
   const dbPath = await pickProjectFile()
   if (!dbPath) return
   try {
-    await jsonStore.openProject(dbPath)
-    await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
-    await jsonStore.validateSoundPaths()
-    if (jsonStore.missingPaths.length) appStore.setRelinkActive(true)
-    closeDialog()
+    if (await openProjectFlow(dbPath)) closeDialog()
   } catch (e) {
     console.error('Failed to open project', e)
     errorMessage.value = String(e)
@@ -154,8 +146,7 @@ async function createProject() {
       return
     }
     const createdPath = await createProjectFolder(appSettings.projectsPath, name)
-    await jsonStore.openProject(createdPath)
-    await appSettings.touchRecent(createdPath, projectNameFromDbPath(createdPath))
+    if (!(await openProjectFlow(createdPath))) return
     errorMessage.value = ''
     newProjectName.value = ''
     closeDialog()

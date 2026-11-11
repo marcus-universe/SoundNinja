@@ -136,6 +136,46 @@
   margin-top: $padding_1;
 }
 
+.dialog-actions--wrap {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+// Explains what each button of a question dialog does.
+.choice-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 44rem;
+  color: $white;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  opacity: 0.85;
+}
+
+// "What goes into the project file" checkboxes.
+.save-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  max-width: 44rem;
+
+  .ui-checkbox {
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}
+
+.save-options__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+}
+
 .import-chooser-actions {
   justify-content: center;
   align-items: center;

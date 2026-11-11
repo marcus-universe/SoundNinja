@@ -30,7 +30,7 @@ pub struct GifCacheEntry {
     pub poster_path: String,
 }
 
-fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_cache_dir()
@@ -38,6 +38,42 @@ fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .join("gif-cache");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
+}
+
+/// Persistent image store for projects saved without embedded images. Unlike
+/// the cache it is never cleared: for those projects it holds the only copy.
+pub(crate) fn library_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("gif-library");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Write one image (plus optional poster and mime marker) into `dir` using the
+/// cache layout, so `hit_on_disk` finds it again.
+pub(crate) fn store_files(
+    dir: &Path,
+    id: &str,
+    mime: &str,
+    data: &str,
+    poster: Option<&str>,
+) -> Result<(PathBuf, PathBuf), String> {
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let anim = dir.join(format!("{id}.{}", extension_for(mime)));
+    write_if_missing(&anim, data)?;
+    let poster_path = match poster {
+        Some(p) if !p.is_empty() => {
+            let path = dir.join(format!("{id}.poster.png"));
+            write_if_missing(&path, p)?;
+            path
+        }
+        _ => anim.clone(),
+    };
+    std::fs::write(dir.join(format!("{id}.mime")), mime).map_err(|e| e.to_string())?;
+    Ok((anim, poster_path))
 }
 
 pub(crate) fn extension_for(mime: &str) -> &'static str {
@@ -120,10 +156,13 @@ fn resolve_paths(
         return Ok(Vec::new());
     }
 
+    let library = library_dir(app).ok();
     let mut out = Vec::with_capacity(wanted.len());
     let mut missing: Vec<&str> = Vec::new();
     for id in &wanted {
-        match hit_on_disk(&dir, id) {
+        let hit = hit_on_disk(&dir, id)
+            .or_else(|| library.as_deref().and_then(|lib| hit_on_disk(lib, id)));
+        match hit {
             Some(entry) => out.push(entry),
             None => missing.push(id.as_str()),
         }
@@ -132,7 +171,14 @@ fn resolve_paths(
         return Ok(out);
     }
 
-    for row in read_blobs(project_db, &missing)? {
+    // A project without a `gif_blobs` table (or one mid-save) must not blank
+    // the images that were already found on disk.
+    let rows = match read_blobs(project_db, &missing) {
+        Ok(rows) => rows,
+        Err(e) if out.is_empty() => return Err(e),
+        Err(_) => Vec::new(),
+    };
+    for row in rows {
         let ext = extension_for(&row.mime);
         let anim = dir.join(format!("{}.{ext}", row.id));
         write_if_missing(&anim, &row.data)?;
@@ -158,7 +204,7 @@ fn resolve_paths(
     Ok(out)
 }
 
-fn hit_on_disk(dir: &Path, id: &str) -> Option<GifCacheEntry> {
+pub(crate) fn hit_on_disk(dir: &Path, id: &str) -> Option<GifCacheEntry> {
     let mime = std::fs::read_to_string(dir.join(format!("{id}.mime"))).ok()?;
     let anim = dir.join(format!("{id}.{}", extension_for(&mime)));
     if !anim.exists() {

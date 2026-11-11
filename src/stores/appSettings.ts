@@ -23,6 +23,14 @@ import { applyUiScale, clampUiScale } from '~/utils/runtime'
 
 const DEFAULT_RECENT_LIMIT = 30
 
+/** Offered autosave cadences in seconds. 0 = after every change. */
+export const AUTOSAVE_INTERVALS = [0, 30, 60, 300, 600] as const
+
+function normalizeAutosaveInterval(value: unknown): number {
+  const n = Math.round(Number(value))
+  return (AUTOSAVE_INTERVALS as readonly number[]).includes(n) ? n : 0
+}
+
 export type TitlebarMode = 'styled' | 'system'
 
 export const useAppSettingsStore = defineStore('appSettings', {
@@ -51,6 +59,10 @@ export const useAppSettingsStore = defineStore('appSettings', {
     basicButtonColors: false,
     /** Check GitHub Releases for a newer version on app start. Default on. */
     checkUpdatesOnStart: true,
+    /** Save the project automatically after changes. Default on. */
+    autosave: true,
+    /** 0 = after every change, otherwise at most every N seconds. */
+    autosaveIntervalSec: 0,
     /** User-supplied Klipy GIF API key (app-wide, never stored in project files). */
     klipyApiKey: '',
     /** User accepted GifSnap API requests (app-wide). */
@@ -131,6 +143,8 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.gifTitleChip = s.gifTitleChip !== '0' && s.gifTitleChip !== 'false'
       this.basicButtonColors = s.basicButtonColors === '1' || s.basicButtonColors === 'true'
       this.checkUpdatesOnStart = s.checkUpdatesOnStart !== '0' && s.checkUpdatesOnStart !== 'false'
+      this.autosave = s.autosave !== '0' && s.autosave !== 'false'
+      this.autosaveIntervalSec = normalizeAutosaveInterval(s.autosaveIntervalSec)
       this.klipyApiKey = s.klipyApiKey || ''
       this.gifsnapConsent = s.gifsnapConsent === '1' || s.gifsnapConsent === 'true'
       attachGifsnapCache(s.gifsnapSearchCache || '', async (blob) => {
@@ -330,6 +344,18 @@ export const useAppSettingsStore = defineStore('appSettings', {
       this.checkUpdatesOnStart = !!enabled
       const d = await this._db()
       await saveSetting(d, 'checkUpdatesOnStart', this.checkUpdatesOnStart ? '1' : '0')
+    },
+
+    async setAutosave(enabled: boolean) {
+      this.autosave = !!enabled
+      const d = await this._db()
+      await saveSetting(d, 'autosave', this.autosave ? '1' : '0')
+    },
+
+    async setAutosaveIntervalSec(seconds: number) {
+      this.autosaveIntervalSec = normalizeAutosaveInterval(seconds)
+      const d = await this._db()
+      await saveSetting(d, 'autosaveIntervalSec', String(this.autosaveIntervalSec))
     },
 
     async setHotkeys(hotkeys: Record<AppHotkeyAction, string>) {
