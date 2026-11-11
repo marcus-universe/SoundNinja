@@ -14,6 +14,13 @@
             @contextmenu.prevent="openBoardMenu"
             @pointerdown="onBoardPointerDown"
         >
+        <div
+            ref="shieldRef"
+            class="scroll-shield"
+            aria-hidden="true"
+            @pointermove="onShieldPointer"
+            @pointerdown="onShieldPointer"
+        />
         <Transition
             :name="tabTransitionName"
             :mode="tabTransitionMode"
@@ -39,16 +46,12 @@
                     :class="{ 'sound-drag-away': dragAwayPaths.has(sound.path) }"
                     :sound="sound"
                     :btnStyle="getBtnStyle(sound)"
-                    :loading="loadingPaths.has(sound.path)"
-                    :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
                     :multi-select="appStore.multiSelectActive"
                     :gifAnimate="gifAnimateAlways"
                     :gifAnimateOnHover="gifAnimateOnHover"
                     :gifPosX="sound.gifPosX ?? 50"
                     :gifPosY="sound.gifPosY ?? 50"
                     :hasGif="!!sound.gifId"
-                    :progressPaused="!!playingSounds.get(sound.index)?.paused || !windowFocused"
-                    :missing="!!jsonStore.missingPaths?.includes(sound.path)"
                     :data-sound-path="sound.path"
                     @play="(e) => onSoundClick(sound, e)"
                     @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
@@ -83,16 +86,12 @@
                             :class="{ 'sound-drag-away': dragAwayPaths.has(sound.path) }"
                             :sound="sound"
                             :btnStyle="getBtnStyle(sound)"
-                            :loading="loadingPaths.has(sound.path)"
-                            :selected="appStore.multiSelectActive && appStore.selectedSoundPaths.includes(sound.path)"
                             :multi-select="appStore.multiSelectActive"
                             :gifAnimate="gifAnimateAlways"
                             :gifAnimateOnHover="gifAnimateOnHover"
                             :gifPosX="sound.gifPosX ?? 50"
                             :gifPosY="sound.gifPosY ?? 50"
                             :hasGif="!!sound.gifId"
-                            :progressPaused="!!playingSounds.get(sound.index)?.paused || !windowFocused"
-                            :missing="!!jsonStore.missingPaths?.includes(sound.path)"
                             :data-sound-path="sound.path"
                             @play="(e) => onSoundClick(sound, e)"
                             @contextmenu="(e) => { e.stopPropagation(); openSoundMenu(e, sound) }"
@@ -165,6 +164,9 @@ import { isRemote } from '~/utils/runtime'
 import { parseOverride, serializeOverride, resolveEffectiveColors, paintOverride } from '~/utils/colorOverride'
 import { normalizeTabTransition } from '~/utils/db'
 import { BOARD_GIF_KEY, ensureGifUrls, peekGifUrls } from '~/utils/gifCache'
+import { BOARD_STATE_KEY } from '~/utils/boardState'
+import { DRAG_TOLERANCE_PX, createPressTracker } from '~/utils/dragClick'
+import { reconcileProgress, startProgress as newProgress } from '~/utils/soundProgress'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -175,6 +177,7 @@ const boardRef = ref(null)
 const orphansRef = ref(null)
 const groupsOuterRef = ref(null)
 const scrollRef = ref(null)
+const shieldRef = ref(null)
 const bulkBarRef = ref(null)
 const bulkColorOpen = ref(false)
 const bulkBarHeight = ref(0)
@@ -207,8 +210,39 @@ const bulkBaseColors = computed(() => {
 })
 
 const currentTab = computed(() => appStore.currentTab)
-const playingSounds = reactive(new Map())
+/** Running playback progress by sound path (see `~/utils/soundProgress`). */
+const progressByPath = reactive(new Map())
 const windowFocused = ref(true)
+
+/** Path → sound, so events naming a path do not scan the file list. */
+const fileByPath = computed(() => new Map((jsonStore.configFile?.files ?? []).map((f) => [f.path, f])))
+
+const missingSet = computed(() => new Set(jsonStore.missingPaths ?? []))
+const selectedSet = computed(() => (
+  appStore.multiSelectActive ? new Set(appStore.selectedSoundPaths) : new Set()
+))
+const tagsById = computed(() => new Map((jsonStore.configFile?.tags ?? []).map((t) => [t.id, t])))
+
+/** How many tag badges fit; read from the CSS button width once per board layout. */
+const badgeCap = ref(3)
+function measureBadgeCap() {
+  if (typeof document === 'undefined') return
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--btn_width')
+  const rem = parseFloat(raw) || 17.6
+  badgeCap.value = rem < 8 ? 1 : rem < 12 ? 2 : 3
+}
+measureBadgeCap()
+
+// Read per key inside each SoundButton. The board template must not read
+// these: one play, load or selection would re-render every button on the tab.
+provide(BOARD_STATE_KEY, {
+  progress: progressByPath,
+  loading: loadingPaths,
+  missing: missingSet,
+  selected: selectedSet,
+  tagsById,
+  badgeCap: computed(() => badgeCap.value),
+})
 
 const sortMode = computed(() => {
   const m = jsonStore.configFile?.settings?.sortMode
@@ -372,9 +406,15 @@ function reorderDisabled() {
     || !groupedLayout.value
 }
 
+// Dead zone before a press becomes a drag; an unsteady pointer (VR controller)
+// would otherwise start one on nearly every click.
 const touchDrag = isRemote
-  ? { delay: 120, delayOnTouchOnly: true, fallbackTolerance: 4 }
-  : {}
+  ? { delay: 120, delayOnTouchOnly: true, fallbackTolerance: DRAG_TOLERANCE_PX }
+  : { fallbackTolerance: DRAG_TOLERANCE_PX }
+
+/** Follows each press on the board so a drag that went nowhere can count as a click. */
+const press = createPressTracker()
+let detachPress = null
 
 function syncSortableDisabled() {
   const disabled = reorderDisabled()
@@ -533,6 +573,13 @@ function onInnerEnd(evt) {
   const { oldIndex, newIndex, from, to } = evt
   if (!carried && from === to && (oldIndex === newIndex || oldIndex == null || newIndex == null)) {
     dragCarried = []
+    // Nothing moved and the pointer barely did: this was a click that
+    // SortableJS took for a drag. The browser's own click is swallowed (by
+    // SortableJS or by dragGuard), so run the action here.
+    if (press.wasClick()) {
+      const sound = fileByPath.value.get(evt.item?.getAttribute('data-sound-path'))
+      if (sound) activateSound(sound, evt.originalEvent)
+    }
     return
   }
   // Read target layout from DOM *before* revert (Sortable already moved the node).
@@ -551,7 +598,6 @@ function bindInnerSortable(el) {
     animation: 180,
     forceFallback: true,
     fallbackOnBody: true,
-    fallbackTolerance: 4,
     ...touchDrag,
     disabled: reorderDisabled(),
     draggable: '.Soundbtn',
@@ -604,6 +650,8 @@ onUnmounted(() => {
   if (visibilityFrame) cancelAnimationFrame(visibilityFrame)
   scrollRef.value?.removeEventListener('scroll', onBoardScroll)
   clearTimeout(scrollIdleTimer)
+  detachPress?.()
+  detachPress = null
   bulkBarObserver?.disconnect()
   bulkBarObserver = null
   endMarqueeListeners()
@@ -820,28 +868,43 @@ watch(
       if (urls) gifUrls[f.gifId] = urls
     }
     pruneBtnStyleCache()
-    nextTick(() => {
-      setupSortables()
-      setupGifObserver()
-      loadVisibleGifs()
-      warmTabSounds()
-    })
+    measureBadgeCap()
+    scheduleBoardRefresh()
   },
   { flush: 'post' },
 )
+
+/**
+ * Rebind drag lists and the visibility observer to the board's current DOM.
+ * A tab switch asks for this from several places in one tick (tab watcher,
+ * board signature, the new tab element mounting); it runs once.
+ */
+let boardRefreshQueued = false
+function scheduleBoardRefresh() {
+  if (boardRefreshQueued) return
+  boardRefreshQueued = true
+  nextTick(() => {
+    boardRefreshQueued = false
+    setupSortables()
+    setupGifObserver()
+    loadVisibleGifs()
+    warmTabSounds()
+  })
+}
 
 watch(currentTab, () => {
   destroySortables()
   gifObserver?.disconnect()
   gifObserver = null
   for (const k of Object.keys(visibleByPath)) delete visibleByPath[k]
-  nextTick(() => {
-    setupSortables()
-    setupGifObserver()
-    loadVisibleGifs()
-    warmTabSounds()
-  })
+  scheduleBoardRefresh()
 })
+
+// With an out-in tab transition the new tab's element only exists after the
+// old one has left, later than the watchers above. Bind again once it mounts.
+watch(boardRef, (el, prev) => {
+  if (el && prev && el !== prev) scheduleBoardRefresh()
+}, { flush: 'post' })
 
 watch(preloadGifs, (on) => {
   if (on) loadAllGifs()
@@ -880,38 +943,15 @@ function openBoardMenu(event) {
  */
 const btnStyleCache = new Map()
 
+/** Colours and stagger slot only. Playback progress is drawn by the button itself. */
 function getBtnStyle(sound) {
   const si = staggerIndexByKey.value[sound.path]
-  const info = sound.active ? playingSounds.get(sound.index) : null
-  const running = info && info.duration > 0
-
-  // Progress advances with wall-clock time, so it is part of the identity.
-  const elapsed = running
-    ? info.paused
-      ? (info.elapsedMs || 0) / 1000
-      : Math.min(info.duration, (Date.now() - info.startTime) / 1000)
-    : 0
-  // Rounded: the CSS transition draws the sweep, this only sets its start.
-  const from = running ? Math.round(Math.min(100, (elapsed / info.duration) * 100) * 10) / 10 : 0
-  const frozen = running && (info.paused || !windowFocused.value)
-
-  const signature = [si, running ? 1 : 0, from, frozen ? 1 : 0, running ? info.duration : 0, sound.color]
-    .join('|')
+  const signature = si + '|' + (sound.color ?? '')
   const cached = btnStyleCache.get(sound.path)
   if (cached && cached.signature === signature) return cached.style
 
   const style = {}
   if (si != null) style['--stagger-i'] = si
-  if (running) {
-    style['--sound-progress-from'] = from + '%'
-    if (frozen) {
-      style['--sound-progress'] = from + '%'
-      style['--sound-progress-dur'] = '0s'
-    } else {
-      style['--sound-progress'] = '100%'
-      style['--sound-progress-dur'] = Math.max(0, info.duration - elapsed) + 's'
-    }
-  }
   const o = parseOverride(sound.color)
   if (o.bg) style['--color-btn'] = o.bg
   if (o.bgHover) style['--btn-bg-hover'] = o.bgHover
@@ -942,74 +982,33 @@ function openSoundMenu(event, sound) {
   })
 }
 
-function startProgress(soundFileIndex, duration) {
-  playingSounds.set(soundFileIndex, {
-    duration,
-    startTime: Date.now(),
-    paused: false,
-    elapsedMs: 0,
-  })
-}
-
-function stopProgress(soundFileIndex) {
-  playingSounds.delete(soundFileIndex)
+function stopProgress(path) {
+  progressByPath.delete(path)
 }
 
 function stopAllProgress() {
-  playingSounds.clear()
+  progressByPath.clear()
 }
 
-function syncProgressPauseState(list) {
-  const files = jsonStore.configFile?.files || []
-  const byPath = new Map((list || []).map((p) => [p.path, p]))
+function rememberedDuration(file) {
+  const meta = Number(file?.durationSecs)
+  return Number.isFinite(meta) && meta > 0 ? meta : 0
+}
 
+/**
+ * Bring the buttons' progress in line with what the backend is playing.
+ * `reconcileProgress` hands back the same object when nothing visible changed,
+ * so an event only touches the buttons whose playback really moved.
+ */
+function syncProgress(list) {
+  const files = fileByPath.value
+  const now = Date.now()
   for (const snap of list || []) {
-    const file = files.find((f) => f.path === snap.path)
+    const file = files.get(snap.path)
     if (!file || !file.active) continue
-    const meta = Number(file.durationSecs)
-    const snapDur = Number(snap.durationSecs)
-    const dur = Math.max(
-      Number.isFinite(meta) && meta > 0 ? meta : 0,
-      Number.isFinite(snapDur) && snapDur > 0 ? snapDur : 0,
-    )
-    if (!(dur > 0)) continue
-    const info = playingSounds.get(file.index)
-    const posSec = Number(snap.positionSecs)
-    const elapsedMs = Number.isFinite(posSec) ? Math.max(0, posSec * 1000) : 0
-    if (!info) {
-      playingSounds.set(file.index, {
-        duration: dur,
-        startTime: Date.now() - elapsedMs,
-        paused: !!snap.paused,
-        elapsedMs,
-      })
-      continue
-    }
-    if (dur > info.duration) info.duration = dur
-  }
-
-  for (const [fileIndex, info] of playingSounds) {
-    const file = files.find((f) => f.index === fileIndex)
-    if (!file || !byPath.has(file.path)) continue
-    const snap = byPath.get(file.path)
-    const shouldPause = !!snap.paused
-    const posSec = Number(snap.positionSecs)
-    if (Number.isFinite(posSec) && info.duration > 0) {
-      info.elapsedMs = Math.max(0, posSec * 1000)
-      info.startTime = Date.now() - info.elapsedMs
-    }
-
-    if (shouldPause && !info.paused) {
-      if (!Number.isFinite(posSec)) {
-        info.elapsedMs = Math.max(0, Date.now() - info.startTime)
-      }
-      info.paused = true
-    } else if (!shouldPause && info.paused) {
-      info.startTime = Date.now() - (info.elapsedMs || 0)
-      info.paused = false
-    } else if (!shouldPause) {
-      info.paused = false
-    }
+    const current = progressByPath.get(snap.path)
+    const next = reconcileProgress(current, snap, rememberedDuration(file), now, !isRemote)
+    if (next && next !== current) progressByPath.set(snap.path, next)
   }
 }
 
@@ -1022,24 +1021,44 @@ function syncWindowFocus() {
 
 // While the board moves under a resting pointer (wheel, or a controller stick
 // mapped to the wheel), every button it passes would fire hover: style
-// recalcs plus a GIF swap to its animated file. Switch pointer events off for
-// the duration of the scroll. Plain classList, so Vue does not re-render.
-const SCROLL_IDLE_MS = 140
+// recalcs plus a GIF swap to its animated file. A single transparent element
+// catches the pointer for the duration of the scroll. One element changes
+// style; switching `pointer-events` on the board itself is inherited and
+// restyled every button at each scroll start and stop — once per stick tick.
+const SCROLL_IDLE_MS = 160
+/** Pointer activity this soon after a scroll event is the scroll itself (laser jitter). */
+const SCROLL_SETTLE_MS = 80
 let scrollIdleTimer = 0
+let lastScrollAt = 0
+
+function dropShield() {
+  clearTimeout(scrollIdleTimer)
+  scrollIdleTimer = 0
+  shieldRef.value?.classList.remove('is-on')
+}
 
 function onBoardScroll() {
-  const el = scrollRef.value
-  if (!el) return
-  if (!scrollIdleTimer) el.classList.add('is-scrolling')
-  else clearTimeout(scrollIdleTimer)
-  scrollIdleTimer = setTimeout(() => {
-    scrollIdleTimer = 0
-    scrollRef.value?.classList.remove('is-scrolling')
-  }, SCROLL_IDLE_MS)
+  const shield = shieldRef.value
+  const scroll = scrollRef.value
+  if (!shield || !scroll) return
+  lastScrollAt = performance.now()
+  if (!scrollIdleTimer) {
+    shield.style.setProperty('--shield-h', scroll.clientHeight + 'px')
+    shield.classList.add('is-on')
+  } else {
+    clearTimeout(scrollIdleTimer)
+  }
+  scrollIdleTimer = setTimeout(dropShield, SCROLL_IDLE_MS)
+}
+
+/** The pointer is being aimed again: give the buttons back at once. */
+function onShieldPointer() {
+  if (performance.now() - lastScrollAt > SCROLL_SETTLE_MS) dropShield()
 }
 
 onMounted(async () => {
   scrollRef.value?.addEventListener('scroll', onBoardScroll, { passive: true })
+  if (scrollRef.value) detachPress = press.attach(scrollRef.value)
   setupGifObserver()
   document.addEventListener('visibilitychange', syncWindowFocus)
   window.addEventListener('focus', syncWindowFocus)
@@ -1048,8 +1067,8 @@ onMounted(async () => {
     const path = event.payload
     const idx = jsonStore.configFile.files.findIndex((f) => f.path === path)
     if (idx !== -1) {
-      const fileIndex = jsonStore.configFile.files[idx].index
-      stopProgress(fileIndex)
+      stopProgress(path)
+      loadingPaths.delete(path)
       jsonStore.setActiveSound({ soundindex: idx, status: false })
     } else {
       stopAllProgress()
@@ -1057,7 +1076,7 @@ onMounted(async () => {
     }
   })
   unlistenPlaying = await listen('playing_changed', (event) => {
-    syncProgressPauseState(event.payload ?? [])
+    syncProgress(event.payload ?? [])
   })
   window.addEventListener('sn:play-sound-id', onPlaySoundId)
   window.addEventListener('sn:stop-sound-id', onStopSoundId)
@@ -1098,7 +1117,7 @@ function stopSoundById(soundId) {
   if (!sound || !sound.active) return
   const fileArrayIndex = jsonStore.configFile.files.indexOf(sound)
   const overlapSounds = Settings.value.overlapSounds ?? false
-  stopProgress(sound.index)
+  stopProgress(sound.path)
   loadingPaths.delete(sound.path)
   jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
   invoke('play_sound', {
@@ -1122,6 +1141,11 @@ function onHotkeyStopAll() {
 
 function onSoundClick(sound, e) {
   if (dragGuard) return
+  activateSound(sound, e)
+}
+
+/** What a click on a sound button does: select, relink or play. */
+function activateSound(sound, e) {
   if (appStore.multiSelectActive) {
     if (e?.shiftKey && appStore.selectionAnchorPath) {
       const paths = allDisplaySounds.value.map((s) => s.path)
@@ -1310,20 +1334,22 @@ async function setActiveSound(sound) {
     })
       .then((duration) => {
         if (!sound.active) return
-        const meta = Number(sound.durationSecs)
+        // The backend's `playing_changed` carries the real position and may
+        // already have arrived; this is only the first guess until it does.
+        if (progressByPath.has(sound.path)) return
         const fromPlay = typeof duration === 'number' && duration > 0 ? duration : 0
-        const dur = Math.max(fromPlay, Number.isFinite(meta) && meta > 0 ? meta : 0)
-        if (dur > 0) startProgress(sound.index, dur)
+        const dur = Math.max(fromPlay, rememberedDuration(sound))
+        if (dur > 0) progressByPath.set(sound.path, newProgress(dur, Date.now(), !!sound.looping))
       })
       .catch((e) => {
         console.error('Sound playback error', e)
-        stopProgress(sound.index)
+        stopProgress(sound.path)
         jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
       })
       .finally(() => loadingPaths.delete(sound.path))
   } else {
     if (!stopOnRetrigger) return
-    stopProgress(sound.index)
+    stopProgress(sound.path)
     loadingPaths.delete(sound.path)
     jsonStore.setActiveSound({ soundindex: fileArrayIndex, status: false })
     invoke('play_sound', {

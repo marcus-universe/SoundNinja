@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { markRaw } from 'vue'
 import {
   ensureSchema, withProjectDb, commitProject, copyProject, forgetProject, loadProject,
   extractProjectMedia, saveConfig, saveMeta, saveHistory, saveSnapshot, loadLatestSnapshot,
@@ -29,6 +30,16 @@ import {
  *  deep-clones and strips Vue reactive Proxies (which structuredClone rejects). */
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
+}
+
+/**
+ * A copy of the board that is kept, not shown: undo/redo entries and the
+ * state at open or last save. Marked raw so Vue neither wraps nor walks it —
+ * the history can hold a hundred full boards, and every deep watcher on the
+ * store would otherwise traverse all of them on each change.
+ */
+function frozenCopy<T extends object>(v: T): T {
+  return markRaw(clone(v))
 }
 
 /** Cap undo/redo stacks so memory stays bounded for large projects. */
@@ -141,7 +152,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
     // ── Undo / redo ───────────────────────────────────────────────────────────
     /** Copy of the live board, tagged with a fresh history id. */
     takeSnapshot(): ProjectConfig {
-      const snap = clone(this.configFile)
+      const snap = frozenCopy(this.configFile)
       snap._hid = ++this._hidSeq
       return snap
     },
@@ -240,7 +251,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       if (!this.configFile.tags) this.configFile.tags = []
       // The board as found on disk. The first save of the session stores it
       // as a recovery snapshot (and, for an old file, as its pre-upgrade state).
-      this.openingSnapshot = clone(config)
+      this.openingSnapshot = frozenCopy(config)
       this.projectMeta = { ...defaultMeta(), ...loaded.meta }
       this.currentProjectPath = dbAbsPath
       this.missingPaths = []
@@ -253,8 +264,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
       // Undo/redo come back with the project. After a recovery the stored
       // history describes a different board, so it is dropped.
       const history = report.recovered ? { undo: [], redo: [], sizes: new Map<number, number>() } : loaded.history
-      this.undoStack = history.undo.slice(-MAX_HISTORY)
-      this.redoStack = history.redo.slice(-MAX_HISTORY)
+      this.undoStack = history.undo.slice(-MAX_HISTORY).map((snap) => markRaw(snap))
+      this.redoStack = history.redo.slice(-MAX_HISTORY).map((snap) => markRaw(snap))
       storedHistory = new Map(history.sizes)
       this._hidSeq = Math.max(0, ...history.sizes.keys())
 
@@ -286,7 +297,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
           console.error('Failed to write back the opened project', e)
         }
       }
-      this.openingSnapshot = clone(this.configFile)
+      this.openingSnapshot = frozenCopy(this.configFile)
       this._savedUndo = [...this.undoStack]
       this._savedRedo = [...this.redoStack]
       this.dirty = false
@@ -556,7 +567,8 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
      * project options, undo/redo history and (first save of a session) a
      * recovery snapshot. On failure the file is left exactly as it was.
      */
-    async persistNow() {
+    /** `progress`: have the backend report save progress (manual saves show a bar). */
+    async persistNow(opts: { progress?: boolean } = {}) {
       if (isRemote) {
         this.dirty = false
         return
@@ -612,11 +624,12 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
           embedAudio: meta.embedAudio,
           embedGifs: meta.embedGifs,
           backup: firstOfSession,
+          ...(opts.progress ? { progress: true } : {}),
         })
         storedHistory = sizes
         this._sessionSaved = true
         this.lastSaveReport = report
-        this.openingSnapshot = clone(this.configFile)
+        this.openingSnapshot = frozenCopy(this.configFile)
         this._savedUndo = [...this.undoStack]
         this._savedRedo = [...this.redoStack]
         // A change that arrived while the save ran is still unsaved.
@@ -636,7 +649,11 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
      * along), switch to the copy, then write the current board into it. The
      * original keeps the state of its last save.
      */
-    async saveAs(dbAbsPath: string, options?: { embedAudio: boolean; embedGifs: boolean }) {
+    async saveAs(
+      dbAbsPath: string,
+      options?: { embedAudio: boolean; embedGifs: boolean },
+      opts: { progress?: boolean } = {},
+    ) {
       const { ensureProjectParentDir, removeInvalidProjectPlaceholder } = await import('~/utils/projects')
       await ensureProjectParentDir(dbAbsPath)
       await removeInvalidProjectPlaceholder(dbAbsPath)
@@ -646,7 +663,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         await this.importConfig(clone(this.configFile), dbAbsPath)
         if (options) {
           this.setSaveOptions(options)
-          await this.persistNow()
+          await this.persistNow(opts)
         }
         return
       }
@@ -659,7 +676,7 @@ export const useJsonHandelingStore = defineStore('JsonHandeling', {
         this._sessionSaved = true
       }
       if (options) this.setSaveOptions(options)
-      await this.persistNow()
+      await this.persistNow(opts)
     },
 
     updateConfigFile(contents: ProjectConfig) {

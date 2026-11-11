@@ -41,6 +41,7 @@
 import Sortable from 'sortablejs'
 import { parseOverride } from '~/utils/colorOverride'
 import { isRemote } from '~/utils/runtime'
+import { DRAG_TOLERANCE_PX, createPressTracker } from '~/utils/dragClick'
 
 const appStore = useAppStore()
 const jsonStore = useJsonHandelingStore()
@@ -48,6 +49,9 @@ const jsonStore = useJsonHandelingStore()
 const tabListRef = ref(null)
 const tabContainerRef = ref(null)
 let sortable = null
+/** Follows each press on the tab strip so a drag that went nowhere can count as a click. */
+const press = createPressTracker()
+let detachPress = null
 
 const allowReorder = computed(() => jsonStore.configFile?.settings?.allowReorder !== false)
 
@@ -66,17 +70,27 @@ function onTabWheel(e) {
 }
 
 onMounted(() => {
+  if (tabListRef.value) detachPress = press.attach(tabListRef.value)
   sortable = Sortable.create(tabListRef.value, {
     animation: 180,
     forceFallback: true,
     fallbackOnBody: true,
-    ...(isRemote ? { delay: 120, delayOnTouchOnly: true, fallbackTolerance: 4 } : {}),
+    // Dead zone before a press becomes a drag: without it any pointer
+    // movement, even one pixel from an unsteady controller, started one.
+    fallbackTolerance: DRAG_TOLERANCE_PX,
+    ...(isRemote ? { delay: 120, delayOnTouchOnly: true } : {}),
     disabled: !allowReorder.value,
     draggable: '.tab',
     ghostClass: 'drag-over',
     onEnd(evt) {
       const { oldIndex, newIndex, item, from } = evt
-      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+      if (oldIndex === newIndex || oldIndex == null || newIndex == null) {
+        // The tab did not move and the pointer barely did: a click that
+        // SortableJS took for a drag and whose click event it swallows.
+        const name = item?.getAttribute('data-tab-name')
+        if (name && press.wasClick()) CheckTabContent(name)
+        return
+      }
       // Undo SortableJS's DOM mutation so Vue owns the final order.
       from.removeChild(item)
       from.insertBefore(item, from.children[oldIndex] ?? null)
@@ -99,6 +113,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  detachPress?.()
+  detachPress = null
   sortable?.destroy()
   sortable = null
 })

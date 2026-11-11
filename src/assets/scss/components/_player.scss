@@ -196,7 +196,11 @@
 
   &__bar-fill {
     height: 100%;
-    width: 0;
+    width: 100%;
+    // Scaled, not resized: the fill moves 20 times a second and a width
+    // change would lay the bar out again each time.
+    transform: scaleX(0);
+    transform-origin: left center;
     border-radius: inherit;
     background: var(--primary_color);
     pointer-events: none;

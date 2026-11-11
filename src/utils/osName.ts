@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { platform } from '@tauri-apps/plugin-os'
+import { arch, platform } from '@tauri-apps/plugin-os'
+import { isRemote } from '~/utils/runtime'
 
 /**
  * OS name. Seeded from the user agent so the first paint already knows Linux.
@@ -33,4 +34,30 @@ export function ensureOs() {
       ;(name as Promise<string>).then((next) => { osName.value = next }).catch(() => {})
     }
   } catch { /* keep the sync guess */ }
+}
+
+/** Linux on an ARM CPU, judged from the user agent (`X11; Linux aarch64`). */
+function looksLikeLinuxArm(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const blob = `${navigator.userAgent || ''} ${navigator.platform || ''}`
+  return /linux/i.test(blob) && !/android/i.test(blob) && /aarch64|arm64|armv\d/i.test(blob)
+}
+
+/**
+ * Switch on reduced effects (`html.sn-lowfx`, see `base/_lowfx.scss`) for the
+ * desktop app on Linux ARM. Decided from the user agent first so the first
+ * paint is already right, then confirmed with what the OS plugin reports.
+ * The browser mirror never gets it: there the page runs on someone's phone.
+ */
+export function applyPlatformEffects() {
+  if (!import.meta.client || isRemote) return
+  let lowFx = looksLikeLinuxArm()
+  try {
+    const os = platform() as unknown
+    const cpu = arch() as unknown
+    if (typeof os === 'string' && typeof cpu === 'string' && os && cpu) {
+      lowFx = os === 'linux' && (cpu === 'aarch64' || cpu === 'arm')
+    }
+  } catch { /* keep the user-agent guess */ }
+  document.documentElement.classList.toggle('sn-lowfx', lowFx)
 }

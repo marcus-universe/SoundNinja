@@ -146,9 +146,31 @@
       // Room for floating player chip above the bottom edge.
       padding-bottom: 5rem;
 
-      // Set by SoundContainer while scrolling: no hover churn under the pointer.
-      &.is-scrolling .SoundTab {
-        pointer-events: none;
+    }
+
+    // Catches the pointer while the board scrolls (see SoundContainer): no
+    // hover churn on the buttons passing underneath. Zero-height and sticky,
+    // so it stays at the top of the viewport without taking space; the
+    // pseudo-element covers exactly the visible height.
+    .scroll-shield {
+      position: sticky;
+      top: 0;
+      left: 0;
+      height: 0;
+      z-index: 30;
+      pointer-events: none;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--shield-h, 0px);
+      }
+
+      &.is-on {
+        pointer-events: auto;
       }
     }
 
@@ -370,26 +392,18 @@
           pointer-events: none;
         }
 
-        // Progress fill — CSS animation from --sound-progress-from to 100%.
-        &::before {
-          content: '';
+        // Progress fill. SoundButton drives it with a Web Animation on
+        // transform, positioned from the audio clock — the compositor moves
+        // it, so a playing button costs no layout.
+        .sound-progress {
           position: absolute;
-          top: 0;
-          left: 0;
-          bottom: 0;
-          width: var(--sound-progress, 0%);
+          inset: 0;
+          transform: scaleX(0);
+          transform-origin: left center;
           background-color: var(--btn-border, var(--primary_color));
           opacity: 0.3;
           z-index: 2;
           pointer-events: none;
-        }
-
-        &.active:not(.progress-paused)::before {
-          animation: sound-progress-fill var(--sound-progress-dur, 0s) linear forwards;
-        }
-
-        &.progress-paused::before {
-          animation: none;
         }
 
         .sound-label {
@@ -526,6 +540,7 @@
           border-radius: 50%;
           z-index: 4;
           pointer-events: none;
+          animation: sound-spin 0.7s linear infinite;
         }
       }
     }
@@ -542,7 +557,7 @@ body > .Soundbtn.sortable-fallback {
   opacity: 0.92 !important;
 
   // No progress fill on the ghost.
-  &::before {
+  .sound-progress {
     display: none;
   }
 }
@@ -572,11 +587,6 @@ body > .Soundbtn.sound-drag-stack__card {
   to {
     transform: rotate(360deg);
   }
-}
-
-@keyframes sound-progress-fill {
-  from { width: var(--sound-progress-from, 0%); }
-  to { width: 100%; }
 }
 
 @keyframes tab-stagger-zoom-in {

@@ -85,9 +85,24 @@
         :title="savePopup === 'saved' ? $t('common.savedTitle') : $t('common.saving')"
         @close="savePopup = null"
       >
-        <div class="flex_c_v align_c gap1 save-popup-body">
-          <span v-if="savePopup === 'saving'" class="saving-indicator__spinner" aria-hidden="true" />
-          <p class="dialog-text">{{ savePopup === 'saved' ? $t('common.saved') : $t('common.saving') }}</p>
+        <div v-if="savePopup === 'saving'" class="save-progress">
+          <div class="save-progress__head">
+            <span class="save-progress__phase">{{ $t('saveProgress.' + saveProgress.phase) }}</span>
+            <span class="save-progress__pct">{{ saveProgress.percent }}%</span>
+          </div>
+          <div
+            class="save-progress__bar"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="saveProgress.percent"
+            :aria-valuetext="$t('saveProgress.' + saveProgress.phase)"
+          >
+            <div class="save-progress__fill" :style="{ transform: `scaleX(${saveProgress.percent / 100})` }" />
+          </div>
+        </div>
+        <div v-else class="flex_c_v align_c gap1 save-popup-body">
+          <p class="dialog-text">{{ $t('common.saved') }}</p>
         </div>
       </DialogField>
       <DialogField
@@ -161,11 +176,17 @@ import { resolveAppLocale } from '~/utils/locales'
 import { publishRemoteState } from '~/utils/remote'
 import { isRemote, REMOTE_LOCALE_KEY } from '~/utils/runtime'
 import { bootRemoteSession, publishThemeFromDom, startWebuiHost } from '~/utils/webuiHost'
+import { applySaveProgress, initialSaveProgress } from '~/utils/saveProgress'
+import { applyPlatformEffects } from '~/utils/osName'
+import { initPerf } from '~/utils/perf'
 
 const jsonStore = useJsonHandelingStore()
 const appStore = useAppStore()
 const appSettings = useAppSettingsStore()
 const { t, setLocale } = useI18n()
+
+// Before the first paint: reduced effects on Linux ARM.
+applyPlatformEffects()
 
 /**
  * Everything registered outside Vue's own bookkeeping (Tauri event handles,
@@ -191,6 +212,8 @@ watch(() => appStore.activeOverlay, (val) => {
 })
 const savePopup = ref(null)
 let savePopupTimer = null
+/** Progress of the manual save shown in the popup; fed by `project_save_progress`. */
+const saveProgress = ref(initialSaveProgress())
 const transferPopup = ref(null)
 
 // Secondary windows (e.g. the Theme Creator) reuse the same SPA bundle. Only the
@@ -421,6 +444,7 @@ async function withSavePopup(work) {
     clearTimeout(savePopupTimer)
     savePopupTimer = null
   }
+  saveProgress.value = initialSaveProgress()
   savePopup.value = 'saving'
   try {
     await work()
@@ -436,7 +460,7 @@ async function withSavePopup(work) {
 }
 
 async function persistOrReport() {
-  return withSavePopup(() => jsonStore.persistNow())
+  return withSavePopup(() => jsonStore.persistNow({ progress: true }))
 }
 
 /** After a manual save: say so if audio meant to be stored in the project was missing. */
@@ -497,7 +521,7 @@ async function handleMenuSaveAs() {
   const dbPath = await pickSaveProjectFile()
   if (!dbPath) return
   const saved = await withSavePopup(async () => {
-    await jsonStore.saveAs(dbPath, picked)
+    await jsonStore.saveAs(dbPath, picked, { progress: true })
     await appSettings.touchRecent(dbPath, projectNameFromDbPath(dbPath))
   })
   if (saved) reportSaveIssues()
@@ -754,6 +778,8 @@ onMounted(async () => {
   splashLabel.value = t('splash.ready')
   splashPercent.value = 100
   setTimeout(() => { booting.value = false }, 280)
+  // Developer diagnostics; does nothing unless started with SN_PERF / SN_PERF_SELFTEST.
+  void initPerf()
 
   // Fetch the settings chunk once the board is up. Opening settings is then
   // instant, and first paint never waited for it.
@@ -784,6 +810,10 @@ onMounted(async () => {
       console.error('Failed to open project', err)
       appStore.setErrorActive(`${t('common.failedOpenProject')}\n\n${formatError(err)}`)
     }
+  })
+  listen('project_save_progress', (e) => {
+    if (savePopup.value !== 'saving') return
+    saveProgress.value = applySaveProgress(saveProgress.value, e?.payload)
   })
   listen('menu_save', handleMenuSave)
   listen('menu_save_as', handleMenuSaveAs)
@@ -843,8 +873,10 @@ onMounted(async () => {
     try { await appSettings.applyRemote() } catch { /* remoteError set in store */ }
     scheduleRemotePublish()
   }
+  // Deep only while the remote is on: off, the getter yields a constant and
+  // nothing is traversed when a sound starts or stops.
   teardown.push(watch(
-    () => jsonStore.configFile?.files,
+    () => (appSettings.remoteEnabled ? jsonStore.configFile?.files : null),
     () => { scheduleRemotePublish() },
     { deep: true },
   ))

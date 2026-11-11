@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useAppSettingsStore } from '~/stores/appSettings'
@@ -418,24 +418,54 @@ export function startWebuiHost(): () => void {
     void onHostMessage((e?.payload || {}) as Parameters<typeof onHostMessage>[0])
   }).then((off) => stops.push(off)).catch(() => {})
 
+  const json = useJsonHandelingStore()
+  const appSettings = useAppSettingsStore()
+
   for (const name of RELAY) {
     listen(name, (e) => {
+      if (!appSettings.webuiEnabled) return
       void publish('event', { name, payload: e?.payload ?? null })
     }).then((off) => stops.push(off)).catch(() => {})
   }
 
-  const json = useJsonHandelingStore()
-  const appSettings = useAppSettingsStore()
-  stops.push(json.$subscribe(() => scheduleDiff(), { detached: true }))
-  stops.push(appSettings.$subscribe(() => scheduleDiff(), { detached: true }))
-  scheduleDiff()
-  void publish('host', { up: true })
+  // Mirroring the board is only worth its cost while browsers can connect.
+  // A store subscription is a deep watch over the whole project, and each
+  // change is answered with a full copy and a diff — far too much to run on
+  // every play and stop when the web UI is switched off.
+  let stopMirror: (() => void) | null = null
+  const startMirror = () => {
+    if (stopMirror) return
+    last = null
+    const offJson = json.$subscribe(() => scheduleDiff(), { detached: true })
+    const offSettings = appSettings.$subscribe(() => scheduleDiff(), { detached: true })
+    stopMirror = () => {
+      offJson()
+      offSettings()
+      if (diffTimer) clearTimeout(diffTimer)
+      diffTimer = 0
+    }
+    scheduleDiff()
+    void publish('host', { up: true })
+  }
+  const endMirror = () => {
+    if (!stopMirror) return
+    stopMirror()
+    stopMirror = null
+    last = null
+    void publish('host', { up: false })
+  }
+  stops.push(watch(
+    () => appSettings.webuiEnabled,
+    (on) => { if (on) startMirror(); else endMirror() },
+    { immediate: true },
+  ))
 
-  const onLeave = () => { void publish('host', { up: false }) }
+  const onLeave = () => { if (stopMirror) void publish('host', { up: false }) }
   window.addEventListener('beforeunload', onLeave)
   stops.push(() => window.removeEventListener('beforeunload', onLeave))
   return () => {
-    if (diffTimer) clearTimeout(diffTimer)
+    stopMirror?.()
+    stopMirror = null
     for (const stop of stops) stop()
   }
 }

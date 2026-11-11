@@ -1,0 +1,29 @@
+@use '../abstracts/variables' as *;
+
+// Reduced effects, set on <html> for Linux on ARM only (see utils/osName.ts).
+//
+// A backdrop blur is recomputed whenever anything moves underneath it. The
+// player bar sits over the board permanently and the overlays cover the whole
+// window, so on ARM GPUs under WebKitGTK the blur is paid on every scrolled
+// frame. A more opaque background keeps the surfaces readable without it.
+// Windows, macOS and Linux x64 never get this class.
+html.sn-lowfx {
+  .player-float,
+  .bulk-bar {
+    backdrop-filter: none;
+    will-change: auto;
+  }
+
+  .player-float {
+    background-color: var(--color-btn, #{$color-btn});
+  }
+
+  .dialog-box,
+  .settings-overlay,
+  .project-overlay,
+  .drop-overlay,
+  .BGBlur {
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--color-bg, #{$color-bg}) 82%, transparent);
+  }
+}

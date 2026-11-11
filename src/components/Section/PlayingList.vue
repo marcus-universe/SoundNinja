@@ -58,6 +58,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { PeakLayer, blitPeaks, drawPlayhead, startThrottledClock } from '~/utils/waveformDraw'
+import { fetchWaveform } from '~/utils/waveform'
 
 export interface PlayingInfo {
   path: string
@@ -122,29 +123,36 @@ function setCanvasRef(path: string, el: unknown) {
   }
 }
 
-async function ensureWaveform(path: string) {
-  if (peaksByPath.has(path) && durationByPath.has(path)) return
+/** Paths whose waveform is still partial (file decoding) and gets asked for again. */
+const waveRetry = new Map<string, ReturnType<typeof setTimeout>>()
+
+async function ensureWaveform(path: string, force = false) {
+  if (!force && peaksByPath.has(path) && durationByPath.has(path)) return
   const fromSnap = props.items.find((i) => i.path === path)?.durationSecs
-  if (fromSnap && fromSnap > 0) {
-    durationByPath.set(path, fromSnap)
-  } else {
-    try {
-      const dur = await invoke<number>('get_sound_duration', { soundPath: path })
-      durationByPath.set(path, dur || 0)
-    } catch {
-      durationByPath.set(path, 0)
-    }
-  }
+  if (!durationByPath.has(path)) durationByPath.set(path, fromSnap && fromSnap > 0 ? fromSnap : 0)
+  let pumping = false
   try {
     const buckets = playerLarge.value ? 160 : 100
-    const peaks = (await invoke<number[]>('get_file_waveform_peaks', { path, buckets })) ?? []
-    peaksByPath.set(path, peaks)
+    const res = await fetchWaveform(path, buckets)
+    peaksByPath.set(path, res.peaks)
+    pumping = res.pumping
+    if (res.durationSecs > 0 && (!pumping || res.durationSecs > (durationByPath.get(path) ?? 0))) {
+      durationByPath.set(path, res.durationSecs)
+    }
   } catch (e) {
     console.warn('playlist waveform failed', e)
     peaksByPath.set(path, [])
   }
   await nextTick()
   drawWave(path)
+  clearTimeout(waveRetry.get(path))
+  waveRetry.delete(path)
+  if (pumping && props.items.some((i) => i.path === path)) {
+    waveRetry.set(path, setTimeout(() => {
+      waveRetry.delete(path)
+      if (props.items.some((i) => i.path === path)) void ensureWaveform(path, true)
+    }, 1000))
+  }
 }
 
 function syncFromItems() {
@@ -389,6 +397,8 @@ onMounted(() => {
 onUnmounted(() => {
   waveClock?.stop()
   waveClock = null
+  for (const timer of waveRetry.values()) clearTimeout(timer)
+  waveRetry.clear()
   if (scrubDrawRaf) {
     cancelAnimationFrame(scrubDrawRaf)
     scrubDrawRaf = null

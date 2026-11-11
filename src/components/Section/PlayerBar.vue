@@ -4,7 +4,7 @@
     :class="{ 'player-float--large': playerLarge, 'player-float--wave': showWave }"
   >
     <div class="player-float__row">
-      <QuickInfo v-if="hasPlaying" :text="anyPaused ? $t('player.play') : $t('player.pause')">
+      <QuickInfo v-if="hasPlaying" fixed :text="anyPaused ? $t('player.play') : $t('player.pause')">
         <button
           class="player-float__btn"
           type="button"
@@ -15,7 +15,7 @@
         </button>
       </QuickInfo>
 
-      <QuickInfo :text="$t('player.stop')">
+      <QuickInfo fixed :text="$t('player.stop')">
         <button class="player-float__btn" type="button" :disabled="!hasPlaying" @click="stopAll">
           <Icons icon="stop" />
         </button>
@@ -46,9 +46,9 @@
         @pointercancel="onScrubPointerUp"
         @pointerleave="onScrubPointerLeave"
       >
-        <div class="player-float__bar-fill" :style="{ width: barPct + '%' }" />
+        <div class="player-float__bar-fill" :style="{ transform: `scaleX(${barPct / 100})` }" />
       </div>
-      <QuickInfo v-if="showScrub" :text="loopOn ? $t('player.loopOn') : $t('player.loopOff')">
+      <QuickInfo v-if="showScrub" fixed :text="loopOn ? $t('player.loopOn') : $t('player.loopOff')">
         <button
           class="player-float__btn"
           type="button"
@@ -59,7 +59,7 @@
         </button>
       </QuickInfo>
 
-      <QuickInfo v-if="!isRemote" :text="$t('player.record')">
+      <QuickInfo v-if="!isRemote" fixed :text="$t('player.record')">
         <button
           class="player-float__btn player-float__btn--record"
           type="button"
@@ -72,7 +72,7 @@
         </button>
       </QuickInfo>
 
-      <QuickInfo v-if="overlapSounds && !isRemote" :text="$t('player.playlist')">
+      <QuickInfo v-if="overlapSounds && !isRemote" fixed :text="$t('player.playlist')">
         <button
           class="player-float__btn"
           type="button"
@@ -91,6 +91,7 @@ import { isRemote } from '~/utils/runtime'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { openSecondaryWindow, PLAYING_LIST, RECORD_EDITOR } from '~/utils/secondaryWindows'
 import { PeakLayer, blitPeaks, drawPlayhead, startThrottledClock } from '~/utils/waveformDraw'
+import { fetchWaveform } from '~/utils/waveform'
 import type { PlayingInfo } from './PlayingList.vue'
 
 const jsonStore = useJsonHandelingStore()
@@ -115,7 +116,7 @@ let progressPaused = true
 let seekInFlight = false
 /** Coalesce scrub pointermove redraws to one paint per animation frame. */
 let scrubDrawRaf: number | null = null
-let peakPoll: ReturnType<typeof setInterval> | null = null
+let peakPoll: ReturnType<typeof setTimeout> | null = null
 const peakLayer = new PeakLayer()
 
 function scheduleScrubDraw() {
@@ -271,7 +272,6 @@ function applyPlayingSnapshot(list: PlayingInfo[]) {
   if (first.path !== wavePath) {
     if (showWave.value) {
       void loadWaveform(first.path, first.durationSecs)
-      void armPeakPoll(first.path)
     } else {
       stopPeakPoll()
       wavePath = first.path
@@ -282,61 +282,50 @@ function applyPlayingSnapshot(list: PlayingInfo[]) {
   }
 }
 
+/**
+ * One backend call returns peaks, decode state and duration. While the file is
+ * still being decoded the shape is partial, so ask again once a second until
+ * it is complete.
+ */
 async function loadWaveform(path: string, knownDuration?: number) {
   if (!showWave.value) return
+  stopPeakPoll()
   wavePath = path
   adoptDuration(knownDuration)
   adoptDuration(fileDuration(path))
-  if (!(durationSec.value > 0)) {
-    try {
-      durationSec.value = await invoke<number>('get_sound_duration', { soundPath: path })
-    } catch {
-      durationSec.value = 0
-    }
-  }
+  let pumping = false
   try {
     const buckets = playerLarge.value ? 220 : 100
-    peaks.value = (await invoke<number[]>('get_file_waveform_peaks', { path, buckets })) ?? []
+    const res = await fetchWaveform(path, buckets)
+    // A newer sound took over while this request was in flight.
+    if (wavePath !== path) return
+    peaks.value = res.peaks
+    pumping = res.pumping
+    if (res.durationSecs > 0) {
+      // Exact once decoding has finished; until then it may still be an estimate.
+      if (!pumping) durationSec.value = res.durationSecs
+      else adoptDuration(res.durationSecs)
+    }
   } catch (e) {
-    console.warn('waveform peaks failed', e)
+    console.warn('waveform failed', e)
+    if (wavePath !== path) return
     peaks.value = []
   }
   await nextTick()
   drawWave()
+  if (pumping && showWave.value && wavePath === path) {
+    peakPoll = setTimeout(() => {
+      peakPoll = null
+      if (showWave.value && wavePath === path) void loadWaveform(path, durationSec.value)
+    }, 1000)
+  }
 }
 
 function stopPeakPoll() {
   if (peakPoll != null) {
-    clearInterval(peakPoll)
+    clearTimeout(peakPoll)
     peakPoll = null
   }
-}
-
-async function armPeakPoll(path: string) {
-  stopPeakPoll()
-  if (!showWave.value) return
-  let pumping = false
-  try {
-    pumping = await invoke<boolean>('is_sound_pumping', { path })
-  } catch {
-    return
-  }
-  if (!pumping) return
-  peakPoll = setInterval(() => {
-    if (!showWave.value || wavePath !== path) {
-      stopPeakPoll()
-      return
-    }
-    void (async () => {
-      try {
-        const still = await invoke<boolean>('is_sound_pumping', { path })
-        await loadWaveform(path, durationSec.value)
-        if (!still) stopPeakPoll()
-      } catch {
-        stopPeakPoll()
-      }
-    })()
-  }, 1000)
 }
 
 function startWaveClock() {
@@ -487,7 +476,6 @@ watch(showWave, async (on) => {
     await nextTick()
     if (activePath.value) {
       await loadWaveform(activePath.value)
-      void armPeakPoll(activePath.value)
     }
     else drawWave()
   } else {
