@@ -138,9 +138,12 @@ jobs:
       cross: true
     secrets: inherit
 
+  # Multi-arch AUR package needs amd64 + arm64 + armhf debs. Without publish
+  # there is no draft to fetch skipped arches from, so only run when all three
+  # were built here (a partial test build would otherwise always fail).
   aur-package:
     needs: [guard, linux-x64, linux-arm64, linux-armhf]
-    if: ${{ always() && needs.guard.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ always() && needs.guard.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && (inputs.publish || (inputs.build_x64 && inputs.build_arm64 && inputs.build_armhf)) }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
