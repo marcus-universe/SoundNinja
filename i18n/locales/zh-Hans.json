@@ -716,5 +716,13 @@
     "embedGifs": "将 GIF 和图片保存在项目中",
     "embedGifsHint": "按钮背景随项目文件一起移动。关闭后仅保留在此电脑上。",
     "embedMissing": "有 {count} 个音效文件未找到，无法保存到项目中："
+  },
+  "saveProgress": {
+    "preparing": "正在准备…",
+    "backup": "正在创建备份…",
+    "board": "正在写入面板…",
+    "audio": "正在保存音效文件…",
+    "images": "正在保存图片…",
+    "finalizing": "正在完成…"
   }
 }

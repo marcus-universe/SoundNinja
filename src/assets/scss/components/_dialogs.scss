@@ -132,6 +132,60 @@
   align-items: center;
 }
 
+// Manual save: what is being written now, how far the whole save is.
+.save-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: min(30rem, calc(100dvw - 8rem));
+}
+
+.save-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.2rem;
+  font-family: $fontRegular;
+  font-size: var(--font-size-sm);
+  color: var(--color-text, #{$white});
+}
+
+.save-progress__phase {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-progress__pct {
+  flex-shrink: 0;
+  // Digits of equal width, so the number does not jitter while it counts.
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-text, #{$white}) 60%, transparent);
+}
+
+.save-progress__bar {
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text, #{$white}) 12%, transparent);
+}
+
+.save-progress__fill {
+  width: 100%;
+  height: 100%;
+  background: var(--primary_color);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.12s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-progress__fill {
+    transition: none;
+  }
+}
+
 .dialog-actions {
   margin-top: $padding_1;
 }

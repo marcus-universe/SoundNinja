@@ -397,6 +397,8 @@ export interface CommitOptions {
   embedGifs?: boolean
   /** Copy the file to `<path>.bak` before writing. */
   backup?: boolean
+  /** Report progress through `project_save_progress` events (manual saves). */
+  progress?: boolean
 }
 
 export interface CommitReport {

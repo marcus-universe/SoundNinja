@@ -716,5 +716,13 @@
     "embedGifs": "Guardar GIF e imágenes en el proyecto",
     "embedGifsHint": "Los fondos de los botones viajan con el archivo del proyecto. Si está desactivado, se quedan solo en este equipo.",
     "embedMissing": "No se pudieron guardar {count} archivos de sonido en el proyecto porque no se encontraron:"
+  },
+  "saveProgress": {
+    "preparing": "Preparando…",
+    "backup": "Creando copia de seguridad…",
+    "board": "Guardando el tablero…",
+    "audio": "Guardando archivos de sonido…",
+    "images": "Guardando imágenes…",
+    "finalizing": "Finalizando…"
   }
 }

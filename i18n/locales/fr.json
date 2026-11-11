@@ -716,5 +716,13 @@
     "embedGifs": "Stocker les GIF et les images dans le projet",
     "embedGifsHint": "Les arrière-plans des boutons suivent le fichier du projet. Si désactivé, ils restent uniquement sur cet ordinateur.",
     "embedMissing": "{count} fichiers audio n’ont pas pu être stockés dans le projet car ils sont introuvables :"
+  },
+  "saveProgress": {
+    "preparing": "Préparation…",
+    "backup": "Création de la copie de sauvegarde…",
+    "board": "Enregistrement du tableau…",
+    "audio": "Enregistrement des fichiers audio…",
+    "images": "Enregistrement des images…",
+    "finalizing": "Finalisation…"
   }
 }

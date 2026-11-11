@@ -716,5 +716,13 @@
     "embedGifs": "GIFs und Bilder im Projekt speichern",
     "embedGifsHint": "Button-Hintergründe wandern mit der Projektdatei mit. Wenn aus, bleiben sie nur auf diesem Computer.",
     "embedMissing": "{count} Sounddateien konnten nicht im Projekt gespeichert werden, weil sie nicht gefunden wurden:"
+  },
+  "saveProgress": {
+    "preparing": "Wird vorbereitet…",
+    "backup": "Sicherungskopie wird erstellt…",
+    "board": "Board wird geschrieben…",
+    "audio": "Sounddateien werden gespeichert…",
+    "images": "Bilder werden gespeichert…",
+    "finalizing": "Wird abgeschlossen…"
   }
 }

@@ -22,10 +22,13 @@ use sqlx::sqlite::{
     SqliteArguments, SqliteConnectOptions, SqliteJournalMode, SqliteRow, SqliteSynchronous,
 };
 use sqlx::{Column, ConnectOptions, Connection, Row, Sqlite, SqliteConnection, TypeInfo, ValueRef};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant, UNIX_EPOCH};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::gifcache;
 
@@ -38,6 +41,10 @@ static PROJECT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 const MAX_BACKUP_BYTES: u64 = 512 * 1024 * 1024;
 /// `PRAGMA quick_check` reads every page. Skip it for very large files.
 const MAX_CHECK_BYTES: u64 = 256 * 1024 * 1024;
+/// Backups at least this large are copied in chunks so the save can report
+/// progress; smaller ones take a single `std::fs::copy`.
+const BACKUP_CHUNKED_MIN_BYTES: u64 = 8 * 1024 * 1024;
+const BACKUP_CHUNK_BYTES: usize = 1024 * 1024;
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
@@ -324,6 +331,228 @@ pub struct CommitOptions {
     /// Copy the file to `<path>.bak` before writing.
     #[serde(default)]
     pub backup: bool,
+    /// Emit `project_save_progress` events while the save runs.
+    #[serde(default)]
+    pub progress: bool,
+}
+
+// ── Save progress ─────────────────────────────────────────────────────────────
+
+/// Event the frontend listens to while a save with `progress: true` runs.
+const SAVE_PROGRESS_EVENT: &str = "project_save_progress";
+/// Minimum gap between two progress events inside one phase.
+const PROGRESS_INTERVAL_MS: u64 = 80;
+/// Work units are bytes. A statement counts as a small fixed amount, an image
+/// as a typical image size, so the phases weigh in roughly by their real cost.
+const STATEMENT_UNITS: u64 = 4096;
+const IMAGE_UNITS: u64 = 256 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Backup,
+    Board,
+    Audio,
+    Images,
+    Finalizing,
+}
+
+impl Phase {
+    /// In discriminant order, so `Phase::ALL[phase as usize] == phase`.
+    const ALL: [Phase; 5] = [
+        Phase::Backup,
+        Phase::Board,
+        Phase::Audio,
+        Phase::Images,
+        Phase::Finalizing,
+    ];
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Phase::Backup => "backup",
+            Phase::Board => "board",
+            Phase::Audio => "audio",
+            Phase::Images => "images",
+            Phase::Finalizing => "finalizing",
+        }
+    }
+}
+
+/// Payload of [`SAVE_PROGRESS_EVENT`]. `done` / `total` / `percent` describe
+/// the whole save, not the current phase.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveProgress {
+    pub path: String,
+    pub phase: &'static str,
+    pub done: u64,
+    pub total: u64,
+    pub percent: u32,
+}
+
+struct ProgressState {
+    sink: Box<dyn Fn(SaveProgress) + Send + Sync>,
+    path: String,
+    started: Instant,
+    /// Milliseconds after `started` at which the last throttled event went out.
+    last_emit_ms: AtomicU64,
+    done: AtomicU64,
+    /// Expected work per phase, indexed like [`Phase::ALL`]. Their sum is the
+    /// total; a phase replaces its entry once it knows its real workload.
+    planned: [AtomicU64; 5],
+    /// Highest percent reported so far; reports never go below it.
+    percent: AtomicU32,
+    /// Index into [`Phase::ALL`].
+    phase: AtomicUsize,
+}
+
+impl ProgressState {
+    /// Report the current state. Stays at 99 or below: 100 is reserved for
+    /// [`Progress::finish`], after the transaction is on disk.
+    fn total(&self) -> u64 {
+        self.planned.iter().map(|units| units.load(Ordering::Relaxed)).sum()
+    }
+
+    fn emit(&self) {
+        let total = self.total();
+        let done = self.done.load(Ordering::Relaxed).min(total);
+        // Nothing planned yet reads as 0 %, not as a division by zero.
+        let ratio = done.saturating_mul(99).checked_div(total).unwrap_or(0);
+        self.send(done, total, ratio.min(99) as u32);
+    }
+
+    fn send(&self, done: u64, total: u64, percent: u32) {
+        // `fetch_max` keeps the reported percent monotonic even when the total
+        // is corrected upwards in the middle of a save.
+        let percent = self.percent.fetch_max(percent, Ordering::Relaxed).max(percent);
+        let phase = Phase::ALL[self.phase.load(Ordering::Relaxed).min(Phase::ALL.len() - 1)];
+        (self.sink)(SaveProgress {
+            path: self.path.clone(),
+            phase: phase.as_str(),
+            done,
+            total,
+            percent,
+        });
+    }
+}
+
+/// Optional progress reporting for one save. Cheap to clone, so the backup
+/// copy on the blocking pool can report bytes too. Every method is a no-op
+/// when progress was not requested.
+#[derive(Clone, Default)]
+pub(crate) struct Progress {
+    state: Option<Arc<ProgressState>>,
+}
+
+impl Progress {
+    /// No reporting: nothing is emitted and no pre-pass runs.
+    pub(crate) fn none() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn new(path: &str, sink: impl Fn(SaveProgress) + Send + Sync + 'static) -> Self {
+        Self {
+            state: Some(Arc::new(ProgressState {
+                sink: Box::new(sink),
+                path: path.to_owned(),
+                started: Instant::now(),
+                last_emit_ms: AtomicU64::new(0),
+                done: AtomicU64::new(0),
+                planned: Default::default(),
+                percent: AtomicU32::new(0),
+                phase: AtomicUsize::new(0),
+            })),
+        }
+    }
+
+    fn enabled(&self) -> bool {
+        self.state.is_some()
+    }
+
+    /// Set the work a phase is expected to do: the estimate before the save
+    /// starts, then the real figure once the phase has looked at its input.
+    fn plan(&self, phase: Phase, units: u64) {
+        if let Some(state) = &self.state {
+            state.planned[phase as usize].store(units, Ordering::Relaxed);
+        }
+    }
+
+    /// Enter a phase. Always emits, so the frontend can label what is running
+    /// even when the phase is over before the throttle would let an event out.
+    fn begin(&self, phase: Phase) {
+        if let Some(state) = &self.state {
+            state.phase.store(phase as usize, Ordering::Relaxed);
+            state.emit();
+        }
+    }
+
+    /// Record `units` of finished work; emits at most every
+    /// [`PROGRESS_INTERVAL_MS`].
+    fn advance(&self, units: u64) {
+        let Some(state) = &self.state else { return };
+        state.done.fetch_add(units, Ordering::Relaxed);
+        let now_ms = state.started.elapsed().as_millis() as u64;
+        let last = state.last_emit_ms.load(Ordering::Relaxed);
+        if now_ms.saturating_sub(last) < PROGRESS_INTERVAL_MS {
+            return;
+        }
+        // Only the caller that wins the exchange emits for this interval.
+        if state
+            .last_emit_ms
+            .compare_exchange(last, now_ms, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            state.emit();
+        }
+    }
+
+    /// The save is on disk: report 100 %.
+    fn finish(&self) {
+        if let Some(state) = &self.state {
+            state.phase.store(Phase::Finalizing as usize, Ordering::Relaxed);
+            let total = state.total();
+            state.done.store(total, Ordering::Relaxed);
+            state.send(total, total, 100);
+        }
+    }
+}
+
+/// Wall-clock time per phase for `SN_PERF` output.
+struct PhaseTimer {
+    started: Instant,
+    lap: Instant,
+    laps: Vec<(&'static str, f64)>,
+}
+
+impl PhaseTimer {
+    fn new() -> Self {
+        let now = Instant::now();
+        Self {
+            started: now,
+            lap: now,
+            laps: Vec::new(),
+        }
+    }
+
+    /// Close the span since the previous lap under `name`.
+    fn lap(&mut self, name: &'static str) {
+        self.laps.push((name, crate::perf::ms_since(self.lap)));
+        self.lap = Instant::now();
+    }
+
+    fn log(&self, path: &str) {
+        crate::perf::log(|| {
+            let phases: Vec<String> = self
+                .laps
+                .iter()
+                .map(|(name, ms)| format!("{name}={ms:.1}ms"))
+                .collect();
+            format!(
+                "commit {} total={:.1}ms '{path}'",
+                phases.join(" "),
+                crate::perf::ms_since(self.started)
+            )
+        });
+    }
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -355,29 +584,218 @@ pub async fn project_commit(
         library: gifcache::library_dir(&app).ok(),
         cache: gifcache::cache_dir(&app).ok(),
     };
+    let options = options.unwrap_or_default();
     let _guard = PROJECT_LOCK.lock().await;
-    commit(&path, &statements, &options.unwrap_or_default(), &dirs).await
+    if !options.progress {
+        return commit(&path, &statements, &options, &dirs).await;
+    }
+    let progress = Progress::new(&path, move |update| {
+        let _ = app.emit(SAVE_PROGRESS_EVENT, update);
+    });
+    commit_with(&path, &statements, &options, &dirs, &progress).await
 }
 
+/// A save without progress events.
 pub(crate) async fn commit(
     path: &str,
     statements: &[Statement],
     options: &CommitOptions,
     dirs: &GifDirs,
 ) -> Result<CommitReport, String> {
-    let mut report = CommitReport::default();
-    if options.backup {
-        if let Ok(meta) = std::fs::metadata(path) {
-            if meta.len() > 0 && meta.len() <= MAX_BACKUP_BYTES {
-                report.backup_written = std::fs::copy(path, format!("{path}.bak")).is_ok();
+    commit_with(path, statements, options, dirs, &Progress::none()).await
+}
+
+/// Size of the file a backup would copy, or `None` when no backup is due
+/// (not requested, new/empty file, or too large to duplicate).
+fn backup_len(path: &str, options: &CommitOptions) -> Option<u64> {
+    if !options.backup {
+        return None;
+    }
+    let len = std::fs::metadata(path).ok()?.len();
+    (len > 0 && len <= MAX_BACKUP_BYTES).then_some(len)
+}
+
+/// Copy `src` to `dst` through `<dst>.partial` and a rename, so a copy that
+/// fails half way leaves the previous backup intact. Files of at least
+/// `chunked_min_bytes` are copied in chunks and report each chunk to
+/// `on_bytes`; smaller ones report once.
+fn backup_file(
+    src: &Path,
+    dst: &Path,
+    chunked_min_bytes: u64,
+    mut on_bytes: impl FnMut(u64),
+) -> std::io::Result<()> {
+    let mut partial = dst.as_os_str().to_owned();
+    partial.push(".partial");
+    let partial = PathBuf::from(partial);
+
+    let copy = |on_bytes: &mut dyn FnMut(u64)| -> std::io::Result<()> {
+        if std::fs::metadata(src)?.len() < chunked_min_bytes {
+            on_bytes(std::fs::copy(src, &partial)?);
+        } else {
+            let mut reader = std::fs::File::open(src)?;
+            let mut writer = std::fs::File::create(&partial)?;
+            let mut chunk = vec![0u8; BACKUP_CHUNK_BYTES];
+            loop {
+                let read = reader.read(&mut chunk)?;
+                if read == 0 {
+                    break;
+                }
+                writer.write_all(&chunk[..read])?;
+                on_bytes(read as u64);
             }
         }
+        std::fs::rename(&partial, dst)
+    };
+    let result = copy(&mut on_bytes);
+    if result.is_err() {
+        let _ = std::fs::remove_file(&partial);
+    }
+    result
+}
+
+/// Expected audio bytes and image units of a save, from the project as it is
+/// on disk before the save. Only an estimate: the statements of this save may
+/// add or remove sounds. The phases replace it with their real workload.
+async fn estimate_media_work(
+    path: &str,
+    statements: &[Statement],
+    options: &CommitOptions,
+) -> (u64, u64) {
+    let wants_audio = options.embed_audio == Some(true);
+    if !wants_audio && options.embed_gifs.is_none() {
+        return (0, 0);
+    }
+
+    // Sounds already in the project, with the stamp of their stored copy.
+    let mut known: Vec<(String, Option<(i64, i64)>)> = Vec::new();
+    let mut images = 0u64;
+    let has_file = std::fs::metadata(path).map(|m| m.len() > 0).unwrap_or(false);
+    if has_file {
+        if let Ok(mut conn) = read_options(path).connect().await {
+            if wants_audio && table_exists(&mut conn, "sounds").await {
+                let sql = if table_exists(&mut conn, "media").await {
+                    "SELECT s.path, m.src_size, m.src_mtime FROM sounds s
+                     LEFT JOIN media m ON m.sound_id = s.sound_id
+                     WHERE s.sound_id IS NOT NULL AND s.sound_id != ''"
+                } else {
+                    "SELECT path, NULL, NULL FROM sounds
+                     WHERE sound_id IS NOT NULL AND sound_id != ''"
+                };
+                if let Ok(rows) = sqlx::query(sql).fetch_all(&mut conn).await {
+                    known = rows
+                        .iter()
+                        .filter_map(|r| {
+                            let path: String = r.try_get(0).ok()?;
+                            let size: Option<i64> = r.try_get(1).ok()?;
+                            let mtime: Option<i64> = r.try_get(2).ok()?;
+                            Some((path, size.zip(mtime)))
+                        })
+                        .collect();
+                }
+            }
+            if table_exists(&mut conn, "gif_blobs").await {
+                let sql = match options.embed_gifs {
+                    Some(true) if table_exists(&mut conn, "sounds").await => Some(
+                        "SELECT COUNT(DISTINCT gif_id) FROM sounds
+                         WHERE gif_id IS NOT NULL AND gif_id != ''
+                           AND gif_id NOT IN (SELECT id FROM gif_blobs)",
+                    ),
+                    Some(false) => Some("SELECT COUNT(*) FROM gif_blobs"),
+                    _ => None,
+                };
+                if let Some(sql) = sql {
+                    if let Ok(row) = sqlx::query(sql).fetch_one(&mut conn).await {
+                        images = row.try_get::<i64, _>(0).unwrap_or(0).max(0) as u64;
+                    }
+                }
+            }
+            let _ = conn.close().await;
+        }
+    }
+    let mut audio = 0;
+    if wants_audio {
+        // Sounds this save adds are not in the file yet. Their paths travel as
+        // parameters of the statements that write the `sounds` table, so any
+        // such parameter that names an existing file is counted as well.
+        let mut candidates: Vec<String> = statements
+            .iter()
+            .filter(|s| s.sql.to_ascii_lowercase().contains("sounds"))
+            .flat_map(|s| s.params.iter())
+            .filter_map(Value::as_str)
+            .filter(|p| p.contains(['/', '\\']))
+            .map(str::to_owned)
+            .collect();
+        candidates.sort_unstable();
+        candidates.dedup();
+        audio = tauri::async_runtime::spawn_blocking(move || {
+            let mut seen: HashSet<&str> = HashSet::new();
+            let mut bytes = 0u64;
+            for (path, stored) in &known {
+                seen.insert(path.as_str());
+                if let Some(stat) = file_stat(Path::new(path)) {
+                    if *stored != Some(stat) {
+                        bytes += stat.0 as u64;
+                    }
+                }
+            }
+            for path in &candidates {
+                if seen.insert(path.as_str()) {
+                    if let Some((size, _)) = file_stat(Path::new(path)) {
+                        bytes += size as u64;
+                    }
+                }
+            }
+            bytes
+        })
+        .await
+        .unwrap_or(0);
+    }
+    (audio, images * IMAGE_UNITS)
+}
+
+/// [`commit`] with progress reporting. With [`Progress::none`] this does
+/// exactly what a plain commit does.
+pub(crate) async fn commit_with(
+    path: &str,
+    statements: &[Statement],
+    options: &CommitOptions,
+    dirs: &GifDirs,
+    progress: &Progress,
+) -> Result<CommitReport, String> {
+    let mut timer = PhaseTimer::new();
+    let mut report = CommitReport::default();
+    let backup_bytes = backup_len(path, options);
+    if progress.enabled() {
+        // The whole workload is laid out before the first event, so the
+        // percentage describes the save as a whole from the start.
+        let (audio, images) = estimate_media_work(path, statements, options).await;
+        progress.plan(Phase::Backup, backup_bytes.unwrap_or(0));
+        progress.plan(Phase::Board, statements.len() as u64 * STATEMENT_UNITS);
+        progress.plan(Phase::Audio, audio);
+        progress.plan(Phase::Images, images);
+        timer.lap("estimate");
+    }
+
+    if backup_bytes.is_some() {
+        progress.begin(Phase::Backup);
+        let src = PathBuf::from(path);
+        let dst = PathBuf::from(format!("{path}.bak"));
+        let reporter = progress.clone();
+        // A large project takes seconds to copy; keep that off the async thread.
+        report.backup_written = tauri::async_runtime::spawn_blocking(move || {
+            backup_file(&src, &dst, BACKUP_CHUNKED_MIN_BYTES, |bytes| reporter.advance(bytes))
+        })
+        .await
+        .is_ok_and(|copied| copied.is_ok());
+        timer.lap("backup");
     }
 
     let mut conn = connect_write(path).await?;
     let mut shrink = false;
     let result: Result<(), String> = async {
         let mut tx = conn.begin().await.map_err(err)?;
+        progress.begin(Phase::Board);
         for stmt in statements {
             let mut query = sqlx::query(&stmt.sql);
             for p in &stmt.params {
@@ -388,21 +806,31 @@ pub(crate) async fn commit(
                     return Err(format!("{e} — in: {}", truncate(&stmt.sql, 120)));
                 }
             }
+            progress.advance(STATEMENT_UNITS);
         }
+        timer.lap("board");
         if options.embed_audio == Some(true) {
-            embed_audio(&mut tx, &mut report).await?;
+            progress.begin(Phase::Audio);
+            embed_audio(&mut tx, &mut report, progress).await?;
+            timer.lap("audio");
         } else if options.embed_audio == Some(false) && table_exists(&mut tx, "media").await {
             let gone = sqlx::query("DELETE FROM media")
                 .execute(&mut *tx)
                 .await
                 .map_err(err)?;
             shrink = gone.rows_affected() > 0;
+            timer.lap("audio");
         }
         if options.embed_gifs == Some(true) {
-            import_gifs(&mut tx, dirs).await?;
+            progress.begin(Phase::Images);
+            import_gifs(&mut tx, dirs, progress).await?;
+            timer.lap("images");
         } else if options.embed_gifs == Some(false) {
-            shrink |= externalize_gifs(&mut tx, dirs).await?;
+            progress.begin(Phase::Images);
+            shrink |= externalize_gifs(&mut tx, dirs, progress).await?;
+            timer.lap("images");
         }
+        progress.begin(Phase::Finalizing);
         tx.commit().await.map_err(err)
     }
     .await;
@@ -412,6 +840,11 @@ pub(crate) async fn commit(
         let _ = sqlx::query("VACUUM").execute(&mut conn).await;
     }
     let _ = conn.close().await;
+    timer.lap("finalize");
+    timer.log(path);
+    if result.is_ok() {
+        progress.finish();
+    }
     result.map(|()| report)
 }
 
@@ -440,10 +873,48 @@ async fn ensure_media_table(conn: &mut SqliteConnection) -> Result<(), String> {
     .map_err(err)
 }
 
+/// One sound whose file has to be (re)stored in `media`.
+struct EmbedJob {
+    path: String,
+    id: String,
+    size: i64,
+    mtime: i64,
+}
+
+/// Decide per sound whether its file must be stored: `Ok` with the job when
+/// the file changed since the stored copy, `Err(path)` when the file is gone
+/// and nothing is stored for it. Unchanged files yield nothing.
+fn plan_embed(
+    sounds: Vec<(String, String)>,
+    stored: &HashMap<String, (Option<i64>, Option<i64>)>,
+) -> (Vec<EmbedJob>, Vec<String>) {
+    let mut jobs = Vec::new();
+    let mut missing = Vec::new();
+    for (path, id) in sounds {
+        match file_stat(Path::new(&path)) {
+            None => {
+                if !stored.contains_key(&id) {
+                    missing.push(path);
+                }
+            }
+            Some((size, mtime)) => {
+                if stored.get(&id) != Some(&(Some(size), Some(mtime))) {
+                    jobs.push(EmbedJob { path, id, size, mtime });
+                }
+            }
+        }
+    }
+    (jobs, missing)
+}
+
 /// Store each sound's audio file in `media`, keyed by the sound's stable id.
 /// Files whose size and mtime match the stored copy are skipped, so a normal
 /// save costs one `stat` per sound.
-async fn embed_audio(conn: &mut SqliteConnection, report: &mut CommitReport) -> Result<(), String> {
+async fn embed_audio(
+    conn: &mut SqliteConnection,
+    report: &mut CommitReport,
+    progress: &Progress,
+) -> Result<(), String> {
     ensure_media_table(conn).await?;
     let sounds = sqlx::query(
         "SELECT path, sound_id FROM sounds WHERE sound_id IS NOT NULL AND sound_id != ''",
@@ -465,28 +936,37 @@ async fn embed_audio(conn: &mut SqliteConnection, report: &mut CommitReport) -> 
             })
             .collect();
 
-    for row in sounds {
+    let mut pairs = Vec::with_capacity(sounds.len());
+    for row in &sounds {
         let path: String = row.try_get(0).map_err(err)?;
         let id: String = row.try_get(1).map_err(err)?;
-        let Some((size, mtime)) = file_stat(Path::new(&path)) else {
-            if !stored.contains_key(&id) {
-                report.missing_audio.push(path);
-            }
-            continue;
-        };
-        if stored.get(&id) == Some(&(Some(size), Some(mtime))) {
-            continue;
-        }
-        let read_path = path.clone();
+        pairs.push((path, id));
+    }
+    // One hop to the blocking pool for every stat, instead of stalling the
+    // async thread once per sound.
+    let (jobs, missing, stored) =
+        tauri::async_runtime::spawn_blocking(move || {
+            let (jobs, missing) = plan_embed(pairs, &stored);
+            (jobs, missing, stored)
+        })
+        .await
+        .map_err(err)?;
+    report.missing_audio.extend(missing);
+    // Now the real workload is known: exactly the files that will be read.
+    progress.plan(Phase::Audio, jobs.iter().map(|j| j.size as u64).sum());
+
+    for job in jobs {
+        let read_path = job.path.clone();
         let bytes = tauri::async_runtime::spawn_blocking(move || std::fs::read(read_path))
             .await
             .map_err(err)?;
         let bytes = match bytes {
             Ok(b) => b,
             Err(_) => {
-                if !stored.contains_key(&id) {
-                    report.missing_audio.push(path);
+                if !stored.contains_key(&job.id) {
+                    report.missing_audio.push(job.path);
                 }
+                progress.advance(job.size as u64);
                 continue;
             }
         };
@@ -496,15 +976,16 @@ async fn embed_audio(conn: &mut SqliteConnection, report: &mut CommitReport) -> 
             "INSERT OR REPLACE INTO media (sound_id, file_name, byte_len, src_size, src_mtime, data)
              VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .bind(&id)
-        .bind(base_name(&path))
+        .bind(&job.id)
+        .bind(base_name(&job.path))
         .bind(bytes.len() as i64)
-        .bind(size)
-        .bind(mtime)
+        .bind(job.size)
+        .bind(job.mtime)
         .bind(bytes)
         .execute(&mut *conn)
         .await
         .map_err(err)?;
+        progress.advance(job.size as u64);
     }
 
     sqlx::query(
@@ -520,7 +1001,11 @@ async fn embed_audio(conn: &mut SqliteConnection, report: &mut CommitReport) -> 
 /// Pull image bytes a sound references back into `gif_blobs` when they only
 /// exist in the app library / cache (project saved without embedded images, or
 /// an undo restored a button background whose blob was already collected).
-async fn import_gifs(conn: &mut SqliteConnection, dirs: &GifDirs) -> Result<(), String> {
+async fn import_gifs(
+    conn: &mut SqliteConnection,
+    dirs: &GifDirs,
+    progress: &Progress,
+) -> Result<(), String> {
     if !table_exists(conn, "gif_blobs").await || !table_exists(conn, "sounds").await {
         return Ok(());
     }
@@ -534,32 +1019,29 @@ async fn import_gifs(conn: &mut SqliteConnection, dirs: &GifDirs) -> Result<(), 
     .map_err(err)?
     .iter()
     .filter_map(|r| r.try_get::<String, _>(0).ok())
+    .filter(|id| gifcache::is_content_hash(id))
     .collect();
+    progress.plan(Phase::Images, missing.len() as u64 * IMAGE_UNITS);
 
     for id in missing {
-        if !gifcache::is_content_hash(&id) {
-            continue;
-        }
-        let hit = [dirs.library.as_deref(), dirs.cache.as_deref()]
-            .into_iter()
-            .flatten()
-            .find_map(|dir| gifcache::hit_on_disk(dir, &id));
-        let Some(entry) = hit else { continue };
-        let Ok(bytes) = std::fs::read(&entry.path) else { continue };
-        let poster = if entry.poster_path != entry.path {
-            std::fs::read(&entry.poster_path).ok().map(|b| BASE64.encode(b))
-        } else {
-            None
-        };
+        // Lookup, read and base64 all touch the disk or burn CPU: do them on
+        // the blocking pool and come back with the row to insert.
+        let dirs = dirs.clone();
+        let lookup_id = id.clone();
+        let image = tauri::async_runtime::spawn_blocking(move || read_library_image(&dirs, &lookup_id))
+            .await
+            .map_err(err)?;
+        progress.advance(IMAGE_UNITS);
+        let Some(image) = image else { continue };
         sqlx::query(
             "INSERT OR IGNORE INTO gif_blobs (id, mime, data, poster, byte_len)
              VALUES (?, ?, ?, ?, ?)",
         )
         .bind(&id)
-        .bind(&entry.mime)
-        .bind(BASE64.encode(&bytes))
-        .bind(poster)
-        .bind(bytes.len() as i64)
+        .bind(image.mime)
+        .bind(image.data)
+        .bind(image.poster)
+        .bind(image.byte_len)
         .execute(&mut *conn)
         .await
         .map_err(err)?;
@@ -567,9 +1049,42 @@ async fn import_gifs(conn: &mut SqliteConnection, dirs: &GifDirs) -> Result<(), 
     Ok(())
 }
 
+/// An image from the app library / cache, encoded the way `gif_blobs` stores it.
+struct LibraryImage {
+    mime: String,
+    /// Base64 of the image file.
+    data: String,
+    /// Base64 of the separate poster frame, if the image has one.
+    poster: Option<String>,
+    byte_len: i64,
+}
+
+fn read_library_image(dirs: &GifDirs, id: &str) -> Option<LibraryImage> {
+    let entry = [dirs.library.as_deref(), dirs.cache.as_deref()]
+        .into_iter()
+        .flatten()
+        .find_map(|dir| gifcache::hit_on_disk(dir, id))?;
+    let bytes = std::fs::read(&entry.path).ok()?;
+    let poster = if entry.poster_path != entry.path {
+        std::fs::read(&entry.poster_path).ok().map(|b| BASE64.encode(b))
+    } else {
+        None
+    };
+    Some(LibraryImage {
+        mime: entry.mime,
+        data: BASE64.encode(&bytes),
+        poster,
+        byte_len: bytes.len() as i64,
+    })
+}
+
 /// Move every stored image out of the project into the app image library.
 /// A blob is only deleted once its file is safely on disk.
-async fn externalize_gifs(conn: &mut SqliteConnection, dirs: &GifDirs) -> Result<bool, String> {
+async fn externalize_gifs(
+    conn: &mut SqliteConnection,
+    dirs: &GifDirs,
+    progress: &Progress,
+) -> Result<bool, String> {
     let Some(library) = dirs.library.as_deref() else {
         return Ok(false);
     };
@@ -582,12 +1097,12 @@ async fn externalize_gifs(conn: &mut SqliteConnection, dirs: &GifDirs) -> Result
         .map_err(err)?
         .iter()
         .filter_map(|r| r.try_get::<String, _>(0).ok())
+        .filter(|id| gifcache::is_content_hash(id))
         .collect();
+    progress.plan(Phase::Images, ids.len() as u64 * IMAGE_UNITS);
     let mut removed = false;
     for id in ids {
-        if !gifcache::is_content_hash(&id) {
-            continue;
-        }
+        progress.advance(IMAGE_UNITS);
         let row = sqlx::query("SELECT mime, data, poster FROM gif_blobs WHERE id = ?")
             .bind(&id)
             .fetch_optional(&mut *conn)
@@ -597,7 +1112,14 @@ async fn externalize_gifs(conn: &mut SqliteConnection, dirs: &GifDirs) -> Result
         let mime: String = row.try_get(0).map_err(err)?;
         let data: String = row.try_get(1).map_err(err)?;
         let poster: Option<String> = row.try_get(2).map_err(err)?;
-        if gifcache::store_files(library, &id, &mime, &data, poster.as_deref()).is_err() {
+        // Base64 decode plus two file writes per image: blocking pool.
+        let (dir, file_id) = (library.to_path_buf(), id.clone());
+        let stored = tauri::async_runtime::spawn_blocking(move || {
+            gifcache::store_files(&dir, &file_id, &mime, &data, poster.as_deref()).is_ok()
+        })
+        .await
+        .map_err(err)?;
+        if !stored {
             continue;
         }
         sqlx::query("DELETE FROM gif_blobs WHERE id = ?")
@@ -691,65 +1213,139 @@ pub async fn project_extract_media(
 }
 
 pub(crate) async fn extract_media(path: &str, dir: &Path) -> Result<Vec<ExtractedSound>, String> {
+    extract_media_counted(path, dir).await.map(|(sounds, _)| sounds)
+}
+
+/// [`extract_media`] plus the number of `media` rows whose source stamp had
+/// to be rewritten. A project that was already extracted reports `0`: opening
+/// it again writes nothing to the file.
+async fn extract_media_counted(
+    path: &str,
+    dir: &Path,
+) -> Result<(Vec<ExtractedSound>, usize), String> {
     let mut conn = connect_write(path).await?;
-    let result: Result<Vec<ExtractedSound>, String> = async {
-        if !table_exists(&mut conn, "media").await || !table_exists(&mut conn, "sounds").await {
-            return Ok(Vec::new());
-        }
-        let rows = sqlx::query(
-            "SELECT s.path, m.sound_id, m.file_name, m.byte_len
-             FROM media m JOIN sounds s ON s.sound_id = m.sound_id",
-        )
-        .fetch_all(&mut conn)
-        .await
-        .map_err(err)?;
+    let result = extract_with(&mut conn, dir).await;
+    let _ = conn.close().await;
+    result
+}
 
-        let mut out = Vec::new();
-        for row in rows {
-            let sound_path: String = row.try_get(0).map_err(err)?;
-            if Path::new(&sound_path).is_file() {
-                continue;
-            }
-            let id: String = row.try_get(1).map_err(err)?;
-            let name: String = row.try_get(2).map_err(err)?;
-            let len: i64 = row.try_get(3).map_err(err)?;
-            let safe_id: String = id.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-            let target = dir.join(format!("{safe_id}-{len}-{}", safe_file_name(&name)));
+/// One embedded sound whose original file is missing on this machine.
+struct ExtractJob {
+    id: String,
+    /// Where the embedded copy lives (or will be written).
+    target: PathBuf,
+    /// Stamp of `target` when it is already on disk with the right length.
+    on_disk: Option<(i64, i64)>,
+    /// `src_size` / `src_mtime` recorded in the `media` row.
+    stored: (Option<i64>, Option<i64>),
+}
 
-            let fresh = std::fs::metadata(&target).map(|m| m.len() as i64 == len).unwrap_or(false);
-            if !fresh {
+/// Write an embedded file next to its final name and rename it into place, so
+/// an interrupted write never leaves a truncated sound behind.
+fn write_extracted(dir: &Path, target: &Path, data: &[u8]) -> Result<Option<(i64, i64)>, String> {
+    std::fs::create_dir_all(dir).map_err(err)?;
+    let tmp = target.with_extension("partial");
+    std::fs::write(&tmp, data).map_err(err)?;
+    std::fs::rename(&tmp, target).map_err(err)?;
+    Ok(file_stat(target))
+}
+
+async fn extract_with(
+    conn: &mut SqliteConnection,
+    dir: &Path,
+) -> Result<(Vec<ExtractedSound>, usize), String> {
+    if !table_exists(conn, "media").await || !table_exists(conn, "sounds").await {
+        return Ok((Vec::new(), 0));
+    }
+    let rows = sqlx::query(
+        "SELECT s.path, m.sound_id, m.file_name, m.byte_len, m.src_size, m.src_mtime
+         FROM media m JOIN sounds s ON s.sound_id = m.sound_id",
+    )
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(err)?;
+
+    let mut candidates = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let sound_path: String = row.try_get(0).map_err(err)?;
+        let id: String = row.try_get(1).map_err(err)?;
+        let name: String = row.try_get(2).map_err(err)?;
+        let len: i64 = row.try_get(3).map_err(err)?;
+        let stored: (Option<i64>, Option<i64>) =
+            (row.try_get(4).map_err(err)?, row.try_get(5).map_err(err)?);
+        let safe_id: String = id.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let target = dir.join(format!("{safe_id}-{len}-{}", safe_file_name(&name)));
+        candidates.push((sound_path, len, ExtractJob { id, target, on_disk: None, stored }));
+    }
+    drop(rows);
+
+    // Every stat in one hop to the blocking pool: which sounds are missing
+    // here, and which of those already have their extracted copy.
+    let jobs: Vec<ExtractJob> = tauri::async_runtime::spawn_blocking(move || {
+        candidates
+            .into_iter()
+            .filter(|(sound_path, _, _)| !Path::new(sound_path).is_file())
+            .map(|(_, len, mut job)| {
+                job.on_disk = file_stat(&job.target).filter(|(size, _)| *size == len);
+                job
+            })
+            .collect()
+    })
+    .await
+    .map_err(err)?;
+
+    let mut out = Vec::with_capacity(jobs.len());
+    let mut stamps: Vec<(String, i64, i64)> = Vec::new();
+    for job in jobs {
+        let stat = match job.on_disk {
+            Some(stat) => Some(stat),
+            None => {
                 let data: Vec<u8> = sqlx::query("SELECT data FROM media WHERE sound_id = ?")
-                    .bind(&id)
-                    .fetch_one(&mut conn)
+                    .bind(&job.id)
+                    .fetch_one(&mut *conn)
                     .await
                     .map_err(err)?
                     .try_get(0)
                     .map_err(err)?;
-                std::fs::create_dir_all(dir).map_err(err)?;
-                let tmp = target.with_extension("partial");
-                std::fs::write(&tmp, &data).map_err(err)?;
-                std::fs::rename(&tmp, &target).map_err(err)?;
+                let (dir, target) = (dir.to_path_buf(), job.target.clone());
+                tauri::async_runtime::spawn_blocking(move || write_extracted(&dir, &target, &data))
+                    .await
+                    .map_err(err)??
             }
-            // Record the extracted file's stat so the next save sees the stored
-            // copy as current and does not read every file back in.
-            if let Some((size, mtime)) = file_stat(&target) {
-                let _ = sqlx::query("UPDATE media SET src_size = ?, src_mtime = ? WHERE sound_id = ?")
-                    .bind(size)
-                    .bind(mtime)
-                    .bind(&id)
-                    .execute(&mut conn)
-                    .await;
+        };
+        // Record the extracted file's stat so the next save sees the stored
+        // copy as current and does not read every file back in. Skipped when
+        // the row already says so: that is every sound on a repeated open.
+        if let Some((size, mtime)) = stat {
+            if job.stored != (Some(size), Some(mtime)) {
+                stamps.push((job.id.clone(), size, mtime));
             }
-            out.push(ExtractedSound {
-                sound_id: id,
-                path: target.to_string_lossy().into_owned(),
-            });
         }
-        Ok(out)
+        out.push(ExtractedSound {
+            sound_id: job.id,
+            path: job.target.to_string_lossy().into_owned(),
+        });
     }
-    .await;
-    let _ = conn.close().await;
-    result
+
+    // One transaction for all stamps: one fsync instead of one per sound.
+    // Best effort, as before — a failed stamp only costs a re-read on save.
+    let updates = stamps.len();
+    if !stamps.is_empty() {
+        if let Ok(mut tx) = conn.begin().await {
+            for (id, size, mtime) in &stamps {
+                let _ = sqlx::query(
+                    "UPDATE media SET src_size = ?, src_mtime = ? WHERE sound_id = ?",
+                )
+                .bind(size)
+                .bind(mtime)
+                .bind(id)
+                .execute(&mut *tx)
+                .await;
+            }
+            let _ = tx.commit().await;
+        }
+    }
+    Ok((out, updates))
 }
 
 #[cfg(test)]
@@ -1012,6 +1608,211 @@ mod tests {
         assert_eq!(rows[0]["journal_mode"], "delete");
         assert_eq!(count(&path, "tabs").await, 1);
         assert!(!Path::new(&format!("{path}-wal")).exists());
+    }
+
+    /// Collects every progress event of a save.
+    fn recording_progress(path: &str) -> (Progress, Arc<std::sync::Mutex<Vec<SaveProgress>>>) {
+        let events = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = Arc::clone(&events);
+        let progress = Progress::new(path, move |update| sink.lock().unwrap().push(update));
+        (progress, events)
+    }
+
+    #[tokio::test]
+    async fn commit_with_reports_monotonic_percent_ending_at_100() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.sninja").to_string_lossy().into_owned();
+        let none = GifDirs::default();
+        commit(&path, &schema(), &CommitOptions::default(), &none).await.unwrap();
+
+        let mut statements = Vec::new();
+        for i in 0..40 {
+            let audio = dir.path().join(format!("s{i}.wav"));
+            std::fs::write(&audio, vec![i as u8; 20_000]).unwrap();
+            statements.push(stmt(
+                "INSERT INTO sounds (path, name, sound_id) VALUES ($1, $2, $3)",
+                vec![
+                    audio.to_string_lossy().into_owned().into(),
+                    format!("S{i}").into(),
+                    format!("id{i:04}").into(),
+                ],
+            ));
+        }
+        let options = CommitOptions {
+            embed_audio: Some(true),
+            embed_gifs: Some(true),
+            backup: true,
+            progress: true,
+        };
+        let (progress, events) = recording_progress(&path);
+        let report = commit_with(&path, &statements, &options, &none, &progress).await.unwrap();
+        assert_eq!(report.embedded_audio, 40);
+        assert!(report.backup_written);
+
+        let events = events.lock().unwrap();
+        let phases: Vec<&str> = events.iter().map(|e| e.phase).collect();
+        // Each phase announces itself, in order, however fast it is.
+        let mut order = phases.clone();
+        order.dedup();
+        assert_eq!(order, ["backup", "board", "audio", "images", "finalizing"]);
+        for pair in events.windows(2) {
+            assert!(pair[1].percent >= pair[0].percent, "{events:?}");
+        }
+        for event in events.iter() {
+            assert_eq!(event.path, path);
+            assert!(event.done <= event.total, "{event:?}");
+            assert!(event.percent <= 100);
+        }
+        let last = events.last().unwrap();
+        assert_eq!((last.phase, last.percent), ("finalizing", 100));
+        assert_eq!(last.done, last.total);
+        // 100 is reported exactly once, by the final event.
+        assert_eq!(events.iter().filter(|e| e.percent == 100).count(), 1);
+        // The new sounds were counted before the first event went out.
+        assert!(events[0].total >= 40 * 20_000, "{:?}", events[0]);
+    }
+
+    #[tokio::test]
+    async fn commit_with_does_not_report_100_when_the_save_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.sninja").to_string_lossy().into_owned();
+        let (progress, events) = recording_progress(&path);
+        let options = CommitOptions { progress: true, ..Default::default() };
+        let failed = commit_with(
+            &path,
+            &[stmt("INSERT INTO no_such_table (x) VALUES (1)", vec![])],
+            &options,
+            &GifDirs::default(),
+            &progress,
+        )
+        .await;
+        assert!(failed.is_err());
+        assert!(events.lock().unwrap().iter().all(|e| e.percent < 100));
+    }
+
+    #[tokio::test]
+    async fn commit_without_progress_emits_no_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.sninja").to_string_lossy().into_owned();
+        let none = Progress::none();
+        assert!(!none.enabled());
+        commit_with(&path, &schema(), &CommitOptions::default(), &GifDirs::default(), &none)
+            .await
+            .unwrap();
+        // The options default keeps reporting off for existing callers.
+        let parsed: CommitOptions = serde_json::from_str(r#"{"backup":true}"#).unwrap();
+        assert!(!parsed.progress);
+    }
+
+    #[test]
+    fn save_progress_serialises_with_the_contract_field_names() {
+        let (progress, events) = recording_progress("/boards/a.sninja");
+        progress.plan(Phase::Audio, 200);
+        progress.begin(Phase::Audio);
+        let json = serde_json::to_value(&events.lock().unwrap()[0]).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "path": "/boards/a.sninja", "phase": "audio", "done": 0, "total": 200, "percent": 0
+            })
+        );
+    }
+
+    #[test]
+    fn progress_never_reports_a_lower_percent_when_the_total_grows() {
+        let (progress, events) = recording_progress("p");
+        progress.plan(Phase::Board, 100);
+        progress.begin(Phase::Board);
+        progress.state.as_ref().unwrap().done.store(90, Ordering::Relaxed);
+        progress.begin(Phase::Audio);
+        // The audio phase finds far more work than the estimate assumed.
+        progress.plan(Phase::Audio, 1_000);
+        progress.begin(Phase::Audio);
+        progress.finish();
+        let percents: Vec<u32> = events.lock().unwrap().iter().map(|e| e.percent).collect();
+        assert_eq!(percents, [0, 89, 89, 100]);
+    }
+
+    #[test]
+    fn backup_file_copies_large_files_in_chunks_byte_for_byte() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("p.sninja");
+        let dst = dir.path().join("p.sninja.bak");
+        // Larger than two chunks and not a multiple of the chunk size.
+        let data: Vec<u8> = (0..2 * BACKUP_CHUNK_BYTES + 12_345).map(|i| (i % 251) as u8).collect();
+        std::fs::write(&src, &data).unwrap();
+        std::fs::write(&dst, b"previous backup").unwrap();
+
+        let mut reported = Vec::new();
+        // Threshold lowered so this file takes the chunked path.
+        backup_file(&src, &dst, 1024, |bytes| reported.push(bytes)).unwrap();
+        assert_eq!(std::fs::read(&dst).unwrap(), data);
+        assert_eq!(reported.len(), 3);
+        assert_eq!(reported.iter().sum::<u64>(), data.len() as u64);
+        assert!(!dir.path().join("p.sninja.bak.partial").exists());
+    }
+
+    #[test]
+    fn backup_file_copies_small_files_in_one_step() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("p.sninja");
+        let dst = dir.path().join("p.sninja.bak");
+        std::fs::write(&src, b"small project").unwrap();
+        let mut reported = Vec::new();
+        backup_file(&src, &dst, BACKUP_CHUNKED_MIN_BYTES, |bytes| reported.push(bytes)).unwrap();
+        assert_eq!(std::fs::read(&dst).unwrap(), b"small project");
+        assert_eq!(reported, [13]);
+    }
+
+    #[test]
+    fn backup_file_keeps_the_previous_backup_when_the_copy_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let dst = dir.path().join("p.sninja.bak");
+        std::fs::write(&dst, b"previous backup").unwrap();
+        let missing = dir.path().join("gone.sninja");
+        assert!(backup_file(&missing, &dst, 1024, |_| {}).is_err());
+        assert_eq!(std::fs::read(&dst).unwrap(), b"previous backup");
+        assert!(!dir.path().join("p.sninja.bak.partial").exists());
+    }
+
+    #[tokio::test]
+    async fn extract_media_writes_no_stamp_on_a_second_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.sninja").to_string_lossy().into_owned();
+        let none = GifDirs::default();
+        commit(&path, &schema(), &CommitOptions::default(), &none).await.unwrap();
+        let mut statements = Vec::new();
+        for name in ["kick", "snare"] {
+            let audio = dir.path().join(format!("{name}.wav"));
+            std::fs::write(&audio, format!("RIFF{name}")).unwrap();
+            statements.push(stmt(
+                "INSERT INTO sounds (path, name, sound_id) VALUES ($1, $2, $3)",
+                vec![audio.to_string_lossy().into_owned().into(), name.into(), format!("id{name}").into()],
+            ));
+        }
+        let embed = CommitOptions { embed_audio: Some(true), ..Default::default() };
+        commit(&path, &statements, &embed, &none).await.unwrap();
+        // "Other machine": the original files are gone.
+        for name in ["kick", "snare"] {
+            std::fs::remove_file(dir.path().join(format!("{name}.wav"))).unwrap();
+        }
+
+        let out = dir.path().join("extracted");
+        let (first, first_updates) = extract_media_counted(&path, &out).await.unwrap();
+        assert_eq!(first.len(), 2);
+        assert_eq!(first_updates, 2);
+
+        let (second, second_updates) = extract_media_counted(&path, &out).await.unwrap();
+        assert_eq!(second.len(), 2);
+        assert_eq!(second_updates, 0);
+        assert!(second.iter().all(|s| Path::new(&s.path).is_file()));
+
+        // A deleted extracted file is written again and stamped again.
+        std::fs::remove_file(&second[0].path).unwrap();
+        let (third, third_updates) = extract_media_counted(&path, &out).await.unwrap();
+        assert_eq!(third.len(), 2);
+        assert!(third_updates <= 1);
+        assert!(Path::new(&third[0].path).is_file());
     }
 
     #[test]

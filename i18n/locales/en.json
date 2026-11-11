@@ -716,5 +716,13 @@
     "embedGifs": "Store GIFs and images in the project",
     "embedGifsHint": "Button backgrounds travel with the project file. If off, they stay on this computer only.",
     "embedMissing": "{count} sound files could not be stored in the project because they were not found:"
+  },
+  "saveProgress": {
+    "preparing": "Preparing…",
+    "backup": "Backing up the previous version…",
+    "board": "Writing the board…",
+    "audio": "Storing sound files…",
+    "images": "Storing images…",
+    "finalizing": "Finishing…"
   }
 }
